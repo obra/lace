@@ -805,6 +805,76 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
+  describe('capAdd + network (PRI-1919)', () => {
+    it('emits --cap-add NET_ADMIN and --network quarantine when runtime sets them', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        capAdd: ['NET_ADMIN'],
+        network: 'quarantine',
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+
+      // Each capAdd is emitted as a separate --cap-add flag.
+      const capAddFlags: string[] = [];
+      for (let i = 0; i < args!.length; i++) {
+        if (args![i] === '--cap-add' && i + 1 < args!.length) {
+          capAddFlags.push(args![i + 1]);
+        }
+      }
+      expect(capAddFlags).toEqual(['NET_ADMIN']);
+
+      // --network is emitted once.
+      const networkIdx = args!.indexOf('--network');
+      expect(networkIdx).toBeGreaterThan(-1);
+      expect(args![networkIdx + 1]).toBe('quarantine');
+
+      // Both must appear before the image.
+      const imageIdx = args!.indexOf('alpine:latest');
+      expect(args!.indexOf('--cap-add')).toBeLessThan(imageIdx);
+      expect(networkIdx).toBeLessThan(imageIdx);
+    });
+
+    it('emits no --cap-add or --network flags when absent', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      expect(args!.some((a) => a === '--cap-add')).toBe(false);
+      expect(args!.some((a) => a === '--network')).toBe(false);
+    });
+
+    it('emits multiple --cap-add flags when capAdd has multiple entries', async () => {
+      await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+        capAdd: ['NET_ADMIN', 'NET_RAW'],
+      });
+
+      const args = findCallWithSubcommand('create');
+      expect(args).toBeDefined();
+      const capAddFlags: string[] = [];
+      for (let i = 0; i < args!.length; i++) {
+        if (args![i] === '--cap-add' && i + 1 < args!.length) {
+          capAddFlags.push(args![i + 1]);
+        }
+      }
+      expect(capAddFlags).toEqual(expect.arrayContaining(['NET_ADMIN', 'NET_RAW']));
+      expect(capAddFlags).toHaveLength(2);
+    });
+  });
+
   describe('daemonInspect (kata #62)', () => {
     it('shells out to docker inspect and returns parsed info without requiring cache', async () => {
       const payload = {

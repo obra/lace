@@ -125,6 +125,14 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('--sysctl', `${key}=${value}`);
     }
 
+    for (const cap of config.capAdd || []) {
+      args.push('--cap-add', cap);
+    }
+
+    if (config.network) {
+      args.push('--network', config.network);
+    }
+
     args.push(config.image);
 
     if (config.command && config.command.length > 0) {
