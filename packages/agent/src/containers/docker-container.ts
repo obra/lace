@@ -643,6 +643,11 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
    * mount map. Mirrors the bookkeeping `create()` performs after a successful
    * `docker create`, so subsequent `start()` and `execStream()` work against
    * an adopted container.
+   *
+   * When config.gatewayRoute is set, the netns-init sidecar is run immediately
+   * to (re)assert the default route. A host reboot or docker restart wipes the
+   * network namespace, so an adopted container has no route until we set it.
+   * `ip route replace` is idempotent — safe to run even if a route survived.
    */
   async adopt(config: ContainerConfig, state: ContainerState): Promise<void> {
     const id = config.id;
@@ -653,7 +658,12 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     info.state = state;
     info.mounts = config.mounts;
     this.containers.set(id, info);
+    this.configs.set(id, { ...config });
     this.registerMounts(id, config);
+
+    if (config.gatewayRoute) {
+      await this.runNetnsInit(id, config.image, config.gatewayRoute, info);
+    }
   }
 
   private dockerInspectToInfo(containerId: string, parsed: DockerInspectJson): ContainerInfo {

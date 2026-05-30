@@ -1039,6 +1039,78 @@ describe('DockerContainerRuntime', () => {
         runtime.adopt({ image: 'alpine:latest', workingDirectory: '/w', mounts: [] }, 'running')
       ).rejects.toThrow(/config.id/);
     });
+
+    it('runs netns-init sidecar when config.gatewayRoute is set', async () => {
+      // The adopted container is already running (resurrected by docker restart policy),
+      // so adopt() must (re)assert the route immediately — the netns is wiped on restart.
+      await runtime.adopt(
+        {
+          id: 'sen-box-shell',
+          image: 'sen-box:dev',
+          workingDirectory: '/work',
+          mounts: [],
+          gatewayRoute: '172.31.250.1',
+        },
+        'running'
+      );
+
+      // adopt() should have issued exactly one docker run (the netns-init sidecar).
+      expect(mockExecFile.mock.calls).toHaveLength(1);
+      const sidecarArgs = mockExecFile.mock.calls[0]?.[1] as string[];
+      expect(sidecarArgs[0]).toBe('run');
+      expect(sidecarArgs).toContain('--rm');
+      expect(sidecarArgs).toContain('--network');
+      expect(sidecarArgs[sidecarArgs.indexOf('--network') + 1]).toBe('container:sen-box-shell');
+      expect(sidecarArgs).toContain('--cap-add');
+      expect(sidecarArgs[sidecarArgs.indexOf('--cap-add') + 1]).toBe('NET_ADMIN');
+      expect(sidecarArgs).toContain('--entrypoint');
+      expect(sidecarArgs[sidecarArgs.indexOf('--entrypoint') + 1]).toBe('sh');
+      expect(sidecarArgs).toContain('sen-box:dev');
+      const imageIdx = sidecarArgs.indexOf('sen-box:dev');
+      expect(sidecarArgs.slice(imageIdx + 1)).toEqual([
+        '-c',
+        'ip route replace default via 172.31.250.1',
+      ]);
+    });
+
+    it('does not run netns-init when gatewayRoute is absent on adopt', async () => {
+      await runtime.adopt(
+        {
+          id: 'sen-box-shell',
+          image: 'sen-box:dev',
+          workingDirectory: '/work',
+          mounts: [],
+        },
+        'running'
+      );
+
+      // No docker calls should have been made — no sidecar, no start.
+      expect(mockExecFile.mock.calls).toHaveLength(0);
+    });
+
+    it('throws ContainerError and marks container failed when netns-init sidecar fails on adopt', async () => {
+      setExecFileResponses([
+        {
+          error: Object.assign(new Error('ip: command not found'), {
+            code: 1,
+            stderr: 'ip: command not found',
+          }),
+        },
+      ]);
+
+      await expect(
+        runtime.adopt(
+          {
+            id: 'sen-box-shell',
+            image: 'sen-box:dev',
+            workingDirectory: '/work',
+            mounts: [],
+            gatewayRoute: '172.31.250.1',
+          },
+          'running'
+        )
+      ).rejects.toBeInstanceOf(ContainerError);
+    });
   });
 
   describe('translateToContainer / translateToHost', () => {
