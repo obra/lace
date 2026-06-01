@@ -3,17 +3,18 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseSpawnBrokerRequest, SpawnBrokerProtocolError } from '../spawn-broker-protocol';
-import { PERSONA_NAMES, StubPersonaRegistry } from '../persona-registry';
+import { PERSONA_NAMES, StubPersonaCatalog } from '../spawn-broker-personas';
 
 const VALID_SPAWN = {
   op: 'spawn' as const,
   persona: 'ephemeral-shell',
-  sessionId: 'sess_abc',
+  parentSessionId: 'sess_abc',
+  childSessionId: 'sess_child123',
   jobId: 'job_123',
 };
 
 describe('parseSpawnBrokerRequest — spawn', () => {
-  it('accepts a spawn request with exactly {op,persona,sessionId,jobId}', () => {
+  it('accepts a spawn request with exactly {op,persona,parentSessionId,childSessionId,jobId}', () => {
     const req = parseSpawnBrokerRequest(VALID_SPAWN);
     expect(req).toEqual(VALID_SPAWN);
   });
@@ -32,14 +33,53 @@ describe('parseSpawnBrokerRequest — spawn', () => {
     );
   });
 
-  it('rejects a spawn request missing sessionId', () => {
-    const { sessionId: _omit, ...rest } = VALID_SPAWN;
+  it('rejects a spawn request missing parentSessionId', () => {
+    const { parentSessionId: _omit, ...rest } = VALID_SPAWN;
+    expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
+  });
+
+  it('rejects a spawn request missing childSessionId', () => {
+    const { childSessionId: _omit, ...rest } = VALID_SPAWN;
     expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
   });
 
   it('rejects a spawn request missing jobId', () => {
     const { jobId: _omit, ...rest } = VALID_SPAWN;
     expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
+  });
+
+  // SECURITY-CRITICAL: childSessionId feeds the per-spawn scratch dir name + the
+  // container name. A path separator or dot would let a caller traverse out of
+  // the broker's scratch base or shadow another container's name.
+  it.each(['../etc', 'a/b', 'a.b', 'has space', 'tab\there', ''])(
+    'rejects a path-unsafe / empty childSessionId %j',
+    (childSessionId) => {
+      expect(() => parseSpawnBrokerRequest({ ...VALID_SPAWN, childSessionId })).toThrow(
+        SpawnBrokerProtocolError
+      );
+    }
+  );
+
+  it('rejects an over-long childSessionId (DoS cap = 64)', () => {
+    expect(() =>
+      parseSpawnBrokerRequest({ ...VALID_SPAWN, childSessionId: 'a'.repeat(65) })
+    ).toThrow(SpawnBrokerProtocolError);
+  });
+
+  it('rejects an over-long jobId (DoS cap = 64)', () => {
+    expect(() => parseSpawnBrokerRequest({ ...VALID_SPAWN, jobId: 'a'.repeat(65) })).toThrow(
+      SpawnBrokerProtocolError
+    );
+  });
+
+  it('accepts the real sess_<uuid> / job_<uuid> id formats', () => {
+    const req = parseSpawnBrokerRequest({
+      ...VALID_SPAWN,
+      parentSessionId: 'sess_f6e64e86-1a2b-4c3d-8e9f-0a1b2c3d4e5f',
+      childSessionId: 'sess_aa11bb22-3c4d-5e6f-7a8b-9c0d1e2f3a4b',
+      jobId: 'job_f6e64e86-1a2b-4c3d-8e9f-0a1b2c3d4e5f',
+    });
+    expect(req.op).toBe('spawn');
   });
 
   // SECURITY-CRITICAL: every spec-bearing key must be rejected. If any of these
@@ -207,16 +247,16 @@ describe('parseSpawnBrokerRequest — malformed top-level', () => {
   });
 });
 
-describe('StubPersonaRegistry', () => {
+describe('StubPersonaCatalog', () => {
   it('throws the not-yet-populated error (documents pending PRI-2012 work)', () => {
-    const registry = new StubPersonaRegistry();
+    const catalog = new StubPersonaCatalog();
     expect(() =>
-      registry.buildContainerConfig('persistent-box', {
-        sessionId: 'sess_abc',
+      catalog.buildContainerConfig('persistent-box', {
+        parentSessionId: 'sess_abc',
+        childSessionId: 'sess_child123',
         jobId: 'job_123',
-        containerName: 'lace-box-1',
         agentToken: 'tok',
       })
-    ).toThrow('persona registry not yet populated — pending PRI-2012 persona enumeration');
+    ).toThrow('persona catalog not yet populated — pending PRI-2012 Component B Task 2');
   });
 });

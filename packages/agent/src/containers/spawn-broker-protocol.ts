@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import type { ContainerState, ContainerMount } from './types';
-import { PERSONA_NAMES } from './persona-registry';
+import { PERSONA_NAMES } from './spawn-broker-personas';
 
 // The closed set of personas a caller may ask the broker to spawn. The broker
 // owns the Docker socket and builds the FULL container spec from its registry;
@@ -11,9 +11,30 @@ import { PERSONA_NAMES } from './persona-registry';
 // schema below. PERSONA_NAMES is the single source of truth (persona-registry.ts).
 const personaNameSchema = z.enum(PERSONA_NAMES);
 
-// Broker-issued container name. The broker generates it at spawn time and the
-// caller echoes it back on every subsequent verb; it is never a spec field.
+// Broker-issued container name. The broker DERIVES it at spawn time (from the
+// session/persona ids) and returns it; the caller echoes it back on every
+// subsequent verb. It is never a caller-supplied spec field, so a caller cannot
+// choose a name that collides with another container or shadows the helper/
+// arbiter namespace.
 const containerNameSchema = z.string().min(1);
+
+// SECURITY-CRITICAL: a path-safe, length-capped identifier. childSessionId feeds
+// the per-spawn scratch DIRECTORY name and the container name, so it must reject
+// path separators and dots (no traversal out of the broker's scratch base, no
+// name shadowing) and cap length (a megabyte-long id is a mkdir/audit DoS). The
+// `sess_<uuid>` / `delegate` formats used today match this. Soft-trust: the
+// caller picks it (resume continuity needs caller-stable ids), but it can never
+// select a higher-privilege spec or escape the broker-derived scratch base.
+const componentIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, 'must contain only [A-Za-z0-9_-] (no path separators or dots)');
+
+// jobId is length-capped against the same DoS, but char-permissive: its exact
+// format is owned by lace's job manager and we don't want a charset assumption
+// here to reject a legitimate job. Used for audit attribution + per-job register.
+const jobIdSchema = z.string().min(1).max(64);
 
 // SECURITY-CRITICAL: a spawn request carries ONLY the persona and the per-spawn
 // identifiers. `.strict()` makes ANY additional key (mounts, volumes, image,
@@ -26,8 +47,15 @@ const spawnRequestSchema = z
   .object({
     op: z.literal('spawn'),
     persona: personaNameSchema,
-    sessionId: z.string().min(1),
-    jobId: z.string().min(1),
+    // Parent (calling agent) session + the subagent's own session. childSessionId
+    // gives per-invocation containers a unique name and a per-spawn scratch dir;
+    // both are validated soft-trust ids (see componentIdSchema). The broker
+    // DERIVES the container name + scratch host path from these — the caller never
+    // supplies a host path (a caller-supplied scratchDirHostPath would be an
+    // arbitrary-host-mount escape, e.g. /etc -> /work).
+    parentSessionId: componentIdSchema,
+    childSessionId: componentIdSchema,
+    jobId: jobIdSchema,
   })
   .strict();
 
@@ -53,7 +81,7 @@ const execStreamRequestSchema = z
     environment: z.record(z.string(), z.string()).optional(),
     workingDirectory: z.string().optional(),
     environmentMode: environmentModeSchema.optional(),
-    jobId: z.string().min(1),
+    jobId: jobIdSchema,
   })
   .strict();
 
