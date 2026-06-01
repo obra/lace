@@ -63,7 +63,11 @@ export interface RefreshOnExecInput {
 // (and is injected into the container's create-env) but only the fingerprint +
 // identity fields ever travel to the helper.
 interface OwnershipRecord {
-  token: string;
+  // Raw token: present for containers THIS process spawned (injected into the
+  // create-env). Absent after adoptRegistration — the adopted container still
+  // carries its create-env token; the broker works from the fingerprint alone
+  // (register/refresh need only the fingerprint).
+  token?: string;
   fingerprint: string;
   persona: string;
   parentSessionId: string;
@@ -73,6 +77,19 @@ interface OwnershipRecord {
   containerSharing: ContainerSharing;
   containerId?: string;
   browserCdpUrl?: string;
+}
+
+export interface AdoptRegistrationInput {
+  persona: string;
+  parentSessionId: string;
+  childSessionId: string;
+  jobId: string;
+  containerName: string;
+  containerSharing: ContainerSharing;
+  // The token fingerprint recovered from the container's sen.broker.tokenFingerprint
+  // label. The raw token is NOT recoverable broker-side (only the container has
+  // it) and not needed — register/refresh take the fingerprint.
+  tokenFingerprint: string;
 }
 
 export class SpawnBrokerIdentity {
@@ -140,6 +157,31 @@ export class SpawnBrokerIdentity {
   async refreshOnExec(input: RefreshOnExecInput): Promise<void> {
     const record = this.requireRecord(input.containerName);
     record.jobId = input.jobId;
+    await this.sendRegisterRuntime(record, {
+      expiresAtMs: this.nowMs() + this.enrichmentTtlMs,
+    });
+  }
+
+  // The fingerprint of the token registered for a container — stamped by the
+  // server as the sen.broker.tokenFingerprint label so adopt can recover it.
+  fingerprintFor(containerName: string): string {
+    return this.requireRecord(containerName).fingerprint;
+  }
+
+  // Rebuild + re-register an adopted container's identity from its recovered
+  // labels (after a broker/helper restart). No raw token — the running container
+  // still carries it in create-env; the broker registers via the fingerprint.
+  async adoptRegistration(input: AdoptRegistrationInput): Promise<void> {
+    const record: OwnershipRecord = {
+      fingerprint: input.tokenFingerprint,
+      persona: input.persona,
+      parentSessionId: input.parentSessionId,
+      childSessionId: input.childSessionId,
+      jobId: input.jobId,
+      containerName: input.containerName,
+      containerSharing: input.containerSharing,
+    };
+    this.ownershipByContainerName.set(input.containerName, record);
     await this.sendRegisterRuntime(record, {
       expiresAtMs: this.nowMs() + this.enrichmentTtlMs,
     });
