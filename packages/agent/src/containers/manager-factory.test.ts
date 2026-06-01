@@ -50,4 +50,25 @@ describe('createDefaultContainerManager', () => {
       /LACE_CONTAINER_RUNTIME must be one of: auto, apple, docker/
     );
   });
+
+  // PRI-2012 B8: when SEN_SPAWN_BROKER_SOCKET is set, main-sen has no docker.sock
+  // and MUST drive the broker — this takes precedence over platform + selection.
+  describe('spawn-broker selection (SEN_SPAWN_BROKER_SOCKET)', () => {
+    it('selects the spawn-broker runtime when the broker socket is set', () => {
+      delete process.env[ENV_KEY];
+      const manager = createDefaultContainerManager('linux', undefined, '/run/sen/broker.sock');
+      expect(getRuntime(manager)?.constructor.name).toBe('SpawnBrokerContainerRuntime');
+    });
+
+    it('takes precedence over platform and LACE_CONTAINER_RUNTIME', () => {
+      const manager = createDefaultContainerManager('darwin', 'docker', '/run/sen/broker.sock');
+      expect(getRuntime(manager)?.constructor.name).toBe('SpawnBrokerContainerRuntime');
+    });
+
+    it('ignores an empty broker socket (falls back to the platform default)', () => {
+      delete process.env[ENV_KEY];
+      const manager = createDefaultContainerManager('linux', undefined, '');
+      expect(getRuntime(manager)?.constructor.name).toBe('DockerContainerRuntime');
+    });
+  });
 });
