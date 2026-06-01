@@ -158,6 +158,10 @@ export class ContainerManager {
    */
   private async notifyNetworkAttached(spec: ContainerSpec, containerId: string): Promise<void> {
     if (!this.networkObserver) return;
+    // browserCdpSocketPath (below) piggybacks on this attach event, so a
+    // `browserCdpSocket: true` persona MUST also be gateway-routed — otherwise the
+    // env is injected but the path is never emitted (a silent half-wired state).
+    // True for every persona that exists today (the browser-driver is quarantined).
     if (!spec.gatewayRoute || !spec.network) return;
     if (typeof this.runtime.inspectNetworkIp !== 'function') return;
     try {
