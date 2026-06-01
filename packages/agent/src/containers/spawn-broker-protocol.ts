@@ -81,7 +81,12 @@ const execStreamRequestSchema = z
     environment: z.record(z.string(), z.string()).optional(),
     workingDirectory: z.string().optional(),
     environmentMode: environmentModeSchema.optional(),
-    jobId: jobIdSchema,
+    // OPTIONAL: the broker attributes the per-exec register-refresh to this jobId
+    // when the caller threads the current job, else falls back to the spawn jobId
+    // from its ownership record. per_invocation personas always have spawn == job;
+    // only the shared persistent-box degrades to spawn-jobId attribution until
+    // ToolContext jobId threading lands (deferred — audit fidelity, not security).
+    jobId: jobIdSchema.optional(),
   })
   .strict();
 

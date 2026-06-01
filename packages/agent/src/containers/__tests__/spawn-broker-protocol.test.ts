@@ -144,9 +144,21 @@ describe('parseSpawnBrokerRequest — execStream', () => {
     expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
   });
 
-  it('rejects an execStream request with no jobId (per-job audit attribution is required)', () => {
+  it('accepts an execStream request with no jobId (broker falls back to the spawn jobId)', () => {
+    // jobId is optional on the wire: the broker attributes to options.jobId when
+    // the caller threads the current job, else the ownership-record spawn jobId.
+    // per_invocation personas always have spawn == job; only the shared
+    // persistent-box degrades to spawn-jobId attribution until ToolContext
+    // jobId threading lands (deferred follow-up).
     const { jobId: _omit, ...rest } = VALID_EXEC;
-    expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
+    const req = parseSpawnBrokerRequest(rest);
+    expect(req.op).toBe('execStream');
+  });
+
+  it('still rejects an over-long jobId when present (DoS cap holds for the optional field)', () => {
+    expect(() => parseSpawnBrokerRequest({ ...VALID_EXEC, jobId: 'a'.repeat(65) })).toThrow(
+      SpawnBrokerProtocolError
+    );
   });
 
   it('rejects an execStream request with no containerName', () => {
