@@ -109,26 +109,30 @@ export class SpawnBrokerServer {
   // frame protocol (see spawn-broker-stream-frames) on the same connection.
 
   private onConnection(socket: net.Socket): void {
-    socket.setEncoding('utf8');
-    let buffer = '';
+    // NB: do NOT setEncoding('utf8'). The control frame is a newline-delimited
+    // JSON line (ASCII), but for execStream the bytes that follow are the BINARY
+    // frame protocol — utf8-decoding them would corrupt the length-prefix headers.
+    // So accumulate raw Buffers, parse only the control-frame line as utf8, and
+    // hand the remaining bytes on as a Buffer.
+    let buffer: Buffer = Buffer.alloc(0);
     let consumedControlFrame = false;
 
-    const onData = (chunk: string): void => {
+    const onData = (chunk: Buffer): void => {
       if (consumedControlFrame) return; // execStream switches to its own listeners
-      buffer += chunk;
-      const newlineIndex = buffer.indexOf('\n');
+      buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);
+      const newlineIndex = buffer.indexOf(0x0a);
       if (newlineIndex === -1) return;
       consumedControlFrame = true;
       socket.off('data', onData);
-      const line = buffer.slice(0, newlineIndex);
-      const rest = buffer.slice(newlineIndex + 1);
+      const line = buffer.subarray(0, newlineIndex).toString('utf8');
+      const rest = buffer.subarray(newlineIndex + 1);
       void this.dispatch(socket, line, rest);
     };
     socket.on('data', onData);
     socket.on('error', () => socket.destroy());
   }
 
-  private async dispatch(socket: net.Socket, line: string, rest: string): Promise<void> {
+  private async dispatch(socket: net.Socket, line: string, rest: Buffer): Promise<void> {
     let request: SpawnBrokerRequest;
     try {
       request = parseSpawnBrokerRequest(JSON.parse(line));
@@ -291,7 +295,7 @@ export class SpawnBrokerServer {
   private async handleExecStream(
     socket: net.Socket,
     request: Extract<SpawnBrokerRequest, { op: 'execStream' }>,
-    rest: string
+    rest: Buffer
   ): Promise<void> {
     let record: OwnershipRecord;
     try {
@@ -353,7 +357,7 @@ export class SpawnBrokerServer {
       wait(): Promise<{ exitCode: number }>;
       kill(signal?: NodeJS.Signals): void;
     },
-    rest: string
+    rest: Buffer
   ): void {
     let finished = false;
     const decoder = new FrameDecoder();
@@ -375,11 +379,10 @@ export class SpawnBrokerServer {
       }
     };
 
-    // The bytes already buffered after the control frame are the first stdin data.
-    if (rest.length > 0) feedStdin(Buffer.from(rest, 'utf8'));
-    socket.on('data', (chunk: Buffer | string) =>
-      feedStdin(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk)
-    );
+    // The bytes already buffered after the control frame are the first stdin data
+    // (raw Buffer — the connection is never utf8-decoded, so frames stay intact).
+    if (rest.length > 0) feedStdin(rest);
+    socket.on('data', (chunk: Buffer) => feedStdin(chunk));
 
     handle.stdout.on('data', (chunk: Buffer) => socket.write(encodeFrame(StreamId.STDOUT, chunk)));
     handle.stderr.on('data', (chunk: Buffer) => socket.write(encodeFrame(StreamId.STDERR, chunk)));
