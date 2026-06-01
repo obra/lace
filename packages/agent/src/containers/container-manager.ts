@@ -125,6 +125,10 @@ export interface ContainerNetworkLifecycleObserver {
     containerId: string;
     sourceIp: string;
     networkName: string;
+    // PRI-2002: per-job CDP unix-socket path on the shared host CDP dir, so the
+    // credential helper can reach this container's quarantined browser Chrome.
+    // Present only for browserCdpSocket-enabled specs.
+    browserCdpSocketPath?: string;
   }): void;
   onDetached(info: { containerName: string; containerId: string }): void;
 }
