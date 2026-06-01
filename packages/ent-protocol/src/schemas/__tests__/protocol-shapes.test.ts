@@ -614,6 +614,26 @@ describe('protocol shapes (representative examples)', () => {
     ).toThrow();
   });
 
+  it('carries browserCdpSocketPath on container_network_attached (PRI-2002)', () => {
+    const parsed = EntProtocolNotificationSchema.parse({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: {
+        sessionId: 'sess_00000000-0000-0000-0000-000000000001',
+        streamSeq: 5,
+        type: 'container_network_attached',
+        containerName: 'sen-persistent-box',
+        containerId: 'sen-persistent-box',
+        sourceIp: '172.31.250.3',
+        networkName: 'ada-sen_quarantine',
+        browserCdpSocketPath: '/run/sen-browser-cdp/sen-persistent-box.sock',
+      },
+    });
+
+    const params = parsed.params as { browserCdpSocketPath?: string };
+    expect(params.browserCdpSocketPath).toBe('/run/sen-browser-cdp/sen-persistent-box.sock');
+  });
+
   it('parses representative responses', () => {
     expect(() =>
       InitializeResponseSchema.parse({
