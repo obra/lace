@@ -244,6 +244,9 @@ export class ContainerManager {
       network: spec.network,
       gatewayRoute: spec.gatewayRoute,
       labels: spec.labels,
+      persona: spec.persona,
+      parentSessionId: spec.parentSessionId,
+      childSessionId: spec.childSessionId,
     };
 
     // Box specs may have a daemon-side container that survived this process —

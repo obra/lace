@@ -66,6 +66,15 @@ export interface ContainerConfig {
   // `sen.broker.*` identity labels so it can rebuild its ownership record from
   // `docker inspect` after a broker restart (survives without persisted state).
   labels?: Record<string, string>;
+
+  // PRI-2012 spawn-broker SELECTOR fields (copied from ContainerSpec by
+  // materializeOnce). The SpawnBrokerContainerRuntime client reads these at
+  // create() to format the wire spawn request. SELECTOR ONLY — never an authority
+  // source (the broker rebuilds the full config from its own catalog using only
+  // persona). The docker/apple runtimes ignore them.
+  persona?: string;
+  parentSessionId?: string;
+  childSessionId?: string;
 }
 
 export interface ContainerMount {

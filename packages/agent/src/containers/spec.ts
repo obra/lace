@@ -29,6 +29,18 @@ export interface ContainerSpec {
   // so it can rebuild + re-validate its ownership record from `docker inspect`
   // after a broker restart.
   labels?: Record<string, string>;
+
+  // PRI-2012 spawn-broker SELECTOR fields. The SpawnBrokerContainerRuntime client
+  // uses these to format the wire spawn request `{persona, parentSessionId,
+  // childSessionId, jobId}`. They are a SELECTOR ONLY — never an authority source:
+  // the broker validates `persona` against its closed enum and rebuilds the FULL
+  // ContainerConfig from its OWN catalog using only `persona` as input, so these
+  // fields grant NO privilege broker-side. The docker/apple runtimes ignore them
+  // (they build the container locally). `persona` is a string here (not PersonaName)
+  // to avoid an import cycle; the broker enforces the enum at the wire boundary.
+  persona?: string;
+  parentSessionId?: string;
+  childSessionId?: string;
   ports?: PortMapping[];
   // Verbatim container id used by the daemon. When set, ContainerManager
   // bypasses the `lace-` prefix and uses this id directly. Used by the box
