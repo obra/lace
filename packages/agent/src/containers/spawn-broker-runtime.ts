@@ -117,19 +117,26 @@ export class SpawnBrokerContainerRuntime extends BaseContainerRuntime {
         'SpawnBrokerContainerRuntime.create requires config.persona — the broker only spawns personas'
       );
     }
-    if (!parentSessionId || !childSessionId) {
+    if (!parentSessionId) {
       throw new SpawnBrokerRuntimeError(
-        'SpawnBrokerContainerRuntime.create requires config.parentSessionId and config.childSessionId (SELECTOR fields)'
+        'SpawnBrokerContainerRuntime.create requires config.parentSessionId (SELECTOR field)'
       );
     }
-    // jobId stand-in = childSessionId (no protocol change; the broker refines the
-    // per-exec attribution on the first execStream — see follow-up #159).
+    // Persistent personas (e.g. persistent-box) carry NO childSessionId — the spec
+    // builder intentionally omits it (persistent containers are named by persona,
+    // not per-child). The broker protocol REQUIRES a path-safe childSessionId, but
+    // BrokerPersonaCatalog ignores it for persistent name/scratch derivation, so
+    // substituting the (already path-safe) parentSessionId is safe and keeps one
+    // spawn path. Without this, persistent-box would throw at first spawn.
+    const wireChildSessionId = childSessionId ?? parentSessionId;
+    // jobId stand-in = the wire childSessionId (no protocol change; the broker
+    // refines per-exec attribution on the first execStream — see follow-up #159).
     const res = await brokerRequestJson(this.socketPath, {
       op: 'spawn',
       persona,
       parentSessionId,
-      childSessionId,
-      jobId: childSessionId,
+      childSessionId: wireChildSessionId,
+      jobId: wireChildSessionId,
     });
     if (res.ok !== true) throw errorFrom(res, 'spawn');
     const containerName = expectString(res.containerName, 'containerName');

@@ -186,6 +186,25 @@ describe('SpawnBrokerContainerRuntime', () => {
     await expect(runtime.create(configFor({ persona: undefined }))).rejects.toThrow(/persona/i);
   });
 
+  it('create() rejects a config without a parentSessionId', async () => {
+    await expect(runtime.create(configFor({ parentSessionId: undefined }))).rejects.toThrow(
+      /parentSessionId/i
+    );
+  });
+
+  // Persistent personas (e.g. persistent-box) carry NO childSessionId — the spec
+  // builder intentionally omits it — but the broker protocol REQUIRES one. The
+  // client substitutes parentSessionId (path-safe; ignored for persistent name
+  // derivation broker-side). Without the stand-in, persistent-box bricks at spawn.
+  it('create() spawns a persistent persona that carries no childSessionId (parentSessionId stand-in)', async () => {
+    const id = await runtime.create(
+      configFor({ persona: 'persistent-box', childSessionId: undefined })
+    );
+    // FakeCatalog derives the name from ctx.childSessionId.slice(0,8); the
+    // stand-in is parentSessionId='sess_parent00112233' → 'sess_par'.
+    expect(id).toBe('parent8-persistent-box-sess_par');
+  });
+
   it('execStream() round-trips stdout + exit code through the broker', async () => {
     const id = await runtime.create(configFor());
     const handle = await runtime.execStream(id, { command: ['/bin/sh', '-c', 'echo hi'] });
