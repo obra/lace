@@ -263,11 +263,10 @@ describe('StubPersonaCatalog', () => {
   it('throws the not-yet-populated error (documents pending PRI-2012 work)', () => {
     const catalog = new StubPersonaCatalog();
     expect(() =>
-      catalog.buildContainerConfig('persistent-box', {
+      catalog.buildSpawn('persistent-box', {
         parentSessionId: 'sess_abc',
         childSessionId: 'sess_child123',
         jobId: 'job_123',
-        agentToken: 'tok',
       })
     ).toThrow('persona catalog not yet populated — pending PRI-2012 Component B Task 2');
   });

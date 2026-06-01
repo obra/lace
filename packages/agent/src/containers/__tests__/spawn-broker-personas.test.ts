@@ -139,7 +139,6 @@ const CTX: PersonaSpawnContext = {
   parentSessionId: 'sess_aabbccddeeff00112233445566778899',
   childSessionId: 'sess_99887766554433221100ffeeddccbbaa',
   jobId: 'job_1234',
-  agentToken: 'tok-supersecret-abc123',
 };
 
 let tmpRoot: string;
@@ -177,12 +176,12 @@ function mountFor(config: ContainerConfig, target: string): ContainerMount | und
   return config.mounts.find((m) => m.target === target);
 }
 
-describe('BrokerPersonaCatalog.buildContainerConfig', () => {
+describe('BrokerPersonaCatalog.buildSpawn', () => {
   describe('browser-driver (sen-browser:dev, per_invocation)', () => {
     let config: ContainerConfig;
     let name: string;
     beforeAll(() => {
-      config = catalog.buildContainerConfig('browser-driver', CTX);
+      config = catalog.buildSpawn('browser-driver', CTX).config;
       // <parent8>-browser-driver-<child8>; sess_ prefix stripped before first 8 hex.
       name = 'aabbccdd-browser-driver-99887766';
     });
@@ -269,8 +268,14 @@ describe('BrokerPersonaCatalog.buildContainerConfig', () => {
       );
     });
 
-    it('stamps the broker-minted agent token under SEN_AGENT_TOKEN', () => {
-      expect(config.environment?.SEN_AGENT_TOKEN).toBe(CTX.agentToken);
+    it('does NOT stamp SEN_AGENT_TOKEN (the server mints/registers/stamps it, not the catalog)', () => {
+      expect(config.environment?.SEN_AGENT_TOKEN).toBeUndefined();
+    });
+
+    it('reports per_invocation sharing + browserCdpSocket on the built spawn', () => {
+      const built = catalog.buildSpawn('browser-driver', CTX);
+      expect(built.containerSharing).toBe('per_invocation');
+      expect(built.browserCdpSocket).toBe(true);
     });
 
     it('creates the per-invocation scratch dir under the work base', () => {
@@ -283,7 +288,7 @@ describe('BrokerPersonaCatalog.buildContainerConfig', () => {
   describe('persistent-box (sen-persistent-box:dev, persistent)', () => {
     let config: ContainerConfig;
     beforeAll(() => {
-      config = catalog.buildContainerConfig('persistent-box', CTX);
+      config = catalog.buildSpawn('persistent-box', CTX).config;
     });
 
     it('uses the sen-persistent-box:dev image and /home/sen workdir', () => {
@@ -326,13 +331,19 @@ describe('BrokerPersonaCatalog.buildContainerConfig', () => {
       expect(mountFor(config, '/sen-browser-cdp')).toBeUndefined();
     });
 
-    it('carries HOME + CA pem env, the agent token, and no CDP socket env', () => {
+    it('carries HOME + CA pem env, no broker token (server stamps it), and no CDP socket env', () => {
       expect(config.environment?.HOME).toBe('/home/sen');
       expect(config.environment?.NODE_EXTRA_CA_CERTS).toBe(
         '/etc/sen-credential-proxy-ca/sen-credential-proxy-ca.pem'
       );
-      expect(config.environment?.SEN_AGENT_TOKEN).toBe(CTX.agentToken);
+      expect(config.environment?.SEN_AGENT_TOKEN).toBeUndefined();
       expect(config.environment?.SEN_BROWSER_CDP_SOCKET).toBeUndefined();
+    });
+
+    it('reports persistent sharing + no browserCdpSocket on the built spawn', () => {
+      const built = catalog.buildSpawn('persistent-box', CTX);
+      expect(built.containerSharing).toBe('persistent');
+      expect(built.browserCdpSocket).toBe(false);
     });
   });
 
@@ -340,7 +351,7 @@ describe('BrokerPersonaCatalog.buildContainerConfig', () => {
     let config: ContainerConfig;
     let name: string;
     beforeAll(() => {
-      config = catalog.buildContainerConfig('ephemeral-shell', CTX);
+      config = catalog.buildSpawn('ephemeral-shell', CTX).config;
       name = 'aabbccdd-ephemeral-shell-99887766';
     });
 
@@ -380,31 +391,29 @@ describe('BrokerPersonaCatalog.buildContainerConfig', () => {
       expect(mountFor(config, '/sen-browser-cdp')).toBeUndefined();
     });
 
-    it('carries only CA pem env (no DISPLAY/HOME/CDP) plus the agent token', () => {
+    it('carries only CA pem env (no DISPLAY/HOME/CDP), no broker token (server stamps it)', () => {
       expect(config.environment?.DISPLAY).toBeUndefined();
       expect(config.environment?.HOME).toBeUndefined();
       expect(config.environment?.SEN_BROWSER_CDP_SOCKET).toBeUndefined();
       expect(config.environment?.NODE_EXTRA_CA_CERTS).toBe(
         '/etc/sen-credential-proxy-ca/sen-credential-proxy-ca.pem'
       );
-      expect(config.environment?.SEN_AGENT_TOKEN).toBe(CTX.agentToken);
+      expect(config.environment?.SEN_AGENT_TOKEN).toBeUndefined();
     });
   });
 
   it('re-validates childSessionId path-safety (defense-in-depth at the trust boundary)', () => {
     for (const bad of ['../escape', 'a/b', 'a.b', 'has space', 'x'.repeat(65)]) {
-      expect(() =>
-        catalog.buildContainerConfig('ephemeral-shell', { ...CTX, childSessionId: bad })
-      ).toThrow(/childSessionId/i);
+      expect(() => catalog.buildSpawn('ephemeral-shell', { ...CTX, childSessionId: bad })).toThrow(
+        /childSessionId/i
+      );
     }
   });
 
   it('throws on an unknown persona', () => {
     // Cast through unknown: the catalog must defend at runtime even if a caller
     // smuggles a non-PersonaName past the type system.
-    expect(() =>
-      catalog.buildContainerConfig('librarian' as unknown as 'browser-driver', CTX)
-    ).toThrow();
+    expect(() => catalog.buildSpawn('librarian' as unknown as 'browser-driver', CTX)).toThrow();
   });
 
   it('throws on a non-container (root) persona', () => {
@@ -422,8 +431,8 @@ describe('BrokerPersonaCatalog.buildContainerConfig', () => {
         credentialHelperSocketHostPath: CRED_SOCKET,
       },
     });
-    expect(() =>
-      rootCatalog.buildContainerConfig('root-ish' as unknown as 'browser-driver', CTX)
-    ).toThrow(/container/i);
+    expect(() => rootCatalog.buildSpawn('root-ish' as unknown as 'browser-driver', CTX)).toThrow(
+      /container/i
+    );
   });
 });

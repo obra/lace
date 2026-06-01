@@ -29,20 +29,34 @@ export function isPersonaName(value: unknown): value is PersonaName {
 }
 
 /**
- * Per-spawn parameterization. Carries ONLY the values the broker stamps into an
- * otherwise catalog-defined spec: the parent + child session ids (for the derived
- * container name + per-spawn scratch dir), the job id (audit/register), and the
- * broker-minted agent token injected as an env var. It carries NO spec fields
- * (no image/mounts/network/etc.) and NO host paths — the broker DERIVES the
- * container name and scratch host path from these ids against its own boot env.
- * The container name is therefore an OUTPUT of buildContainerConfig (config.name),
- * not an input.
+ * Per-spawn parameterization. Carries ONLY the per-spawn identifiers: the parent
+ * + child session ids (for the derived container name + per-spawn scratch dir)
+ * and the job id (audit/register). It carries NO spec fields (no image/mounts/
+ * network/etc.), NO host paths, and NO identity token — the broker DERIVES the
+ * container name + scratch host path from these ids against its own boot env, and
+ * the SERVER (not the catalog) mints/registers/stamps the agent token. The
+ * container name is an OUTPUT (config.name), not an input.
  */
 export interface PersonaSpawnContext {
   parentSessionId: string;
   childSessionId: string;
   jobId: string;
-  agentToken: string;
+}
+
+/**
+ * What the catalog produces for a spawn: the full ContainerConfig plus the two
+ * persona facts the SERVER needs for identity registration but that aren't on
+ * ContainerConfig — containerSharing (→ register_runtime `container_sharing`) and
+ * browserCdpSocket (so the server can compute the per-spawn CDP socket path for
+ * the network-attach enrichment). The catalog has NO identity surface: it does
+ * not stamp SEN_AGENT_TOKEN or the sen.broker.* ownership labels — that is the
+ * server's job (mint → register → stamp), since the token comes from a register
+ * call that needs the name the catalog derives.
+ */
+export interface BuiltPersonaSpawn {
+  config: ContainerConfig;
+  containerSharing: 'per_invocation' | 'persistent';
+  browserCdpSocket: boolean;
 }
 
 /**
@@ -61,7 +75,7 @@ export interface PersonaSpawnContext {
  * enumerated in docs/superpowers/specs/2026-06-01-spawn-broker-persona-registry-enumeration.md.
  */
 export interface PersonaCatalog {
-  buildContainerConfig(persona: PersonaName, ctx: PersonaSpawnContext): ContainerConfig;
+  buildSpawn(persona: PersonaName, ctx: PersonaSpawnContext): BuiltPersonaSpawn;
 }
 
 /**
@@ -71,7 +85,7 @@ export interface PersonaCatalog {
  * from the real persona definitions.
  */
 export class StubPersonaCatalog implements PersonaCatalog {
-  buildContainerConfig(_persona: PersonaName, _ctx: PersonaSpawnContext): ContainerConfig {
+  buildSpawn(_persona: PersonaName, _ctx: PersonaSpawnContext): BuiltPersonaSpawn {
     throw new Error('persona catalog not yet populated — pending PRI-2012 Component B Task 2');
   }
 }
@@ -123,7 +137,7 @@ export class BrokerPersonaCatalog implements PersonaCatalog {
     });
   }
 
-  buildContainerConfig(persona: PersonaName, ctx: PersonaSpawnContext): ContainerConfig {
+  buildSpawn(persona: PersonaName, ctx: PersonaSpawnContext): BuiltPersonaSpawn {
     // Defense-in-depth: childSessionId feeds a host path (the per-spawn scratch
     // dir) and the container name. The protocol layer already enforces this, but
     // this is a trust boundary — re-validate here so a future caller that reaches
@@ -183,13 +197,16 @@ export class BrokerPersonaCatalog implements PersonaCatalog {
       gatewayRoute: spec.gatewayRoute,
     };
 
-    // Stamp the already-minted agent token into the create-env. The env var NAME
-    // is the contract with sen-core's `tokenEnvName` (sen-core-v2/src/main.ts:1228,
-    // literal 'SEN_AGENT_TOKEN'); keep these in sync. The token itself is minted +
-    // registered elsewhere (PRI-2012 Component B Task 3); the catalog only stamps
-    // ctx.agentToken. Merge — never clobber the persona's other env.
-    config.environment = { ...(config.environment ?? {}), SEN_AGENT_TOKEN: ctx.agentToken };
-
-    return config;
+    // The catalog has NO identity surface: SEN_AGENT_TOKEN and the sen.broker.*
+    // ownership labels are stamped by the SERVER after it mints + registers the
+    // token (the token comes from a register call that needs config.name, which
+    // is derived here — so it can't be stamped at this layer). Return the config
+    // plus the two persona facts the server needs for register/enrich that aren't
+    // on ContainerConfig.
+    return {
+      config,
+      containerSharing: runtime.containerSharing,
+      browserCdpSocket: runtime.browserCdpSocket ?? false,
+    };
   }
 }
