@@ -230,4 +230,41 @@ describe('SpawnBrokerIdentity', () => {
       identity.enrichOnAttach({ containerName: 'never-registered', sourceIp: '10.0.0.9' })
     ).rejects.toThrow();
   });
+
+  it('registerAtSpawn rejects when the helper replies {ok:false} (register-before-egress must fail closed)', async () => {
+    // A helper that rejects the registration. If registerAtSpawn swallowed this,
+    // the container would egress with an unregistered/misattributed identity —
+    // the broker must fail the spawn instead.
+    const rejectDir = mkdtempSync(join(tmpdir(), 'spawn-broker-identity-reject-'));
+    const rejectSocket = join(rejectDir, 'helper.sock');
+    const server = net.createServer((socket) => {
+      let buffer = '';
+      socket.setEncoding('utf8');
+      socket.on('data', (chunk: string) => {
+        buffer += chunk;
+        const newlineIndex = buffer.indexOf('\n');
+        if (newlineIndex === -1) return;
+        socket.write(`${JSON.stringify({ ok: false, error: 'policy_denied' })}\n`);
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(rejectSocket, resolve));
+    try {
+      const identity = new SpawnBrokerIdentity({ helperSocketPath: rejectSocket });
+      await expect(
+        identity.registerAtSpawn({
+          persona: 'sen-coworker',
+          parentSessionId: 'sess_parent',
+          childSessionId: 'sess_child',
+          jobId: 'job_1',
+          containerName: 'sen-coworker-rej',
+          containerSharing: 'persistent',
+        })
+      ).rejects.toThrow(/policy_denied/);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve()))
+      );
+      rmSync(rejectDir, { recursive: true, force: true });
+    }
+  });
 });
