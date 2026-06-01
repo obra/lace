@@ -315,7 +315,7 @@ describe('buildPersonaContainerSpec persistent', () => {
 
     expect(spec.browserCdpSocket).toBe(true);
     expect(spec.env).toEqual({
-      SEN_BROWSER_CDP_SOCKET: '/run/sen-browser-cdp/pppppppp-browser-cccccccc.sock',
+      SEN_BROWSER_CDP_SOCKET: '/sen-browser-cdp/pppppppp-browser-cccccccc.sock',
     });
   });
 
@@ -346,7 +346,7 @@ describe('buildPersonaContainerSpec persistent', () => {
 
     expect(spec.browserCdpSocket).toBe(true);
     expect(spec.env).toEqual({
-      SEN_BROWSER_CDP_SOCKET: '/run/sen-browser-cdp/browser.sock',
+      SEN_BROWSER_CDP_SOCKET: '/sen-browser-cdp/browser.sock',
     });
   });
 

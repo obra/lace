@@ -889,7 +889,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
           containerId: 'sen-persistent-box',
           sourceIp: '172.31.250.3',
           networkName: 'quarantine',
-          browserCdpSocketPath: '/run/sen-browser-cdp/sen-persistent-box.sock',
+          browserCdpSocketPath: '/sen-browser-cdp/sen-persistent-box.sock',
         });
         await sessionUpdateHandler?.({
           type: 'container_network_detached',
@@ -937,7 +937,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
         containerId: 'sen-persistent-box',
         sourceIp: '172.31.250.3',
         networkName: 'quarantine',
-        browserCdpSocketPath: '/run/sen-browser-cdp/sen-persistent-box.sock',
+        browserCdpSocketPath: '/sen-browser-cdp/sen-persistent-box.sock',
       })
     );
     expect(emittedUpdates).toContainEqual(

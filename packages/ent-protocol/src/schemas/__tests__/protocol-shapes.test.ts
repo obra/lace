@@ -626,12 +626,12 @@ describe('protocol shapes (representative examples)', () => {
         containerId: 'sen-persistent-box',
         sourceIp: '172.31.250.3',
         networkName: 'ada-sen_quarantine',
-        browserCdpSocketPath: '/run/sen-browser-cdp/sen-persistent-box.sock',
+        browserCdpSocketPath: '/sen-browser-cdp/sen-persistent-box.sock',
       },
     });
 
     const params = parsed.params as { browserCdpSocketPath?: string };
-    expect(params.browserCdpSocketPath).toBe('/run/sen-browser-cdp/sen-persistent-box.sock');
+    expect(params.browserCdpSocketPath).toBe('/sen-browser-cdp/sen-persistent-box.sock');
   });
 
   it('parses representative responses', () => {

@@ -553,7 +553,7 @@ describe('ContainerManager', () => {
         containerId: handle.containerId,
         sourceIp: '172.31.250.3',
         networkName: 'ada-sen_quarantine',
-        browserCdpSocketPath: '/run/sen-browser-cdp/sess1-worker.sock',
+        browserCdpSocketPath: '/sen-browser-cdp/sess1-worker.sock',
       });
     });
 

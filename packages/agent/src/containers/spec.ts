@@ -6,11 +6,13 @@ import type { ContainerMount, ContainerState, PortMapping } from './types';
 export type { PortMapping };
 
 // PRI-2002: the credential helper and the quarantined browser-driver share one
-// host dir (the `sen-browser-cdp` named mount, container path
-// `/run/sen-browser-cdp`); each container gets a uniquely-named socket on it.
+// host dir (the `sen-browser-cdp` named mount, container path `/sen-browser-cdp`);
+// each container gets a uniquely-named socket on it. A TOP-LEVEL path (NOT under
+// `/run`, which is itself the `sen-cred` mount) — a nested mount target inside
+// another mount's destination fails at container init ("read-only file system").
 // Single source of truth for that path so the SEN_BROWSER_CDP_SOCKET env injected
 // at spec-build time and the lifecycle browserCdpSocketPath cannot drift.
-const BROWSER_CDP_SOCKET_DIR = '/run/sen-browser-cdp';
+const BROWSER_CDP_SOCKET_DIR = '/sen-browser-cdp';
 
 export function browserCdpSocketPath(containerName: string): string {
   return `${BROWSER_CDP_SOCKET_DIR}/${containerName}.sock`;
