@@ -10,17 +10,24 @@ import type { PersonaSpawnContext } from '../spawn-broker-personas';
 import type { ContainerConfig, ContainerMount } from '../types';
 
 // Self-contained persona fixtures mirroring the sen-core container personas'
-// `runtime:` frontmatter (the broker reads these at runtime from a RO-mounted
-// dir). Inlined — not read from sen-core — so this lace test is portable (no
-// cross-repo path) and matches lace's fixture idiom (config/persona-registry.test.ts
-// writes persona .md files into a tempdir). Drift between these fixtures and the
-// real persona files is caught by the on-box parity smoke (PRI-2012 Task 9), not
-// by this unit test, whose job is the assembly logic.
+// FULL frontmatter — tools + mcpServers + the runtime: block — so the parser is
+// exercised on the real persona shape (notably: browser-driver carries an
+// mcpServers block; this asserts parsePersona ignores it for spec-build rather
+// than choking). Inlined — not read from sen-core — so this lace test is portable
+// (no cross-repo path) and matches lace's fixture idiom
+// (config/persona-registry.test.ts writes persona .md files into a tempdir). Any
+// future drift between these fixtures and the real persona files is also caught by
+// the on-box parity smoke (PRI-2012 Task 9).
 const PERSONA_FIXTURES: Record<string, string> = {
   'browser-driver': `---
 model: claude-sonnet-4-6
 tools:
   - bash
+  - file_read
+  - file_write
+  - file_edit
+  - file_find
+  - ripgrep_search
   - superpowers-chrome/use_browser
   - use_skill
 runtime:
@@ -47,6 +54,15 @@ runtime:
   network: quarantine
   gatewayRoute: 172.31.250.2
   browserCdpSocket: true
+mcpServers:
+  superpowers-chrome:
+    command: node
+    args:
+      - /opt/superpowers-chrome/mcp/dist/index.js
+    placement: toolRuntime
+    enabled: true
+    env:
+      DISPLAY: ":1"
 maxTurns: 100
 ---
 browser-driver fixture body.
@@ -55,6 +71,11 @@ browser-driver fixture body.
 model: claude-sonnet-4-6
 tools:
   - bash
+  - file_read
+  - file_write
+  - file_edit
+  - file_find
+  - ripgrep_search
 runtime:
   type: container
   containerSharing: persistent
@@ -83,6 +104,11 @@ persistent-box fixture body.
 model: claude-sonnet-4-6
 tools:
   - bash
+  - file_read
+  - file_write
+  - file_edit
+  - file_find
+  - ripgrep_search
 runtime:
   type: container
   containerSharing: per_invocation
