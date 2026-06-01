@@ -622,6 +622,72 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
+  describe('labels (PRI-2012 spawn-broker ownership)', () => {
+    it('emits --label key=value for each config label at create', async () => {
+      await runtime.create({
+        name: 'persistent-box',
+        image: 'sen-persistent-box:dev',
+        workingDirectory: '/home/sen',
+        mounts: [],
+        labels: {
+          'sen.broker.persona': 'persistent-box',
+          'sen.broker.jobId': 'job_1',
+        },
+      });
+      const args = findCallWithSubcommand('create')!;
+      expect(args).toContain('--label');
+      expect(args).toContain('sen.broker.persona=persistent-box');
+      expect(args).toContain('sen.broker.jobId=job_1');
+    });
+
+    it('emits no --label flag when config has no labels', async () => {
+      await runtime.create({
+        name: 'no-labels',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      const args = findCallWithSubcommand('create')!;
+      expect(args).not.toContain('--label');
+    });
+
+    it('parses .Config.Labels from docker inspect into ContainerInfo.labels', async () => {
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      const payload = {
+        Id: 'sha256:abc',
+        Name: `/${id}`,
+        State: { Status: 'running', Running: true },
+        Config: { Labels: { 'sen.broker.persona': 'browser-driver', other: 'x' } },
+      };
+      setExecFileResponses([{ stdout: JSON.stringify(payload), stderr: '' }]);
+      const info = await runtime.daemonInspect(id);
+      expect(info?.labels).toEqual({ 'sen.broker.persona': 'browser-driver', other: 'x' });
+    });
+
+    it('leaves labels undefined when docker reports null Config.Labels', async () => {
+      const id = await runtime.create({
+        name: 'svc2',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+      const payload = {
+        Id: 'x',
+        Name: `/${id}`,
+        State: { Status: 'running' },
+        Config: { Labels: null },
+      };
+      setExecFileResponses([{ stdout: JSON.stringify(payload), stderr: '' }]);
+      const info = await runtime.daemonInspect(id);
+      expect(info?.labels).toBeUndefined();
+    });
+  });
+
   describe('inspectNetworkIp (PRI-1919)', () => {
     it('returns the IPAddress for the named network', async () => {
       setExecFileResponses([

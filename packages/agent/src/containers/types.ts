@@ -60,6 +60,12 @@ export interface ContainerConfig {
   // The persona container itself does NOT need NET_ADMIN — the sidecar holds
   // the privilege and exits immediately. PRI-1919 transparent egress gateway.
   gatewayRoute?: string;
+
+  // Docker object labels stamped at create (`docker create --label key=value`).
+  // Absent or empty ⇒ no --label flags. PRI-2012: the spawn broker stamps
+  // `sen.broker.*` identity labels so it can rebuild its ownership record from
+  // `docker inspect` after a broker restart (survives without persisted state).
+  labels?: Record<string, string>;
 }
 
 export interface ContainerMount {
@@ -76,6 +82,10 @@ export interface ContainerInfo {
   startedAt?: Date;
   stoppedAt?: Date;
   exitCode?: number;
+  // Docker object labels read back from `docker inspect` (.Config.Labels).
+  // PRI-2012: the spawn broker reads its `sen.broker.*` identity labels here to
+  // reconstruct + re-validate ownership when adopting a container after restart.
+  labels?: Record<string, string>;
 }
 
 export type ContainerState = 'created' | 'running' | 'stopped' | 'failed';

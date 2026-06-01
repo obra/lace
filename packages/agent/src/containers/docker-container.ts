@@ -47,6 +47,9 @@ interface DockerInspectJson {
     StartedAt?: string;
     FinishedAt?: string;
   };
+  Config?: {
+    Labels?: Record<string, string> | null;
+  };
 }
 
 interface DockerPsRowJson {
@@ -126,6 +129,10 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
 
     for (const [key, value] of Object.entries(config.sysctls || {})) {
       args.push('--sysctl', `${key}=${value}`);
+    }
+
+    for (const [key, value] of Object.entries(config.labels || {})) {
+      args.push('--label', `${key}=${value}`);
     }
 
     for (const cap of config.capAdd || []) {
@@ -740,6 +747,12 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       ];
     });
 
+    // Docker reports no labels as either an absent key or null; normalize both
+    // to undefined so consumers (the spawn broker's adopt path) get a clean
+    // optional. A present-but-empty object stays {} (distinct from "unlabelled").
+    const rawLabels = parsed.Config?.Labels;
+    const labels = rawLabels === null || rawLabels === undefined ? undefined : rawLabels;
+
     return {
       id: containerId,
       state,
@@ -749,6 +762,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       stoppedAt:
         stoppedAt && !isNaN(stoppedAt.getTime()) && stoppedAt.getTime() > 0 ? stoppedAt : undefined,
       exitCode: parsed.State?.ExitCode,
+      ...(labels !== undefined ? { labels } : {}),
     };
   }
 
