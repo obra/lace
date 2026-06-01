@@ -52,10 +52,13 @@ export function buildBrokerContainerMounts(
 
   const socketHostPath = env.credentialHelperSocketHostPath;
   if (socketHostPath && socketHostPath.length > 0) {
-    // A3b: the `sen-cred` mount source is the socket's directory, so the persona
-    // sees only the socket — not the broader state/ tree. Today that dirname is
-    // wide; once the deploy relocates the socket under state/sockets/ this
-    // narrows automatically (the broker tracks wherever the socket lives).
+    // A3b (C3): the `sen-cred` mount source is the socket's DIRECTORY, so the
+    // persona sees only the subagent socket — not a broader tree. The deploy
+    // places the subagent socket under state/sockets/ (a dir that holds only that
+    // socket), so dirname() narrows to exactly it. Before A3b the socket lived in
+    // run/ alongside sen-browser-cdp/, which dirname() over-exposed; the relocation
+    // is what fixes that. No logic change here — the broker tracks wherever the
+    // socket lives; correctness depends on the deploy placing it in a narrow dir.
     mounts['sen-cred'] = { hostPath: path.dirname(socketHostPath), readonly: true };
 
     mounts['sen-ca'] = {
