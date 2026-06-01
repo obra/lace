@@ -287,6 +287,44 @@ describe('SpawnBrokerServer', () => {
         rmSync(dir2, { recursive: true, force: true });
       }
     });
+
+    it('fail-closed when start() fails after register: removes the container + drops ownership', async () => {
+      // Symmetry with the register-failure cleanup: ANY post-create failure must
+      // tear down so a spawn that didn't fully succeed leaves no owned, registered,
+      // never-started container behind.
+      class FailingStartRuntime extends MockRuntime {
+        override async start(): Promise<void> {
+          throw new Error('start boom');
+        }
+      }
+      const name = 'parent8-ephemeral-shell-sess_chi';
+      const failing = new FailingStartRuntime();
+      const dir3 = mkdtempSync(join(tmpdir(), 'spawn-broker-failstart-'));
+      const helper3 = await startFakeHelper(dir3);
+      const identity3 = new SpawnBrokerIdentity({ helperSocketPath: helper3.socketPath });
+      const socketPath3 = join(dir3, 'broker.sock');
+      const server3 = new SpawnBrokerServer({
+        runtime: failing,
+        catalog: new FakeCatalog(),
+        identity: identity3,
+        socketPath: socketPath3,
+      });
+      await server3.listen();
+      try {
+        const res = await sendControl(socketPath3, VALID_SPAWN);
+        expect(res.ok).toBe(false);
+        // container was torn down (fail closed)
+        expect(events).toContain(`remove:${name}`);
+        // ownership dropped → a follow-up verb is rejected as not-owned
+        const stopRes = await sendControl(socketPath3, { op: 'stop', containerName: name });
+        expect(stopRes.ok).toBe(false);
+        expect(String(stopRes.error)).toMatch(/not a broker-owned container/);
+      } finally {
+        await server3.close();
+        await helper3.close();
+        rmSync(dir3, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('ownership enforcement (every non-spawn verb)', () => {

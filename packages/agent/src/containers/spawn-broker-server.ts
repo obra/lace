@@ -233,10 +233,14 @@ export class SpawnBrokerServer {
     //    is created but NOT started, so it has no network and cannot egress yet.
     const containerName = await this.runtime.create(config);
 
-    // 5. Register BEFORE start (= before egress) using the canonical containerName.
-    //    A created-but-unstarted container has no route out, so this preserves the
-    //    register-before-egress invariant even though it now runs after create. On
-    //    register failure, tear the container down (fail closed; no leak).
+    // 5-6. Register BEFORE start (= before egress) using the canonical
+    //    containerName, record ownership, then start (start runs the netns-init
+    //    sidecar when gatewayRoute set). A created-but-unstarted container has no
+    //    route out, so register-before-egress holds even though register now runs
+    //    after create. FAIL CLOSED on ANY post-create failure (register OR start):
+    //    drop the ownership entry + remove the container so a spawn that didn't
+    //    fully succeed leaves no owned/registered/never-started container behind.
+    //    (The helper registration, if it landed, lapses via TTL — no unregister verb.)
     try {
       await this.identity.registerAtSpawn({
         token,
@@ -248,23 +252,21 @@ export class SpawnBrokerServer {
         containerSharing,
         ...(config.id ? { containerId: config.id } : {}),
       });
+      this.owned.set(containerName, {
+        persona,
+        parentSessionId,
+        childSessionId,
+        spawnJobId: jobId,
+        containerSharing,
+        containerName,
+        token,
+      });
+      await this.runtime.start(containerName);
     } catch (error) {
+      this.owned.delete(containerName);
       await this.runtime.remove(containerName).catch(() => {});
       throw error;
     }
-
-    // 6. Record ownership keyed by the canonical id, then start (start runs the
-    //    netns-init sidecar when gatewayRoute set) — register has completed.
-    this.owned.set(containerName, {
-      persona,
-      parentSessionId,
-      childSessionId,
-      spawnJobId: jobId,
-      containerSharing,
-      containerName,
-      token,
-    });
-    await this.runtime.start(containerName);
 
     // 7. Network-attach enrichment: learn the quarantine source IP + (for
     //    browserCdpSocket personas) the per-spawn CDP socket path, and re-register
