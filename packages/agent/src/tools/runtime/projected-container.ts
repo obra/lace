@@ -261,6 +261,17 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.browserCdpSocket) {
     spec.browserCdpSocket = descriptor.spec.browserCdpSocket;
   }
+  // PRI-2012 B7 SELECTOR fields — rebuild them onto the ContainerSpec so
+  // materializeOnce copies them to the ContainerConfig the broker client reads.
+  if (descriptor.spec.persona) {
+    spec.persona = descriptor.spec.persona;
+  }
+  if (descriptor.spec.parentSessionId) {
+    spec.parentSessionId = descriptor.spec.parentSessionId;
+  }
+  if (descriptor.spec.childSessionId) {
+    spec.childSessionId = descriptor.spec.childSessionId;
+  }
 
   return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
 }

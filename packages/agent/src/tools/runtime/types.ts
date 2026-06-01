@@ -76,6 +76,15 @@ export type ToolRuntimeDescriptor =
         // reach it. Mount scope IS the access-control boundary: only personas
         // with this flag get the socket dir + env.
         browserCdpSocket?: boolean;
+        // PRI-2012 spawn-broker SELECTOR fields. Carried verbatim across the
+        // ContainerSpec→RuntimeSpec→ContainerSpec round-trip so the
+        // SpawnBrokerContainerRuntime client can format the wire spawn request
+        // `{persona, parentSessionId, childSessionId}`. SELECTOR ONLY — never an
+        // authority source: the broker rebuilds the FULL container spec from its
+        // own catalog using only `persona`. The docker/apple runtimes ignore them.
+        persona?: string;
+        parentSessionId?: string;
+        childSessionId?: string;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;

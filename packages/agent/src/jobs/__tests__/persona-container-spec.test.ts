@@ -389,3 +389,57 @@ describe('containerSpecToRuntimeSpec', () => {
     });
   });
 });
+
+// PRI-2012 B7.1 — the SELECTOR fields (persona/parentSessionId/childSessionId)
+// must be populated by the spec builder and survive containerSpecToRuntimeSpec so
+// the SpawnBrokerContainerRuntime client can format the wire spawn request. They
+// are SELECTOR ONLY (the broker rebuilds the full config from its catalog); the
+// docker/apple runtimes ignore them. A field dropped here silently breaks persona
+// selection broker-side, so it is asserted at every hop.
+describe('SELECTOR fields (PRI-2012 B7)', () => {
+  it('buildPersonaContainerSpec sets persona/parentSessionId/childSessionId (per_invocation)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.persona).toBe('shell');
+    expect(spec.parentSessionId).toBe(PARENT_SESSION_ID);
+    expect(spec.childSessionId).toBe(CHILD_SESSION_ID);
+  });
+
+  it('buildPersonaContainerSpec sets persona/parentSessionId (persistent; childSessionId undefined)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'box',
+      runtime: persistentRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.persona).toBe('box');
+    expect(spec.parentSessionId).toBe(PARENT_SESSION_ID);
+    // persistent personas have no per-child session id.
+    expect(spec.childSessionId).toBeUndefined();
+  });
+
+  it('containerSpecToRuntimeSpec carries the SELECTOR fields onto the runtime spec', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    expect(containerSpecToRuntimeSpec({ spec })).toMatchObject({
+      persona: 'shell',
+      parentSessionId: PARENT_SESSION_ID,
+      childSessionId: CHILD_SESSION_ID,
+    });
+  });
+});

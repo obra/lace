@@ -158,6 +158,9 @@ export function buildPersonaContainerSpec(input: {
       mounts,
       env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
       restartPolicy: 'unless-stopped',
+      // PRI-2012 B7 SELECTOR fields (persistent has no childSessionId).
+      persona: personaName,
+      parentSessionId,
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
       ...(runtime.network ? { network: runtime.network } : {}),
@@ -186,6 +189,11 @@ export function buildPersonaContainerSpec(input: {
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
     env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
+    // PRI-2012 B7 SELECTOR fields. childSessionId is guaranteed non-null here
+    // (validated above for per_invocation).
+    persona: personaName,
+    parentSessionId,
+    childSessionId: input.childSessionId,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
     ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
@@ -235,5 +243,9 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
     ...(spec.browserCdpSocket ? { browserCdpSocket: true } : {}),
+    // PRI-2012 B7 SELECTOR fields — verbatim across the round-trip.
+    ...(spec.persona ? { persona: spec.persona } : {}),
+    ...(spec.parentSessionId ? { parentSessionId: spec.parentSessionId } : {}),
+    ...(spec.childSessionId ? { childSessionId: spec.childSessionId } : {}),
   };
 }
