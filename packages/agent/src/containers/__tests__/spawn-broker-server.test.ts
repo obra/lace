@@ -112,7 +112,9 @@ class MockRuntime extends BaseContainerRuntime {
     const info = this.containers.get(containerId);
     return info ?? { id: containerId, state: 'running' };
   }
+  failInspectNetworkIp = false;
   async inspectNetworkIp(): Promise<string | undefined> {
+    if (this.failInspectNetworkIp) throw new Error('inspect raced (PRI-1919)');
     return '172.31.250.7';
   }
 }
@@ -356,6 +358,55 @@ describe('SpawnBrokerServer', () => {
       const res = await sendControl(socketPath, { op: 'adopt', containerName: 'evil2' });
       expect(res.ok).toBe(false);
       expect(String(res.error)).toMatch(/tokenFingerprint/);
+    });
+  });
+
+  describe('B5 gap coverage (ada review)', () => {
+    it('list reports the REAL daemon state per owned container (not hardcoded running)', async () => {
+      const spawn = await sendControl(socketPath, VALID_SPAWN);
+      const name = spawn.containerName as string;
+      // The container exited unexpectedly — daemonInspect now reports 'stopped'.
+      runtime.inspectResults.set(name, { id: name, state: 'stopped' });
+      const res = await sendControl(socketPath, { op: 'list' });
+      expect(res.ok).toBe(true);
+      const containers = res.containers as Array<{ id: string; state: string }>;
+      expect(containers.find((c) => c.id === name)?.state).toBe('stopped');
+    });
+
+    it('spawn still succeeds when network-attach enrich (inspectNetworkIp) throws', async () => {
+      runtime.failInspectNetworkIp = true;
+      const res = await sendControl(socketPath, VALID_SPAWN);
+      expect(res.ok).toBe(true);
+      expect(res.containerName).toBe('parent8-ephemeral-shell-sess_chi');
+    });
+
+    it('execStream replace-mode on an adopted container errors (broker lacks the raw token)', async () => {
+      // Adopt a persistent-box (no raw token broker-side, only the fingerprint).
+      runtime.inspectResults.set('persistent-box', {
+        id: 'persistent-box',
+        state: 'running',
+        mounts: [],
+        labels: {
+          'sen.broker.persona': 'persistent-box',
+          'sen.broker.parentSessionId': 'sess_parent',
+          'sen.broker.childSessionId': 'sess_child',
+          'sen.broker.jobId': 'job_1',
+          'sen.broker.tokenFingerprint': 'a'.repeat(64),
+        },
+      });
+      expect(
+        (await sendControl(socketPath, { op: 'adopt', containerName: 'persistent-box' })).ok
+      ).toBe(true);
+      const res = await sendControl(socketPath, {
+        op: 'execStream',
+        containerName: 'persistent-box',
+        command: ['/bin/sh'],
+        environment: { FOO: 'bar' },
+        environmentMode: 'replace',
+        jobId: 'job_2',
+      });
+      expect(res.ok).toBe(false);
+      expect(String(res.error)).toMatch(/adopted.*replace/i);
     });
   });
 

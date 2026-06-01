@@ -166,7 +166,7 @@ export class SpawnBrokerServer {
           this.replyJson(socket, await this.handleAdopt(request));
           return;
         case 'list':
-          this.replyJson(socket, this.handleList());
+          this.replyJson(socket, await this.handleList());
           return;
       }
     } catch (error) {
@@ -452,11 +452,16 @@ export class SpawnBrokerServer {
     };
   }
 
-  private handleList(): ListResponse {
-    const containers = Array.from(this.owned.values()).map((r) => ({
-      id: r.containerName,
-      state: 'running' as ContainerState,
-    }));
+  private async handleList(): Promise<ListResponse> {
+    // Report the REAL daemon state per owned container (not a hardcoded value) so
+    // a container that exited unexpectedly isn't reported as running. Ownership-
+    // scoped: only the containers this broker spawned/adopted.
+    const containers = await Promise.all(
+      Array.from(this.owned.values()).map(async (r) => {
+        const info = await this.runtime.daemonInspect(r.containerName);
+        return { id: r.containerName, state: (info?.state ?? 'stopped') as ContainerState };
+      })
+    );
     return { ok: true, containers };
   }
 
