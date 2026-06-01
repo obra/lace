@@ -1,7 +1,17 @@
 // ABOUTME: Closed persona enumeration + the catalog interface the spawn-broker uses to build full container specs
 // ABOUTME: The broker — not the caller — owns spec assembly; this is the contract for that assembly
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { ContainerConfig } from './types';
+import { resolveContainerId } from './container-manager';
+import { buildBrokerContainerMounts, type BrokerMountEnv } from './broker-container-mounts';
+import type { MountRegistryEntry } from '@lace/agent/server-types';
+import { PersonaRegistry } from '@lace/agent/config/persona-registry';
+import {
+  buildPersonaContainerSpec,
+  type PersonaContainerRuntime,
+} from '@lace/agent/jobs/persona-container-spec';
 
 // The closed set of container personas the broker can spawn. Confirmed against
 // the live sen-core persona files in agent-runtime/user/agent-personas/
@@ -63,5 +73,123 @@ export interface PersonaCatalog {
 export class StubPersonaCatalog implements PersonaCatalog {
   buildContainerConfig(_persona: PersonaName, _ctx: PersonaSpawnContext): ContainerConfig {
     throw new Error('persona catalog not yet populated — pending PRI-2012 Component B Task 2');
+  }
+}
+
+/**
+ * Boot-time inputs the broker needs to build persona container configs. Every
+ * field is deployment-static and comes from the broker's own boot environment —
+ * the (adversarial) caller never supplies any of them.
+ */
+export interface BrokerPersonaCatalogOptions {
+  // Host path to the RO-mounted sen-core persona directory (the three
+  // container-persona `.md` files: browser-driver / persistent-box /
+  // ephemeral-shell). Deploy writes it; the broker mounts it read-only.
+  personasDir: string;
+  // Host path to the broker's per-invocation scratch base. The per-spawn scratch
+  // dir is `<workBaseHostPath>/<childSessionId>`; the broker DERIVES it (never
+  // caller-supplied) — a caller-chosen host path would be an arbitrary-mount escape.
+  workBaseHostPath: string;
+  // Boot env for resolving persona mount names to host bind-mount sources.
+  mountEnv: BrokerMountEnv;
+}
+
+/**
+ * Real PersonaCatalog: assembles each persona's full ContainerConfig entirely
+ * broker-side from the RO-mounted sen-core persona files. Reuses lace's existing
+ * machinery end-to-end — the persona-file parser (PersonaRegistry), the
+ * broker-side mount registry (buildBrokerContainerMounts), and the spec builder
+ * (buildPersonaContainerSpec) — then copies the resulting ContainerSpec into a
+ * ContainerConfig exactly as ContainerManager.materializeOnce does. The caller
+ * supplies no part of the returned config; this is the spawn broker's security
+ * boundary.
+ */
+export class BrokerPersonaCatalog implements PersonaCatalog {
+  private readonly registry: PersonaRegistry;
+  private readonly workBaseHostPath: string;
+  private readonly containerMounts: Record<string, MountRegistryEntry>;
+
+  constructor(opts: BrokerPersonaCatalogOptions) {
+    this.workBaseHostPath = opts.workBaseHostPath;
+    this.containerMounts = buildBrokerContainerMounts(opts.mountEnv);
+    // The broker mounts a SINGLE read-only personas directory. Point both
+    // resolution paths at it: `userPersonasPaths` is the real-fs path the parser
+    // reads file content from, `bundledPersonasPath` is the dir scanned at
+    // construction. Same dir for both keeps the source unambiguous — there is no
+    // bundled-vs-user override layering in the broker.
+    this.registry = new PersonaRegistry({
+      bundledPersonasPath: opts.personasDir,
+      userPersonasPaths: [opts.personasDir],
+    });
+  }
+
+  buildContainerConfig(persona: PersonaName, ctx: PersonaSpawnContext): ContainerConfig {
+    // Defense-in-depth: childSessionId feeds a host path (the per-spawn scratch
+    // dir) and the container name. The protocol layer already enforces this, but
+    // this is a trust boundary — re-validate here so a future caller that reaches
+    // the catalog off the protocol path can never traverse out of the work base
+    // or shadow a name. Must match componentIdSchema in spawn-broker-protocol.ts.
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(ctx.childSessionId)) {
+      throw new Error(
+        `Unsafe childSessionId '${ctx.childSessionId}': must be [A-Za-z0-9_-]{1,64} ` +
+          `(no path separators or dots).`
+      );
+    }
+
+    const parsed = this.registry.parsePersona(persona);
+    if (parsed.config.runtime?.type !== 'container') {
+      throw new Error(
+        `Persona '${persona}' is not a container persona (runtime.type=` +
+          `${parsed.config.runtime?.type ?? 'undefined'}); the spawn broker only builds container configs.`
+      );
+    }
+    const runtime: PersonaContainerRuntime = parsed.config.runtime;
+
+    // For per_invocation personas the broker DERIVES the scratch host path from
+    // its own work base + the (protocol-validated path-safe) child session id and
+    // mkdirs it 0o700 — mirroring sen-core's delegate.ts. Persistent personas
+    // declare their own scratch mount and need no per-spawn dir.
+    let scratchDirHostPath: string | undefined;
+    if (runtime.containerSharing === 'per_invocation') {
+      scratchDirHostPath = path.join(this.workBaseHostPath, ctx.childSessionId);
+      fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
+    }
+
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: ctx.parentSessionId,
+      personaName: persona,
+      runtime,
+      containerMounts: this.containerMounts,
+      childSessionId: ctx.childSessionId,
+      scratchDirHostPath,
+    });
+
+    // Copy ContainerSpec → ContainerConfig exactly as ContainerManager.materializeOnce
+    // does (no transform). `id` is the resolved container id (verbatim
+    // `sen-<persona>` for persistent, `lace-<name>` otherwise); `command` is left
+    // unset so the container runs `sleep infinity` and is only ever exec'd into.
+    const config: ContainerConfig = {
+      id: resolveContainerId(spec),
+      name: spec.name,
+      image: spec.image,
+      workingDirectory: spec.workingDirectory,
+      mounts: spec.mounts,
+      environment: spec.env,
+      ports: spec.ports,
+      restartPolicy: spec.restartPolicy,
+      sysctls: spec.sysctls,
+      capAdd: spec.capAdd,
+      network: spec.network,
+      gatewayRoute: spec.gatewayRoute,
+    };
+
+    // Stamp the already-minted agent token into the create-env. The env var NAME
+    // is the contract with sen-core's `tokenEnvName` (sen-core-v2/src/main.ts:1228,
+    // literal 'SEN_AGENT_TOKEN'); keep these in sync. The token itself is minted +
+    // registered elsewhere (PRI-2012 Component B Task 3); the catalog only stamps
+    // ctx.agentToken. Merge — never clobber the persona's other env.
+    config.environment = { ...(config.environment ?? {}), SEN_AGENT_TOKEN: ctx.agentToken };
+
+    return config;
   }
 }
