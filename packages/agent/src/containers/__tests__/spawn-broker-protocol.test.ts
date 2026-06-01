@@ -70,24 +70,86 @@ describe('parseSpawnBrokerRequest — spawn', () => {
   });
 });
 
+describe('parseSpawnBrokerRequest — execStream', () => {
+  const VALID_EXEC = {
+    op: 'execStream' as const,
+    containerName: 'lace-box-1',
+    command: ['/bin/sh', '-c', 'echo hi'],
+    jobId: 'job_123',
+  };
+
+  it('accepts an execStream request with command + jobId (the closed surface is SPAWN, not exec)', () => {
+    const req = parseSpawnBrokerRequest(VALID_EXEC);
+    expect(req).toEqual(VALID_EXEC);
+  });
+
+  it('accepts optional environment / workingDirectory / environmentMode', () => {
+    const req = parseSpawnBrokerRequest({
+      ...VALID_EXEC,
+      environment: { FOO: 'bar' },
+      workingDirectory: '/work',
+      environmentMode: 'inherit',
+    });
+    expect(req.op).toBe('execStream');
+  });
+
+  it('rejects an execStream request with an empty command array', () => {
+    expect(() => parseSpawnBrokerRequest({ ...VALID_EXEC, command: [] })).toThrow(
+      SpawnBrokerProtocolError
+    );
+  });
+
+  it('rejects an execStream request with no command', () => {
+    const { command: _omit, ...rest } = VALID_EXEC;
+    expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
+  });
+
+  it('rejects an execStream request with no jobId (per-job audit attribution is required)', () => {
+    const { jobId: _omit, ...rest } = VALID_EXEC;
+    expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
+  });
+
+  it('rejects an execStream request with no containerName', () => {
+    const { containerName: _omit, ...rest } = VALID_EXEC;
+    expect(() => parseSpawnBrokerRequest(rest)).toThrow(SpawnBrokerProtocolError);
+  });
+
+  it('rejects an unknown environmentMode', () => {
+    expect(() => parseSpawnBrokerRequest({ ...VALID_EXEC, environmentMode: 'merge' })).toThrow(
+      SpawnBrokerProtocolError
+    );
+  });
+
+  // execStream legitimately carries command+env (that's how the agent runs), but
+  // .strict() must still reject SPEC-bearing keys — those belong only to the
+  // registry-locked spawn, never to a per-call exec.
+  const execSpecFields: Array<[string, unknown]> = [
+    ['mounts', [{ source: '/etc', target: '/host-etc' }]],
+    ['image', 'evil:latest'],
+    ['network', 'host'],
+    ['privileged', true],
+    ['capAdd', ['SYS_ADMIN']],
+    ['persona', 'persistent-box'],
+    ['unknownField', 'whatever'],
+  ];
+
+  it.each(execSpecFields)('rejects an execStream request carrying %s', (key, value) => {
+    expect(() => parseSpawnBrokerRequest({ ...VALID_EXEC, [key]: value })).toThrow(
+      SpawnBrokerProtocolError
+    );
+  });
+});
+
 describe('parseSpawnBrokerRequest — other verbs', () => {
-  it('accepts a valid exec request', () => {
-    const req = parseSpawnBrokerRequest({ op: 'exec', containerName: 'lace-box-1' });
-    expect(req).toEqual({ op: 'exec', containerName: 'lace-box-1' });
+  it('accepts a valid list request', () => {
+    const req = parseSpawnBrokerRequest({ op: 'list' });
+    expect(req).toEqual({ op: 'list' });
   });
 
-  it('rejects an exec request carrying a command field (no caller-chosen command)', () => {
-    expect(() =>
-      parseSpawnBrokerRequest({
-        op: 'exec',
-        containerName: 'lace-box-1',
-        command: ['/bin/sh'],
-      })
-    ).toThrow(SpawnBrokerProtocolError);
-  });
-
-  it('rejects an exec request with no containerName', () => {
-    expect(() => parseSpawnBrokerRequest({ op: 'exec' })).toThrow(SpawnBrokerProtocolError);
+  it('rejects a list request carrying a containerName', () => {
+    expect(() => parseSpawnBrokerRequest({ op: 'list', containerName: 'x' })).toThrow(
+      SpawnBrokerProtocolError
+    );
   });
 
   it('accepts a valid stop request without timeout', () => {
