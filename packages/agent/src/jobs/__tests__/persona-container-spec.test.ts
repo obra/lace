@@ -299,6 +299,74 @@ describe('buildPersonaContainerSpec persistent', () => {
       gatewayRoute: '172.31.250.1',
     });
   });
+
+  it('injects SEN_BROWSER_CDP_SOCKET env when browserCdpSocket is set (PRI-2002)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'browser',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        ...perInvocationRuntime,
+        browserCdpSocket: true,
+      },
+      containerMounts: {},
+    });
+
+    expect(spec.browserCdpSocket).toBe(true);
+    expect(spec.env).toEqual({
+      SEN_BROWSER_CDP_SOCKET: '/run/sen-browser-cdp/pppppppp-browser-cccccccc.sock',
+    });
+  });
+
+  it('does not inject SEN_BROWSER_CDP_SOCKET env when browserCdpSocket is absent (PRI-2002)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'browser',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    expect(spec.browserCdpSocket).toBeUndefined();
+    expect(spec.env.SEN_BROWSER_CDP_SOCKET).toBeUndefined();
+  });
+
+  it('injects SEN_BROWSER_CDP_SOCKET env for persistent personas (PRI-2002)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'browser',
+      runtime: {
+        ...persistentRuntime,
+        browserCdpSocket: true,
+      },
+      containerMounts: {},
+    });
+
+    expect(spec.browserCdpSocket).toBe(true);
+    expect(spec.env).toEqual({
+      SEN_BROWSER_CDP_SOCKET: '/run/sen-browser-cdp/browser.sock',
+    });
+  });
+
+  it('passes browserCdpSocket through containerSpecToRuntimeSpec (PRI-2002)', () => {
+    const spec = buildPersonaContainerSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'browser',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        ...perInvocationRuntime,
+        browserCdpSocket: true,
+      },
+      containerMounts: {},
+    });
+
+    expect(containerSpecToRuntimeSpec({ spec })).toMatchObject({
+      browserCdpSocket: true,
+    });
+  });
 });
 
 describe('containerSpecToRuntimeSpec', () => {

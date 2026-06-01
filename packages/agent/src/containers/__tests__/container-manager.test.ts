@@ -540,6 +540,32 @@ describe('ContainerManager', () => {
         containerId: 'lace-sess1-worker',
       });
     });
+
+    it('populates browserCdpSocketPath in onAttached when browserCdpSocket is set (PRI-2002)', async () => {
+      const onAttached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
+
+      const cdpSpec: ContainerSpec = { ...gatewaySpec, browserCdpSocket: true };
+      const handle = await manager.materialize(cdpSpec);
+
+      expect(onAttached).toHaveBeenCalledWith({
+        containerName: 'sess1-worker',
+        containerId: handle.containerId,
+        sourceIp: '172.31.250.3',
+        networkName: 'ada-sen_quarantine',
+        browserCdpSocketPath: '/run/sen-browser-cdp/sess1-worker.sock',
+      });
+    });
+
+    it('leaves browserCdpSocketPath undefined in onAttached when the flag is absent (PRI-2002)', async () => {
+      const onAttached = vi.fn();
+      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
+
+      await manager.materialize(gatewaySpec);
+
+      const payload = onAttached.mock.calls[0][0];
+      expect(payload.browserCdpSocketPath).toBeUndefined();
+    });
   });
 
   describe('execStream', () => {

@@ -57,6 +57,9 @@ const ContainerRuntimeDescriptorSchema = z
         // PRI-1919: IPv4 address of the egress gateway for the post-start
         // netns-init sidecar. Validated as a non-empty string (loose IPv4).
         gatewayRoute: z.string().min(1).optional(),
+        // PRI-2002: when true, lace injects SEN_BROWSER_CDP_SOCKET + emits
+        // browserCdpSocketPath for this quarantined browser-driver persona.
+        browserCdpSocket: z.boolean().optional(),
       })
       .strict(),
     helper: z

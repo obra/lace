@@ -69,6 +69,13 @@ export type ToolRuntimeDescriptor =
         // IPv4 address of the egress gateway. When set, a privileged one-shot
         // sidecar sets the persona's default route after start. PRI-1919.
         gatewayRoute?: string;
+        // PRI-2002: when true, the persona is a quarantined browser-driver whose
+        // Chrome CDP is exposed over a unix socket on the shared sen-browser-cdp
+        // mount. Lace injects SEN_BROWSER_CDP_SOCKET and emits the matching
+        // browserCdpSocketPath on network attach so the credential helper can
+        // reach it. Mount scope IS the access-control boundary: only personas
+        // with this flag get the socket dir + env.
+        browserCdpSocket?: boolean;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;

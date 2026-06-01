@@ -5,6 +5,17 @@ import type { ContainerMount, ContainerState, PortMapping } from './types';
 
 export type { PortMapping };
 
+// PRI-2002: the credential helper and the quarantined browser-driver share one
+// host dir (the `sen-browser-cdp` named mount, container path
+// `/run/sen-browser-cdp`); each container gets a uniquely-named socket on it.
+// Single source of truth for that path so the SEN_BROWSER_CDP_SOCKET env injected
+// at spec-build time and the lifecycle browserCdpSocketPath cannot drift.
+const BROWSER_CDP_SOCKET_DIR = '/run/sen-browser-cdp';
+
+export function browserCdpSocketPath(containerName: string): string {
+  return `${BROWSER_CDP_SOCKET_DIR}/${containerName}.sock`;
+}
+
 export interface ContainerSpec {
   name: string;
   image: string;
@@ -38,6 +49,13 @@ export interface ContainerSpec {
   // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
   // sets the persona's default route after `docker start`. PRI-1919.
   gatewayRoute?: string;
+
+  // PRI-2002: when true, this is a quarantined browser-driver spec. The
+  // SEN_BROWSER_CDP_SOCKET env is injected at spec-build time (the in-container
+  // relay listens there); ContainerManager.notifyNetworkAttached emits the
+  // matching browserCdpSocketPath so the credential helper can reach the
+  // persona's Chrome CDP over the shared sen-browser-cdp unix socket.
+  browserCdpSocket?: boolean;
 
   // Mount target namespaces owned by Lace. When adopting a daemon-side
   // persistent container, ContainerManager rejects stale extra mounts under

@@ -13,6 +13,7 @@ import type {
   ExecStreamOptions,
 } from './types';
 import { ContainerError, ContainerNotFoundError } from './types';
+import { browserCdpSocketPath } from './spec';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
 
 // See ABOUTME above: every container id is namespaced under this prefix so
@@ -167,6 +168,10 @@ export class ContainerManager {
         containerId,
         sourceIp,
         networkName: spec.network,
+        // PRI-2002: same path as the injected SEN_BROWSER_CDP_SOCKET env, so the
+        // credential helper reaches the same socket the in-container relay opens.
+        // Only for browserCdpSocket-enabled specs; undefined otherwise.
+        ...(spec.browserCdpSocket ? { browserCdpSocketPath: browserCdpSocketPath(spec.name) } : {}),
       });
     } catch (error) {
       logger.warn('ContainerManager.notifyNetworkAttached failed', {
