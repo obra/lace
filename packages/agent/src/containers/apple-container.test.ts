@@ -9,7 +9,11 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
-describe('AppleContainerRuntime', () => {
+// AppleContainerRuntime shells out to the macOS-only `container` CLI; on any
+// other platform the CLI is absent and these integration tests cannot run.
+const isDarwin = process.platform === 'darwin';
+
+describe.skipIf(!isDarwin)('AppleContainerRuntime', () => {
   let runtime: AppleContainerRuntime;
   let testDir: string;
   let createdContainers: string[] = [];

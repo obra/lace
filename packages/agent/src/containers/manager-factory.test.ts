@@ -7,6 +7,11 @@ import type { ContainerRuntime } from './types';
 
 const ENV_KEY = 'LACE_CONTAINER_RUNTIME';
 
+// Constructing AppleContainerRuntime kicks off a floating `container system
+// start` probe that rejects on non-macOS hosts (CLI absent) and surfaces as an
+// unhandled rejection. The darwin-default branch can only be exercised on macOS.
+const isDarwin = process.platform === 'darwin';
+
 function getRuntime(manager: ContainerManager | null): ContainerRuntime | null {
   return manager === null ? null : (manager as unknown as { runtime: ContainerRuntime }).runtime;
 }
@@ -22,7 +27,7 @@ describe('createDefaultContainerManager', () => {
     }
   });
 
-  it('selects Apple Container by default on macOS', () => {
+  it.skipIf(!isDarwin)('selects Apple Container by default on macOS', () => {
     delete process.env[ENV_KEY];
 
     const manager = createDefaultContainerManager('darwin');
