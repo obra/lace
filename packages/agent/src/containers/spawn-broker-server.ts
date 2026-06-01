@@ -204,25 +204,18 @@ export class SpawnBrokerServer {
       childSessionId,
       jobId,
     });
-    const containerName = config.name;
-    if (!containerName) {
+    if (!config.name) {
       return { ok: false, error: 'catalog produced a config without a name' };
     }
 
-    // 2. Mint + register the identity BEFORE the container can egress. persona is
-    //    the registry-truth value from the catalog, never a caller-asserted field.
-    const token = await this.identity.registerAtSpawn({
-      persona,
-      parentSessionId,
-      childSessionId,
-      jobId,
-      containerName,
-      containerSharing,
-      ...(config.id ? { containerId: config.id } : {}),
-    });
+    // 2. Mint the token BEFORE create — it must be in the create-env and its
+    //    fingerprint in the sen.broker.* labels (which are stamped at create).
+    //    persona is the registry-truth value from the catalog, never caller-asserted.
+    const token = this.identity.mintToken();
 
     // 3. Server stamps the broker-minted token + the sen.broker.* ownership labels
-    //    (the catalog has no identity surface).
+    //    into the config (the catalog has no identity surface). Labels carry no
+    //    container name, so they don't need the (post-create) canonical id.
     config.environment = { ...(config.environment ?? {}), [SEN_AGENT_TOKEN_ENV_NAME]: token };
     config.labels = {
       ...(config.labels ?? {}),
@@ -230,9 +223,38 @@ export class SpawnBrokerServer {
       [LABEL.parentSessionId]: parentSessionId,
       [LABEL.childSessionId]: childSessionId,
       [LABEL.jobId]: jobId,
-      [LABEL.tokenFingerprint]: this.identity.fingerprintFor(containerName),
+      [LABEL.tokenFingerprint]: this.identity.fingerprintOf(token),
     };
 
+    // 4. Create → the CANONICAL container id. DockerContainerRuntime canonicalizes
+    //    the name (resolveContainerName lace-prefixes it), so the broker MUST use
+    //    create()'s RETURN value, never assume config.name — otherwise every
+    //    subsequent verb (start/exec/ownership) misses the container. The container
+    //    is created but NOT started, so it has no network and cannot egress yet.
+    const containerName = await this.runtime.create(config);
+
+    // 5. Register BEFORE start (= before egress) using the canonical containerName.
+    //    A created-but-unstarted container has no route out, so this preserves the
+    //    register-before-egress invariant even though it now runs after create. On
+    //    register failure, tear the container down (fail closed; no leak).
+    try {
+      await this.identity.registerAtSpawn({
+        token,
+        persona,
+        parentSessionId,
+        childSessionId,
+        jobId,
+        containerName,
+        containerSharing,
+        ...(config.id ? { containerId: config.id } : {}),
+      });
+    } catch (error) {
+      await this.runtime.remove(containerName).catch(() => {});
+      throw error;
+    }
+
+    // 6. Record ownership keyed by the canonical id, then start (start runs the
+    //    netns-init sidecar when gatewayRoute set) — register has completed.
     this.owned.set(containerName, {
       persona,
       parentSessionId,
@@ -242,13 +264,9 @@ export class SpawnBrokerServer {
       containerName,
       token,
     });
-
-    // 4. Create + start (start runs the netns-init sidecar when gatewayRoute set).
-    //    register already completed (step 2) → register-before-egress holds.
-    await this.runtime.create(config);
     await this.runtime.start(containerName);
 
-    // 5. Network-attach enrichment: learn the quarantine source IP + (for
+    // 7. Network-attach enrichment: learn the quarantine source IP + (for
     //    browserCdpSocket personas) the per-spawn CDP socket path, and re-register
     //    enriched. Best-effort: a failed inspect degrades to no source-IP mapping.
     await this.enrich(containerName, browserCdpSocket);

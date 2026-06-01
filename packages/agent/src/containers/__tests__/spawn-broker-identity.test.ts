@@ -62,10 +62,12 @@ describe('SpawnBrokerIdentity', () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('registerAtSpawn mints a token and sends register_runtime with registry-truth persona', async () => {
+  it('registerAtSpawn registers a pre-minted token and sends register_runtime with registry-truth persona', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
 
-    const token = await identity.registerAtSpawn({
+    const token = identity.mintToken();
+    await identity.registerAtSpawn({
+      token,
       persona: 'sen-coworker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -88,10 +90,12 @@ describe('SpawnBrokerIdentity', () => {
     expect(typeof req.expires_at_ms).toBe('number');
   });
 
-  it('sends a token_fingerprint that equals fingerprintContainerExecutionToken(returnedToken)', async () => {
+  it('sends a token_fingerprint that equals fingerprintContainerExecutionToken(mintedToken)', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
 
-    const token = await identity.registerAtSpawn({
+    const token = identity.mintToken();
+    await identity.registerAtSpawn({
+      token,
       persona: 'sen-coworker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -101,11 +105,14 @@ describe('SpawnBrokerIdentity', () => {
     });
 
     expect(helper.requests[0].token_fingerprint).toBe(fingerprintContainerExecutionToken(token));
+    // fingerprintOf(token) matches the wire fingerprint (used for the pre-create label).
+    expect(identity.fingerprintOf(token)).toBe(helper.requests[0].token_fingerprint);
   });
 
   it('uses parentSessionId as the wire session_id (never childSessionId)', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
     await identity.registerAtSpawn({
+      token: identity.mintToken(),
       persona: 'sen-coworker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -121,6 +128,7 @@ describe('SpawnBrokerIdentity', () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
 
     const registerPromise = identity.registerAtSpawn({
+      token: identity.mintToken(),
       persona: 'sen-coworker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -137,7 +145,9 @@ describe('SpawnBrokerIdentity', () => {
 
   it('enrichOnAttach re-sends the stored identity with source_ip', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
-    const token = await identity.registerAtSpawn({
+    const token = identity.mintToken();
+    await identity.registerAtSpawn({
+      token,
       persona: 'sen-coworker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -160,6 +170,7 @@ describe('SpawnBrokerIdentity', () => {
   it('enrichOnAttach includes browser_cdp_url for a browserCdpSocketPath persona', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
     await identity.registerAtSpawn({
+      token: identity.mintToken(),
       persona: 'sen-browser',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -185,7 +196,9 @@ describe('SpawnBrokerIdentity', () => {
       helperSocketPath: helper.socketPath,
       nowMs: () => clock,
     });
-    const token = await identity.registerAtSpawn({
+    const token = identity.mintToken();
+    await identity.registerAtSpawn({
+      token,
       persona: 'sen-coworker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -252,6 +265,7 @@ describe('SpawnBrokerIdentity', () => {
       const identity = new SpawnBrokerIdentity({ helperSocketPath: rejectSocket });
       await expect(
         identity.registerAtSpawn({
+          token: identity.mintToken(),
           persona: 'sen-coworker',
           parentSessionId: 'sess_parent',
           childSessionId: 'sess_child',

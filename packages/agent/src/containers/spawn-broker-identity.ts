@@ -37,6 +37,11 @@ export interface SpawnBrokerIdentityOptions {
 }
 
 export interface RegisterAtSpawnInput {
+  // The token MINTED before create() and injected into the container's create-env
+  // (mintToken). Split from register so the canonical container id (create()'s
+  // return value) is known before we register: mint → stamp env+labels → create →
+  // register. Register still runs BEFORE start, so before any egress.
+  token: string;
   // Registry-truth persona — NEVER caller-asserted.
   persona: string;
   parentSessionId: string;
@@ -111,15 +116,24 @@ export class SpawnBrokerIdentity {
     return randomBytes(32).toString('base64url');
   }
 
-  // Mint + register the container's identity with the helper, and return the
-  // token to inject into the container create-env. This MUST be awaited and
-  // complete BEFORE the container can egress: the returned promise resolves only
-  // after the helper has acknowledged the register_runtime request.
-  async registerAtSpawn(input: RegisterAtSpawnInput): Promise<string> {
-    const token = this.mintToken();
+  // The fingerprint of a freshly-minted token, for stamping the
+  // sen.broker.tokenFingerprint label BEFORE create() (and before the identity
+  // record exists). Byte-identical to the helper's resolve-side fingerprint.
+  fingerprintOf(token: string): string {
+    return fingerprintContainerExecutionToken(token);
+  }
+
+  // Register the container's identity with the helper using a PRE-MINTED token
+  // (mintToken). Split from minting so the canonical container id — create()'s
+  // return value — is known and used here as containerName. This MUST be awaited
+  // and complete BEFORE the container can egress: it is called after create() but
+  // strictly before start() (a created-but-not-started container has no network),
+  // and the returned promise resolves only after the helper acknowledges the
+  // register_runtime request.
+  async registerAtSpawn(input: RegisterAtSpawnInput): Promise<void> {
     const record: OwnershipRecord = {
-      token,
-      fingerprint: fingerprintContainerExecutionToken(token),
+      token: input.token,
+      fingerprint: fingerprintContainerExecutionToken(input.token),
       persona: input.persona,
       parentSessionId: input.parentSessionId,
       childSessionId: input.childSessionId,
@@ -133,7 +147,6 @@ export class SpawnBrokerIdentity {
     await this.sendRegisterRuntime(record, {
       expiresAtMs: this.nowMs() + this.tokenTtlMs,
     });
-    return token;
   }
 
   // Re-register the stored identity enriched with the quarantine source IP
@@ -160,12 +173,6 @@ export class SpawnBrokerIdentity {
     await this.sendRegisterRuntime(record, {
       expiresAtMs: this.nowMs() + this.enrichmentTtlMs,
     });
-  }
-
-  // The fingerprint of the token registered for a container — stamped by the
-  // server as the sen.broker.tokenFingerprint label so adopt can recover it.
-  fingerprintFor(containerName: string): string {
-    return this.requireRecord(containerName).fingerprint;
   }
 
   // Rebuild + re-register an adopted container's identity from its recovered

@@ -31,13 +31,10 @@ function hasDockerAvailable(): boolean {
 const DOCKER_AVAILABLE = hasDockerAvailable();
 const TEST_IMAGE = process.env.LACE_DOCKER_TEST_IMAGE || 'alpine:3.19';
 
-// PRI-2012 BLOCKER: this real-docker repro is RED on the canonical-id bug — the
-// broker's handleSpawn uses config.name as the canonical container id, but
-// DockerContainerRuntime canonicalizes via resolveContainerName() (lace-prefixes)
-// and acts under lace-<name>, so start(config.name) throws and every spawn fails.
-// Fix is gated on ada-sen (B5 server + register-before-egress ordering — see the
-// plan's "Open follow-ups"). Flip this to false once the fix lands to re-enable.
-const BLOCKED_ON_CANONICAL_ID_BUG = true;
+// PRI-2012: the canonical-id bug is FIXED — handleSpawn now uses create()'s return
+// value as the canonical container id (mint → stamp → create → register → start),
+// so this real-docker repro is green. Kept docker-gated via DOCKER_AVAILABLE.
+const BLOCKED_ON_CANONICAL_ID_BUG = false;
 
 async function pullImageIfMissing(image: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -227,6 +224,8 @@ describe.skipIf(!DOCKER_AVAILABLE || BLOCKED_ON_CANONICAL_ID_BUG)(
         exists = false;
       }
       expect(exists).toBe(false);
-    });
+      // `sleep` runs as PID 1 and ignores SIGTERM, so `docker stop` waits its full
+      // grace before SIGKILL — give the teardown room beyond the 5s default.
+    }, 20000);
   }
 );

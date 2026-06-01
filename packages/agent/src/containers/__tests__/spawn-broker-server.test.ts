@@ -193,14 +193,17 @@ describe('SpawnBrokerServer', () => {
   });
 
   describe('spawn', () => {
-    it('registers BEFORE create/start (register-before-egress)', async () => {
+    it('registers AFTER create but BEFORE start (register-before-egress; canonical id from create)', async () => {
       await sendControl(socketPath, VALID_SPAWN);
-      const registerIdx = events.indexOf('register');
       const createIdx = events.indexOf('create');
+      const registerIdx = events.indexOf('register');
       const startIdx = events.indexOf('start');
-      expect(registerIdx).toBeGreaterThanOrEqual(0);
-      expect(registerIdx).toBeLessThan(createIdx);
-      expect(createIdx).toBeLessThan(startIdx);
+      // create runs first so the canonical container id (its return value) is known
+      // before register; register still runs strictly BEFORE start, and a created-
+      // but-unstarted container has no network — so register-before-egress holds.
+      expect(createIdx).toBeGreaterThanOrEqual(0);
+      expect(createIdx).toBeLessThan(registerIdx);
+      expect(registerIdx).toBeLessThan(startIdx);
     });
 
     it('stamps the broker token + sen.broker.* labels into the created config', async () => {
@@ -230,6 +233,59 @@ describe('SpawnBrokerServer', () => {
       expect(res.resolvedMounts).toEqual([
         { source: '/h/scratch', target: '/work', readonly: false },
       ]);
+    });
+
+    it("uses create()'s RETURN value as the canonical id (DockerContainerRuntime lace-prefixes)", async () => {
+      // A runtime that canonicalizes the name like DockerContainerRuntime does:
+      // create() stores + returns a DIFFERENT id than config.name. The broker must
+      // thread that return value through register/ownership/start/response — never
+      // assume config.name. This is the real-docker canonical-id bug at unit level.
+      class PrefixingRuntime extends MockRuntime {
+        override create(config: ContainerConfig): string {
+          events.push('create');
+          this.createdConfigs.push(config);
+          const id = `lace-${config.name}`;
+          this.containers.set(id, { id, state: 'created', mounts: config.mounts });
+          return id;
+        }
+      }
+      const canonical = 'lace-parent8-ephemeral-shell-sess_chi';
+      const dir2 = mkdtempSync(join(tmpdir(), 'spawn-broker-prefix-'));
+      const helper2 = await startFakeHelper(dir2);
+      const identity2 = new SpawnBrokerIdentity({ helperSocketPath: helper2.socketPath });
+      const socketPath2 = join(dir2, 'broker.sock');
+      const server2 = new SpawnBrokerServer({
+        runtime: new PrefixingRuntime(),
+        catalog: new FakeCatalog(),
+        identity: identity2,
+        socketPath: socketPath2,
+      });
+      await server2.listen();
+      try {
+        const res = await sendControl(socketPath2, VALID_SPAWN);
+        expect(res.ok).toBe(true);
+        // the returned canonical id is the lace-prefixed one create() returned
+        expect(res.containerName).toBe(canonical);
+        // register_runtime carried the canonical id, not config.name
+        expect(helper2.requests[0].container_name).toBe(canonical);
+        // ownership-gated verbs resolve under the canonical id (start succeeded)
+        expect((await sendControl(socketPath2, { op: 'stop', containerName: canonical })).ok).toBe(
+          true
+        );
+        // …and NOT under the unprefixed config.name
+        expect(
+          (
+            await sendControl(socketPath2, {
+              op: 'stop',
+              containerName: 'parent8-ephemeral-shell-sess_chi',
+            })
+          ).ok
+        ).toBe(false);
+      } finally {
+        await server2.close();
+        await helper2.close();
+        rmSync(dir2, { recursive: true, force: true });
+      }
     });
   });
 
