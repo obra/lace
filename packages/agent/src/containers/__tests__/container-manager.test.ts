@@ -157,6 +157,33 @@ describe('ContainerManager', () => {
       expect(config.ports).toBeUndefined();
     });
 
+    it('propagates spec.labels into ContainerConfig (PRI-2012 spawn-broker ownership)', async () => {
+      // The spawn broker stamps sen.broker.* identity labels on the spec; they
+      // must reach ContainerConfig so DockerContainerRuntime emits --label and the
+      // broker can re-read them via inspect to rebuild ownership after a restart.
+      const createSpy = vi.spyOn(runtime, 'create');
+      const labelledSpec: ContainerSpec = {
+        ...baseSpec,
+        name: 'persistent-box',
+        labels: { 'sen.broker.persona': 'persistent-box', 'sen.broker.jobId': 'job_1' },
+      };
+
+      await manager.materialize(labelledSpec);
+
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.labels).toEqual({
+        'sen.broker.persona': 'persistent-box',
+        'sen.broker.jobId': 'job_1',
+      });
+    });
+
+    it('omits labels when spec has none', async () => {
+      const createSpy = vi.spyOn(runtime, 'create');
+      await manager.materialize(baseSpec);
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.labels).toBeUndefined();
+    });
+
     it('propagates spec.image into ContainerConfig (kata #53)', async () => {
       // Regression: ContainerManager used to drop spec.image, so every container
       // booted whatever default image the runtime carried. Lock the wiring down.

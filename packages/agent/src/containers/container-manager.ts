@@ -243,6 +243,7 @@ export class ContainerManager {
       capAdd: spec.capAdd,
       network: spec.network,
       gatewayRoute: spec.gatewayRoute,
+      labels: spec.labels,
     };
 
     // Box specs may have a daemon-side container that survived this process —

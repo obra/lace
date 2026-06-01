@@ -24,6 +24,11 @@ export interface ContainerSpec {
   workingDirectory: string;
   mounts: ContainerMount[];
   env: Record<string, string>;
+  // Docker object labels forwarded to ContainerConfig.labels (→ `--label`).
+  // PRI-2012: the spawn broker stamps `sen.broker.*` identity labels on the spec
+  // so it can rebuild + re-validate its ownership record from `docker inspect`
+  // after a broker restart.
+  labels?: Record<string, string>;
   ports?: PortMapping[];
   // Verbatim container id used by the daemon. When set, ContainerManager
   // bypasses the `lace-` prefix and uses this id directly. Used by the box
