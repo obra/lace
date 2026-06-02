@@ -146,6 +146,31 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
+  it('accepts projected container binding with PRI-2012 SELECTOR fields (persona/parent/child)', () => {
+    // B7 added these to ContainerSpec/RuntimeSpec + the spec assembly; the .strict()
+    // binding validator MUST allow them or EVERY container persona spawn is rejected
+    // with unrecognized_keys (the bug the on-box parity smoke caught).
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container_selector' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/work',
+          spec: {
+            name: 'pppppppp-ephemeral-shell-cccccccc',
+            image: 'sen-ephemeral-shell:dev',
+            workingDirectory: '/work',
+            mounts: [],
+            persona: 'ephemeral-shell',
+            parentSessionId: 'sess_parent00112233',
+            childSessionId: 'sess_child00112233',
+          },
+        },
+      })
+    ).not.toThrow();
+  });
+
   it('accepts projected container binding with sysctls (PRI-1790)', () => {
     expect(() =>
       parseRuntimeExecutionBinding({

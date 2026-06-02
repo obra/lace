@@ -60,6 +60,17 @@ const ContainerRuntimeDescriptorSchema = z
         // PRI-2002: when true, lace injects SEN_BROWSER_CDP_SOCKET + emits
         // browserCdpSocketPath for this quarantined browser-driver persona.
         browserCdpSocket: z.boolean().optional(),
+        // PRI-2012 B7 SELECTOR fields. The SpawnBrokerContainerRuntime client reads
+        // these at create() to format the wire spawn request. SELECTOR ONLY — never
+        // an authority source: the broker validates `persona` against its closed enum
+        // and rebuilds the FULL container spec from its own catalog using only
+        // persona. They MUST be allowed through this .strict() runtime-binding
+        // validator (they're on ContainerSpec/RuntimeSpec + the spec assembly); a
+        // strict reject here blocks EVERY container persona spawn (the B7-missed wire
+        // boundary — type was updated, this validator wasn't).
+        persona: z.string().min(1).optional(),
+        parentSessionId: z.string().min(1).optional(),
+        childSessionId: z.string().min(1).optional(),
       })
       .strict(),
     helper: z
