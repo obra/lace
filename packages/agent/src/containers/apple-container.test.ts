@@ -9,7 +9,12 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
-describe('AppleContainerRuntime', () => {
+// The Apple `container` runtime only exists on macOS; on Linux (CI, the sen
+// hosts) `container system start` fails. Guard the whole suite to darwin —
+// mirrors apple-container.integration.test.ts's APPLE_CONTAINER_AVAILABLE gate.
+const isDarwin = process.platform === 'darwin';
+
+describe.skipIf(!isDarwin)('AppleContainerRuntime', () => {
   let runtime: AppleContainerRuntime;
   let testDir: string;
   let createdContainers: string[] = [];

@@ -6,6 +6,10 @@ import type { ContainerManager } from './container-manager';
 import type { ContainerRuntime } from './types';
 
 const ENV_KEY = 'LACE_CONTAINER_RUNTIME';
+// Constructing AppleContainerRuntime on Linux kicks off an async `container
+// system start` that rejects (no Apple runtime) → unhandled rejection. Guard the
+// Apple-constructing case to darwin; the docker/linux selection paths still run.
+const isDarwin = process.platform === 'darwin';
 
 function getRuntime(manager: ContainerManager | null): ContainerRuntime | null {
   return manager === null ? null : (manager as unknown as { runtime: ContainerRuntime }).runtime;
@@ -22,7 +26,7 @@ describe('createDefaultContainerManager', () => {
     }
   });
 
-  it('selects Apple Container by default on macOS', () => {
+  it.skipIf(!isDarwin)('selects Apple Container by default on macOS', () => {
     delete process.env[ENV_KEY];
 
     const manager = createDefaultContainerManager('darwin');
