@@ -64,6 +64,16 @@ export interface ContainerSpec {
   // these prefixes so an old container cannot expose paths the new spec no
   // longer advertises.
   managedMountTargetPrefixes?: string[];
+
+  // PRI-2012 Root A SELECTOR fields. Carried for the sen-docker shim runtime,
+  // whose create() emits the closed `spawn <persona> <parent> <child> <jobId>`
+  // command instead of a full `docker create` argv. SELECTOR ONLY — never an
+  // authority source: the shim validates `persona` against its closed enum and
+  // rebuilds the container spec itself. Ignored by DockerContainerRuntime.
+  persona?: string;
+  parentSession?: string;
+  childSession?: string;
+  jobId?: string;
 }
 
 export interface ContainerHandle {

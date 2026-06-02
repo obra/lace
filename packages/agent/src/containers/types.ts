@@ -60,6 +60,15 @@ export interface ContainerConfig {
   // The persona container itself does NOT need NET_ADMIN — the sidecar holds
   // the privilege and exits immediately. PRI-1919 transparent egress gateway.
   gatewayRoute?: string;
+
+  // PRI-2012 Root A SELECTOR fields (carried from ContainerSpec). The
+  // ShimContainerRuntime's create() emits `spawn <persona> <parent> <child>
+  // <jobId>` from these instead of a full `docker create` argv. SELECTOR ONLY;
+  // DockerContainerRuntime ignores them.
+  persona?: string;
+  parentSession?: string;
+  childSession?: string;
+  jobId?: string;
 }
 
 export interface ContainerMount {
