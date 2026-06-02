@@ -76,6 +76,13 @@ export type ToolRuntimeDescriptor =
         // reach it. Mount scope IS the access-control boundary: only personas
         // with this flag get the socket dir + env.
         browserCdpSocket?: boolean;
+        // PRI-2012 Root A SELECTOR fields — carried across the wire for the
+        // ShimContainerRuntime's create()->spawn. SELECTOR ONLY; the shim
+        // re-validates persona against its closed enum + rebuilds the spec.
+        persona?: string;
+        parentSession?: string;
+        childSession?: string;
+        jobId?: string;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;

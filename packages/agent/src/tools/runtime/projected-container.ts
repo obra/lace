@@ -261,6 +261,20 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.browserCdpSocket) {
     spec.browserCdpSocket = descriptor.spec.browserCdpSocket;
   }
+  // PRI-2012 Root A selector fields — carried through to the ContainerSpec so the
+  // ShimContainerRuntime's create()->spawn can read them.
+  if (descriptor.spec.persona) {
+    spec.persona = descriptor.spec.persona;
+  }
+  if (descriptor.spec.parentSession) {
+    spec.parentSession = descriptor.spec.parentSession;
+  }
+  if (descriptor.spec.childSession) {
+    spec.childSession = descriptor.spec.childSession;
+  }
+  if (descriptor.spec.jobId) {
+    spec.jobId = descriptor.spec.jobId;
+  }
 
   return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
 }

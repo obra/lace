@@ -243,6 +243,12 @@ export class ContainerManager {
       capAdd: spec.capAdd,
       network: spec.network,
       gatewayRoute: spec.gatewayRoute,
+      // PRI-2012 Root A selector fields — the ShimContainerRuntime reads these in
+      // create() to emit `spawn <persona> <parent> <child> <jobId>`.
+      persona: spec.persona,
+      parentSession: spec.parentSession,
+      childSession: spec.childSession,
+      jobId: spec.jobId,
     };
 
     // Box specs may have a daemon-side container that survived this process —

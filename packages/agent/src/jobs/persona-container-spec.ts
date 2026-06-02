@@ -163,6 +163,9 @@ export function buildPersonaContainerSpec(input: {
       ...(runtime.network ? { network: runtime.network } : {}),
       ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
       ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
+      // PRI-2012 Root A selector fields (persistent has no child session).
+      persona: personaName,
+      parentSession: parentSessionId,
     };
   }
 
@@ -192,6 +195,10 @@ export function buildPersonaContainerSpec(input: {
     ...(runtime.network ? { network: runtime.network } : {}),
     ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
     ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
+    // PRI-2012 Root A selector fields.
+    persona: personaName,
+    parentSession: parentSessionId,
+    childSession: input.childSessionId,
   };
 }
 
@@ -235,5 +242,10 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
     ...(spec.browserCdpSocket ? { browserCdpSocket: true } : {}),
+    // PRI-2012 Root A selector fields — carried across the wire for the shim.
+    ...(spec.persona ? { persona: spec.persona } : {}),
+    ...(spec.parentSession ? { parentSession: spec.parentSession } : {}),
+    ...(spec.childSession ? { childSession: spec.childSession } : {}),
+    ...(spec.jobId ? { jobId: spec.jobId } : {}),
   };
 }

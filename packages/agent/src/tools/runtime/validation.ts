@@ -60,6 +60,13 @@ const ContainerRuntimeDescriptorSchema = z
         // PRI-2002: when true, lace injects SEN_BROWSER_CDP_SOCKET + emits
         // browserCdpSocketPath for this quarantined browser-driver persona.
         browserCdpSocket: z.boolean().optional(),
+        // PRI-2012 Root A SELECTOR fields — carried for the ShimContainerRuntime's
+        // create()->spawn. MUST be in this .strict() schema or a shim binding fails
+        // validation (bug-#7 class). SELECTOR ONLY; the shim re-validates persona.
+        persona: z.string().min(1).optional(),
+        parentSession: z.string().min(1).optional(),
+        childSession: z.string().min(1).optional(),
+        jobId: z.string().min(1).optional(),
       })
       .strict(),
     helper: z

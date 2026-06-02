@@ -58,10 +58,13 @@ interface DockerPsRowJson {
 }
 
 export class DockerContainerRuntime extends BaseContainerRuntime {
-  private readonly dockerBin: string;
+  // protected (not private): ShimContainerRuntime extends this + overrides
+  // create()/start() to drive the sen-docker shim, reusing dockerBin + the
+  // configs/containers bookkeeping + resolveContainerName (PRI-2012 Root A).
+  protected readonly dockerBin: string;
   // Stores the full ContainerConfig keyed by container id so start() can
   // access gatewayRoute and image after create() has returned.
-  private readonly configs = new Map<string, ContainerConfig>();
+  protected readonly configs = new Map<string, ContainerConfig>();
 
   constructor(dockerBin: string = 'docker') {
     super();
@@ -72,7 +75,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     return name.startsWith(LACE_PREFIX) ? name : `${LACE_PREFIX}${name}`;
   }
 
-  private resolveContainerName(config: ContainerConfig): string {
+  protected resolveContainerName(config: ContainerConfig): string {
     // Persistent container runtime supplies a verbatim id that intentionally lacks the `lace-`
     // prefix (so the startup reaper's `name=lace-` scan ignores it). Honor
     // config.id directly when BOTH id and name are present and id is already a

@@ -4,10 +4,27 @@
 import { logger } from '@lace/agent/utils/logger';
 import { ContainerManager } from './container-manager';
 import { DockerContainerRuntime } from './docker-container';
+import { ShimContainerRuntime } from './shim-container-runtime';
 import { AppleContainerRuntime } from './apple-container';
 import type { ContainerRuntime } from './types';
 
 const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
+// PRI-2012 Root A: when set, lace drives the sen-docker shim instead of docker
+// directly. The value is the wrapper binary (e.g. /usr/local/bin/sen-docker-client)
+// that the runtime shells out to. Stage 3 of the cutover sets it; unset = direct
+// docker (Stage 1 / non-shim hosts).
+const DOCKER_BIN_ENV = 'LACE_DOCKER_BIN';
+
+// The docker-backed runtime: the sen-docker shim when LACE_DOCKER_BIN is set
+// (create()->spawn over the wrapper), else direct DockerContainerRuntime.
+function makeDockerRuntime(): ContainerRuntime {
+  const shimBin = process.env[DOCKER_BIN_ENV]?.trim();
+  if (shimBin) {
+    logger.info('containers.manager_factory.shim', { dockerBin: shimBin });
+    return new ShimContainerRuntime(shimBin);
+  }
+  return new DockerContainerRuntime();
+}
 type ContainerRuntimeSelection = 'auto' | 'apple' | 'docker';
 
 function parseContainerRuntimeSelection(value: string | undefined): ContainerRuntimeSelection {
@@ -25,11 +42,11 @@ export function createDefaultContainerManager(
   const selection = parseContainerRuntimeSelection(runtimeSelection);
 
   if (selection === 'docker') {
-    runtime = new DockerContainerRuntime();
+    runtime = makeDockerRuntime();
   } else if (selection === 'apple') {
     runtime = new AppleContainerRuntime();
   } else if (platform === 'linux') {
-    runtime = new DockerContainerRuntime();
+    runtime = makeDockerRuntime();
   } else if (platform === 'darwin') {
     runtime = new AppleContainerRuntime();
   } else {
