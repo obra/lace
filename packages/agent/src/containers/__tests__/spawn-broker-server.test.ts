@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import net from 'node:net';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BaseContainerRuntime } from '../runtime';
@@ -190,6 +190,22 @@ describe('SpawnBrokerServer', () => {
     await server.close();
     await helper.close();
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('listen() unlinks a stale socket file at its path (survives a hard-killed restart)', async () => {
+    // The broker socket lives on a persistent volume; a SIGKILL'd broker leaves
+    // the file behind, and the next boot must not fail EADDRINUSE. Caught live on
+    // the box during the Stage-1 deploy (broker crash-looped on recreate).
+    const stalePath = join(dir, 'stale-broker.sock');
+    writeFileSync(stalePath, '');
+    const reborn = new SpawnBrokerServer({
+      runtime,
+      catalog: new FakeCatalog(),
+      identity,
+      socketPath: stalePath,
+    });
+    await expect(reborn.listen()).resolves.toBeUndefined();
+    await reborn.close();
   });
 
   describe('spawn', () => {

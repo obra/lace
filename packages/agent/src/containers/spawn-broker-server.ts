@@ -3,7 +3,7 @@
 // ABOUTME: owns ALL identity stamping + ownership enforcement on every non-spawn verb.
 
 import net from 'node:net';
-import { chmod } from 'node:fs/promises';
+import { chmod, unlink } from 'node:fs/promises';
 import type { ContainerRuntime, ContainerState } from './types';
 import type { PersonaCatalog, PersonaName } from './spawn-broker-personas';
 import { isPersonaName } from './spawn-broker-personas';
@@ -80,6 +80,11 @@ export class SpawnBrokerServer {
   }
 
   async listen(): Promise<void> {
+    // The listen socket lives on a persistent volume, so a stale file survives a
+    // hard-killed broker (SIGKILL skips net.Server.close()'s unlink). Remove it
+    // before binding or listen() fails EADDRINUSE on every restart after the first.
+    // ENOENT (fresh path) is fine; ignore it.
+    await unlink(this.socketPath).catch(() => {});
     const server = net.createServer((socket) => this.onConnection(socket));
     this.server = server;
     await new Promise<void>((resolve, reject) => {
