@@ -56,6 +56,10 @@ Request (stdin):
 - `input` — the model-supplied arguments (matching your `inputSchema`).
 - `context.persona` — the **authoritative** session persona, stamped server-side
   (the keystone — the model cannot forge it). `context.sessionId` likewise.
+- `context` carries **only** `sessionId` and `persona` today (plus a future
+  `credentialSocket` for #6). The session working directory is **not** a field in
+  this JSON — it is delivered as the process **cwd**, so read it with
+  `process.cwd()`, not from `context`.
 
 Result (stdout):
 ```json
@@ -129,6 +133,13 @@ esac
 
 Make it executable (`chmod +x`) and put it in a directory you pass to
 `discoverExecTools`.
+
+> **Writing it in Node?** An exec tool is a standalone executable, so Node decides
+> CommonJS-vs-ESM from *its* context: the nearest `package.json` `"type"` field and
+> the file extension. A bare script inside a `"type": "module"` package is treated
+> as ESM, so `require()` throws `require is not defined in ES module scope`. Be
+> explicit — name the file `.mjs` (ESM, use `import`) or `.cjs` (CommonJS, use
+> `require`) — rather than relying on an inherited `package.json`.
 
 ---
 
