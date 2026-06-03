@@ -9,7 +9,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
-// The Apple `container` runtime only exists on macOS; on Linux (CI, the sen
+// The Apple `container` runtime only exists on macOS; on Linux (CI, embedder
 // hosts) `container system start` fails. Guard the whole suite to darwin —
 // mirrors apple-container.integration.test.ts's APPLE_CONTAINER_AVAILABLE gate.
 const isDarwin = process.platform === 'darwin';

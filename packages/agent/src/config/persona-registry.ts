@@ -57,7 +57,7 @@ const runtimeContainerSchema = z
     env: z.record(z.string(), z.string()).optional().default({}),
     ports: z.array(portMappingSchema).optional(),
     // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-    // sen-browser needs `net.ipv6.conf.lo.disable_ipv6=0` so the
+    // Browser personas need `net.ipv6.conf.lo.disable_ipv6=0` so the
     // container has an `::1` for superpowers-chrome's port-availability check.
     sysctls: z.record(sysctlKeySchema, z.string()).optional(),
     // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
@@ -72,7 +72,7 @@ const runtimeContainerSchema = z
     // When true, this persona is a quarantined browser-driver. Lace
     // injects SEN_BROWSER_CDP_SOCKET and emits browserCdpSocketPath on attach so
     // the credential helper can reach the persona's Chrome CDP over a unix socket
-    // on the shared sen-browser-cdp mount. Only this persona gets that mount + env.
+    // on the shared browser-cdp mount. Only this persona gets that mount + env.
     browserCdpSocket: z.boolean().optional(),
   })
   .strict();

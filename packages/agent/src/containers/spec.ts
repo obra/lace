@@ -6,12 +6,12 @@ import type { ContainerMount, ContainerState, PortMapping } from './types';
 export type { PortMapping };
 
 // The credential helper and the quarantined browser-driver share one
-// host dir (the `sen-browser-cdp` named mount, container path `/sen-browser-cdp`);
-// each container gets a uniquely-named socket on it. A TOP-LEVEL path (NOT under
-// `/run`, which is itself the `sen-cred` mount) — a nested mount target inside
-// another mount's destination fails at container init ("read-only file system").
-// Single source of truth for that path so the SEN_BROWSER_CDP_SOCKET env injected
-// at spec-build time and the lifecycle browserCdpSocketPath cannot drift.
+// host dir (the CDP socket named mount); each container gets a uniquely-named
+// socket on it. A TOP-LEVEL path (NOT under `/run`, which is itself a credential
+// mount) — a nested mount target inside another mount's destination fails at
+// container init ("read-only file system"). Single source of truth for that path
+// so the browser CDP socket env injected at spec-build time and the lifecycle
+// browserCdpSocketPath cannot drift.
 const BROWSER_CDP_SOCKET_DIR = '/sen-browser-cdp';
 
 export function browserCdpSocketPath(containerName: string): string {
@@ -27,16 +27,15 @@ export interface ContainerSpec {
   ports?: PortMapping[];
   // Verbatim container id used by the daemon. When set, ContainerManager
   // bypasses the `lace-` prefix and uses this id directly. Used by the box
-  // runtime so the daemon-side container id (e.g. `sen-box-shell`) is stable
-  // across agent restarts and avoids the startup reaper's `lace-` scan.
+  // runtime so the daemon-side container id is stable across agent restarts
+  // and avoids the startup reaper's `lace-` scan.
   containerId?: string;
   // Forwarded to ContainerConfig.restartPolicy. Used by boxes so the daemon
   // auto-restarts them after host reboot.
   restartPolicy?: 'unless-stopped';
   // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-  // Personas declare these in `runtime.sysctls`; added support so sen-browser
-  // can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome launcher's
-  // port-availability check.
+  // Personas declare these in `runtime.sysctls`; the browser persona may need
+  // `net.ipv6.conf.lo.disable_ipv6=0` for the chrome launcher's port-availability check.
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
@@ -52,11 +51,11 @@ export interface ContainerSpec {
   // sets the persona's default route after `docker start`.
   gatewayRoute?: string;
 
-  // When true, this is a quarantined browser-driver spec. The
-  // SEN_BROWSER_CDP_SOCKET env is injected at spec-build time (the in-container
+  // When true, this is a quarantined browser-driver spec. The embedder's
+  // browser CDP socket env is injected at spec-build time (the in-container
   // relay listens there); ContainerManager.notifyNetworkAttached emits the
   // matching browserCdpSocketPath so the credential helper can reach the
-  // persona's Chrome CDP over the shared sen-browser-cdp unix socket.
+  // persona's Chrome CDP over the shared host CDP unix socket.
   browserCdpSocket?: boolean;
 
   // Mount target namespaces owned by Lace. When adopting a daemon-side
@@ -65,7 +64,7 @@ export interface ContainerSpec {
   // longer advertises.
   managedMountTargetPrefixes?: string[];
 
-  // SELECTOR fields carried for the sen-docker shim runtime,
+  // SELECTOR fields carried for the docker shim runtime,
   // whose create() emits the closed `spawn <persona> <parent> <child> <jobId>`
   // command instead of a full `docker create` argv. SELECTOR ONLY — never an
   // authority source: the shim validates `persona` against its closed enum and

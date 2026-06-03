@@ -38,7 +38,7 @@ export interface ContainerConfig {
   restartPolicy?: 'unless-stopped';
 
   // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-  // Absent or empty ⇒ no --sysctl flag emitted. sen-browser needs
+  // Absent or empty ⇒ no --sysctl flag emitted. The browser persona may need
   // `net.ipv6.conf.lo.disable_ipv6=0` so chrome's port-availability check
   // can bind to `::1`.
   sysctls?: Record<string, string>;

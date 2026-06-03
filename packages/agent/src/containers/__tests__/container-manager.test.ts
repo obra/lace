@@ -281,8 +281,8 @@ describe('ContainerManager', () => {
     });
 
     it('adopts an existing daemon-side container without creating', async () => {
-      // Simulate a running daemon-side `sen-box-shell` that this process has never
-      // seen — daemonInspect returns it.
+      // Simulate a running daemon-side persistent container that this process has
+      // never seen — daemonInspect returns it.
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
         id: 'sen-box-shell',
         state: 'running',

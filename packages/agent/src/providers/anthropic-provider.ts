@@ -484,7 +484,7 @@ export class AnthropicProvider extends AIProvider {
                   completionTokens: usage.output_tokens || 0,
                   totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
                   // Progressive cache totals so UI consumers (e.g.
-                  // sen-core's bot-debugging channel formatter) can show the
+                  // an embedder's debug channel formatter) can show the
                   // cache breakdown mid-turn without waiting for the final
                   // message.
                   cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,

@@ -2392,7 +2392,7 @@ export const SessionRequestPermissionResponseSchema = z
 // host/spawn/env — outbound (lace → embedder). During delegate-job creation,
 // after lace builds the base executionEnv from containerExecutionIdentity, it
 // asks the embedder for any additional env vars to merge into the spawn env
-// (e.g. sen-core's per-spawn placeholder tokens). The embedder may return an
+// (e.g. per-spawn placeholder tokens injected by the embedder). The embedder may return an
 // empty record, or not implement the method at all — lace treats both as
 // "no extra env" and proceeds with the base executionEnv. The spawn is never
 // blocked by this call.

@@ -37,7 +37,7 @@ export type JobManagerDeps = {
   runSubagentProcess: (job: JobState) => void;
   setupProgressTimer?: (job: JobState) => void;
   /**
-   * Optional: ask the embedder (e.g. sen-core) for per-spawn env vars to merge
+   * Optional: ask the embedder for per-spawn env vars to merge
    * into the delegate container's executionEnv. Called once per delegate job,
    * after lace has computed the base executionEnv. Returns extra env vars; the
    * caller merges them with conflict resolution and shape validation applied.
@@ -830,11 +830,11 @@ export class JobManager {
           })
         : undefined;
 
-    // Ask the embedder for per-spawn env additions (e.g. sen-core's
-    // placeholder tokens for sen-credential-proxy). Only applies to delegate
-    // jobs that actually got a containerExecutionContext (i.e. containerized
-    // spawn with an identity config). Failure of the host RPC is non-fatal —
-    // the spawn proceeds with the base executionEnv.
+    // Ask the embedder for per-spawn env additions (e.g. placeholder tokens
+    // for a credential proxy). Only applies to delegate jobs that actually got
+    // a containerExecutionContext (i.e. containerized spawn with an identity
+    // config). Failure of the host RPC is non-fatal — the spawn proceeds with
+    // the base executionEnv.
     let finalExecutionEnv = containerExecutionContext?.executionEnv;
     if (
       type === 'delegate' &&

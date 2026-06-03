@@ -84,9 +84,9 @@ function isNotFoundError(error: unknown): boolean {
 
 // Best-effort post-create capture of the daemon's `.Image` field. The audit
 // trail for projected container runtimes lives here: persona images may be
-// floating tags (e.g. sen-box:dev), so the only way to know what actually got
-// used is to ask docker after create. Failures degrade to a warning log;
-// never throw — runtime startup must not depend on this.
+// floating tags (e.g. embedder dev images), so the only way to know what
+// actually got used is to ask docker after create. Failures degrade to a
+// warning log; never throw — runtime startup must not depend on this.
 async function captureContainerImageId(input: {
   containerId: string;
   runtimeId: string;
@@ -228,9 +228,9 @@ async function containerSpecFromDescriptor(
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
     // Pass the persona-declared image reference through verbatim. Pre-resolution
-    // to a digest was dropped because locally-built images (sen-box:dev,
-    // sen-browser:dev) have no registry digest. The post-create `.Image`
-    // capture below is the immutable runtime identity for audit purposes.
+    // to a digest was dropped because locally-built images (e.g. embedder dev
+    // images) have no registry digest. The post-create `.Image` capture below
+    // is the immutable runtime identity for audit purposes.
     image: descriptor.spec.image,
     workingDirectory: descriptor.spec.workingDirectory,
     mounts,

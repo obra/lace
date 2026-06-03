@@ -9,12 +9,11 @@ import { AppleContainerRuntime } from './apple-container';
 import type { ContainerRuntime } from './types';
 
 const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
-// When set, lace drives the sen-docker shim instead of docker directly. The value
-// is the wrapper binary (e.g. /usr/local/bin/sen-docker-client) that the runtime
-// shells out to. Unset = direct docker.
+// When set, lace drives an external docker shim instead of docker directly. The value
+// is the wrapper binary that the runtime shells out to. Unset = direct docker.
 const DOCKER_BIN_ENV = 'LACE_DOCKER_BIN';
 
-// The docker-backed runtime: the sen-docker shim when LACE_DOCKER_BIN is set
+// The docker-backed runtime: the external shim when LACE_DOCKER_BIN is set
 // (create()->spawn over the wrapper), else direct DockerContainerRuntime.
 function makeDockerRuntime(): ContainerRuntime {
   const shimBin = process.env[DOCKER_BIN_ENV]?.trim();

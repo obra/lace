@@ -615,7 +615,7 @@ export class AppleContainerRuntime extends BaseContainerRuntime {
   }
 
   // Persistent container runtime support (kata #62): macOS does not host long-lived persistent containers in v1
-  // (sen-core deploys on linux). Inherit BaseContainerRuntime's default
+  // (production deploys on linux). Inherit BaseContainerRuntime's default
   // daemonInspect (falls back to cached inspect, null on NotFound) and adopt
   // (populates the in-process cache) — adequate for the macOS dev path and
   // for any future single-tenant-style flow that lands here.

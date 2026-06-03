@@ -59,7 +59,7 @@ interface DockerPsRowJson {
 
 export class DockerContainerRuntime extends BaseContainerRuntime {
   // protected (not private): ShimContainerRuntime extends this + overrides
-  // create()/start() to drive the sen-docker shim, reusing dockerBin + the
+  // create()/start() to drive the external docker shim, reusing dockerBin + the
   // configs/containers bookkeeping + resolveContainerName.
   protected readonly dockerBin: string;
   // Stores the full ContainerConfig keyed by container id so start() can
@@ -307,11 +307,12 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       'run',
       '--rm',
       // Run as root: --cap-add NET_ADMIN only populates the BOUNDING set, which
-      // a non-root user (the persona image runs as `sen`) cannot exercise without
-      // file caps on `ip`/`iptables`. The ephemeral sidecar runs for milliseconds
-      // and exits; it never touches the persona's processes/filesystem (only its
-      // netns), so root here does NOT weaken the workload (which stays non-root,
-      // no NET_ADMIN). Mirrors Istio's privileged istio-init + unprivileged app.
+      // a non-root user (persona images run as an unprivileged user) cannot
+      // exercise without file caps on `ip`/`iptables`. The ephemeral sidecar runs
+      // for milliseconds and exits; it never touches the persona's
+      // processes/filesystem (only its netns), so root here does NOT weaken the
+      // workload (which stays non-root, no NET_ADMIN). Mirrors Istio's privileged
+      // istio-init + unprivileged app.
       '--user',
       '0:0',
       '--network',

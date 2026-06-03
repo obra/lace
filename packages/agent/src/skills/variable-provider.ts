@@ -31,8 +31,8 @@ export class SkillVariableProvider {
    * @returns Object containing `availableSkills` as an XML string
    */
   getVariables(): Record<string, unknown> {
-    // Rescan on every call so skills authored mid-session (e.g. via sen-core's
-    // create_skill tool) appear in the next system-prompt rebuild.
+    // Rescan on every call so skills authored mid-session (e.g. via the
+    // embedder's skill-creation tool) appear in the next system-prompt rebuild.
     this.registry.refresh();
     const skills = this.registry.listSkills();
 

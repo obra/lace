@@ -47,7 +47,7 @@ export type ToolRuntimeDescriptor =
         // may be a tag, a RepoDigest, or anything else docker accepts. The
         // post-create `.Image` capture (see projected-container.ts) is the
         // immutable identity used for audit/tracking. Pre-resolution was
-        // dropped because locally-built images (sen-box:dev, sen-browser:dev)
+        // dropped because locally-built images (e.g. embedder dev images)
         // have no registry digest to pin to.
         image: string;
         workingDirectory: string;
@@ -57,7 +57,7 @@ export type ToolRuntimeDescriptor =
         ports?: RuntimePortDescriptor[];
         restartPolicy?: 'unless-stopped';
         // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-        // sen-browser declares `net.ipv6.conf.lo.disable_ipv6=0`
+        // Some embedder images declare `net.ipv6.conf.lo.disable_ipv6=0`
         // so superpowers-chrome's port-availability check can bind to `::1`.
         sysctls?: Record<string, string>;
         // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
@@ -70,7 +70,7 @@ export type ToolRuntimeDescriptor =
         // sidecar sets the persona's default route after start.
         gatewayRoute?: string;
         // When true, the persona is a quarantined browser-driver whose
-        // Chrome CDP is exposed over a unix socket on the shared sen-browser-cdp
+        // Chrome CDP is exposed over a unix socket on a shared browser-cdp
         // mount. Lace injects SEN_BROWSER_CDP_SOCKET and emits the matching
         // browserCdpSocketPath on network attach so the credential helper can
         // reach it. Mount scope IS the access-control boundary: only personas

@@ -42,7 +42,7 @@ function hasImage(image: string): boolean {
 const DOCKER_AVAILABLE = hasDockerAvailable();
 
 // Use node:24-bookworm for per_invocation tests (has sh + bash, readily available).
-// For persistent tests, prefer sen-box:dev if available; fall back to node:24-bookworm.
+// For persistent tests, prefer a locally available embedder image if present; fall back to node:24-bookworm.
 const TEST_PER_INVOCATION_IMAGE = process.env.LACE_TEST_PER_INVOCATION_IMAGE ?? 'node:24-bookworm';
 const TEST_PERSISTENT_IMAGE =
   process.env.LACE_TEST_PERSISTENT_IMAGE ??
@@ -241,7 +241,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
     });
 
     const specName = spec.name;
-    // Persistent containers use spec.containerId = `sen-<persona>` (no lace- prefix).
+    // Persistent containers use spec.containerId = `<prefix>-<persona>` (no lace- prefix).
     const dockerName = `sen-${personaName}`;
     createdContainerNames.push(dockerName);
 
@@ -392,7 +392,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
   // -------------------------------------------------------------------------
 
   it('concurrent persistent delegates use the same projected container', async () => {
-    // Use a unique persona name to avoid colliding with a real sen-box-shell on the host
+    // Use a unique persona name to avoid colliding with any real persistent persona container on the host
     const personaName = `test-pri1796-${uuidv4().slice(0, 8)}`;
     const expectedDockerName = `sen-${personaName}`;
 

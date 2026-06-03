@@ -1,5 +1,5 @@
-// ABOUTME: ShimContainerRuntime — drives the sen-docker shim via the closed `spawn` verb instead of `docker create`.
-// ABOUTME: create() emits `<dockerBin> spawn <persona> <parent> <child> <jobId>`; start()/netns are no-ops (spawn is atomic); other verbs inherit DockerContainerRuntime (dockerBin = the sen-docker-client wrapper, which forwards + the shim gates).
+// ABOUTME: ShimContainerRuntime — drives an external docker shim via the closed `spawn` verb instead of `docker create`.
+// ABOUTME: create() emits `<dockerBin> spawn <persona> <parent> <child> <jobId>`; start()/netns are no-ops (spawn is atomic); other verbs inherit DockerContainerRuntime (dockerBin = the shim wrapper binary, which forwards to the shim and is gated by it).
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
