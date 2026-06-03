@@ -10,7 +10,8 @@ import {
   writeSessionState,
 } from '@lace/agent/storage/session-store';
 import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
-import { compact } from '@lace/agent/compaction/track-compaction';
+import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import {
@@ -157,12 +158,16 @@ export async function handleSlashCommand(
           connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
         });
-        const result = await compact(events, {
-          threadId: sessionId,
-          sessionDir,
-          provider,
-          modelId: effectiveConfig.modelId,
-        }).finally(() => provider.cleanup());
+        const name = compactionStrategyNameForSession(sessionDir);
+        const raw = await resolveCompactionStrategy(name)
+          .compact(events, {
+            threadId: sessionId,
+            sessionDir,
+            provider,
+            modelId: effectiveConfig.modelId,
+          })
+          .finally(() => provider.cleanup());
+        const result = validatePreserved(raw);
 
         if ('noop' in result) {
           return finishTurn('Context is already minimal. Nothing to compact.');

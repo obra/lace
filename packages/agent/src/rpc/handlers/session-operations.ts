@@ -37,7 +37,8 @@ import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
 } from '../../message-building/message-builder';
-import { compact } from '@lace/agent/compaction/track-compaction';
+import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
@@ -461,9 +462,6 @@ export function registerSessionOperationHandlers(
     assertSessionReady(state);
 
     const parsed = params as { strategy?: string } | undefined;
-    if (parsed?.strategy && parsed.strategy !== 'track-based') {
-      throwInvalidParams('strategy must be track-based (legacy strategies removed)');
-    }
 
     return await runExclusive(async () => {
       const sessionDir = state.activeSession!.dir;
@@ -487,12 +485,14 @@ export function registerSessionOperationHandlers(
         // identical. Same cast pattern is used in slash-commands.ts.
         const events = rawEvents.events as unknown as TypedDurableEvent[];
 
-        const result = await compact(events, {
+        const name = parsed?.strategy ?? compactionStrategyNameForSession(sessionDir);
+        const raw = await resolveCompactionStrategy(name).compact(events, {
           threadId: state.activeSession!.meta.sessionId,
           sessionDir,
           provider,
           modelId: effectiveConfig.modelId,
         });
+        const result = validatePreserved(raw);
 
         if ('noop' in result) {
           return {

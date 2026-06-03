@@ -46,7 +46,8 @@ import type {
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
 import { computePressure, shouldFireCompaction } from './compaction-trigger';
-import { compact } from '@lace/agent/compaction/track-compaction';
+import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 /**
@@ -1062,7 +1063,10 @@ export class ConversationRunner {
           const allEvents = readDurableEvents(sessionDir, {
             limit: Number.MAX_SAFE_INTEGER,
           }).events;
-          const result = await compact(
+          const strategy = resolveCompactionStrategy(
+            this.config.persona ? compactionStrategyNameForSession(sessionDir) : 'track-based'
+          );
+          const raw = await strategy.compact(
             // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
             // is the typed union. The shapes are identical on disk — this cast is
             // safe because the event-log writer and event-types agree on the wire
@@ -1070,6 +1074,7 @@ export class ConversationRunner {
             allEvents as unknown as TypedDurableEvent[],
             { threadId: sessionId, sessionDir, provider, modelId: modelId ?? undefined }
           );
+          const result = validatePreserved(raw);
           if (!('noop' in result)) {
             await this.deps.runExclusive(() => {
               const sessionState = readSessionState(sessionDir);
@@ -1084,7 +1089,7 @@ export class ConversationRunner {
           }
         }
       } catch (compactionErr) {
-        logger.error('runner: track-based compaction failed', {
+        logger.error('runner: compaction failed', {
           err: compactionErr instanceof Error ? compactionErr.message : String(compactionErr),
           turnId,
           stopReason,

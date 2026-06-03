@@ -13,6 +13,8 @@ export function registerBuiltinCompaction(): void {
 }
 
 export function resolveCompactionStrategy(name: string): CompactionStrategy {
+  // Ensure the built-in is registered even when boot() hasn't run (e.g. tests).
+  registerBuiltinCompaction();
   return registries.compaction.resolve(name);
 }
 
