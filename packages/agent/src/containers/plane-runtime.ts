@@ -1,7 +1,8 @@
 // ABOUTME: Standalone ContainerRuntime that talks the sen-docker plane client.
 // ABOUTME: The plane owns docker create/start details; lace sends selector verbs only.
 
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
+import type { ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import { logger } from '@lace/agent/utils/logger';
 import { appendEnvironmentOverlayArgs, commandWithExecEnvironment } from './exec-environment';
@@ -81,7 +82,10 @@ export class PlaneRuntime implements ContainerRuntime {
   private readonly containers = new Map<string, ContainerInfo>();
   private readonly configs = new Map<string, ContainerConfig | PlaneSpawnRequest>();
 
-  constructor(planeBin: string, options: { run?: PlaneRunner['run'] } = {}) {
+  constructor(
+    private readonly planeBin: string,
+    options: { run?: PlaneRunner['run'] } = {}
+  ) {
     this.runner = options.run ? { run: options.run } : new ExecFilePlaneRunner(planeBin);
   }
 
@@ -162,7 +166,7 @@ export class PlaneRuntime implements ContainerRuntime {
     }
     if (options.stdin !== undefined) {
       throw new ContainerError(
-        'PlaneRuntime.exec does not support stdin; use execStream when plane streaming lands',
+        'PlaneRuntime.exec does not support stdin; use execStream for interactive commands',
         containerId
       );
     }
@@ -193,8 +197,110 @@ export class PlaneRuntime implements ContainerRuntime {
     }
   }
 
-  async execStream(_containerId: string, _options: ExecStreamOptions): Promise<ExecStreamHandle> {
-    throw new ContainerError('PlaneRuntime.execStream is not implemented in this phase');
+  async execStream(containerId: string, options: ExecStreamOptions): Promise<ExecStreamHandle> {
+    const info = this.containers.get(containerId);
+    if (!info) {
+      throw new ContainerNotFoundError(containerId);
+    }
+    if (info.state !== 'running') {
+      throw new ContainerError(`Container ${containerId} is not running`, containerId);
+    }
+
+    const args: string[] = ['exec-stream', '-i'];
+    if (options.workingDirectory) {
+      args.push('-w', options.workingDirectory);
+    }
+    appendEnvironmentOverlayArgs(args, options);
+    args.push(containerId, ...commandWithExecEnvironment(options));
+
+    logger.debug('Streaming exec in plane container', {
+      containerId,
+      commandLength: options.command.length,
+    });
+
+    let child: ChildProcess;
+    try {
+      child = spawn(this.planeBin, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContainerError(
+        `Failed to spawn plane exec stream: ${message}`,
+        containerId,
+        error instanceof Error ? error : undefined
+      );
+    }
+
+    let spawned = false;
+    const waitPromise = new Promise<{ exitCode: number }>((resolve) => {
+      let settled = false;
+      const settle = (exitCode: number) => {
+        if (settled) return;
+        settled = true;
+        resolve({ exitCode });
+      };
+      child.once('error', (err) => {
+        if (!spawned || settled) return;
+        logger.warn('Plane exec stream child errored after spawn', {
+          containerId,
+          error: err.message,
+        });
+        settle(1);
+      });
+      child.once('close', (code) => {
+        settle(code ?? 1);
+      });
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const onSpawn = () => {
+          spawned = true;
+          child.off('error', onError);
+          resolve();
+        };
+        const onError = (err: Error) => {
+          child.off('spawn', onSpawn);
+          reject(
+            new ContainerError(
+              `Failed to spawn plane exec stream: ${err.message}`,
+              containerId,
+              err
+            )
+          );
+        };
+        child.once('spawn', onSpawn);
+        child.once('error', onError);
+      });
+    } catch (error) {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // Best effort; the process may have failed before it could be killed.
+      }
+      throw error;
+    }
+
+    if (!child.stdin || !child.stdout || !child.stderr) {
+      child.kill('SIGKILL');
+      throw new ContainerError(
+        'Spawned plane exec stream is missing one or more standard streams',
+        containerId
+      );
+    }
+
+    child.stdin.on('error', () => {});
+
+    return {
+      stdin: child.stdin,
+      stdout: child.stdout,
+      stderr: child.stderr,
+      wait: () => waitPromise,
+      kill: (signal?: NodeJS.Signals) => {
+        child.kill(signal ?? 'SIGTERM');
+      },
+    };
   }
 
   inspect(containerId: string): ContainerInfo {

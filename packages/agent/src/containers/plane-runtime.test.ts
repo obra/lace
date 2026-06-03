@@ -1,9 +1,53 @@
 // ABOUTME: Tests PlaneRuntime as a standalone sen-docker plane client.
 // ABOUTME: Uses an injected runner so no docker CLI or real plane process is needed.
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { EventEmitter } from 'events';
+import { PassThrough } from 'stream';
+import type { ChildProcess } from 'child_process';
+
+const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
+
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    spawn: spawnMock,
+  };
+});
+
 import { PlaneRuntime, type PlaneRunner } from './plane-runtime';
 import type { PlaneSpawnRequest } from './types';
+
+interface FakeChild {
+  child: ChildProcess;
+  stdin: PassThrough;
+  stdout: PassThrough;
+  stderr: PassThrough;
+  kill: ReturnType<typeof vi.fn>;
+  emit: EventEmitter['emit'];
+  listenerCount: EventEmitter['listenerCount'];
+}
+
+function makeFakeChild(): FakeChild {
+  const emitter = new EventEmitter();
+  const stdin = new PassThrough();
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const kill = vi.fn();
+
+  Object.assign(emitter, { stdin, stdout, stderr, kill });
+
+  return {
+    child: emitter as unknown as ChildProcess,
+    stdin,
+    stdout,
+    stderr,
+    kill,
+    emit: emitter.emit.bind(emitter),
+    listenerCount: emitter.listenerCount.bind(emitter),
+  };
+}
 
 function spawnRequest(extra: Partial<PlaneSpawnRequest> = {}): PlaneSpawnRequest {
   return {
@@ -16,6 +60,10 @@ function spawnRequest(extra: Partial<PlaneSpawnRequest> = {}): PlaneSpawnRequest
 }
 
 describe('PlaneRuntime', () => {
+  beforeEach(() => {
+    spawnMock.mockReset();
+  });
+
   it('create emits the 4-arg spawn verb and returns the daemon name', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-abc\n',
@@ -194,7 +242,7 @@ describe('PlaneRuntime', () => {
     await expect(rt.exec(id, { command: ['sleep', '10'] })).rejects.toThrow(/Execution timeout/);
   });
 
-  it('exec rejects stdin until streaming exec is implemented', async () => {
+  it('exec rejects stdin and directs callers to execStream', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-stdin\n',
       stderr: '',
@@ -208,14 +256,134 @@ describe('PlaneRuntime', () => {
     );
   });
 
-  it('execStream throws a clear not-yet-implemented error', async () => {
-    const rt = new PlaneRuntime('/bin/sen-docker-client', {
-      run: vi.fn<PlaneRunner['run']>(),
+  it('execStream spawns exec-stream with stdin and maps child streams', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-stream\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+    const fake = makeFakeChild();
+    spawnMock.mockReturnValue(fake.child);
+    setImmediate(() => fake.emit('spawn'));
+
+    const handle = await rt.execStream(id, {
+      command: ['node', '-e', 'process.exit(7)'],
+      workingDirectory: '/work',
+      environment: { A: '1', B: '2' },
     });
 
-    await expect(rt.execStream('sen-x-stream', { command: ['cat'] })).rejects.toThrow(
-      /execStream.*not implemented/i
+    expect(spawnMock).toHaveBeenCalledWith(
+      '/bin/sen-docker-client',
+      [
+        'exec-stream',
+        '-i',
+        '-w',
+        '/work',
+        '-e',
+        'A=1',
+        '-e',
+        'B=2',
+        id,
+        'node',
+        '-e',
+        'process.exit(7)',
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
     );
+    expect(handle.stdin).toBe(fake.stdin);
+    expect(handle.stdout).toBe(fake.stdout);
+    expect(handle.stderr).toBe(fake.stderr);
+  });
+
+  it('execStream wraps replace-mode commands with env -i instead of plane env flags', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-replace\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+    const fake = makeFakeChild();
+    spawnMock.mockReturnValue(fake.child);
+    setImmediate(() => fake.emit('spawn'));
+
+    await rt.execStream(id, {
+      command: ['printenv', 'HOST_SECRET'],
+      environment: { MCP_ONLY: 'visible' },
+      environmentMode: 'replace',
+    });
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      '/bin/sen-docker-client',
+      ['exec-stream', '-i', id, 'env', '-i', 'MCP_ONLY=visible', 'printenv', 'HOST_SECRET'],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+  });
+
+  it('execStream rejects unknown and non-running cached containers', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-stopped\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+
+    await expect(rt.execStream('missing-container', { command: ['true'] })).rejects.toThrow(
+      /Container not found: missing-container/
+    );
+
+    await rt.stop(id);
+    await expect(rt.execStream(id, { command: ['true'] })).rejects.toThrow(/not running/);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it('execStream wait reuses the same promise and resolves the plane client exit code', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-wait\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+    const fake = makeFakeChild();
+    spawnMock.mockReturnValue(fake.child);
+    setImmediate(() => fake.emit('spawn'));
+
+    const handle = await rt.execStream(id, { command: ['true'] });
+    const firstWait = handle.wait();
+    const secondWait = handle.wait();
+
+    expect(firstWait).toBe(secondWait);
+    expect(fake.listenerCount('close')).toBe(1);
+    expect(fake.listenerCount('error')).toBe(1);
+
+    setImmediate(() => fake.emit('close', 7, null));
+
+    await expect(firstWait).resolves.toEqual({ exitCode: 7 });
+    await expect(secondWait).resolves.toEqual({ exitCode: 7 });
+  });
+
+  it("execStream rejects when the plane client emits 'error' before spawn", async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-spawn-error\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+    const fake = makeFakeChild();
+    spawnMock.mockImplementation(() => {
+      setImmediate(() => fake.emit('error', new Error('ENOENT: sen-docker-client')));
+      return fake.child;
+    });
+
+    await expect(rt.execStream(id, { command: ['true'] })).rejects.toThrow(
+      /ENOENT: sen-docker-client/
+    );
+    expect(fake.kill).toHaveBeenCalledWith('SIGKILL');
   });
 
   it('stop and remove go through the plane client and update cache', async () => {
