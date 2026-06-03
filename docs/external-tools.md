@@ -177,9 +177,71 @@ mcpServers:
   `toolRuntime` runs it inside the persona's container runtime (via a runtime
   stdio transport).
 - **Lifecycle:** servers are started and their tools registered when a session's
-  config is reconciled (`reconcileMcpServersForActiveSession` →
-  `MCPServerManager.startServer` → `client.listTools()` → `MCPToolAdapter` →
-  `ToolExecutor`). Enable/disable is per-session config.
+  config is reconciled: `reconcileMcpServersForActiveSession` →
+  `MCPServerManager.startServer` → (`MCPToolRegistry` listens for the
+  `server-status-changed` event) → `client.listTools()` → `MCPToolAdapter` →
+  `ToolExecutor`. `MCPToolRegistry` is the glue between the manager and the
+  executor. Enable/disable is per-session config.
+
+### Writing an MCP server (Node, stdio)
+
+Use the MCP SDK's server side. The `inputSchema` you pass to `registerTool` is a
+**Zod raw shape** (`{ field: z.string() }`) — *not* a JSON Schema object; the SDK
+generates the JSON Schema the client sees. (Passing a JSON-Schema object setups
+fine but throws at call time.)
+
+```js
+// my-server.mjs  (".mjs" → ESM; the package may be type:module)
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+
+const server = new McpServer(
+  { name: 'my-server', version: '1.0.0' },
+  { capabilities: { tools: {} } }
+);
+
+server.registerTool(
+  'do_thing',
+  {
+    description: 'Does a thing',
+    inputSchema: { text: z.string().describe('input text') }, // Zod RAW SHAPE
+  },
+  ({ text }) => ({ content: [{ type: 'text', text: text.toUpperCase() }] })
+);
+
+await server.connect(new StdioServerTransport());
+```
+
+Run it with `node my-server.mjs`; declare it in `mcpServers` with
+`command: node, args: ['my-server.mjs']`.
+
+### Testing an MCP server
+
+Drive lace's real wiring — no mocks of the MCP protocol. Note the in-code
+`MCPServerConfig` requires a `tools` field (`tools: {}` = default each tool to the
+`ask` policy) that the YAML form fills in implicitly:
+
+```ts
+import { MCPServerManager } from '@lace/agent/mcp/server-manager';
+import { MCPToolAdapter } from '@lace/agent/mcp/tool-adapter';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
+
+const manager = new MCPServerManager();
+await manager.startServer({
+  serverId: 'my-server',
+  config: { command: process.execPath, args: [SERVER_PATH], enabled: true, tools: {}, placement: 'host' },
+  runtime: new HostToolRuntime({ id: 'test:my-server', cwd: process.cwd() }),
+  hostCwd: process.cwd(),
+});
+
+const client = manager.getClient('my-server')!;            // also: manager.getServer(id).status === 'running'
+const { tools } = await client.listTools();
+const adapter = new MCPToolAdapter(tools.find((t) => t.name === 'do_thing')!, 'my-server', client);
+const result = await adapter.execute({ text: 'hi' }, { signal: new AbortController().signal });
+// adapter.name === 'my-server/do_thing'; result.content[0].text holds the output
+await manager.shutdown();
+```
 
 ### Limitation: MCP tools don't receive `ToolContext`
 
