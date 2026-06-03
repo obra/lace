@@ -118,9 +118,11 @@ const researcher: PersonaDef = {
 api.personas.register('acme/researcher', researcher);
 ```
 
-The `body` is rendered with the same variable substitution as disk personas
-(e.g. `{{system.os}}`, `{{system.sessionDate}}`). User-disk personas override
-plugin personas override bundled ones.
+The `body` is rendered with the same mustache variables as disk personas. The
+built-in `SystemVariableProvider` supplies three: `{{system.os}}` (platform, e.g.
+`linux`/`darwin`), `{{system.arch}}` (e.g. `x64`/`arm64`), and
+`{{system.sessionDate}}` (`YYYY-MM-DD`). User-disk personas override plugin
+personas override bundled ones.
 
 `PersonaConfig` is a strict Zod type, so anything beyond the trivial
 `{ runtime: { type: 'root' } }` won't satisfy the TypeScript type from a plain

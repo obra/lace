@@ -375,6 +375,16 @@ interface PersonaConfig {
 }
 ```
 
+Example `config` with a compaction breakpoint:
+
+```ts
+config: {
+  tools: ['file_read', 'ripgrep', 'bash'],          // allowlist
+  maxTurns: 40,
+  compaction: { strategy: 'track-based', breakpoints: [{ at: 0.8, action: 'notify' }] },
+} as PersonaDef['config']
+```
+
 > **Typing note.** `PersonaConfig` is a Zod **`.strict()`** type, so a partial
 > object literal does not satisfy it directly in TypeScript (even a complete one
 > trips the strictness in many cases). Either build it via

@@ -22,7 +22,7 @@ const securityReviewer: PersonaDef = {
   config: {
     runtime: { type: 'root' },
     compaction: { strategy: 'track-based' },
-  } as never, // cast: PersonaConfig is strict; partial objects fail Zod unless cast
+  } as PersonaDef['config'], // cast: PersonaConfig is strict; partial objects fail Zod unless cast
   body:
     'You are Security Reviewer. Today is {{system.sessionDate}}.\n' +
     'Your job is to inspect code changes for security vulnerabilities: ' +
