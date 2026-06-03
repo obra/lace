@@ -31,8 +31,8 @@ const runtimeRootSchema = z
 
 const portMappingSchema = z
   .object({
-    host: z.number().int().positive(),
-    container: z.number().int().positive(),
+    host: z.number().int().min(0).max(65535),
+    container: z.number().int().min(0).max(65535),
   })
   .strict();
 
@@ -47,6 +47,13 @@ const containerSharingSchema = z.enum(['per_invocation', 'persistent']);
 // persona file fails at parse time instead of mid-`docker create`.
 const sysctlKeySchema = z.string().regex(/^[a-z0-9_]+(\.[a-z0-9_]+)+$/);
 
+/**
+ * Coupled to sen-core-v2/sen-docker/src/persona.rs `PersonaSpec`: container
+ * runtime frontmatter is the single-source `.md` schema consumed by both lace
+ * and the plane. Future edits to these runtime fields need plane round-trip
+ * tests because Rust deserializes the same `runtime:` mapping with
+ * `deny_unknown_fields`.
+ */
 const runtimeContainerSchema = z
   .object({
     type: z.literal('container'),

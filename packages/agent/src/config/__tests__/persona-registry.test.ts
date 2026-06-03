@@ -114,6 +114,45 @@ Body.`;
     });
   });
 
+  it('clamps container runtime ports to u16 bounds', () => {
+    const atUpperBound = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /work
+  mounts: []
+  ports:
+    - host: 65535
+      container: 0
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'port-upper-bound.md'), atUpperBound);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('port-upper-bound').config.runtime).toMatchObject({
+      type: 'container',
+      ports: [{ host: 65535, container: 0 }],
+    });
+
+    const overUpperBound = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /work
+  mounts: []
+  ports:
+    - host: 65536
+      container: 80
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'port-over-upper-bound.md'), overUpperBound);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('port-over-upper-bound')).toThrow(/ports/i);
+  });
+
   it('parses runtime.type=container with empty mounts and defaulted env', () => {
     const content = `---
 runtime:
