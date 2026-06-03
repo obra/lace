@@ -180,7 +180,7 @@ export function splitAtTailBoundary(
  * The caller supplies the attribution logic, making this domain-neutral.
  *
  * Used by track-based compaction with `kernelAttributor`; can be used by plugin
- * strategies with custom attributors (e.g. slack-aware).
+ * strategies with custom attributors (e.g. domain-specific attributors).
  */
 export function demuxByTrack(
   events: TypedDurableEvent[],
@@ -211,7 +211,7 @@ export type TrackBlock = {
 const estimate = (s: string) => Math.ceil(s.length / 4);
 
 // ---------------------------------------------------------------------------
-// Generic (non-slack) salience helpers
+// Generic salience helpers
 // ---------------------------------------------------------------------------
 
 export const UNTRACKED = 'untracked' as const;
@@ -307,7 +307,7 @@ export function systemSalience(trackId: string, events: TypedDurableEvent[]): Tr
 }
 
 // ---------------------------------------------------------------------------
-// Generic (slack-free) section renderer
+// Generic section renderer
 // ---------------------------------------------------------------------------
 
 export type SchedulerRollup = {
@@ -323,31 +323,30 @@ export type GenericRenderInput = {
 const HEADER = '[Earlier conversation, compacted by track]';
 
 /**
- * Render job, scheduler, system/untracked, and "other" sections — all sections
- * except Slack. The Slack section is domain-specific and must be added by the
- * caller (e.g. renderCompactionPrefix in track-render.ts).
+ * Render job, scheduler, system/untracked, and "other" sections.
  *
  * Returns sections joined by newlines, starting with the header.
- * `slackParts` is an optional pre-rendered slack section to inject first
- * (after the header), preserving ordering: slack → job → scheduler → system → other.
+ * `extraSections` is an optional pre-rendered section string to inject first
+ * (after the header, before job/scheduler/system/other). Used by plugin strategies
+ * to inject domain-specific sections (e.g. a plugin's own rendered section).
+ * When `extraSections` is provided, blocks whose trackId would be rendered by that
+ * section are excluded from ## Other; when absent, all unrecognised blocks fall
+ * through to ## Other.
  */
-export function renderGenericSections(input: GenericRenderInput, slackParts?: string): string {
+export function renderGenericSections(input: GenericRenderInput, extraSections?: string): string {
   const jobBlocks = input.blocks.filter((b) => b.trackId.startsWith('job:'));
   const systemBlocks = input.blocks.filter(
     (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked'
   );
   const otherBlocks = input.blocks.filter(
     (b) =>
-      !b.trackId.startsWith('slack:') &&
-      !b.trackId.startsWith('job:') &&
-      !b.trackId.startsWith('system:') &&
-      b.trackId !== 'untracked'
+      !b.trackId.startsWith('job:') && !b.trackId.startsWith('system:') && b.trackId !== 'untracked'
   );
 
   const parts: string[] = [HEADER];
 
-  if (slackParts) {
-    parts.push(slackParts);
+  if (extraSections) {
+    parts.push(extraSections);
   }
 
   if (jobBlocks.length > 0) {

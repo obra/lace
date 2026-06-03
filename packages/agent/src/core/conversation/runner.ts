@@ -1133,22 +1133,13 @@ export class ConversationRunner {
           const strategy = resolveCompactionStrategy(
             this.config.persona ? compactionStrategyNameForSession(sessionDir) : 'track-based'
           );
-          const compactionCtx = {
-            // Legacy fields kept for track-based strategy back-compat until Task 6
-            // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
-            provider,
-            modelId,
-            // New ctx.query + guidance fields from buildCompactionContext.
-            // buildCompactionContext omits ctx.query when connectionId/modelId is
-            // absent — no need for the conditional spread here any more.
-            ...buildCompactionContext({
-              threadId: sessionId,
-              sessionDir,
-              connectionId: this.config.connectionId,
-              modelId: modelId ?? undefined,
-              guidance: compactionRequest.guidance,
-            }),
-          };
+          const compactionCtx = buildCompactionContext({
+            threadId: sessionId,
+            sessionDir,
+            connectionId: this.config.connectionId,
+            modelId: modelId ?? undefined,
+            guidance: compactionRequest.guidance,
+          });
           const raw = await strategy.compact(
             // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
             // is the typed union. The shapes are identical on disk — this cast is

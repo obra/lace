@@ -14,7 +14,6 @@ import {
 import { demuxByTrack } from '../toolkit';
 import type { CompactionContext } from '../types';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
-import type { AIProvider } from '@lace/agent/providers/base-provider';
 
 const event = (
   seq: number,
@@ -32,13 +31,13 @@ const event = (
 describe('buildTurnToTrackMap', () => {
   it('maps turnId to the track of the immediately preceding prompt', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [{ type: 'text', text: 'hi' }], track: 'slack:A' }),
+      event(1, 'prompt', { content: [{ type: 'text', text: 'hi' }], track: 'ext:A' }),
       event(2, 'turn_start', {}, 'turn_X'),
       event(3, 'message', { content: 'reply' }, 'turn_X'),
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_X'),
     ];
     const map = buildTurnToTrackMap(events);
-    expect(map.get('turn_X')).toBe('slack:A');
+    expect(map.get('turn_X')).toBe('ext:A');
   });
 
   it('defaults missing track to untracked', () => {
@@ -51,32 +50,32 @@ describe('buildTurnToTrackMap', () => {
 
   it('uses the closest preceding prompt across multiple turns', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      event(1, 'prompt', { content: [], track: 'ext:A' }),
       event(2, 'turn_start', {}, 'turn_1'),
       event(3, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
-      event(4, 'prompt', { content: [], track: 'slack:B' }),
+      event(4, 'prompt', { content: [], track: 'ext:B' }),
       event(5, 'turn_start', {}, 'turn_2'),
       event(6, 'turn_end', { stopReason: 'end_turn' }, 'turn_2'),
     ];
     const map = buildTurnToTrackMap(events);
-    expect(map.get('turn_1')).toBe('slack:A');
-    expect(map.get('turn_2')).toBe('slack:B');
+    expect(map.get('turn_1')).toBe('ext:A');
+    expect(map.get('turn_2')).toBe('ext:B');
   });
 });
 
 describe('groupEarlierEventsByTrack', () => {
   it('groups in-turn events by the turn-track and mid-turn injects by their own track', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      event(1, 'prompt', { content: [], track: 'ext:A' }),
       event(2, 'turn_start', {}, 'turn_1'),
       event(3, 'tool_use', { toolCallId: 't1', name: 'bash', input: {} }, 'turn_1'),
       event(4, 'context_injected', { content: [], track: 'alarm:X' }), // mid-turn (no turnId)
       event(5, 'message', { content: 'ok' }, 'turn_1'),
       event(6, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
     ];
-    const turnToTrack = new Map([['turn_1', 'slack:A']]);
+    const turnToTrack = new Map([['turn_1', 'ext:A']]);
     const groups = groupEarlierEventsByTrack(events, turnToTrack);
-    expect(groups.get('slack:A')?.map((e) => e.eventSeq)).toEqual([1, 2, 3, 5, 6]);
+    expect(groups.get('ext:A')?.map((e) => e.eventSeq)).toEqual([1, 2, 3, 5, 6]);
     expect(groups.get('alarm:X')?.map((e) => e.eventSeq)).toEqual([4]);
   });
 
@@ -93,11 +92,11 @@ describe('groupEarlierEventsByTrack', () => {
   it('filters out context_compacted events', () => {
     const events: TypedDurableEvent[] = [
       event(1, 'context_compacted', { strategy: 'old', preserved: [] }),
-      event(2, 'prompt', { content: [], track: 'slack:A' }),
+      event(2, 'prompt', { content: [], track: 'ext:A' }),
     ];
     const groups = groupEarlierEventsByTrack(events, new Map());
     expect(groups.get('untracked')).toBeUndefined();
-    expect(groups.get('slack:A')?.map((e) => e.eventSeq)).toEqual([2]);
+    expect(groups.get('ext:A')?.map((e) => e.eventSeq)).toEqual([2]);
   });
 
   it('routes top-level job_started and job_finished to job:<jobId> track', () => {
@@ -147,19 +146,17 @@ describe('salienceForTrack', () => {
     expect(block?.body).toMatch(/3 idle-error reports/i);
   });
 
-  it('slack tracks extract inbound text from prompts and outbound from slack_send_message tool_use', () => {
+  it('unknown plugin-prefixed tracks render generically (no domain-specific XML wrapper)', () => {
+    // The kernel default treats any unrecognised track prefix generically —
+    // generic prose extraction. Domain-specific rendering belongs in plugins.
+    // This verifies the kernel produces no plugin-specific XML for arbitrary tracks.
     const events: TypedDurableEvent[] = [
       event(
         1,
         'prompt',
         {
-          content: [
-            {
-              type: 'text',
-              text: '<messages source="slack" channel="&lt;#C1|test&gt;" thread_ts="1.0" reply=\'slack_send_message(channel="C1", thread_ts="1.0")\'><current count="1"><slack_message ref="slack:T:C1|test/1.0@1.0" from="@U1|test">hello</slack_message></current></messages>',
-            },
-          ],
-          track: 'slack:T:C1:1.0',
+          content: [{ type: 'text', text: 'hello from plugin track' }],
+          track: 'ext:T:C1:1.0',
         },
         undefined
       ),
@@ -169,114 +166,20 @@ describe('salienceForTrack', () => {
         'tool_use',
         {
           toolCallId: 't1',
-          name: 'slack/send_message',
+          name: 'ext/send_message',
           input: { channel: 'C1', text: 'hi back' },
         },
         'turn_1'
       ),
       event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
     ];
-    const block = salienceForTrack('slack:T:C1:1.0', events);
-    expect(block?.body).toContain('<slack-thread ref="slack:T0FIXTURE:C1|test/1.0"');
-    expect(block?.body).toContain('from="@U1|test"');
-    expect(block?.body).toContain('>hello</slack_message>');
-    expect(block?.body).toContain('from="me"');
-    expect(block?.body).toContain('>hi back</slack_message>');
-  });
-
-  it('slack tracks dedupe consecutive identical inbound messages within a speaker block', () => {
-    // Two consecutive prompts with the same actor+text — should appear only once,
-    // as adjacent-only deduplication merges them in the speaker block.
-    const sameMessage =
-      '<messages source="slack" channel="&lt;#C1|test&gt;" thread_ts="1.0" reply=\'slack_send_message(channel="C1", thread_ts="1.0")\'><current count="1"><slack_message ref="slack:T:C1|test/1.0@1.0" from="@U1|test">hello</slack_message></current></messages>';
-    const events: TypedDurableEvent[] = [
-      event(1, 'prompt', {
-        content: [{ type: 'text', text: sameMessage }],
-        track: 'slack:T:C1:1.0',
-      }),
-      event(2, 'prompt', {
-        content: [{ type: 'text', text: sameMessage }],
-        track: 'slack:T:C1:1.0',
-      }),
-    ];
-    const block = salienceForTrack('slack:T:C1:1.0', events);
-    const body = block?.body ?? '';
-    // The message appears exactly once (dedupe within speaker block)
-    const msgOccurrences = body.split('>hello</slack_message>').length - 1;
-    expect(msgOccurrences).toBe(1);
-    // The actor token appears exactly once (grouped into one speaker block)
-    const actorOccurrences = body.split('from="@U1|test"').length - 1;
-    expect(actorOccurrences).toBe(1);
-  });
-
-  it('slack tracks interleave inbound and outbound chronologically', () => {
-    // Alternating prompt/tool_use produces alternating <slack_message> elements, not
-    // all-inbound-then-all-outbound.
-    const makeEnvelope = (msg: string) =>
-      `<messages source="slack" channel="&lt;#C1|test&gt;" thread_ts="1.0" reply='slack_send_message(channel="C1", thread_ts="1.0")'><current count="1"><slack_message ref="slack:T:C1|test/1.0@1.0" from="@U1|test">${msg}</slack_message></current></messages>`;
-    const events: TypedDurableEvent[] = [
-      event(1, 'prompt', {
-        content: [{ type: 'text', text: makeEnvelope('hi') }],
-        track: 'slack:T:C1:1.0',
-      }),
-      event(2, 'turn_start', {}, 'turn_1'),
-      event(
-        3,
-        'tool_use',
-        { toolCallId: 't1', name: 'slack/send_message', input: { channel: 'C1', text: 'reply1' } },
-        'turn_1'
-      ),
-      event(4, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
-      event(5, 'prompt', {
-        content: [{ type: 'text', text: makeEnvelope('bye') }],
-        track: 'slack:T:C1:1.0',
-      }),
-      event(6, 'turn_start', {}, 'turn_2'),
-      event(
-        7,
-        'tool_use',
-        { toolCallId: 't2', name: 'slack/send_message', input: { channel: 'C1', text: 'reply2' } },
-        'turn_2'
-      ),
-      event(8, 'turn_end', { stopReason: 'end_turn' }, 'turn_2'),
-    ];
-    const block = salienceForTrack('slack:T:C1:1.0', events);
-    const body = block?.body ?? '';
-    // Alternating blocks: U1 → me → U1 → me
-    // Each inbound actor token appears twice (once per inbound group)
-    const inActorOccurrences = body.split('from="@U1|test"').length - 1;
-    const outActorOccurrences = body.split('from="me"').length - 1;
-    expect(inActorOccurrences).toBe(2);
-    expect(outActorOccurrences).toBe(2);
-    // Messages appear in chronological order: hi before reply1 before bye before reply2
-    const hiIdx = body.indexOf('>hi<');
-    const reply1Idx = body.indexOf('>reply1<');
-    const byeIdx = body.indexOf('>bye<');
-    const reply2Idx = body.indexOf('>reply2<');
-    expect(hiIdx).toBeLessThan(reply1Idx);
-    expect(reply1Idx).toBeLessThan(byeIdx);
-    expect(byeIdx).toBeLessThan(reply2Idx);
-  });
-
-  it('slack tracks render actor token directly from from= attribute', () => {
-    // The actor token is taken verbatim from from="@U2|name" — no display_name
-    // attribute needed, no [u/UID] fallback format.
-    const events: TypedDurableEvent[] = [
-      event(1, 'prompt', {
-        content: [
-          {
-            type: 'text',
-            text: '<messages source="slack" channel="&lt;#C1|test&gt;" thread_ts="1.0" reply=\'slack_send_message(channel="C1", thread_ts="1.0")\'><current count="1"><slack_message ref="slack:T:C1|test/1.0@1.0" from="@U2|alice">no name needed</slack_message></current></messages>',
-          },
-        ],
-        track: 'slack:T:C1:1.0',
-      }),
-    ];
-    const block = salienceForTrack('slack:T:C1:1.0', events);
-    const body = block?.body ?? '';
-    expect(body).toContain('from="@U2|alice"');
-    expect(body).not.toContain('null');
-    expect(body).toContain('>no name needed</slack_message>');
+    const block = salienceForTrack('ext:T:C1:1.0', events);
+    // Must render generically — no plugin-specific XML wrapper
+    expect(block).not.toBeNull();
+    expect(block?.body).not.toContain('<plugin-thread');
+    expect(block?.body).not.toContain('<domain-thread');
+    // The prompt text appears as User: prose
+    expect(block?.body).toContain('hello from plugin track');
   });
 
   it('job tracks emit "delegated X → outcome" using job_started/job_finished', () => {
@@ -329,7 +232,7 @@ describe('splitAtTailBoundary', () => {
     const events: TypedDurableEvent[] = [];
     let seq = 1;
     for (let t = 0; t < 12; t++) {
-      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${t}` }));
+      events.push(event(seq++, 'prompt', { content: [], track: `ext:T${t}` }));
       events.push(turnStart(seq++, `turn_${t}`));
       events.push(turnEnd(seq++, `turn_${t}`));
     }
@@ -345,7 +248,7 @@ describe('splitAtTailBoundary', () => {
     // This confirms the turn-boundary semantics: a tool_use and its result both
     // live on turn_1, so they end up together in earlier — no snap needed.
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      event(1, 'prompt', { content: [], track: 'ext:A' }),
       turnStart(2, 'turn_1'),
       event(3, 'tool_use', { toolCallId: 't1', name: 'bash', input: {} }, 'turn_1'),
       event(
@@ -355,7 +258,7 @@ describe('splitAtTailBoundary', () => {
         'turn_1'
       ),
       turnEnd(5, 'turn_1'),
-      event(6, 'prompt', { content: [], track: 'slack:B' }),
+      event(6, 'prompt', { content: [], track: 'ext:B' }),
       turnStart(7, 'turn_2'),
       turnEnd(8, 'turn_2'),
     ];
@@ -367,7 +270,7 @@ describe('splitAtTailBoundary', () => {
 
   it('returns all-as-earlier when tailTurns is 0', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      event(1, 'prompt', { content: [], track: 'ext:A' }),
       turnStart(2, 'turn_1'),
       turnEnd(3, 'turn_1'),
     ];
@@ -379,10 +282,10 @@ describe('splitAtTailBoundary', () => {
   it('bails out (all-as-tail) when target turn_end has no turnId', () => {
     // turn_end with undefined turnId (e.g. crash-recovery synthesized)
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      event(1, 'prompt', { content: [], track: 'ext:A' }),
       turnStart(2, 'turn_1'),
       turnEnd(3, 'turn_1'),
-      event(4, 'prompt', { content: [], track: 'slack:B' }),
+      event(4, 'prompt', { content: [], track: 'ext:B' }),
       // Note: NO turnId on this turn_end
       event(5, 'turn_end', { stopReason: 'process_died' }),
     ];
@@ -393,96 +296,13 @@ describe('splitAtTailBoundary', () => {
 
   it('returns all events as tail when total turns <= tail size', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:A' }),
+      event(1, 'prompt', { content: [], track: 'ext:A' }),
       turnStart(2, 'turn_1'),
       turnEnd(3, 'turn_1'),
     ];
     const { earlier, tail } = splitAtTailBoundary(events, 10);
     expect(earlier).toEqual([]);
     expect(tail.length).toBe(3);
-  });
-});
-
-describe('compact() with LLM fallback', () => {
-  // Build a text that is long enough that many entries in the body will exceed
-  // the 5K-token cap. untrackedSalience truncates each prompt to 500 chars and
-  // prefixes "User: " (6 chars), so each entry contributes ~506 chars (~127 tokens).
-  // 42 earlier turns × 127 tokens ≈ 5,334 tokens — comfortably over the cap.
-  const longEntry = 'a'.repeat(500);
-
-  it('calls provider.createResponse when a track block exceeds 5K tokens', async () => {
-    const calls: Array<{ messages: unknown; tools: unknown; modelId: string }> = [];
-    const mockProvider = {
-      createResponse: async (messages: unknown, tools: unknown, modelId: string) => {
-        calls.push({ messages, tools, modelId });
-        return { content: 'condensed summary', usage: { promptTokens: 0, completionTokens: 50 } };
-      },
-      setSystemPrompt: () => {},
-    } as unknown as AIProvider;
-
-    // Build an untracked track with 42 earlier turns (no `track` field → 'untracked').
-    const events: TypedDurableEvent[] = [];
-    let seq = 1;
-    for (let i = 0; i < 42; i++) {
-      events.push(
-        event(seq++, 'prompt', {
-          content: [{ type: 'text', text: longEntry }],
-        })
-      );
-      events.push(turnStart(seq++, `turn_${i}`));
-      events.push(turnEnd(seq++, `turn_${i}`));
-    }
-    // Add 10 trailing turns on a different track to satisfy the tail-size requirement.
-    for (let i = 0; i < 10; i++) {
-      events.push(event(seq++, 'prompt', { content: [], track: 'slack:T:C:1' }));
-      events.push(turnStart(seq++, `tail_${i}`));
-      events.push(turnEnd(seq++, `tail_${i}`));
-    }
-    const result = await compact(events, {
-      threadId: 'sess',
-      provider: mockProvider,
-      modelId: 'test-model',
-    });
-    expect(calls.length).toBeGreaterThan(0);
-    expect(calls[0].modelId).toBe('test-model');
-    // The prefix is merged into the first tail user message. Extract text
-    // from either a plain string or a ContentBlock[] to check for the summary.
-    const firstEntry = result.compactionEvent.data.preserved[0] as {
-      role: string;
-      content: string | Array<{ type: string; text?: string }>;
-    };
-    expect(firstEntry.role).toBe('user');
-    const firstText =
-      typeof firstEntry.content === 'string'
-        ? firstEntry.content
-        : (firstEntry.content as Array<{ type: string; text?: string }>)
-            .map((b) => b.text ?? '')
-            .join('');
-    expect(firstText).toContain('condensed summary');
-  });
-
-  it('does NOT call provider when all tracks fit', async () => {
-    let called = false;
-    const mockProvider = {
-      createResponse: async () => {
-        called = true;
-        return { content: '', usage: { promptTokens: 0, completionTokens: 0 } };
-      },
-      setSystemPrompt: () => {},
-    } as unknown as AIProvider;
-    const events: TypedDurableEvent[] = [];
-    let seq = 1;
-    for (let i = 0; i < 12; i++) {
-      events.push(
-        event(seq++, 'prompt', { content: [{ type: 'text', text: 'short' }], track: 'slack:T:C:0' })
-      );
-      events.push(turnStart(seq++, `turn_${i}`));
-      events.push(turnEnd(seq++, `turn_${i}`));
-    }
-    // modelId is set so the absence of a call is due to tracks fitting, not the
-    // missing-modelId guard.
-    await compact(events, { threadId: 'sess', provider: mockProvider, modelId: 'test-model' });
-    expect(called).toBe(false);
   });
 });
 
@@ -496,7 +316,7 @@ describe('compact()', () => {
       events.push(
         event(seq++, 'prompt', {
           content: [{ type: 'text', text: `msg ${t}` }],
-          track: `slack:T:C:${t}`,
+          track: `ext:T:C:${t}`,
         })
       );
       events.push(turnStart(seq++, `turn_${t}`));
@@ -523,9 +343,55 @@ describe('compact()', () => {
     expect(firstText).toContain('[Earlier conversation');
   });
 
+  it('plugin-tracked events render generically in the prefix (no domain-specific XML)', async () => {
+    // The kernel default renders any plugin-prefixed track as generic prose.
+    // No plugin-specific XML wrapper is emitted by the kernel.
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    // 2 earlier turns + 10 tail turns, all on the same ext: track
+    for (let t = 0; t < 2; t++) {
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: `ext msg ${t}` }],
+          track: 'ext:T:C1:1.0',
+        })
+      );
+      events.push(turnStart(seq++, `turn_${t}`));
+      events.push(turnEnd(seq++, `turn_${t}`));
+    }
+    for (let t = 2; t < 12; t++) {
+      events.push(
+        event(seq++, 'prompt', {
+          content: [{ type: 'text', text: `tail msg ${t}` }],
+          track: 'ext:T:C1:1.0',
+        })
+      );
+      events.push(turnStart(seq++, `turn_${t}`));
+      events.push(turnEnd(seq++, `turn_${t}`));
+    }
+    const result = await compact(events, ctx);
+    expect('compactionEvent' in result).toBe(true);
+    if (!('compactionEvent' in result)) return;
+    const firstEntry = result.compactionEvent.data.preserved[0] as {
+      role: string;
+      content: string | Array<{ type: string; text?: string }>;
+    };
+    const prefixText =
+      typeof firstEntry.content === 'string'
+        ? firstEntry.content
+        : (firstEntry.content as Array<{ type: string; text?: string }>)
+            .map((b) => b.text ?? '')
+            .join('');
+    // Generic rendering — no plugin-specific XML
+    expect(prefixText).not.toContain('<plugin-thread');
+    expect(prefixText).not.toContain('<domain-thread');
+    // The prompt text is captured generically as prose
+    expect(prefixText).toContain('ext msg 0');
+  });
+
   it('returns noop when there is nothing to compact (≤10 turns)', async () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [{ type: 'text', text: 'one' }], track: 'slack:A' }),
+      event(1, 'prompt', { content: [{ type: 'text', text: 'one' }], track: 'ext:A' }),
       turnStart(2, 'turn_1'),
       turnEnd(3, 'turn_1'),
     ];
@@ -543,7 +409,7 @@ describe('compact()', () => {
       events.push(
         event(seq++, 'prompt', {
           content: [{ type: 'text', text: `msg ${t}` }],
-          track: `slack:T${t}`,
+          track: `ext:T${t}`,
         })
       );
       events.push(turnStart(seq++, `turn_${t}`));
@@ -594,7 +460,7 @@ describe('compact()', () => {
     const events: TypedDurableEvent[] = [];
     let seq = 1;
     for (let i = 0; i < 10; i++) {
-      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(event(seq++, 'prompt', { content: [], track: `ext:T${i}` }));
       events.push(turnStart(seq++, `fill_${i}`));
       events.push(turnEnd(seq++, `fill_${i}`));
     }
@@ -602,7 +468,7 @@ describe('compact()', () => {
     events.push(
       event(seq++, 'prompt', {
         content: [{ type: 'text', text: 'use bash please' }],
-        track: 'slack:A',
+        track: 'ext:A',
       })
     );
     events.push(turnStart(seq++, 'turn_tool'));
@@ -666,7 +532,7 @@ describe('compact()', () => {
     events.push(event(seq++, 'job_finished', { jobId: 'job_xyz', outcome: 'completed' }));
     // 11 turns after the job events; last 10 go to tail, 1 goes to earlier
     for (let i = 0; i < 11; i++) {
-      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(event(seq++, 'prompt', { content: [], track: `ext:T${i}` }));
       events.push(turnStart(seq++, `turn_${i}`));
       events.push(turnEnd(seq++, `turn_${i}`));
     }
@@ -693,7 +559,7 @@ describe('compact()', () => {
     let seq = 1;
     // 11 filler turns to push earliest into earlier
     for (let i = 0; i < 11; i++) {
-      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(event(seq++, 'prompt', { content: [], track: `ext:T${i}` }));
       events.push(turnStart(seq++, `turn_${i}`));
       events.push(turnEnd(seq++, `turn_${i}`));
     }
@@ -732,7 +598,7 @@ describe('compact()', () => {
     const events: TypedDurableEvent[] = [];
     let seq = 1;
     for (let i = 0; i < 10; i++) {
-      events.push(event(seq++, 'prompt', { content: [], track: `slack:T${i}` }));
+      events.push(event(seq++, 'prompt', { content: [], track: `ext:T${i}` }));
       events.push(turnStart(seq++, `fill_${i}`));
       events.push(turnEnd(seq++, `fill_${i}`));
     }
@@ -770,7 +636,7 @@ describe('compact()', () => {
 // demuxByTrack(kernelAttributor) rather than calling groupEarlierEventsByTrack
 // directly. This test asserts that both paths produce identical group maps on a
 // representative fixture covering all attribution branches:
-//   - slack track (prompt + in-turn tool_use)
+//   - plugin track (prompt + in-turn tool_use)
 //   - job track (job_started / job_finished)
 //   - turn-inherited in-turn events (tool_use, message inheriting from turnToTrack)
 //   - untracked fallback (no track, no turnId in map)
@@ -782,10 +648,10 @@ describe('demuxByTrack(kernelAttributor) produces identical groups to groupEarli
     const events: TypedDurableEvent[] = [
       // A context_compacted event — should be filtered by both paths
       event(1, 'context_compacted', { strategy: 'old', preserved: [] }),
-      // Slack prompt → track 'slack:A'
-      event(2, 'prompt', { content: [{ type: 'text', text: 'hi' }], track: 'slack:A' }),
+      // Plugin-tracked prompt → track 'ext:A'
+      event(2, 'prompt', { content: [{ type: 'text', text: 'hi' }], track: 'ext:A' }),
       event(3, 'turn_start', {}, 'turn_1'),
-      // In-turn tool_use → should inherit 'slack:A' via turnToTrack
+      // In-turn tool_use → should inherit 'ext:A' via turnToTrack
       event(4, 'tool_use', { toolCallId: 'tc1', name: 'bash', input: {} }, 'turn_1'),
       // Mid-turn context_injected with its own track → 'alarm:X'
       event(5, 'context_injected', { content: [], track: 'alarm:X' }),
@@ -820,7 +686,7 @@ describe('demuxByTrack(kernelAttributor) produces identical groups to groupEarli
 
   it('matches for turn-inherited tool_use and message events', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:B' }),
+      event(1, 'prompt', { content: [], track: 'ext:B' }),
       event(2, 'turn_start', {}, 'turn_X'),
       event(3, 'tool_use', { toolCallId: 'tc1', name: 'bash', input: {} }, 'turn_X'),
       event(4, 'message', { content: 'reply' }, 'turn_X'),
@@ -836,8 +702,8 @@ describe('demuxByTrack(kernelAttributor) produces identical groups to groupEarli
     for (const [track, evts] of expected) {
       expect(groups.get(track)?.map((e) => e.eventSeq)).toEqual(evts.map((e) => e.eventSeq));
     }
-    // Confirm all in-turn events are under 'slack:B', not untracked
-    expect(groups.get('slack:B')?.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+    // Confirm all in-turn events are under 'ext:B', not untracked
+    expect(groups.get('ext:B')?.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
     expect(groups.get(UNTRACKED)).toBeUndefined();
   });
 });

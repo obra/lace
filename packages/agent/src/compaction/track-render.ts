@@ -1,28 +1,23 @@
 // ABOUTME: Markdown renderer for compacted track blocks
 // ABOUTME: Pure function; receives TrackBlock[] and scheduler roll-up, returns string
-// ABOUTME: Composes renderGenericSections from toolkit and adds the Slack section.
+// ABOUTME: Domain-neutral — delegates entirely to renderGenericSections from toolkit.
 
+import { renderGenericSections, type SchedulerRollup } from './toolkit';
 import type { TrackBlock } from './toolkit';
-import { renderGenericSections } from './toolkit';
 
-export type SchedulerRollup = {
-  alarmsPending: number;
-  remindersPending: number;
-};
+export type { SchedulerRollup };
 
 export type RenderInput = {
   blocks: TrackBlock[];
   scheduler: SchedulerRollup;
 };
 
+/**
+ * Render the compaction prefix from track blocks and scheduler state.
+ * Domain-neutral: delegates to renderGenericSections. Plugin strategies
+ * that need domain-specific sections call renderGenericSections directly
+ * with an extraSections argument.
+ */
 export function renderCompactionPrefix(input: RenderInput): string {
-  const slackBlocks = input.blocks.filter((b) => b.trackId.startsWith('slack:'));
-
-  // Build the slack section string (if any) to inject into the generic renderer.
-  let slackParts: string | undefined;
-  if (slackBlocks.length > 0) {
-    slackParts = '\n## Slack threads\n\n' + slackBlocks.map((b) => b.body).join('\n\n');
-  }
-
-  return renderGenericSections(input, slackParts);
+  return renderGenericSections(input);
 }

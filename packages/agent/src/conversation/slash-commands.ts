@@ -21,7 +21,6 @@ import {
   type CreateToolExecutorFn,
 } from '@lace/agent/server-types';
 import { composeAndWriteSystemPromptSet } from '@lace/agent/rpc/handlers/session';
-import { createProviderForTurn } from './provider-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 
 export type SlashCommandResult = {
@@ -155,31 +154,17 @@ export async function handleSlashCommand(
 
         const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
-        const provider = await createProviderForTurn({
-          connectionId: effectiveConfig.connectionId,
-          modelId: effectiveConfig.modelId,
-        });
         const name = compactionStrategyNameForSession(sessionDir);
         // args is the free-text tail after /compact — thread as guidance.
         const guidance = args.trim() || undefined;
-        const compactionCtx = {
-          // Legacy fields kept for track-based strategy back-compat until Task 6
-          // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
-          provider,
+        const compactionCtx = buildCompactionContext({
+          threadId: sessionId,
+          sessionDir,
+          connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
-          // New ctx.query + guidance from buildCompactionContext.
-          // buildCompactionContext omits ctx.query when connectionId/modelId is absent.
-          ...buildCompactionContext({
-            threadId: sessionId,
-            sessionDir,
-            connectionId: effectiveConfig.connectionId,
-            modelId: effectiveConfig.modelId,
-            guidance,
-          }),
-        };
-        const raw = await resolveCompactionStrategy(name)
-          .compact(events, compactionCtx)
-          .finally(() => provider.cleanup());
+          guidance,
+        });
+        const raw = await resolveCompactionStrategy(name).compact(events, compactionCtx);
         const result = validatePreserved(raw);
 
         if ('noop' in result) {

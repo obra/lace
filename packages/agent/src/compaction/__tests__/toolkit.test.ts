@@ -143,7 +143,7 @@ describe('demuxByTrack', () => {
 
   it('supports a track-field-based attributor matching kernel behavior for simple cases', () => {
     const events: TypedDurableEvent[] = [
-      event(1, 'prompt', { content: [], track: 'slack:T:C:1.0' }),
+      event(1, 'prompt', { content: [], track: 'ext:T:C:1.0' }),
       event(2, 'prompt', { content: [], track: 'system:bootstrap' }),
       event(3, 'prompt', { content: [] }), // no track → untracked
     ];
@@ -153,7 +153,7 @@ describe('demuxByTrack', () => {
       return data.track ?? UNTRACKED;
     };
     const groups = demuxByTrack(events, simpleKernelAttr);
-    expect(groups.get('slack:T:C:1.0')?.map((e) => e.eventSeq)).toEqual([1]);
+    expect(groups.get('ext:T:C:1.0')?.map((e) => e.eventSeq)).toEqual([1]);
     expect(groups.get('system:bootstrap')?.map((e) => e.eventSeq)).toEqual([2]);
     expect(groups.get(UNTRACKED)?.map((e) => e.eventSeq)).toEqual([3]);
   });
@@ -497,26 +497,26 @@ describe('renderGenericSections', () => {
     expect(out).toContain('1 reminder pending');
   });
 
-  it('injects slack section when slackParts is provided', () => {
-    const slackParts = '\n## Slack threads\n\n<slack-thread ref="x"></slack-thread>';
+  it('injects extraSections content when provided', () => {
+    const extraSections = '\n## Plugin section\n\n<plugin-content ref="x"></plugin-content>';
     const out = renderGenericSections(
       { blocks: [], scheduler: { alarmsPending: 0, remindersPending: 0 } },
-      slackParts
+      extraSections
     );
-    expect(out).toContain('## Slack threads');
-    expect(out).toContain('<slack-thread');
+    expect(out).toContain('## Plugin section');
+    expect(out).toContain('<plugin-content');
   });
 
-  it('slack section appears before job section', () => {
-    const slackParts = '\n## Slack threads\n\nslack content';
+  it('extraSections appears before job section', () => {
+    const extraSections = '\n## Plugin section\n\nextra content';
     const blocks: TrackBlock[] = [{ trackId: 'job:j1', body: 'job content', estimatedTokens: 5 }];
     const out = renderGenericSections(
       { blocks, scheduler: { alarmsPending: 0, remindersPending: 0 } },
-      slackParts
+      extraSections
     );
-    const slackIdx = out.indexOf('slack content');
+    const extraIdx = out.indexOf('extra content');
     const jobIdx = out.indexOf('job content');
-    expect(slackIdx).toBeLessThan(jobIdx);
+    expect(extraIdx).toBeLessThan(jobIdx);
   });
 
   it('renders other section for non-standard track prefixes', () => {
