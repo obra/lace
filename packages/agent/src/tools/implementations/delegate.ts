@@ -200,7 +200,7 @@ Parameters:
           // Project the persona container into a host-side RuntimeExecutionBinding.
           // The session runner threads the embedder-supplied named-mount registry
           // into ToolContext; when absent (e.g. unit-test fixtures), fall back to
-          // {} so personas with `mounts: {}` still resolve and personas that do
+          // {} so personas with `mounts: []` still resolve and personas that do
           // declare mounts fail with a clear "unknown mount" error.
           //
           // The persona-declared image string (tag or digest) flows through
