@@ -1,217 +1,257 @@
-# Container Runtime + Plane (#3) Implementation Plan
+# Container Runtime + Plane (#3) Implementation Plan — rev 2
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`). This plan spans **two repos** (lace TypeScript + sen-core-v2 Rust) and is **box-coordinated** — Part 2 (Rust) + the deploy change are gated on a coordinated `--recreate` (we own the box; not in production).
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans. Steps use checkbox (`- [ ]`). This plan spans **two repos** (lace TypeScript + sen-core-v2 Rust) and is **box-coordinated** — Part 2 (Rust) + the deploy change land together under a coordinated `--recreate` (we own the box; not in production).
 
-**Goal:** Finish making the sen-docker shim the single "plane" that owns the container spec, make lace a thin plane-client registered into `api.runtimes`, fix the shim's two live passthrough bugs, give it native exec-attach streaming, and collapse persona definitions to a **single on-disk source: the lace `.md` files** (no generated `.json`).
+> **rev 3 (2026-06-03):** second 3-opus re-review. Decision (Jesse): **ship 2A now with a documented interim root-compromise window** (not in production, Ada-only), with the persona-`.md` lockdown AND plane-side persona-field validation as **hard pre-prod gates**. Changes from rev 2: 2E widened from cap-only to a full **persona-field validation** prod-gate (network/sysctls/image/user/command, not just caps — a tampered `.md` grants root via `user:0:0`/`network:host`/chosen image, which cap-allowlist alone does not bound); **Part 2D fully concretized** (thread model, frame→relay transition, EOF/exit/partial-chunk semantics, a shared wire-contract subsection, anti-forgery invariants, size caps, testable `Docker` abstraction); dev projected personas declared **plane-only**; 2B allowlist criterion = "inert OR plane-pinned value"; the embedder `MountRegistryEntry.containerPath` change promoted to an owned prerequisite phase; minors (both `runNetnsInit` sites, ports-u16 step, `resolvePersonaMountsAndEnv`→`containerPath` step, 2C closed leaves, YAML-anchor hardening).
 
-**Architecture:** lace already passes only `spawn <persona> <parent> <child> <jobId>` and the plane already builds the whole docker create-spec from the persona + mount registry (deny-by-default, ownership-labelled, cap-allowlisted persona-side). This plan removes the now-dead lace-side spec machinery, repoints the plane's persona source to the lace `.md` frontmatter, fixes the two remaining caller-passthrough holes, and adds streaming. The runtime becomes a `runtimes` plugin selected by `LACE_CONTAINER_RUNTIME=plane`.
+> **rev 2 (2026-06-03):** rewritten after a roborev (codex/architecture) + 3-opus panel re-review. Changes from rev 1: corrected a FALSE "cap-allowlist already enforced" claim (it is NOT — now Part 2E); redesigned streaming (Part 2D) against the real one-shot wire; switched exec-env from denylist→**allowlist**; split `PlaneSpawnRequest` vs `DockerCreateConfig` so dev runtimes survive; made `buildPersonaContainerSpec`'s deletion a *split* (keep the live mount/env resolver); fixed the stale `jobs/delegate.ts` path; hard-gated Part 1 on the plugin-system `api.runtimes`; made the mount-model a hard precondition; sequenced `inspectNetworkIp` removal with #4; tightened the inspect closed-set; recorded the persona-`.md`-lockdown production prerequisite.
+
+**Goal:** Make the sen-docker **plane** the single authority for the container spec, make lace a thin plane-client registered into `api.runtimes`, fix the plane's two caller-passthrough bugs, add a real exec-attach **streaming** path, enforce a cap-allowlist, and collapse persona definitions to a single on-disk source: the lace `.md` files.
+
+**Architecture:** lace already passes only `spawn <persona> <parent> <child> <jobId>`; the plane already builds the whole `docker create` argv from the persona + mount registry (deny-by-default verbs, ownership labels, mount guard). This plan removes the dead lace-side spec machinery, repoints the plane's persona source to the lace `.md` frontmatter, **adds the missing cap-allowlist**, fixes the two passthrough holes, and adds streaming. The runtime becomes a `runtimes` plugin selected by `LACE_CONTAINER_RUNTIME=plane`.
+
+**Tech Stack:** TypeScript (strict) in `lace/packages/agent`; Rust in `sen-core-v2/sen-docker` (serde, serde_yaml). 
+
+> **HARD DEPENDENCY:** Part 1 imports `api.runtimes` / `registerBuiltinRuntimes` from the **plugin-system plan (#2) Part E**, which must land first. There is no `runtimes` registry in the tree today, and `LACE_CONTAINER_RUNTIME=plane` *throws* against the current `manager-factory.ts` enum. Do not start Part 1 before #2 Part E. (rev-1 wrongly claimed Part 1 was independently mergeable.)
 
 ## Terminology — two things were called "the shim" (Jesse, 2026-06-03)
 
-- **"The shim" that GOES AWAY = the lace-side `ShimContainerRuntime`** (TypeScript, in `lace/packages/agent/src/containers/`). Phase 1.1 deletes it and replaces it with `PlaneRuntime`.
-- **"The plane" that STAYS and is EVOLVED = the sen-docker Rust binary** (`sen-core-v2/sen-docker/`, the `docker.sock` holder). It is well-built and kept; Part 2 evolves it. Decision: *"only the lace-side client goes"* — the sen-docker binary stays as the plane.
-
-This doc uses **"plane"** for the Rust binary throughout (it formerly went by "the sen-docker shim").
-
-**Tech Stack:** TypeScript (strict) in `lace/packages/agent`; Rust in `sen-core-v2/sen-docker` (serde, serde_yaml). Branch: lace `pri2012-shim-lace` after the plugin-system plan (#2) lands (this rides `api.runtimes` from its Part E).
+- **"The shim" that GOES AWAY = the lace-side `ShimContainerRuntime`** (TypeScript). Phase 1.1 deletes it → `PlaneRuntime`.
+- **"The plane" that STAYS and is EVOLVED = the sen-docker Rust binary** (`sen-core-v2/sen-docker/`, the `docker.sock` holder). Decision: *"only the lace-side client goes."* This doc says **"plane"** for the Rust binary.
 
 ---
 
-## ⚠️ Reality correction — the kit overstated this spec
+## Reality correction — what the kit/rev-1 got wrong, verified against the code
 
-Investigation of the live shim (`sen-core-v2/sen-docker/`, 2773 lines) found several kit "TODO" items are **already done**, so this plan does NOT redo them:
+Investigation of the live plane (`sen-core-v2/sen-docker/`) found:
 
-- **"The plane BUILDS the spec from persona+registry (caller passes only persona+identity)"** — already true. `ShimContainerRuntime.create()` sends only `spawn <persona> <parent> <child> <jobId>`; `build_create_argv` (spawn.rs:101-178) sources image/caps/mounts/env/labels/network/user from the persona spec + mount registry. The rich `ContainerSpec` lace builds is **ignored** on the shim path.
-- **"cap-allowlist ENFORCED (spawn.rs:158 forwards verbatim today)"** — wrong; caps come **only** from the persona spec (spawn.rs:158-160), never the caller. No fix needed.
-- **deny-by-default verbs, ownership-label gating, mount guard, closed persona enum** — all present (dispatch.rs:75-82, ownership.rs, mounts.rs guard_path:112, validate.rs PERSONAS:9).
+- **Already done (do NOT redo):** the plane builds the full `docker create` argv from the persona + mount registry (`spawn.rs:101-178`); deny-by-default verb dispatch (`dispatch.rs:75-82`); ownership-label gating (`ownership.rs`); mount guard (`mounts.rs:112`); closed persona enum (`validate.rs:9`). lace passes only 4 args; the rich `ContainerSpec` is ignored on the spawn path.
+- **NOT done — rev-1 was WRONG to claim "cap-allowlist enforced":** `spawn.rs:158-160` forwards persona `cap_add` **verbatim** with no allowlist. The caller can't inject caps (true), but the *persona file* can name any cap, and under single-source personas the persona file is the cap source. The security floor (`2026-06-03-lace-embedder-architecture.md:246`) requires "caps allowlisted (only NET_ADMIN) **even from a persona file**." This is **net-new work → Part 2E.**
+- **Still real bugs:** exec `-e` passthrough (`dispatch.rs:266-272`) and inspect `--format` passthrough (`dispatch.rs:425-432`).
+- **Streaming does not exist and the wire can't do it as-is:** the plane is one request frame → one buffered, length-prefixed response (≤16 MiB) → close (`server.rs`, `frame.rs`); `Docker::run` is `Command::output()` with **no stdin** (`docker.rs:41`). So `execStream` (and even the projected helper's stdin round-trip) need a new streaming sub-protocol → **Part 2D**.
 
-**What is actually left** (this plan): (1) two real caller-passthrough bugs (exec `-e`, inspect `--format`); (2) native exec-attach **streaming** (exec is buffered `Command::output()` today; execStream has no plane path); (3) **single-source personas** — the shim parses the lace `.md` frontmatter, killing the deploy-time `.json` generation; (4) lace-side cleanup — delete the dead spec-builder, narrow `ContainerRuntime`, delete the netns sidecar + direct-docker, and register a clean plane-client into `api.runtimes`.
+## Decisions (Jesse, 2026-06-03)
 
-## Decisions taken (Jesse, 2026-06-03)
+- **Single source = the lace `.md` files. No `.json`.** The plane parses the persona `.md` `runtime:` frontmatter directly; kill the deploy-time `.md`→`.json` generation. The docker/cap fields therefore **stay in the `.md`/lace schema** (the plane reads them); lace stops *using* them to build a spec.
+- **Persona-`.md` write-protection is a deferred hardening, tracked as a PROD prerequisite.** Reading the `.md` live is safe **only** once the persona `.md` dir is made agent-unwritable. Jesse: *"we will make agents unable to write those .md files later."* Until that lands, the plane trusting the `.md` is an escalation path (a prompt-injected agent that can write a persona `.md` grants itself caps/mounts/image). **Part 2E's cap-allowlist is the defense-in-depth that bounds the damage even with a tampered `.md`.** See "Production prerequisites."
+- **exec-env: allowlist, not denylist** (Part 2B) — a denylist of execution-hijacking env keys is unwinnable (NODE_OPTIONS, GIT_SSH_COMMAND, PYTHON*, LD_AUDIT, HOME, TMPDIR, …). Allowlist the small known set; secrets move to the credential socket in #6.
 
-- **Single source = the lace `.md` files. No `.json` on disk.** Kill the deploy-time markdown→`.json` generation; the shim reads the persona `.md` `runtime:` frontmatter directly. The docker/egress/cap fields therefore **stay in the `.md`/lace schema** (the shim needs them) — they are *not* stripped; lace simply stops *using* them to build a spec.
-- **exec-env fix: investigate, recommend in-spec.** Done below (Part 2B) — evidence + recommendation, not a blanket strip.
+## ⚠️ Interim security window (accepted; Jesse, 2026-06-03) + hard pre-prod gates
+
+**Blunt statement of the accepted risk:** once Part 2A points the plane at the live, **agent-writable** persona `.md` dir, a prompt-injected lace agent can rewrite a persona `.md` and obtain **root on the host** on the next `spawn` — via `user: "0:0"`, `network: host`, a chosen `image`/`command` (which also runs as root+NET_ADMIN in the netns sidecar), or `sysctls`. The cap-allowlist (2E base) does **not** close this — it locks one of several doors. This window is **accepted as temporary debt** solely because: not in production, Ada is the only runner, we own the box. It is a **root-compromisable-by-any-prompt-injection** state and must be closed before any prod / multi-tenant / adversarial-agent use.
+
+**Hard pre-prod gates (both required before this leaves the Ada-only box):**
+1. **Persona `.md` dir made agent-unwritable.** The plane must read personas from a path the agent (uid 1000 / prompt-injected lace) cannot write — operator-owned (root:0444) or image-baked — and ignore any agent-writable user-override dir. (Today's `/etc/sen-personas/*.json` is already such a surface; 2A is what introduces the writable source, so this gate restores the property.)
+2. **Plane-side persona-field validation (Part 2E, widened).** Even with the lockdown, defense-in-depth: the plane validates every spec-bearing persona field against closed allowlists — `cap_add ⊆ {NET_ADMIN}`, `network ∈ {quarantine + the #4 per-agent nets}` (reject `host`/`none`/`container:*`), `sysctls` keys ⊆ a closed set, `user` pinned non-root (reject uid 0), `image ⊆` a registry-prefix allowlist (mirror the closed persona-enum discipline) — enforced in `PersonaSpec::validate()` so it binds every load path.
+
+**Lands now (with this plan, not deferred):** the `cap_add ⊆ {NET_ADMIN}` base of 2E (cheap; a floor item). The rest of the field-validation + the lockdown are the two pre-prod gates above.
+
+## Open coordination items (resolve before the dependent phase)
+
+1. **Mount-model reconciliation — HARD precondition for Part 2A.** lace persona `mounts: record(name→target)`; plane `PersonaSpec.mounts: Vec<String>` (names) + registry-owned `container_path`. One `.md` parsed by both forces agreement. **Decision: the registry is the sole source of container paths.** Change lace's persona `mounts` to a **name list** (`z.array(mountName)`) and add `containerPath` to `MountRegistryEntry`; lace resolves the target from the registry, exactly as the plane does. `serde_yaml` cannot deserialize a YAML mapping into `Vec<String>`, so 2A literally cannot parse today's `.md` until this lands.
+   > **Owner/sequencing:** `MountRegistryEntry` is the **embedder-supplied contract** (`server-types.ts`, populated by sen-core at `initialize`) — adding `containerPath` is a **third-party (sen-core embedder) change**, not pure-lace. It is a prerequisite PHASE with a sen-core owner that must land before 2A, not a "settle inline" item. Sequence: (a) sen-core adds `containerPath` to the registry it supplies + the `.md` mounts become a name list; (b) lace `resolvePersonaMountsAndEnv` reads `entry.containerPath`; (c) then 2A's plane parser can consume the `.md`.
+2. **Plugin-system #2 Part E** (`api.runtimes`) — hard dependency for all of Part 1.
+3. **Deploy:** plane's persona dir repoints to the (write-protected, prereq #1) lace `.md` path; remove the `.md`→`.json` generation step. Box-coordinated `--recreate`.
 
 ---
 
-## Open coordination items (resolve during implementation; surfaced to Jesse)
+# Part 1 — lace (TypeScript): thin plane-client, split the carriers, delete dead machinery
 
-1. **Mount-model reconciliation (single-source consequence).** lace's persona schema has `mounts: z.record(name, containerTarget)` (name→target); the shim's `PersonaSpec.mounts: Vec<String>` (names only) + the mount registry supplies `container_path`. With one `.md` parsed by both, the models must agree. **Recommendation:** make the registry the sole source of container paths (the shim's model); change lace's persona `mounts` to a **name list** (`z.array(mountName)`) and have lace resolve the container target from the same registry entry (`containerMounts[name]` gains `containerPath`). This is a small lace schema change + a `MountRegistryEntry` field. Settle before Part 2A's parser lands. (Alternative: keep name→target in the `.md` and have the shim read the target from frontmatter instead of the registry — but that moves container-path authority out of the single audited registry, weakening the mount-escape audit surface. Not recommended.)
-2. **exec-env final policy** (Part 2B) — the recommendation below needs a sign-off because it interacts with the credentials spec (#6).
-3. **Deploy:** the shim's persona dir config repoints from `/etc/sen-personas` to the lace persona `.md` path; the markdown→json generation step is removed from the deploy pipeline. Box-coordinated `--recreate`.
+**Code mapped (rev-2 corrected paths):** `containers/types.ts` (`ContainerRuntime`, `ContainerConfig`), `containers/spec.ts` (`ContainerSpec`), `jobs/persona-container-spec.ts` (`buildPersonaContainerSpec` + `resolvePersonaMountsAndEnv` + `buildPerInvocationSpecName`), `jobs/persona-projected-binding.ts` (`buildPersonaProjectedRuntimeBinding` → calls the builder), `containers/shim-container-runtime.ts` (the 4-arg `spawn` wire), `containers/docker-container.ts` (`runNetnsInit:287-350`, `execStream:533`, exec `-e` build :122), `tools/runtime/projected-container.ts` (`ProjectedContainerToolRuntime`; `captureContainerImageId:90` direct `docker inspect`, called fire-and-forget from :713), `config/persona-registry.ts` (`runtimeContainerSchema:48-78`), **`tools/implementations/delegate.ts:179-216`** (rev-1 wrongly said `jobs/delegate.ts`).
 
----
+## Phase 1.1 — `PlaneRuntime` (composition, not subclass); split the request types; register `plane`
 
-# Part 1 — lace (TypeScript): thin plane-client, delete the dead spec machinery
-
-**Code mapped:** `containers/types.ts` (`ContainerRuntime`, `ContainerConfig`), `containers/spec.ts` (`ContainerSpec` with `sysctls/capAdd/network/gatewayRoute/browserCdpSocket`), `jobs/persona-container-spec.ts` (`buildPersonaContainerSpec` — the dead builder), `containers/shim-container-runtime.ts` (the 4-arg `spawn` wire), `containers/docker-container.ts` (`runNetnsInit:287-350`, `execStream:533`, `exec -e` build at :122), `tools/runtime/projected-container.ts` (`captureContainerImageId:96` direct `docker inspect`), `config/persona-registry.ts` (`runtimeContainerSchema:48-78`), `jobs/delegate.ts:179-216`.
-
-## Phase 1.1 — Make `PlaneRuntime` the registered runtime; retire the docker impls from the live path
-
-The shim path is the only one used on the box. Replace `ShimContainerRuntime extends DockerContainerRuntime` with a purpose-built `PlaneRuntime` that talks the 4-arg `spawn` wire + the new streaming/inspect verbs, and register it into `api.runtimes` (Part E) under `plane`.
+`ShimContainerRuntime extends DockerContainerRuntime` is an inheritance leak (box code can fall back to docker CLI). Replace with a standalone `PlaneRuntime` that talks the plane wire. Split the carrier so a plane spawn does not pretend to carry docker-create fields (codex/opus both flagged the ambiguous shared carrier).
 
 **Files:**
-- Create: `packages/agent/src/containers/plane-runtime.ts` (`PlaneRuntime implements ContainerRuntime`)
-- Modify: `packages/agent/src/containers/manager-factory.ts` (register `plane`; keep `docker`/`apple` for non-box dev)
-- Test: `packages/agent/src/containers/plane-runtime.test.ts`
+- Create: `containers/plane-runtime.ts` (`PlaneRuntime implements ContainerRuntime`)
+- Modify: `containers/types.ts` — introduce `PlaneSpawnRequest` (selector-only) distinct from `DockerCreateConfig` (dev runtimes' fields)
+- Modify: `containers/manager-factory.ts` — register `plane` (when `LACE_DOCKER_BIN` set) alongside `docker`/`apple` dev runtimes
+- Test: `containers/plane-runtime.test.ts`
 
-- [ ] **Step 1: Write the failing test** — `create()` emits `spawn <persona> <parent> <child> <jobId>` to the plane binary and records the returned name; `exec` and `inspect` go over the plane (not direct docker). Mock the plane binary via an injected runner (mirror `ShimContainerRuntime`'s `execFileAsync` seam — inject it for the test).
+- [ ] **Step 1: Split the request types** in `containers/types.ts`:
 
 ```typescript
-// ABOUTME: PlaneRuntime talks the plane wire (spawn/exec-stream/inspect), no direct docker
+/** What the plane needs to create a container: only the persona + identity. */
+export interface PlaneSpawnRequest {
+  persona: string;
+  parentSession: string;
+  childSession?: string;
+  jobId: string;
+}
+
+/** What the dev docker/apple runtimes need (image, mounts, docker fields). Unchanged
+ *  from today's ContainerConfig MINUS the plane selector fields. Kept so local dev
+ *  runtimes keep working — NOT narrowed away (codex: don't collapse plane + dev). */
+export interface DockerCreateConfig {
+  image: string; workingDirectory: string; mounts: ContainerMount[];
+  command?: string[]; environment?: Record<string, string>;
+  sysctls?: Record<string, string>; capAdd?: string[]; network?: string;
+  gatewayRoute?: string; ports?: PortMapping[]; restartPolicy?: 'unless-stopped';
+}
+```
+
+`ContainerConfig` becomes `PlaneSpawnRequest & Partial<DockerCreateConfig> & { id?; name? }` for transition, or the create signature is overloaded per runtime. Pick the minimal typing that lets `PlaneRuntime.create` accept only `PlaneSpawnRequest` and the dev runtimes accept `DockerCreateConfig`.
+
+- [ ] **Step 2: Write the failing test** — `create()` emits `spawn <persona> <parent> <child> <jobId>` via an injected runner; `exec`/`execStream`/`inspect` go over the plane, never docker; missing persona → reject; the injected runner is the ONLY egress (assert no `docker` spawn).
+
+```typescript
 import { describe, it, expect, vi } from 'vitest';
 import { PlaneRuntime } from './plane-runtime';
-
 describe('PlaneRuntime', () => {
   it('create emits the 4-arg spawn verb and returns the daemon name', async () => {
-    const run = vi.fn().mockResolvedValue({ stdout: 'sen-researcher-abc\n', stderr: '', exitCode: 0 });
-    const rt = new PlaneRuntime('/usr/local/bin/sen-docker-client', { run });
-    const id = await rt.create({ image: 'ignored', workingDirectory: '/w', mounts: [],
-      persona: 'ephemeral-shell', parentSession: 'sess_p', childSession: 'sess_c', jobId: 'job_1' } as never);
+    const run = vi.fn().mockResolvedValue({ stdout: 'sen-x-abc\n', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create({ persona: 'ephemeral-shell', parentSession: 'sess_p', childSession: 'sess_c', jobId: 'job_1' });
     expect(run).toHaveBeenCalledWith(['spawn', 'ephemeral-shell', 'sess_p', 'sess_c', 'job_1']);
-    expect(id).toBe('sen-researcher-abc');
+    expect(id).toBe('sen-x-abc');
   });
-  it('create rejects when persona selector is missing', async () => {
-    const rt = new PlaneRuntime('/bin/x', { run: vi.fn() });
-    await expect(rt.create({ image: 'x', workingDirectory: '/w', mounts: [] } as never)).rejects.toThrow(/persona/);
+  it('rejects when persona is missing', async () => {
+    await expect(new PlaneRuntime('/bin/x', { run: vi.fn() }).create({} as never)).rejects.toThrow(/persona/);
   });
 });
 ```
 
-- [ ] **Step 2: Run → FAIL** (`npm test -- plane-runtime`).
+- [ ] **Step 3: Implement `PlaneRuntime`** — port `ShimContainerRuntime.create()`'s 4-arg `spawn` assembly + error handling (it's correct) into a standalone `implements ContainerRuntime` with an injectable `{ run }`. Keep the `synthesizeJobId` fallback. `start` no-op; `adopt` re-runs `create`; in-process cache for `inspect`/`list`. `exec` → buffered plane `exec` verb; `execStream`/`inspect` wire to Part 1.4 (2D/2C). Do NOT extend `DockerContainerRuntime`.
 
-- [ ] **Step 3: Implement `PlaneRuntime`** — port `ShimContainerRuntime.create()`'s 4-arg `spawn` logic (it's correct), but as a standalone `implements ContainerRuntime` (not `extends DockerContainerRuntime`), with an injectable `{ run }` for tests. `exec`/`execStream`/`inspect`/`stop`/`remove` go over the plane verbs (exec-stream + inspect-template land in Phase 1.4 wired to Part 2's new verbs; for now `exec` uses the existing buffered plane `exec` verb). Keep the in-process container cache for `inspect`/`list` parity. `start` is a no-op (spawn is atomic). `adopt` re-runs `create` (idempotent spawn), as today.
-
-> Reuse the exact `spawn`-arg assembly + error handling from `shim-container-runtime.ts:25-73`. The only structural change is the base class — `PlaneRuntime` does not inherit docker logic, so it cannot accidentally shell out to docker on the box.
-
-- [ ] **Step 4: Register `plane` in the factory**
-
-In `manager-factory.ts` `registerBuiltinRuntimes()` (added in plugin-system Part E), register `plane` when `LACE_DOCKER_BIN` is set; keep `docker`/`apple` for local dev:
+- [ ] **Step 4: Register `plane`** in `registerBuiltinRuntimes()` (#2 Part E):
 
 ```typescript
-  const planeBin = process.env.LACE_DOCKER_BIN?.trim();
-  if (planeBin) registries.runtimes.register('plane', new PlaneRuntime(planeBin));
-  registries.runtimes.register('docker', makeDockerRuntime());   // dev / non-box
-  registries.runtimes.register('apple', new AppleContainerRuntime());
+const planeBin = process.env.LACE_DOCKER_BIN?.trim();
+if (planeBin) registries.runtimes.register('plane', new PlaneRuntime(planeBin));
+registries.runtimes.register('docker', makeDockerRuntime());   // dev/off-box
+registries.runtimes.register('apple', new AppleContainerRuntime());
 ```
 
-The box sets `LACE_CONTAINER_RUNTIME=plane`. (`makeDockerRuntime`'s old shim branch that returned `ShimContainerRuntime` is removed — `plane` is now its own registered runtime.)
+Box sets `LACE_CONTAINER_RUNTIME=plane`. Remove the old `ShimContainerRuntime` branch from `makeDockerRuntime`.
 
-- [ ] **Step 5: Run → PASS; commit.**
+- [ ] **Step 5:** Run → PASS; delete `containers/shim-container-runtime.ts` + its tests. Commit (when the concurrent-writer coast is clear).
 
-```bash
-git add packages/agent/src/containers/plane-runtime.ts packages/agent/src/containers/plane-runtime.test.ts packages/agent/src/containers/manager-factory.ts
-git commit -m "feat(lace/containers): PlaneRuntime as a registered runtime (no docker inheritance)"
-```
+## Phase 1.2 — Split `buildPersonaContainerSpec`; delete netns + direct-docker
 
-## Phase 1.2 — Delete the dead spec-builder + the netns sidecar + direct-docker
+`buildPersonaContainerSpec` does **two jobs**: (a) dead docker-field emission (the plane rebuilds these), and (b) the **live** mount-name→host-path + env resolution the projected tool-runtime needs (`resolvePersonaMountsAndEnv`, consumed via `persona-projected-binding.ts:41` → `ProjectedContainerToolRuntime`). rev-1's "delete the whole function" would break the subagent's path/fs/exec. **Split, don't delete.**
 
-These only fed the docker path or the ignored `ContainerSpec`; the shim builds the real spec.
+**Files:** `jobs/persona-container-spec.ts`, `jobs/persona-projected-binding.ts`, `tools/runtime/projected-container.ts`, `containers/docker-container.ts`, `tools/implementations/delegate.ts`
 
-**Files:**
-- Delete: `packages/agent/src/jobs/persona-container-spec.ts`'s docker-field emission — specifically `buildPersonaContainerSpec` (the whole function) and `withBrowserCdpSocketEnv`; **keep** `buildPerInvocationSpecName` (delegate uses it for the scratch path) and `resolvePersonaMountsAndEnv` only if still needed for the projected tool-runtime (see note).
-- Modify: `containers/docker-container.ts` — delete `runNetnsInit` (:287-350) and its caller in `start`/`adopt`; the netns wiring is the shim's.
-- Modify: `tools/runtime/projected-container.ts` — replace `captureContainerImageId`'s direct `docker inspect` (:96) with a plane `inspect` call (or drop the audit log entirely — it is best-effort).
-- Modify: `jobs/delegate.ts:179-216` — stop reading `runtime.sysctls/capAdd/network/gatewayRoute/browserCdpSocket` (they were passed into the dead builder); keep reading `containerSharing` + the scratch-dir mkdir + `buildPerInvocationSpecName`.
+- [ ] **Step 1:** Keep `resolvePersonaMountsAndEnv` + `buildPerInvocationSpecName`. Extract `buildProjectedRuntimeSpec` returning only `{ name, image, workingDirectory, mounts, env, persona, parentSession, childSession, jobId }` — NO `sysctls/capAdd/network/gatewayRoute/browserCdpSocket/ports/restartPolicy`. Delete `buildPersonaContainerSpec` + `withBrowserCdpSocketEnv` and the docker-field copies in `containerSpecToRuntimeSpec` + `projected-container.ts:243-263`. Update `persona-container-spec.test.ts` + `persona-projected-binding.test.ts` (don't delete — assert the narrowed shape).
+  > **DECISION (rev 3): projected persona containers are PLANE-ONLY.** The only production path to `ContainerManager.materialize` is the projected path, and the plane rebuilds the docker fields from the persona — so dropping the docker-field copies is correct. A projected persona run on the dev `docker`/`apple` runtime would now lack network/caps/sysctls (un-quarantined) — that path is **not supported**; dev `docker`/`apple` are for non-persona local dev only. (Resolves the panel's "delete copies vs dev runtimes survive" contradiction.)
+  > Also repoint `resolvePersonaMountsAndEnv` to read the container path from `entry.containerPath` (Open Item #1 / the prerequisite phase) instead of the persona mapping value.
+- [ ] **Step 2:** Delete `runNetnsInit` (`docker-container.ts:287-350`) + **both** call sites (`:271` start path and `:726` create→start path — name both, or a dangling `await this.runNetnsInit(...)` is left); delete the `gatewayRoute` netns-sidecar tests in `docker-container.test.ts` (~1114-1193).
+- [ ] **Step 3:** **Drop** `captureContainerImageId` entirely — it's a free fire-and-forget function with no runtime handle (can't call `planeRuntime.inspect`), and it shells out to `docker` which the box lacks. Remove the call at `projected-container.ts:713` + the function. (Best-effort audit log; no replacement needed.)
+- [ ] **Step 4:** In `tools/implementations/delegate.ts` — confirm it reads only `runtime.type`/`runtime.containerSharing`/`runtime.workingDirectory` and passes `runtime` to the binding builder (it does NOT read the docker fields directly — rev-1 was wrong). Keep the scratch mkdir + `buildPerInvocationSpecName`. The dead-field removal is in `persona-container-spec.ts`, not here.
+- [ ] **Step 5:** typecheck + `npm test -- "containers|delegate|projected|persona"`; commit.
 
-- [ ] **Step 1: Confirm the projected tool-runtime's real needs.** The subagent's tool runtime (`ProjectedContainerToolRuntime`) needs `mounts` (host↔container path services) + `image` + `workingDirectory` for path/fs/exec — NOT caps/network/sysctls/gatewayRoute/browserCdp. Verify what `buildPersonaProjectedRuntimeBinding` actually consumes; keep only that. (grep `runtime\.\(sysctls\|capAdd\|network\|gatewayRoute\|browserCdpSocket\)` across `jobs/` and `tools/runtime/` — every hit is dead and removed.)
+## Phase 1.3 — Narrow `ContainerRuntime`; DEFER `inspectNetworkIp` removal to #4
 
-- [ ] **Step 2: Delete `buildPersonaContainerSpec` + `withBrowserCdpSocketEnv`** and any now-unused `ContainerSpec` docker fields they set. Run typecheck to find the now-broken references (the projected binding builder); rewire it to the narrowed shape.
+**Files:** `containers/types.ts`
 
-- [ ] **Step 3: Delete `runNetnsInit`** and its call sites in `docker-container.ts`. Remove the `gatewayRoute`-triggered sidecar tests (`docker-container.test.ts` "runs netns-init sidecar..." ~1114-1193 — these test deleted behavior).
+- [ ] **Step 1:** Keep the `ContainerRuntime` method set used by the plane path. **Do NOT remove `inspectNetworkIp?` here** — it has a live caller (`container-manager.ts:166`) feeding the egress source-IP bridge that #4 (D3) removes. Removing it now breaks the build; sequence it with #4. (rev-1 listed it for removal here — corrected.)
+- [ ] **Step 2:** The carrier split (1.1) already keeps docker fields on `DockerCreateConfig` for dev runtimes — do NOT delete them from shared types in a way that breaks `docker`/`apple` (codex). Remove only the truly-orphaned bits.
+- [ ] **Step 3:** typecheck + tests; commit.
 
-- [ ] **Step 4: Replace `captureContainerImageId`'s direct docker** with `planeRuntime.inspect(id)` (image id from the plane's templated inspect, Part 2C) or remove the best-effort audit log. Do not leave a `spawn('docker', ...)` in lace — the box has no docker access.
+## Phase 1.4 — `execStream` + `inspect` over the plane (pairs with 2D/2C)
 
-- [ ] **Step 5: Trim `delegate.ts`** to stop reading the dead runtime fields. Keep `containerSharing`, scratch mkdir, `buildPerInvocationSpecName`.
-
-- [ ] **Step 6: typecheck + tests + commit.**
-
-```bash
-npm run typecheck && npm test -- "containers|delegate|projected"
-git add -A packages/agent/src
-git commit -m "refactor(lace/containers): delete dead spec-builder, netns sidecar, direct-docker (shim owns them)"
-```
-
-## Phase 1.3 — Narrow `ContainerRuntime` + the carrier types to the plane path
-
-**Files:** `containers/types.ts`, `containers/spec.ts`
-
-- [ ] **Step 1:** Narrow `ContainerRuntime` to the methods the plane path uses: `create`/`start`/`stop`/`remove`/`exec`/`execStream`/`inspect`/`list`/`adopt`/`daemonInspect`. Remove `inspectNetworkIp?` (it backed the lace-side egress source-IP bridge being deleted in D3/#4) — confirm no remaining caller before removing.
-- [ ] **Step 2:** On `ContainerConfig`/`ContainerSpec`, **keep** the selector fields (`persona/parentSession/childSession/jobId`), `image`, `workingDirectory`, `mounts`, `env`; remove the now-unused docker carriers (`sysctls/capAdd/network/gatewayRoute/browserCdpSocket/restartPolicy/ports`) **from the lace carrier types** — they live in the persona `.md` the shim reads, not in a lace runtime call. (Schema fields in `persona-registry.ts` STAY per the single-source decision — only the *carrier types lace passes to a runtime* are narrowed.)
-- [ ] **Step 3:** Remove the orphaned `mountMap`/`registerMounts`/`unregisterMounts` (left dead by the cleanup PR-A′) now that the runtime is rebuilt — if `PlaneRuntime` doesn't use them, delete them from `BaseContainerRuntime`/wherever they remain.
-- [ ] **Step 4:** typecheck + tests + commit.
-
-```bash
-git commit -am "refactor(lace/containers): narrow ContainerRuntime + carriers to the plane path"
-```
-
-## Phase 1.4 — Route `execStream` + `inspect` over the plane (pairs with Part 2D/2C)
-
-- [ ] **Step 1:** Implement `PlaneRuntime.execStream` against Part 2D's new streaming verb (attach to the plane process's stdio; return the `ExecStreamHandle` stdin/stdout/stderr + `wait()`/`kill()`). Test with a fake plane process (a script that echoes stdin).
-- [ ] **Step 2:** Implement `PlaneRuntime.inspect`/`daemonInspect` against Part 2C's templated inspect verb (no caller `--format`). Map to `ContainerInfo`.
-- [ ] **Step 3:** Delete the now-unreachable `DockerContainerRuntime.execStream` (`docker-container.ts:533`) if `docker` runtime is dev-only and you choose to drop streaming there; otherwise leave it for the `docker` dev runtime. (Decide: keep `docker` runtime functional for local dev, or mark dev-only. Recommend keep — it's harmless and useful off-box.)
-- [ ] **Step 4:** tests + commit.
+- [ ] **Step 1:** `PlaneRuntime.execStream` against Part 2D's streaming client mode: spawn the plane client in `exec-stream` mode with piped stdio; map to `ExecStreamHandle` (stdin/stdout/stderr + `wait()`/`kill()`). Test against a fake plane client (echoes stdin). This is also what the projected helper's stdin round-trip rides.
+- [ ] **Step 2:** `PlaneRuntime.inspect`/`daemonInspect` against Part 2C's closed query keys (`state`, `image`); map to `ContainerInfo`. Test the key→`ContainerInfo` mapping.
+- [ ] **Step 3:** Keep `DockerContainerRuntime.execStream` for the dev `docker` runtime (off-box). Commit.
 
 ---
 
-# Part 2 — sen-docker (Rust): single-source personas, fix the two bugs, add streaming
+# Part 2 — sen-docker (Rust): personas-from-`.md`, fix the bugs, streaming, cap-allowlist
 
-**Location:** `/home/jesse/git/prime-radiant/sen2/sen-core-v2/sen-docker/` (Cargo crate). Target: ~2773 → ~800-1000 lines is **not** a goal of this plan — the shim is already close to its right shape; we change four things, not rewrite it. (The "2900→800" figure in old notes referred to an abandoned broker, not this shim.)
+**Location:** `/home/jesse/git/prime-radiant/sen2/sen-core-v2/sen-docker/`.
 
 ## Phase 2A — Persona source: parse the lace `.md` frontmatter (kill the `.json`)
 
-**Files:** `sen-docker/src/persona.rs`, `src/config.rs` (persona dir path), `Cargo.toml` (add `serde_yaml`)
+> Blocked on Open Item #1 (mount-model) — `serde_yaml` cannot read today's `mounts:` mapping into `Vec<String>`. Land the registry-owns-paths change first.
 
-`PersonaSpec` (persona.rs:30-66) stays — same fields. Only the **source** changes: from `PersonaSpec::from_json(/etc/sen-personas/<p>.json)` to parsing the lace persona `.md`'s `runtime:` frontmatter block.
+**Files:** `persona.rs`, `config.rs`, `Cargo.toml`
 
 - [ ] **Step 1:** Add `serde_yaml` to `Cargo.toml`.
-- [ ] **Step 2:** Add `PersonaSpec::from_markdown(md: &str) -> Result<PersonaSpec>`: split YAML frontmatter (between leading `---` fences), `serde_yaml::from_str` the document, extract the `runtime:` mapping, require `type: container`, deserialize into `PersonaSpec`. Write tests against a fixture `.md` with a `runtime:` block (mirror an existing lace persona `.md`).
-- [ ] **Step 3:** Repoint the persona dir (`config.rs`) from `/etc/sen-personas` to the lace persona `.md` path (a startup env, e.g. `SEN_PERSONA_MD_DIR`, trusted startup input). Resolve `<persona>.md` (+ user-persona override dir if the box uses one — match lace's bundled+user precedence if both are mounted; otherwise the single bundled dir).
-- [ ] **Step 4:** Reconcile the mount model per Open Item #1 — the recommended path: persona `.md` `runtime.mounts` is a **name list**; container paths come from the mount registry. If lace's `.md` currently uses `mounts: {name: target}`, this requires the lace schema change in Open Item #1 to land first (a name list), so both parsers agree. Until then, `from_markdown` reads the mount **keys** (names) and ignores targets — document this as the interim.
-- [ ] **Step 5:** Delete `PersonaSpec::from_json` + the `/etc/sen-personas` reading. Remove the markdown→json generation from the deploy pipeline (sen-deploy / image build — a separate edit, coordinated).
-- [ ] **Step 6:** `cargo test` + commit.
+- [ ] **Step 2:** `PersonaSpec::from_markdown(md) -> Result<PersonaSpec>`: split the leading `---` YAML frontmatter, `serde_yaml::from_str` to a `Value`, take the `runtime:` mapping, **require + then STRIP the `type` key** (lace's `runtime.type: 'container'` is not a `PersonaSpec` field; with `deny_unknown_fields` it must be removed before deserialize, or model it via an intermediate tagged struct). Reject `type: root` personas with a clear error (the plane is only asked to spawn container personas). **YAML hardening (the `.md` is attacker-influencable until the lockdown gate):** reject documents using anchors/aliases (`&`/`*`), custom tags (`!!`), or duplicate keys before trusting any field. Then deserialize into `PersonaSpec`. Field correspondence to assert with a fixture `.md`: `image, containerSharing, workingDirectory, network?, gatewayRoute?, browserCdpSocket?, mounts(names), env, sysctls, capAdd, ports{host:u16,container:u16}, command?, user?` — lace has no `user`/`command` (both `#[serde(default)]`, fine).
+- [ ] **Step 2b (lace):** clamp `portMappingSchema` (`config/persona-registry.ts:31-34`) to u16 (`z.number().int().min(0).max(65535)`) so a port lace accepts can't error the plane's `PortSpec: u16` parser. Single-source `.md` couples the two parsers — also add a doc-comment cross-link between `runtimeContainerSchema` and the Rust `PersonaSpec`, and gate lace persona-schema edits on a plane round-trip test (a future lace field would hard-fail the plane's `deny_unknown_fields` → spawn outage).
+- [ ] **Step 3:** Repoint `config.rs` `persona_path` from `/etc/sen-personas/<p>.json` to `<SEN_PERSONA_MD_DIR>/<p>.md` (a trusted **write-protected** startup path — Production prereq #1). Single dir (the operator-owned/baked copy); the plane does NOT honor an agent-writable user-override dir. Change the `.json` suffix logic to `.md`. Document how that dir is mounted into the plane container (operator-owned mount or baked at image build) — load-bearing for prereq #1.
+- [ ] **Step 4:** `mounts` reads the registry-supplied container path (Open Item #1). Delete `PersonaSpec::from_json` + `/etc/sen-personas` reading. Remove the `.md`→`.json` generation from the deploy pipeline (coordinated).
+- [ ] **Step 5:** `cargo test` (fixture `.md` → expected `PersonaSpec`); commit.
 
-> The `deny_unknown_fields` on `PersonaSpec` means the `.md` `runtime:` block must contain exactly the fields the shim knows. lace's `runtimeContainerSchema` is the canonical field set; keep the two in sync (the `.md` is validated by lace's zod at lace boot AND by the shim's serde — divergence fails loudly at one end). Add a doc comment in both `runtimeContainerSchema` and `PersonaSpec` pointing at each other.
+## Phase 2B — exec env: ALLOWLIST (replace verbatim `-e` passthrough)
 
-## Phase 2B — Fix exec `-e` passthrough (dispatch.rs:266-271)
+**Audit:** lace sends exec env via `ExecOptions.environment` → `docker exec -e K=V` (`docker-container.ts:122`); callers are the projected tool-runtime + helper (`runtime.process.exec`). A denylist is unwinnable (NODE_OPTIONS, GIT_SSH_COMMAND, GIT_EXTERNAL_DIFF, PYTHONPATH/PYTHONSTARTUP, LD_AUDIT/LD_*, PERL5OPT, RUBYOPT, HOME, TMPDIR, ENV, BASH_ENV, case-variant *proxy*, …).
 
-**Audit (done):** lace sends exec env via `ExecOptions.environment` → `docker exec -e K=V` (`docker-container.ts:122-123`); `environmentMode: 'inherit'|'replace'`. Callers pass env for tool execution — including secrets resolved by the runtime secret resolver (`ProjectedContainerProcessRunner`) and tool env overlays (`runtime.process.exec` in ripgrep/bounded-host). So a **blanket strip breaks secret + tool-env delivery to exec'd tools.**
+- [ ] **Step 1:** At `dispatch.rs:266-272`, replace the verbatim `-e` forward with an **allowlist** check: only env keys on a small hardcoded allowlist (the exact set the tool runtime legitimately needs — derive from lace's exec callers; expect a handful) are forwarded; everything else → `deny`. Keep `-i`/`-w`. **Allowlist criterion: the value must be inert, or the value is pinned plane-side** — never allowlist a key whose caller-supplied *value* is security-bearing. Specifically `NODE_EXTRA_CA_CERTS` (a real persona env) must NOT be caller-settable via exec (an attacker CA → MITM of the credential proxy/TLS): exclude it from the exec allowlist, or accept the key but override its value with the plane's known CA path.
+- [ ] **Step 2:** Tests: allowlisted inert key forwarded; non-allowlisted → deny; `-e NODE_EXTRA_CA_CERTS=/tmp/evil.pem` → denied or value-overridden. `cargo test`.
+- [ ] **Step 3:** Commit. PR note: secrets must NOT ride exec `-e`; #6 moves them to the credential socket, shrinking this surface.
 
-**Recommendation (for sign-off):** deny-by-default with a **key-policy**, not a blanket strip:
-- The shim rejects exec env keys that can subvert the process (`LD_PRELOAD`, `LD_LIBRARY_PATH`, `PATH`, `BASH_ENV`, `IFS`, `*PROXY*` — a small hardcoded denylist of execution-hijacking keys), and passes the rest.
-- **Secrets should not ride exec `-e` at all** — they move to the credential socket (#6). Once #6 lands, exec env shrinks to non-sensitive tool env, and the key-policy is the residual guard. Note this dependency.
-- This preserves today's tool-env behavior while closing the "caller injects `LD_PRELOAD`" hijack, and composes with #6.
+## Phase 2C — inspect: closed query keys (replace verbatim `--format`)
 
-- [ ] **Step 1:** Replace the verbatim `opts.push(val.clone())` for `-e` (dispatch.rs:271) with a `validate_exec_env_key(key)` check against the denylist; reject (`deny(...)`) on a denylisted key, pass otherwise. Keep `-i`/`-w` handling.
-- [ ] **Step 2:** Tests: a denylisted key → `deny`; a normal key → forwarded. `cargo test`.
-- [ ] **Step 3:** Commit. (Flag in the PR that the long-term shrink depends on #6 moving secrets off exec env.)
+- [ ] **Step 1:** Replace caller `--format` (`dispatch.rs:425-432`) with a closed set of **templated** queries keyed by name (`state`→`{{.State.Status}}`, `image`→`{{.Image}}`, `json`→a **positive enumerated LEAF-field allowlist** — specific leaves like `.State.Status`/`.Image` only, **never a subtree** like `.Config`/`.NetworkSettings` and never a passthrough/`{{json .}}`). Reject any caller `--format`; an unknown query key → `deny`.
+- [ ] **Step 2:** The projection MUST exclude sensitive fields: never expose `.Config.Env` (holds `SEN_AGENT_TOKEN`, `spawn.rs:138`), `.Config.Labels` (token-fingerprint), `.HostConfig.Binds`/`.Mounts` (host paths), `.NetworkSettings`. Keep the internal `inspect_labels` (`dispatch.rs:327-336`, returns the fingerprint label) **unreachable via the public query set** — it stays an internal call. Test: each query's output contains none of token/env/binds/mounts/fingerprint; unknown key → deny.
+- [ ] **Step 3:** `cargo test`; commit.
 
-## Phase 2C — Fix inspect `--format` passthrough (dispatch.rs:425-430)
+## Phase 2D — Streaming exec-attach (new sub-protocol)
 
-- [ ] **Step 1:** Replace the verbatim `--format` forward with a **closed set of templated inspect queries** the plane supports (e.g. `state` → `{{.State.Status}}`, `image` → `{{.Image}}`, `json` → a fixed safe projection). The caller names a query key, never a raw format string. Map lace's `inspect`/`daemonInspect` needs (state, image id) to these keys.
-- [ ] **Step 2:** Reject any caller `--format`. Tests: known key → templated; raw format → `deny`. `cargo test`.
-- [ ] **Step 3:** Commit.
+The existing request/response frame is buffered one-shot. Streaming needs a second mode on the same socket. rev-3 concretizes the design against the real blocking-I/O primitives (a single-loop relay deadlocks; the frame→relay transition and EOF/exit semantics must be pinned).
 
-## Phase 2D — Native exec-attach streaming (replace buffered `Command::output`)
+### Streaming wire contract (NORMATIVE — both the Rust plane and lace's `PlaneRuntime` cite this verbatim; do not re-derive per-repo)
 
-Today `RealDocker::run` uses `Command::output()` (docker.rs:41) — collects all stdout into memory, no streaming. lace's `execStream` has no plane path. Add a streaming exec verb.
+- **Entry:** the connection begins with the normal length-prefixed request frame (`read_request_frame`) whose verb is `exec-stream`. After that frame, the socket switches to **chunk mode** for the rest of the connection; no response frame is ever written.
+- **Chunk:** `<channel:u8><len:u32 big-endian><payload[len]>`. Channels: `stdin=0`, `stdout=1`, `stderr=2`, `exit=3`. `exit` payload = 1 byte (the process exit code; 255 for signal-killed).
+- **Anti-forgery invariants (security-critical):** the **plane is the SOLE writer of the channel byte and the length** — container stdout/stderr bytes are *payload only*, never spliced onto the socket as control bytes. The `exit` chunk's code comes **only** from the child's `wait()` status, never synthesized from or triggered by container output. The client treats the **first** `exit` chunk as terminal and ignores all bytes after it. (A container that emits the exact bytes of an `exit(0)` chunk on its stdout reaches the client *inside a `stdout` chunk*, indistinguishable as data.)
+- **stdin EOF:** the client signals "stdin done" with a **zero-length `channel=0` chunk** (NOT a socket half-close — the socket must stay open for stdout/exit). The plane, on the zero-len stdin chunk, closes the child's stdin.
+- **Teardown ordering:** the plane drains child stdout/stderr to EOF and flushes all their chunks **before** sending the single `exit` chunk, **then** closes the socket. (Ties to the serialized-writer requirement below — out-of-order would truncate output.)
+- **Size bounds:** each chunk `len ≤ MAX_FIELD_LEN` (reuse `frame.rs:10`, 16 MiB); a per-session total-byte + wall-time budget kills the child + closes on exceed (prevents an unbounded-output DoS against the sock holder).
 
-- [ ] **Step 1:** Add an `exec-stream` plane verb (or extend `exec` with an attach mode) that runs `docker exec -i <id> <cmd...>` with **inherited/piped stdio** (`Command::spawn` + attach), streaming stdin→child and child stdout/stderr→the plane's stdout/stderr, returning the real exit code. Keep the same ownership gate + exec-env key-policy (2B) as buffered exec.
-- [ ] **Step 2:** Decide the wire: the plane is invoked per-call by lace (`execFileAsync`/`spawn`). For streaming, lace `spawn`s the plane client and attaches to its stdio (the spike validated execStream-over-plane-socket, ~6ms/hop). Implement the plane side to pass-through stdio to `docker exec`. `PlaneRuntime.execStream` (Part 1.4) attaches to this.
-- [ ] **Step 3:** Tests (Rust): a streaming exec echoes stdin to stdout and returns the child exit code. Integration: lace `PlaneRuntime.execStream` round-trips. `cargo test` + the lace test from Part 1.4.
-- [ ] **Step 4:** Commit.
+### `frame.rs` additions
+- [ ] `write_chunk(w, channel, payload)` and `read_chunk(r) -> (channel, payload)` with explicit short-read loops (read exactly 5 header bytes, then exactly `len`), `len` bounded by `MAX_FIELD_LEN`. Unit tests incl. a chunk split across reads and an over-cap `len` rejected.
+
+### `Docker` trait — make the relay unit-testable
+- [ ] Add `spawn_stream(args) -> io::Result<StreamChild>` where `StreamChild` exposes `stdin: impl Write`, `stdout: impl Read`, `stderr: impl Read`, `wait() -> ExitStatus` as a **small trait** (not concrete `std::process::Child`), so the relay logic operates on generic `Read`/`Write` halves and `FakeDocker` can supply an in-memory scripted child (no real subprocess in unit tests). `RealDocker::spawn_stream` wires `Command::spawn` with piped stdio. Buffered `run` is untouched; existing callers stay on it.
+
+### Server `exec-stream`
+- [ ] `handle_connection` must **fork before `write_response_frame`** for this verb: validate via dispatch (ownership `require_owned`; exec-env **allowlist** from 2B; **deny `-t`** — only `-i`), then hand the **raw `UnixStream` + the existing `BufReader` + the `StreamChild`** to the relay (the current `handle_request → Response` path cannot carry these; add a streaming branch). The relay **must reuse the existing `BufReader`** for the socket-read side — it may already hold stdin bytes the client pipelined after the request frame; reading from a fresh handle would drop them.
+- [ ] **Thread model (REQUIRED — a single loop deadlocks on pipe-buffer fill):** `try_clone()` the socket. Run **three pumps** — (a) socket→child.stdin (drives the zero-len-chunk → close-stdin), (b) child.stdout→socket, (c) child.stderr→socket — plus the exit reaper (`wait()`). **All socket writes go through one serialized writer** (a `Mutex<UnixStream>` or a single writer thread fed by an mpsc) so stdout/stderr chunks never interleave and corrupt framing. On `wait()`: ensure (b)/(c) have drained to EOF, then emit the one `exit` chunk, then close.
+
+### Client `exec-stream` mode
+- [ ] New client function (the one-shot `run_client` shape cannot be reused): after writing the request frame, run **two threads** — process-stdin→socket(`channel=0`, zero-len on EOF) and socket→demux to process stdout/stderr; on the first `exit` chunk, stop and exit with its code.
+
+### lace + tests
+- [ ] `PlaneRuntime.execStream` (Part 1.4) spawns the client in `exec-stream` mode with piped stdio → `ExecStreamHandle`. `PlaneRuntime.exec` (buffered) **throws if `options.stdin` is set** (routes stdin callers to `execStream`) so the stdin-less buffered path can't silently drop data. The projected helper already rides `execStream` (verified: `projected-container.ts:756/840`), so its stdin round-trip works.
+- [ ] **Tests:** (Rust) echo stdin→stdout + correct exit; **forgery test** — a fake child whose stdout is exactly the bytes of a forged `exit(0)` chunk → client still sees the real process exit, forged bytes delivered as stdout payload; unowned id → `no such container`, no `spawn_stream`; over-budget session → child killed; partial-chunk read. (lace) `PlaneRuntime.execStream` round-trips stdin/stdout/exit against a fake plane client implementing the wire contract above.
+- [ ] `cargo test` + the lace test; commit.
+
+## Phase 2E — Persona-field validation (cap base now; full validation = pre-prod gate)
+
+A tampered persona `.md` escalates via MORE than caps — `user:0:0` (root), `network:host`, a chosen `image`/`command`, `sysctls`. So 2E is **persona-field validation**, all enforced in `PersonaSpec::validate()` (binds every load path), not just a cap filter.
+
+- [ ] **Step 1 (lands now — cheap floor item):** enforce `cap_add ⊆ {NET_ADMIN}`; reject any other cap **even from the persona file**. Test: `SYS_ADMIN` rejected, `NET_ADMIN` allowed. Commit.
+- [ ] **Step 2 (PRE-PROD GATE — see Interim security window):** add the rest of the closed-allowlist validation, each with a reject test:
+  - `network` ∈ `{quarantine, <the per-agent nets #4 adds>}` — reject `host`, `none`, `container:*`.
+  - `sysctls` keys ⊆ a closed set (today's only real entry is `net.ipv4.ip_local_port_range`).
+  - `user` pinned non-root — reject uid 0 (or force `1000:1000` plane-side).
+  - `image` ⊆ a registry-prefix allowlist (mirror the closed persona-enum discipline in `validate.rs:9`).
+  - `command` — constrained or dropped for personas that don't need it; with `user`/`image` bounded it is far less dangerous.
+  This is the defense-in-depth half of the pre-prod gate; the other half is the `.md`-dir lockdown. Until both land, the interim window (above) stands.
+
+## Phase 2F — Egress fail-closed (tighten; coordinate with #4)
+
+- [ ] **Step 1:** Today the container is `docker start`ed and THEN the netns iptables run (`spawn.rs` create→start→`finish_with_netns`); a netns-init failure leaves it running with open egress (fail-open). Make it **fail-closed:** on netns-init failure, `stop`+`rm` the container before returning the error. (Full structural-egress-at-create is #4/D3; this is the minimal fail-closed fix.)
+- [ ] **Step 2:** Test: netns failure → container removed, error returned. `cargo test`; commit.
 
 ---
 
-## Self-review
+## Self-review (rev 2)
 
-- **Spec coverage (Part 7 #3):** `ContainerRuntime` narrowed + impl as a `runtimes` plugin ✓ (Part 1.1/1.3, rides plugin-system Part E); plane = evolved shim ✓ (Part 2); deny-by-default / plane-builds-spec / ownership / mount-guard / cap-allowlist — **already present** (reality correction, not re-done); exec-env strip ✓ (2B, as a key-policy with evidence per Jesse); inspect-format templated ✓ (2C); native exec-attach ✓ (2D); delete docker-container.ts netns + direct-docker ✓ (1.2); boot→initialize via the registry ✓ (Part E). **Single-source personas** (Jesse) ✓ (2A) — exceeds the kit, which assumed a generated `.json`.
-- **Two-repo + box-coordinated:** Part 1 (lace) is mergeable independently for the `docker`/dev path; Part 2 (Rust) + the deploy repoint + `LACE_CONTAINER_RUNTIME=plane` land together under `--recreate`.
-- **Open items flagged, not hidden:** mount-model reconciliation (#1, settle before 2A); exec-env policy sign-off (#2); deploy repoint + kill json-gen (#3).
-- **Dependencies:** rides plugin-system Part E (`api.runtimes`). Pairs with #4 (D3 egress — `inspectNetworkIp`/source-IP bridge removal) and #6 (credentials — exec-env secret migration off `-e`). Does not block on them but is cleaner after.
+- **Floor items now correct:** cap-allowlist is BUILT (2E), not falsely claimed done; exec-env is an allowlist (2B); inspect closed-set excludes the token-bearing fields (2C); egress fail-closed (2F).
+- **Streaming is buildable:** 2D specifies the actual sub-protocol (chunk framing + `spawn_stream` + client mode), not "extend exec." It also closes the stdin gap for the projected helper.
+- **No projected-runtime breakage:** 1.2 splits the builder (keeps `resolvePersonaMountsAndEnv`).
+- **Dev runtimes:** carriers split (`PlaneSpawnRequest` vs `DockerCreateConfig`); `docker`/`apple` keep their fields + `execStream` for **non-persona local dev**. **Projected persona containers are PLANE-ONLY** (rev 3) — running a persona on dev docker/apple is unsupported (it would be un-quarantined), resolving the panel's copy-deletion-vs-dev contradiction.
+- **Streaming is now buildable, not just shaped:** 2D pins the thread model (3 server pumps + serialized writer; 2 client threads; `try_clone` halves), the `handle_connection` fork + `BufReader` reuse, stdin-EOF / drain-before-exit ordering, `read_chunk`/`write_chunk` in `frame.rs`, a testable `Docker::spawn_stream` (generic Read/Write halves, not concrete `Child`), the anti-forgery invariants (plane sole writer of channel+len; exit only from `wait()`), and size/session caps.
+- **Dependencies honored:** Part 1 hard-gated on #2 Part E; 2A hard-gated on Open Item #1; `inspectNetworkIp` removal deferred to #4; paths corrected (`tools/implementations/delegate.ts`).
+- **Security posture stated honestly:** the live-`.md`-source escalation is closed by Production prereq #1 (agent-unwritable `.md`, Jesse-deferred) + bounded by 2E; not hand-waved.
 
 ## Open items carried forward
 
-- D3 egress (#4): the shim already wires netns at spawn; #4 covers the per-agent point-to-point topology + IPAM + removing lace's source-IP bridge.
-- Credentials (#6): move secrets off exec `-e` onto the credential socket (shrinks 2B's surface); CDP injection via plane `docker exec` into the browser.
-- `docker`/`apple` dev runtimes: kept functional off-box; if they bitrot, mark dev-only explicitly rather than silently.
+- Production prereq #1 (agent-unwritable persona `.md` dir) — separate hardening, MUST precede prod trust.
+- #4 (egress D3): per-agent point-to-point + IPAM + structural-egress-at-create + `inspectNetworkIp`/source-IP-bridge removal.
+- #6 (credentials): move secrets off exec env onto the credential socket (shrinks 2B); CDP injection via plane `docker exec` into the browser.
+- `docker`/`apple` dev runtimes: kept off-box; mark dev-only if they bitrot.
