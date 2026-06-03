@@ -10,6 +10,7 @@ import { getLaceDir } from './lace-dir';
 import { resolveMcpServerCommandArgs } from './mcp-path-resolution';
 import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import { logger } from '@lace/agent/utils/logger';
+import { registries as pluginRegistries } from '@lace/agent/plugins';
 
 export interface PersonaInfo {
   name: string;
@@ -285,6 +286,14 @@ export class PersonaRegistry {
       seen.add(name);
     }
 
+    // Plugin personas (user disk wins, bundled falls through)
+    for (const name of pluginRegistries.personas.names()) {
+      if (!seen.has(name)) {
+        personas.push({ name, isUserDefined: false, path: `plugin:${name}` });
+        seen.add(name);
+      }
+    }
+
     // Built-in personas (only if not overridden)
     for (const name of this.bundledPersonasCache) {
       if (!seen.has(name)) {
@@ -301,7 +310,11 @@ export class PersonaRegistry {
    */
   hasPersona(name: string): boolean {
     this.loadUserPersonas();
-    return this.userPersonasCache.has(name) || this.bundledPersonasCache.has(name);
+    return (
+      this.userPersonasCache.has(name) ||
+      pluginRegistries.personas.has(name) ||
+      this.bundledPersonasCache.has(name)
+    );
   }
 
   /**
@@ -336,9 +349,14 @@ export class PersonaRegistry {
 
   /**
    * Parse a persona file into its frontmatter config and template body.
-   * User personas override bundled. Frontmatter is optional; absent ⇒ config = {}.
+   * User personas override bundled. Plugin personas slot between user-disk and bundled.
+   * Frontmatter is optional; absent ⇒ config = {}.
    */
   parsePersona(name: string): ParsedPersona {
+    this.loadUserPersonas();
+    if (!this.userPersonasCache.has(name) && pluginRegistries.personas.has(name)) {
+      return pluginRegistries.personas.resolve(name); // plugin source (user disk still wins)
+    }
     this.validatePersona(name);
 
     const raw = this.readPersonaContent(name);
