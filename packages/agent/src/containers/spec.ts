@@ -26,12 +26,10 @@ export interface ContainerSpec {
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // Persona containers need NET_ADMIN to replace the default route via the
-  // transparent egress gateway.
+  // Used by direct docker container specs that need extra kernel authority.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // Persona containers join the quarantine network.
   network?: string;
 
   // IPv4 address of the egress gateway broker.

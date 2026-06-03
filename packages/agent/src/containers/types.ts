@@ -24,10 +24,6 @@ export interface DockerCreateConfig {
   // may ignore (see AppleContainerRuntime).
   ports?: PortMapping[];
 
-  // Resource limits (optional for now)
-  memory?: number; // bytes
-  cpuShares?: number;
-
   // Docker --restart policy. Only 'unless-stopped' is supported in v1; used by
   // persistent container runtimes so the daemon resurrects them after host reboot.
   // Absent ⇒ no restart flag emitted (default no-restart behavior).
@@ -40,13 +36,12 @@ export interface DockerCreateConfig {
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // Absent or empty ⇒ no --cap-add flags emitted. Persona containers need
-  // NET_ADMIN to replace the default route via the transparent egress gateway.
+  // Absent or empty ⇒ no --cap-add flags emitted. Used by direct docker
+  // container specs that need extra kernel authority.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // Absent ⇒ no --network flag emitted (docker default). Persona containers
-  // join the quarantine network for transparent egress.
+  // Absent ⇒ no --network flag emitted (docker default).
   network?: string;
 
   // IPv4 address of the egress gateway broker.
