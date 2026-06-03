@@ -152,7 +152,7 @@ export function buildPersonaContainerSpec(input: {
     const name = personaName;
     return {
       name,
-      containerId: `sen-${personaName}`,
+      containerId: `box-${personaName}`,
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
       mounts,

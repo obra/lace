@@ -318,7 +318,7 @@ describe('DelegateTool', () => {
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect((options.runtimeBinding as RuntimeExecutionBinding).toolRuntime).toMatchObject({
       type: 'container',
-      spec: { name: 'box-shell', containerId: 'sen-box-shell', restartPolicy: 'unless-stopped' },
+      spec: { name: 'box-shell', containerId: 'box-box-shell', restartPolicy: 'unless-stopped' },
     });
   });
 

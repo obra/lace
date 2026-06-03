@@ -111,7 +111,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       cwd: '/home/agent',
       spec: {
         name: 'box-shell',
-        containerId: 'sen-box-shell',
+        containerId: 'box-box-shell',
         image: 'sen-box:dev',
         restartPolicy: 'unless-stopped',
       },

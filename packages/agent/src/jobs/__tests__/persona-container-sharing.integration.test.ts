@@ -242,7 +242,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
 
     const specName = spec.name;
     // Persistent containers use spec.containerId = `<prefix>-<persona>` (no lace- prefix).
-    const dockerName = `sen-${personaName}`;
+    const dockerName = `box-${personaName}`;
     createdContainerNames.push(dockerName);
 
     await containerManager.materialize(spec);
@@ -394,7 +394,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
   it('concurrent persistent delegates use the same projected container', async () => {
     // Use a unique persona name to avoid colliding with any real persistent persona container on the host
     const personaName = `test-pri1796-${uuidv4().slice(0, 8)}`;
-    const expectedDockerName = `sen-${personaName}`;
+    const expectedDockerName = `box-${personaName}`;
 
     // Materialize the same persistent persona twice concurrently.
     // Both should adopt / share one container.

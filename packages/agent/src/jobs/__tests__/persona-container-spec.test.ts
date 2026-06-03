@@ -171,7 +171,7 @@ describe('buildPersonaContainerSpec persistent', () => {
 
     expect(spec).toMatchObject({
       name: 'box-shell',
-      containerId: 'sen-box-shell',
+      containerId: 'box-box-shell',
       image: 'sen-box:dev',
       workingDirectory: '/home/agent',
       env: {},

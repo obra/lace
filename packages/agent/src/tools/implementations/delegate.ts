@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
@@ -185,7 +186,7 @@ Parameters:
             // host. Idempotent: the resume path finds an existing dir; the
             // fresh path creates a new one. mode 0o700 applies only to
             // newly created dirs — existing dirs keep their mode.
-            const scratchBase = process.env.LACE_WORK_DIR ?? '/var/sen/instance/work';
+            const scratchBase = process.env.LACE_WORK_DIR ?? path.join(os.tmpdir(), 'lace-work');
             scratchDirHostPath = path.join(scratchBase, childSessionId!);
             fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
 
