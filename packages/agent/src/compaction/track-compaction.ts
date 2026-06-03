@@ -9,6 +9,7 @@ import type { ProviderMessage } from '@lace/agent/providers/base-provider';
 import {
   UNTRACKED,
   splitAtTailBoundary,
+  demuxByTrack,
   buildPreservedTail,
   buildPreservedWithPrefix,
   jobSalience,
@@ -406,7 +407,9 @@ export async function compact(
   let prefixContent: string;
   {
     const turnToTrack = buildTurnToTrackMap(events);
-    const groups = groupEarlierEventsByTrack(earlier, turnToTrack);
+    const groups = demuxByTrack(earlier, (e) => kernelAttributor(e, turnToTrack));
+    // Remove the sentinel bucket produced by kernelAttributor for context_compacted events.
+    groups.delete('__skip__');
     const blocks: TrackBlock[] = [];
     for (const [trackId, trackEvents] of groups) {
       const block = salienceForTrack(trackId, trackEvents);

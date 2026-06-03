@@ -5,11 +5,13 @@ import { describe, it, expect } from 'vitest';
 import {
   buildTurnToTrackMap,
   groupEarlierEventsByTrack,
+  kernelAttributor,
   salienceForTrack,
   compact,
   splitAtTailBoundary,
   UNTRACKED,
 } from '../track-compaction';
+import { demuxByTrack } from '../toolkit';
 import type { CompactionContext } from '../types';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
 import type { AIProvider } from '@lace/agent/providers/base-provider';
@@ -758,5 +760,84 @@ describe('compact()', () => {
     const blocks = promptEntry!.content as Array<{ type: string }>;
     expect(blocks.some((b) => b.type === 'image')).toBe(true);
     expect(blocks.some((b) => b.type === 'text')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Live seam test: demuxByTrack(kernelAttributor) === groupEarlierEventsByTrack
+// ---------------------------------------------------------------------------
+// Proves kernelAttributor is correct and live — compact() now routes through
+// demuxByTrack(kernelAttributor) rather than calling groupEarlierEventsByTrack
+// directly. This test asserts that both paths produce identical group maps on a
+// representative fixture covering all attribution branches:
+//   - slack track (prompt + in-turn tool_use)
+//   - job track (job_started / job_finished)
+//   - turn-inherited in-turn events (tool_use, message inheriting from turnToTrack)
+//   - untracked fallback (no track, no turnId in map)
+//   - context_compacted filtered out by both paths
+//   - mid-turn context_injected using its own track
+
+describe('demuxByTrack(kernelAttributor) produces identical groups to groupEarlierEventsByTrack', () => {
+  it('matches on a representative event set with all attribution branches', () => {
+    const events: TypedDurableEvent[] = [
+      // A context_compacted event — should be filtered by both paths
+      event(1, 'context_compacted', { strategy: 'old', preserved: [] }),
+      // Slack prompt → track 'slack:A'
+      event(2, 'prompt', { content: [{ type: 'text', text: 'hi' }], track: 'slack:A' }),
+      event(3, 'turn_start', {}, 'turn_1'),
+      // In-turn tool_use → should inherit 'slack:A' via turnToTrack
+      event(4, 'tool_use', { toolCallId: 'tc1', name: 'bash', input: {} }, 'turn_1'),
+      // Mid-turn context_injected with its own track → 'alarm:X'
+      event(5, 'context_injected', { content: [], track: 'alarm:X' }),
+      event(6, 'message', { content: 'done' }, 'turn_1'),
+      event(7, 'turn_end', { stopReason: 'end_turn' }, 'turn_1'),
+      // Job lifecycle events → 'job:job_abc'
+      event(8, 'job_started', { jobId: 'job_abc', jobType: 'delegate', description: 'deploy' }),
+      event(9, 'job_finished', { jobId: 'job_abc', outcome: 'completed' }),
+      // Prompt with no track → untracked
+      event(10, 'prompt', { content: [{ type: 'text', text: 'legacy' }] }),
+      // Event with turnId not in map → untracked fallback
+      event(11, 'tool_use', { toolCallId: 'tc2', name: 'bash', input: {} }, 'unknown_turn'),
+    ];
+
+    const turnToTrack = buildTurnToTrackMap(events);
+
+    // Reference: old groupEarlierEventsByTrack
+    const expected = groupEarlierEventsByTrack(events, turnToTrack);
+
+    // Live seam: demuxByTrack + kernelAttributor, with __skip__ bucket removed
+    const groups = demuxByTrack(events, (e) => kernelAttributor(e, turnToTrack));
+    groups.delete('__skip__');
+
+    // Same keys, same order
+    expect([...groups.keys()]).toEqual([...expected.keys()]);
+
+    // Same event sequences per bucket
+    for (const [track, evts] of expected) {
+      expect(groups.get(track)?.map((e) => e.eventSeq)).toEqual(evts.map((e) => e.eventSeq));
+    }
+  });
+
+  it('matches for turn-inherited tool_use and message events', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [], track: 'slack:B' }),
+      event(2, 'turn_start', {}, 'turn_X'),
+      event(3, 'tool_use', { toolCallId: 'tc1', name: 'bash', input: {} }, 'turn_X'),
+      event(4, 'message', { content: 'reply' }, 'turn_X'),
+      event(5, 'turn_end', { stopReason: 'end_turn' }, 'turn_X'),
+    ];
+
+    const turnToTrack = buildTurnToTrackMap(events);
+    const expected = groupEarlierEventsByTrack(events, turnToTrack);
+    const groups = demuxByTrack(events, (e) => kernelAttributor(e, turnToTrack));
+    groups.delete('__skip__');
+
+    expect([...groups.keys()]).toEqual([...expected.keys()]);
+    for (const [track, evts] of expected) {
+      expect(groups.get(track)?.map((e) => e.eventSeq)).toEqual(evts.map((e) => e.eventSeq));
+    }
+    // Confirm all in-turn events are under 'slack:B', not untracked
+    expect(groups.get('slack:B')?.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5]);
+    expect(groups.get(UNTRACKED)).toBeUndefined();
   });
 });
