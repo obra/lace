@@ -59,6 +59,12 @@ export type SessionState = {
     totalInputTokens: number;
     totalOutputTokens: number;
   };
+  /**
+   * The highest breakpoint `at` value that has been fired in the current
+   * ascending pressure run. Reset to 0 when pressure drops below all breakpoints.
+   * Undefined on disk is treated as 0 (new sessions / old state.json files).
+   */
+  highestFiredBreakpointAt?: number;
   config?: {
     executionMode?: 'plan' | 'execute';
     approvalMode?:
@@ -158,6 +164,10 @@ export function readSessionState(sessionDir: string): SessionState {
       config:
         typeof parsed.config === 'object' && parsed.config
           ? (parsed.config as SessionState['config'])
+          : undefined,
+      highestFiredBreakpointAt:
+        typeof parsed.highestFiredBreakpointAt === 'number'
+          ? parsed.highestFiredBreakpointAt
           : undefined,
     };
   } catch {

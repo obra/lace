@@ -45,11 +45,15 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
-import { computePressure, shouldFireCompaction } from './compaction-trigger';
+import { computePressure, evaluateBreakpoints } from './compaction-trigger';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
-import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import {
+  compactionStrategyNameForSession,
+  compactionBreakpointsForSession,
+} from '@lace/agent/compaction/select';
 import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
+import { injectNotification } from '@lace/agent/notifications/inject-notification';
 
 /**
  * Non-enumerable sentinel applied to errors thrown out of `executeToolCall`.
@@ -1049,12 +1053,13 @@ export class ConversationRunner {
         });
       }
 
-      // Track-based compaction trigger. Runs synchronously in the runner's
-      // finally block after the turn_end write. Uses the raw
-      // appendDurableEvent + writeSessionState path (no writeAndAdvance) so
-      // we don't acquire a nested runExclusive lock and deadlock.
-      // Failures are logged but never abort the turn — pressure stays high and
-      // the next clean turn re-evaluates.
+      // Compaction trigger. Runs synchronously in the runner's finally block
+      // after the turn_end write. Uses the raw appendDurableEvent +
+      // writeSessionState path (no writeAndAdvance) so we don't acquire a
+      // nested runExclusive lock and deadlock. Failures are logged but never
+      // abort the turn — pressure stays high and the next clean turn
+      // re-evaluates. The clean-stop-reason gate below (compactionRequest gate
+      // skips it) mirrors the prior shouldFireCompaction gate.
       try {
         const usage = {
           inputTokens: totalInputTokens,
@@ -1067,7 +1072,65 @@ export class ConversationRunner {
         };
         const contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
         const pressure = computePressure(usage, contextWindowSize);
-        if (compactionRequest.requested || shouldFireCompaction({ stopReason, pressure })) {
+
+        const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
+        const isCleanStop = CLEAN_STOP_REASONS.has(stopReason);
+
+        // Evaluate persona breakpoints (only on clean stops; compactionRequest
+        // bypasses the clean-stop gate entirely so the agent can explicitly
+        // request compaction at any stop reason).
+        let breakpointCompactCrossed = false;
+        if (isCleanStop) {
+          const breakpoints = this.config.persona
+            ? compactionBreakpointsForSession(sessionDir)
+            : [
+                { at: 0.6, action: 'compact' as const },
+                { at: 0.9, action: 'compact' as const },
+              ];
+          const currentHighestFiredAt = readSessionState(sessionDir).highestFiredBreakpointAt ?? 0;
+          const ev = evaluateBreakpoints({
+            pressure,
+            breakpoints,
+            highestFiredAt: currentHighestFiredAt,
+          });
+
+          if (ev.reset) {
+            // Pressure has dropped below all breakpoints: reset once-per-crossing state
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              writeSessionState(sessionDir, { ...sessionState, highestFiredBreakpointAt: 0 });
+            });
+          } else if (ev.fire?.action === 'notify') {
+            // Notify action: inject a notification and persist the crossed level
+            const pressurePct = Math.round(pressure * 100);
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              injectNotification({
+                sessionDir,
+                kind: 'compaction-pressure',
+                attributes: { pressure: pressurePct },
+                body: `Context window is ${pressurePct}% full. Consider wrapping up your current task or calling compact_session to compress the conversation history.`,
+              });
+              writeSessionState(sessionDir, {
+                ...sessionState,
+                highestFiredBreakpointAt: ev.nextHighestFiredAt,
+              });
+            });
+          } else if (ev.fire?.action === 'compact') {
+            breakpointCompactCrossed = true;
+            // Persist the new highestFiredBreakpointAt — the compact path below
+            // will read and write state under its own runExclusive.
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              writeSessionState(sessionDir, {
+                ...sessionState,
+                highestFiredBreakpointAt: ev.nextHighestFiredAt,
+              });
+            });
+          }
+        }
+
+        if (compactionRequest.requested || breakpointCompactCrossed) {
           const allEvents = readDurableEvents(sessionDir, {
             limit: Number.MAX_SAFE_INTEGER,
           }).events;

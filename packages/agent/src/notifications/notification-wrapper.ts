@@ -8,7 +8,8 @@ export type NotificationKind =
   | 'job-failed'
   | 'job-cancelled'
   | 'job-progress'
-  | 'subagent-exited';
+  | 'subagent-exited'
+  | 'compaction-pressure';
 
 export interface BuildNotificationOptions {
   kind: NotificationKind;

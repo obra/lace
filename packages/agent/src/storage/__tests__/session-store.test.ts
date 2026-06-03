@@ -88,6 +88,42 @@ describe('storage/session-store', () => {
     expect(roundTrip.config).toMatchObject({ approvalMode: 'ask' });
   });
 
+  it('round-trips highestFiredBreakpointAt', () => {
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+
+    // Initially undefined
+    const initial = readSessionState(sessionDir);
+    expect(initial.highestFiredBreakpointAt).toBeUndefined();
+
+    // Write a non-zero value
+    writeSessionState(sessionDir, {
+      nextEventSeq: 1,
+      nextStreamSeq: 1,
+      highestFiredBreakpointAt: 0.6,
+    });
+
+    const afterWrite = readSessionState(sessionDir);
+    expect(afterWrite.highestFiredBreakpointAt).toBe(0.6);
+
+    // Reset to 0
+    writeSessionState(sessionDir, {
+      nextEventSeq: 1,
+      nextStreamSeq: 1,
+      highestFiredBreakpointAt: 0,
+    });
+
+    const afterReset = readSessionState(sessionDir);
+    expect(afterReset.highestFiredBreakpointAt).toBe(0);
+  });
+
+  it('reads highestFiredBreakpointAt as undefined from a legacy state.json without the field', () => {
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    // Write a state.json that has no highestFiredBreakpointAt (simulates old files)
+    writeSessionState(sessionDir, { nextEventSeq: 3, nextStreamSeq: 2 });
+    const state = readSessionState(sessionDir);
+    expect(state.highestFiredBreakpointAt).toBeUndefined();
+  });
+
   it('persists runtimeBinding under state.config.runtimeBinding', () => {
     const sessionDir = join(tempDir, 'sess_runtime_binding');
     writeSessionMeta(sessionDir, {
