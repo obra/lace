@@ -1068,7 +1068,7 @@ export class ConversationRunner {
             // safe because the event-log writer and event-types agree on the wire
             // format.
             allEvents as unknown as TypedDurableEvent[],
-            { threadId: sessionId, provider, modelId: modelId ?? undefined }
+            { threadId: sessionId, sessionDir, provider, modelId: modelId ?? undefined }
           );
           if (!('noop' in result)) {
             await this.deps.runExclusive(() => {

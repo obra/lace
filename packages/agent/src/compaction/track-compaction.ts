@@ -2,9 +2,9 @@
 // ABOUTME: Uses context_compacted event type for event-sourced replay
 
 import { isEventOfType } from '@lace/agent/storage/event-types';
-import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
+import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
-import type { CompactionContext } from './types';
+import type { CompactionContext, CompactResult } from './types';
 import type { ProviderMessage, ContentBlock } from '@lace/agent/providers/base-provider';
 import { coreToolResultFromProtocol, toNonEmptyString } from '../rpc/utils';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
@@ -384,15 +384,6 @@ function truncate(s: string, max: number): string {
 }
 
 const TAIL_TURNS = 10;
-
-export type CompactResult =
-  | {
-      compactionEvent: {
-        type: 'context_compacted';
-        data: ContextCompactedEventData;
-      };
-    }
-  | { noop: true };
 
 /**
  * Split events into [earlier, tail] at the boundary that gives `tailTurns`

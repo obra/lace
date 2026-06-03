@@ -489,6 +489,7 @@ export function registerSessionOperationHandlers(
 
         const result = await compact(events, {
           threadId: state.activeSession!.meta.sessionId,
+          sessionDir,
           provider,
           modelId: effectiveConfig.modelId,
         });

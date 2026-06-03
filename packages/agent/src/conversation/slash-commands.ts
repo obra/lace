@@ -159,6 +159,7 @@ export async function handleSlashCommand(
         });
         const result = await compact(events, {
           threadId: sessionId,
+          sessionDir,
           provider,
           modelId: effectiveConfig.modelId,
         }).finally(() => provider.cleanup());
