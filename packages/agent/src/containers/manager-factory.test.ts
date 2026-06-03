@@ -42,11 +42,14 @@ describe('createDefaultContainerManager', () => {
     expect(getRuntime(manager)?.constructor.name).toBe('DockerContainerRuntime');
   });
 
-  it('fails clearly for an invalid LACE_CONTAINER_RUNTIME value', () => {
+  it('fails clearly for an unregistered LACE_CONTAINER_RUNTIME value', () => {
+    // Previously: parseContainerRuntimeSelection hard-rejected names outside {auto,apple,docker}.
+    // Now: any name is accepted and resolved against the plugin registry; an unknown name throws
+    // with a registry-miss message so embedders get a clear error.
     process.env[ENV_KEY] = 'podman';
 
     expect(() => createDefaultContainerManager('darwin')).toThrow(
-      /LACE_CONTAINER_RUNTIME must be one of: auto, apple, docker/
+      /LACE_CONTAINER_RUNTIME="podman" but no runtime registered under that name/
     );
   });
 });
