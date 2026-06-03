@@ -238,6 +238,8 @@ await manager.startServer({
 const client = manager.getClient('my-server')!;            // also: manager.getServer(id).status === 'running'
 const { tools } = await client.listTools();
 const adapter = new MCPToolAdapter(tools.find((t) => t.name === 'do_thing')!, 'my-server', client);
+// execute takes exactly two args: (args, context: ToolContext). MCP ignores the
+// context, but it is the real signature — don't pass a third argument.
 const result = await adapter.execute({ text: 'hi' }, { signal: new AbortController().signal });
 // adapter.name === 'my-server/do_thing'; result.content[0].text holds the output
 await manager.shutdown();

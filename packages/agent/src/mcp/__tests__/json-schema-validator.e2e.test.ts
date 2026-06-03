@@ -108,7 +108,7 @@ describe('json-schema-validator MCP server (e2e — real lace wiring)', () => {
     });
     const value = JSON.stringify({ name: 'Alice', age: 30 });
 
-    const result = await adapter.execute({ schema, value }, {}, undefined);
+    const result = await adapter.execute({ schema, value }, {});
 
     expect(result.status).toBe('completed');
     const parsed = parseResult(result.content as Array<{ type: string; text?: string }>);
@@ -130,7 +130,7 @@ describe('json-schema-validator MCP server (e2e — real lace wiring)', () => {
     });
     const value = JSON.stringify({ name: 'Bob' }); // missing age
 
-    const result = await adapter.execute({ schema, value }, {}, undefined);
+    const result = await adapter.execute({ schema, value }, {});
 
     expect(result.status).toBe('completed');
     const parsed = parseResult(result.content as Array<{ type: string; text?: string }>);
@@ -152,7 +152,7 @@ describe('json-schema-validator MCP server (e2e — real lace wiring)', () => {
     });
     const value = JSON.stringify({ count: 'not-a-number' }); // wrong type
 
-    const result = await adapter.execute({ schema, value }, {}, undefined);
+    const result = await adapter.execute({ schema, value }, {});
 
     expect(result.status).toBe('completed');
     const parsed = parseResult(result.content as Array<{ type: string; text?: string }>);
@@ -169,8 +169,7 @@ describe('json-schema-validator MCP server (e2e — real lace wiring)', () => {
 
     const result = await adapter.execute(
       { schema: '{"type":"object"}', value: 'not json at all {{' },
-      {},
-      undefined
+      {}
     );
 
     expect(result.status).toBe('completed');
@@ -210,8 +209,7 @@ describe('json-schema-validator MCP server (e2e — real lace wiring)', () => {
         }),
         value: JSON.stringify({ x: 42 }),
       },
-      ctx,
-      undefined
+      ctx
     );
 
     // The call still succeeds — context being ignored doesn't break anything
