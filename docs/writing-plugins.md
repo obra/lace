@@ -122,6 +122,14 @@ The `body` is rendered with the same variable substitution as disk personas
 (e.g. `{{system.os}}`, `{{system.sessionDate}}`). User-disk personas override
 plugin personas override bundled ones.
 
+`PersonaConfig` is a strict Zod type, so anything beyond the trivial
+`{ runtime: { type: 'root' } }` won't satisfy the TypeScript type from a plain
+object literal. Either parse it (`personaConfigSchema.parse(...)`) or cast
+(`config: { ... } as PersonaDef['config']`). See the
+[reference](reference/plugins.md#personadef-lace-agentplugins) for the full field
+list and the rendering caveat (plugin bodies use string-render, so avoid `@path`
+includes).
+
 ### A container runtime
 
 `ContainerRuntime` is the heaviest contract (lifecycle + exec + inspect +
@@ -133,7 +141,9 @@ one, implement the full interface from `@lace/agent/containers/types` and
 
 Write an **end-to-end** test: load the plugin through the real loader into the
 real registries, then assert it shows up at the real consumption site. No mocks —
-that's the point. Mirror the kernel's own `whole-system.integration.test.ts`.
+that's the point. Mirror the kernel's own template at
+`packages/agent/src/plugins/__tests__/whole-system.integration.test.ts` (and the
+worked examples in `packages/agent/src/plugins/__examples__/`).
 
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -158,12 +168,69 @@ describe('acme plugin', () => {
 });
 ```
 
+`registerBuiltinTools()` (and `registerBuiltinCompaction()` /
+`registerBuiltinRuntimes()` for those kinds) must run **before** `loadPlugins` —
+built-ins register first so a plugin name clashing with a built-in is a fatal
+duplicate. Omit them and your assertions about built-ins coexisting will be wrong.
+
 Consumption sites for the other kinds (assert against these, real, no mocks):
 
 - compaction → `resolveCompactionStrategy('acme/aggressive').name`
+  (from `@lace/agent/compaction/strategy`)
 - runtimes → `createDefaultContainerManager(platform, 'acme/mybackend')`
+  (from `@lace/agent/containers/manager-factory`)
 - personas → `new PersonaRegistry({...}).parsePersona('acme/researcher').body`
-  (and `.render(name, engine, context)` to check the rendered prompt)
+  (from `@lace/agent/config/persona-registry`; see rendering below)
+
+### Running the test
+
+Tests live in the `packages/agent` package, which has its **own** vitest config —
+the repo-root config excludes `packages/**`. Run from inside the package:
+
+```bash
+cd packages/agent && npx vitest run src/plugins/__tests__/your-plugin.e2e.test.ts
+```
+
+### Loading an in-repo plugin
+
+In production you load a published package (`loadPlugins('@acme/lace-plugin')`).
+In an in-repo test, pass a **relative specifier resolved from
+`src/plugins/loader.ts`** (the module that does the `import()`). A plugin at
+`src/plugins/__examples__/my-plugin.ts` loads as:
+
+```ts
+await loadPlugins('./__examples__/my-plugin');
+```
+
+### Rendering a plugin persona in a test
+
+`registry.render(name, engine, context)` needs a real `TemplateEngine` and a real
+variable context. Build them from `@lace/agent/config`:
+
+```ts
+import { TemplateEngine } from '@lace/agent/config/template-engine';
+import { VariableProviderManager, SystemVariableProvider } from '@lace/agent/config/variable-providers';
+
+const engine = new TemplateEngine([]);                 // no template dirs needed for plugin bodies
+const vars = new VariableProviderManager();
+vars.addProvider(new SystemVariableProvider());
+const context = await vars.getTemplateContext();
+
+const prompt = registry.render('acme/researcher', engine, context);
+expect(prompt).not.toContain('{{system.sessionDate}}');   // substitution fired
+```
+
+### Testing `assertVersion` without a fixture
+
+To exercise version-skew directly, build a live `PluginApi` against scratch
+registries — both helpers are exported from `@lace/agent/plugins`:
+
+```ts
+import { createPluginApi, makeRegistries, PluginVersionError } from '@lace/agent/plugins';
+
+const api = createPluginApi({ name: 'x', namespace: 'x', version: '0.0.0' }, makeRegistries());
+expect(() => api.assertVersion(2)).toThrow(PluginVersionError);   // kernel is major 1
+```
 
 ## Packaging for real
 

@@ -140,6 +140,11 @@ class Registry<T> {
 }
 ```
 
+The exported `registries` object exposes one of these per kind —
+`registries.tools`, `registries.compaction`, `registries.runtimes`,
+`registries.personas` — each with the full surface above. In a test you can assert
+ownership across all four (e.g. `registries.compaction.owner('acme/strat')`).
+
 ## Capability manifest
 
 A plugin declares privileged capabilities in its `manifest`. The model is
@@ -228,10 +233,19 @@ abstract class Tool {
 }
 ```
 
+Import `Tool` from `@lace/agent/tools/tool`; import the `ToolResult` and
+`ToolContext` types from `@lace/agent/tools/types`.
+
 `ToolContext.persona` is the authoritative session identity, stamped server-side
 from the session's persona. A plugin tool reads `context.persona`; tool arguments
 **cannot** forge it (the model passing `args.persona` is ignored). This is the
 identity keystone — use `context.persona`, never an arg, for who-am-I decisions.
+
+To invoke a tool directly (e.g. in a test), call its **public** `execute`
+(not the `protected executeValidated`): `tool.execute(args: unknown, ctx:
+ToolContext)`. `ToolContext` has many optional fields; the only **required** one
+is `signal: AbortSignal`. A minimal context is
+`{ signal: new AbortController().signal, persona: 'researcher' }`.
 
 ### CompactionStrategy (`@lace/agent/compaction/types`)
 
@@ -246,23 +260,94 @@ type CompactResult =
 interface CompactionContext { threadId; sessionDir; provider?; agent?; modelId? }
 ```
 
-`@lace/agent/compaction/toolkit` exports `mergePreservedAdjacent(entries)` — apply
-it to your preserved-message list so message replay stays legal (drops empties,
-merges consecutive same-role entries, ensures a leading user-role entry).
+Return `{ noop: true }` when there is nothing to compact — do **not** return a
+`compactionEvent` with an empty `preserved`. `ContextCompactedEventData` (from
+`@lace/agent/storage/event-types`) requires `strategy: string` and
+`preserved: unknown[]`; `summary?: string` and `messagesCompacted?: number` are
+optional.
+
+**Reading the input events:** each `TypedDurableEvent` is
+`{ eventSeq, timestamp, type, data }`. Filter on the **envelope** `event.type`
+(the reliable discriminant) — *not* `event.data.type`, which may be absent on
+disk-loaded events. Valid `type` values include `'message'`, `'prompt'`,
+`'tool_use'`, `'turn_start'`, `'turn_end'`, `'context_compacted'`, … (see
+`event-types.ts` for the full union — there is no `'message_complete'`).
+
+**The toolkit:** `@lace/agent/compaction/toolkit` exports
+`mergePreservedAdjacent(entries: PreservedEntry[])` — apply it to your preserved
+list so message replay stays legal (drops empties, merges consecutive same-role
+entries, ensures a leading user-role entry; returns `[]` when nothing remains →
+return `{ noop: true }`). A `PreservedEntry` is
+`{ role: string; content: string | Block[]; toolCalls?: unknown[]; toolResults?: unknown[] }`
+where `Block = { type: string; [k: string]: unknown }`. This type is internal to
+the toolkit — inline the shape; it is not re-exported.
 
 ### ContainerRuntime (`@lace/agent/containers/types`)
 
-A full runtime implements: `create`, `start`, `stop`, `remove`, `exec`,
-`execStream`, `inspect`, `list`, `daemonInspect`, `adopt`, and optionally
-`inspectNetworkIp`. See the interface for exact signatures. This is the heaviest
-contract; most embedders use the built-in `docker`/`apple` runtimes rather than
-writing one.
+The heaviest contract — most embedders use the built-in `docker`/`apple` runtimes
+rather than writing one. If you do, implement the full interface:
+
+```ts
+interface ContainerRuntime {
+  // Lifecycle
+  create(config: ContainerConfig): string | Promise<string>;   // returns container ID; may be sync
+  start(containerId: string): Promise<void>;
+  stop(containerId: string, timeout?: number): Promise<void>;
+  remove(containerId: string): Promise<void>;
+  // Execution
+  exec(containerId: string, options: ExecOptions): Promise<ExecResult>;
+  execStream(containerId: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
+  // Information
+  inspect(containerId: string): ContainerInfo | Promise<ContainerInfo>;       // in-process cache; may be sync
+  list(): ContainerInfo[] | Promise<ContainerInfo[]>;
+  daemonInspect(containerId: string): Promise<ContainerInfo | null>;          // live daemon; null if absent
+  adopt(config: ContainerConfig, state: ContainerState): Promise<void>;       // re-register a surviving box; idempotent
+  // Optional — only runtimes backing the egress gateway implement it
+  inspectNetworkIp?(containerId: string, networkName: string): Promise<string | undefined>;
+}
+
+interface ExecStreamHandle {
+  stdin: Writable; stdout: Readable; stderr: Readable;
+  wait(): Promise<{ exitCode: number }>;
+  kill(signal?: NodeJS.Signals): void;
+}
+```
+
+`inspect` reads the in-process cache (and may be synchronous); `daemonInspect`
+hits the daemon and returns `null` when the container does not exist — that null
+case is how `ContainerManager` adopts boxes after a parent restart. The supporting
+types (`ContainerConfig`, `ContainerInfo`, `ContainerState`, `ExecOptions`,
+`ExecResult`, `ExecStreamOptions`) are all in `@lace/agent/containers/types`.
 
 ### PersonaDef (`@lace/agent/plugins`)
 
 `PersonaDef = ParsedPersona = { config: PersonaConfig; body: string }` — the same
-shape a persona `.md` file parses to. `body` is the system-prompt template
-(rendered with the same variable substitution as disk personas); `config` is the
-validated frontmatter (`model`, `tools`, `runtime`, `compaction`, `mcpServers`,
-…). User-disk personas override plugin personas override bundled. Plugin personas
-are **not** run through MCP-path resolution — supply absolute/ready config.
+shape a persona `.md` file parses to. `PersonaConfig` (from
+`@lace/agent/config/persona-registry`) is:
+
+```ts
+interface PersonaConfig {
+  model?: string;
+  tools?: string[];
+  runtime?: { type: 'root' } | { type: 'container'; /* image, mounts, … */ };  // default { type: 'root' }
+  compaction?: { strategy?: string; breakpoints?: { at: number; action: 'notify' | 'compact' }[] };
+  mcpServers?: Record<string, { command: string; args?: string[]; /* … */ }>;
+  maxTurns?: number;
+}
+```
+
+> **Typing note.** `PersonaConfig` is a Zod **`.strict()`** type, so a partial
+> object literal does not satisfy it directly in TypeScript (even a complete one
+> trips the strictness in many cases). Either build it via
+> `personaConfigSchema.parse(...)`, or — as the examples do for brevity — write the
+> literal and cast with `as PersonaDef['config']`.
+
+`body` is the system-prompt template. Plugin persona bodies are rendered via
+`engine.renderString(body, context)` (string render), **not** the file-based
+`engine.render(name + '.md')` used for disk/bundled personas — so `@path` partial
+includes in a plugin body resolve against `.` (cwd), not the template search
+dirs. Avoid `@path` includes in plugin persona bodies; mustache variables
+(`{{system.os}}`, `{{system.sessionDate}}`, …) work normally.
+
+Precedence: user-disk overrides plugin overrides bundled. Plugin personas are
+**not** run through MCP-path resolution — supply absolute/ready config.
