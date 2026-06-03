@@ -200,7 +200,15 @@ Delete these two lines from the `ContainerRuntime` interface (currently lines 16
 
 Delete both methods from `BaseContainerRuntime` (currently lines 74–113) — the entire `translateToContainer(...) { ... }` block and the entire `translateToHost(...) { ... }` block. Keep `list()` above them and `updateContainerState` below them.
 
-After deletion, `join` (imported `from 'path'` at the top) may become unused. If `npm run typecheck`/lint flags it as unused, remove the `import { join } from 'path';` line. (Verify first — do not remove it blindly.)
+After deletion, two imports at the top of `runtime.ts` become unused — both are referenced **only** inside the two deleted methods:
+- `import { logger } from '@lace/agent/utils/logger';` — used only by the `logger.warn(...)` calls in `translateToContainer`/`translateToHost`.
+- `import { join } from 'path';` — used only by the `join(...)` calls in those methods.
+
+Remove **both** import lines. Leaving either in place fails `npm run lint` (no-unused). After removing them, re-grep to confirm no other usage remains:
+```bash
+grep -n "logger\|join(" packages/agent/src/containers/runtime.ts
+```
+Expected: no matches (or only matches you are certain are unrelated — there should be none).
 
 - [ ] **Step 3: Fix `runtime.test.ts`**
 
@@ -322,4 +330,4 @@ grep -n "timezone" packages/agent/src/config/persona-registry.ts && echo "FAIL: 
 
 - **Spec coverage:** Part 1.7 de-leak items addressed here = `scratch-gc-reminder`, `timezone`, dead `translateTo*`, PRI/sen comment cosmetics (no-op). Remaining 1.7 items (docker impls, `persona-container-spec.ts`, the three field-carriers, the egress observer, schema narrowing) are explicitly deferred to specs #3/#7 — by design, not omission.
 - **Mount subsystem left intentionally** (write-only, compiles) — swept by #3. Documented in scope boundaries so a reviewer doesn't read it as a miss.
-- **`join` import in `runtime.ts`** flagged as a conditional follow-on removal (verify-then-remove) — the only secondary-deadness this cleanup introduces.
+- **`logger` and `join` imports in `runtime.ts`** are both orphaned by the `translateTo*` deletion (each is used only inside those methods) — Task 3 Step 2 removes both. This is the only secondary-deadness this cleanup introduces. (Caught by roborev review of `b416763`.)
