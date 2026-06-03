@@ -115,7 +115,7 @@ Body.`;
   });
 
   it('clamps container runtime ports to u16 bounds', () => {
-    const atUpperBound = `---
+    const atBounds = `---
 runtime:
   type: container
   containerSharing: per_invocation
@@ -125,17 +125,30 @@ runtime:
   ports:
     - host: 65535
       container: 0
+    - host: 0
+      container: 65535
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'port-upper-bound.md'), atUpperBound);
+    writeFileSync(path.join(tempBundledDir, 'port-bounds.md'), atBounds);
     registry = makeRegistry([userPersonaDir]);
 
-    expect(registry.parsePersona('port-upper-bound').config.runtime).toMatchObject({
+    expect(registry.parsePersona('port-bounds').config.runtime).toMatchObject({
       type: 'container',
-      ports: [{ host: 65535, container: 0 }],
+      ports: [
+        { host: 65535, container: 0 },
+        { host: 0, container: 65535 },
+      ],
     });
 
-    const overUpperBound = `---
+    const outOfRangeCases = [
+      { name: 'host-below-lower-bound', host: -1, container: 80 },
+      { name: 'host-over-upper-bound', host: 65536, container: 80 },
+      { name: 'container-below-lower-bound', host: 8080, container: -1 },
+      { name: 'container-over-upper-bound', host: 8080, container: 65536 },
+    ];
+
+    for (const { name, host, container } of outOfRangeCases) {
+      const content = `---
 runtime:
   type: container
   containerSharing: per_invocation
@@ -143,14 +156,15 @@ runtime:
   workingDirectory: /work
   mounts: []
   ports:
-    - host: 65536
-      container: 80
+    - host: ${host}
+      container: ${container}
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'port-over-upper-bound.md'), overUpperBound);
-    registry = makeRegistry([userPersonaDir]);
+      writeFileSync(path.join(tempBundledDir, `port-${name}.md`), content);
+      registry = makeRegistry([userPersonaDir]);
 
-    expect(() => registry.parsePersona('port-over-upper-bound')).toThrow(/ports/i);
+      expect(() => registry.parsePersona(`port-${name}`)).toThrow(/ports/i);
+    }
   });
 
   it('parses runtime.type=container with empty mounts and defaulted env', () => {
