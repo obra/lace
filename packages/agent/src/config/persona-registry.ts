@@ -11,6 +11,7 @@ import { resolveMcpServerCommandArgs } from './mcp-path-resolution';
 import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import { logger } from '@lace/agent/utils/logger';
 import { registries as pluginRegistries } from '@lace/agent/plugins';
+import type { TemplateEngine, TemplateContext } from './template-engine';
 
 export interface PersonaInfo {
   name: string;
@@ -174,6 +175,220 @@ export interface PersonaRegistryOptions {
   mcpBaseDir?: string;
 }
 
+// ── PersonaSource interface ───────────────────────────────────────────────────
+
+/**
+ * A single source of personas. Each source owns membership, parsing, and
+ * rendering for the personas it provides. Sources are held in precedence order:
+ * user > plugin > bundled. The first source that `has` a name wins.
+ */
+export interface PersonaSource {
+  readonly kind: 'user' | 'plugin' | 'bundled';
+  readonly isUserDefined: boolean;
+  has(name: string): boolean;
+  names(): string[];
+  /**
+   * Disk path or logical path for display in PersonaInfo.
+   * Returns null for plugin personas (no file on disk).
+   */
+  infoPath(name: string): string | null;
+  parse(name: string): ParsedPersona;
+  render(name: string, engine: TemplateEngine, context: TemplateContext): string;
+}
+
+// ── Shared file-based parse helper ───────────────────────────────────────────
+
+/**
+ * Parses raw markdown+frontmatter content into a ParsedPersona.
+ * Shared by user-disk and bundled sources.
+ */
+function parseFileContent(
+  name: string,
+  raw: string,
+  mcpBaseDir: string | undefined
+): ParsedPersona {
+  let parsed: matter.GrayMatterFile<string>;
+  try {
+    parsed = matter(raw);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new PersonaParseError(`Failed to parse YAML frontmatter for persona '${name}': ${msg}`);
+  }
+
+  const validated = personaConfigSchema.safeParse(parsed.data);
+  if (!validated.success) {
+    const issues = validated.error.issues
+      .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ');
+    throw new PersonaParseError(`Invalid frontmatter for persona '${name}': ${issues}`);
+  }
+
+  return { config: resolveMcpPaths(validated.data, mcpBaseDir), body: parsed.content };
+}
+
+/**
+ * Resolve relative `command`/`args` of host-placement MCP servers
+ * against `mcpBaseDir`. Host-placement servers run from the embedder's package
+ * root (where the server scripts live), not lace's cwd, so a relative path
+ * must be anchored there. toolRuntime-placement servers run inside the persona
+ * container — their relative paths are container-side and are left untouched.
+ * Absolute paths and bare command names (no `./`/`../`) pass through, so this
+ * is idempotent over already-absolute configs.
+ */
+function resolveMcpPaths(config: PersonaConfig, baseDir: string | undefined): PersonaConfig {
+  if (baseDir === undefined || config.mcpServers === undefined) return config;
+
+  let changed = false;
+  const mcpServers: NonNullable<PersonaConfig['mcpServers']> = {};
+  for (const [serverId, server] of Object.entries(config.mcpServers)) {
+    const resolved = resolveMcpServerCommandArgs(server, baseDir);
+    if (resolved !== server) changed = true;
+    mcpServers[serverId] = resolved;
+  }
+
+  return changed ? { ...config, mcpServers } : config;
+}
+
+// ── User-disk source ──────────────────────────────────────────────────────────
+
+/**
+ * Persona source backed by the user's on-disk persona files.
+ * The cache (and its TTL/anyPathScanned behaviour) is owned by PersonaRegistry
+ * and accessed via the callback. `render` delegates to engine.render so @path
+ * includes work correctly across the template directory search path.
+ */
+class UserDiskSource implements PersonaSource {
+  readonly kind = 'user' as const;
+  readonly isUserDefined = true;
+
+  constructor(
+    private readonly getCache: () => Map<string, string>,
+    private readonly mcpBaseDir: string | undefined
+  ) {}
+
+  has(name: string): boolean {
+    return this.getCache().has(name);
+  }
+
+  names(): string[] {
+    return Array.from(this.getCache().keys());
+  }
+
+  infoPath(name: string): string | null {
+    return this.getCache().get(name) ?? null;
+  }
+
+  parse(name: string): ParsedPersona {
+    const filePath = this.getCache().get(name);
+    if (!filePath) {
+      throw new PersonaParseError(`User persona '${name}' not found in cache`);
+    }
+    return parseFileContent(name, fs.readFileSync(filePath, 'utf-8'), this.mcpBaseDir);
+  }
+
+  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
+    // TemplateEngine searches its dirs in order; user dirs are listed first,
+    // so `${name}.md` resolves to the user file when present.
+    return engine.render(`${name}.md`, context);
+  }
+}
+
+// ── Plugin source ─────────────────────────────────────────────────────────────
+
+/**
+ * Persona source backed by the plugin registry (registries.personas).
+ * Plugin personas arrive pre-parsed and do NOT go through resolveMcpPaths.
+ * `render` uses engine.renderString because plugin persona bodies are in-memory.
+ */
+class PluginSource implements PersonaSource {
+  readonly kind = 'plugin' as const;
+  readonly isUserDefined = false;
+
+  has(name: string): boolean {
+    return pluginRegistries.personas.has(name);
+  }
+
+  names(): string[] {
+    return pluginRegistries.personas.names();
+  }
+
+  infoPath(_name: string): string | null {
+    // Plugin personas have no file on disk.
+    return null;
+  }
+
+  parse(name: string): ParsedPersona {
+    return pluginRegistries.personas.resolve(name);
+  }
+
+  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
+    return engine.renderString(this.parse(name).body, context);
+  }
+}
+
+// ── Bundled source ────────────────────────────────────────────────────────────
+
+/**
+ * Persona source backed by the bundled (embedded) persona files.
+ * `render` delegates to engine.render so @path includes and the Bun-embedded
+ * fallback both work correctly.
+ */
+class BundledSource implements PersonaSource {
+  readonly kind = 'bundled' as const;
+  readonly isUserDefined = false;
+
+  constructor(
+    private readonly getCache: () => Set<string>,
+    private readonly bundledPersonasPath: string,
+    private readonly mcpBaseDir: string | undefined
+  ) {}
+
+  has(name: string): boolean {
+    return this.getCache().has(name);
+  }
+
+  names(): string[] {
+    return Array.from(this.getCache());
+  }
+
+  infoPath(name: string): string {
+    return `${name}.md`;
+  }
+
+  parse(name: string): ParsedPersona {
+    const raw = readBundledPersonaContent(name, this.bundledPersonasPath);
+    return parseFileContent(name, raw, this.mcpBaseDir);
+  }
+
+  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
+    return engine.render(`${name}.md`, context);
+  }
+}
+
+// ── Bundled file reader ───────────────────────────────────────────────────────
+
+/** Reads raw persona content from the bundled filesystem path or Bun embedded files. */
+function readBundledPersonaContent(name: string, bundledPersonasPath: string): string {
+  const bundledFsPath = path.join(bundledPersonasPath, `${name}.md`);
+  if (fs.existsSync(bundledFsPath)) {
+    return fs.readFileSync(bundledFsPath, 'utf-8');
+  }
+
+  // Bun embedded files fallback (production standalone). Sync-over-async to match TemplateEngine.
+  if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+    const suffix = `agent-personas/${name}.md`;
+    for (const file of Bun.embeddedFiles) {
+      if ((file as File).name.endsWith(suffix)) {
+        return readEmbeddedFileSync(file);
+      }
+    }
+  }
+
+  throw new PersonaParseError(`Could not locate persona file for '${name}'`);
+}
+
+// ── PersonaRegistry ───────────────────────────────────────────────────────────
+
 export class PersonaRegistry {
   private bundledPersonasCache: Set<string> = new Set();
   private userPersonasCache: Map<string, string> = new Map(); // name -> resolved path
@@ -183,10 +398,20 @@ export class PersonaRegistry {
   private readonly userPersonasPaths: readonly string[];
   private readonly mcpBaseDir: string | undefined;
 
+  // Precedence-ordered sources: user > plugin > bundled.
+  private readonly sources: PersonaSource[];
+
   constructor(opts: PersonaRegistryOptions) {
     this.bundledPersonasPath = opts.bundledPersonasPath;
     this.userPersonasPaths = opts.userPersonasPaths;
     this.mcpBaseDir = opts.mcpBaseDir;
+
+    this.sources = [
+      new UserDiskSource(() => this.userPersonasCache, this.mcpBaseDir),
+      new PluginSource(),
+      new BundledSource(() => this.bundledPersonasCache, this.bundledPersonasPath, this.mcpBaseDir),
+    ];
+
     this.loadBundledPersonas();
   }
 
@@ -280,25 +505,14 @@ export class PersonaRegistry {
     const personas: PersonaInfo[] = [];
     const seen = new Set<string>();
 
-    // User personas first (they override built-ins)
-    for (const [name, filePath] of this.userPersonasCache) {
-      personas.push({ name, isUserDefined: true, path: filePath });
-      seen.add(name);
-    }
-
-    // Plugin personas (user disk wins, bundled falls through)
-    for (const name of pluginRegistries.personas.names()) {
-      if (!seen.has(name)) {
-        personas.push({ name, isUserDefined: false, path: `plugin:${name}` });
+    for (const source of this.sources) {
+      for (const name of source.names()) {
+        if (seen.has(name)) continue;
         seen.add(name);
-      }
-    }
-
-    // Built-in personas (only if not overridden)
-    for (const name of this.bundledPersonasCache) {
-      if (!seen.has(name)) {
-        const logicalPath = this.getPersonaPath(name);
-        personas.push({ name, isUserDefined: false, path: logicalPath || `${name}.md` });
+        // Plugin source returns null from infoPath; fall back to the sentinel
+        // string that callers (e.g. display layers) expect for plugin personas.
+        const infoPath = source.infoPath(name) ?? `plugin:${name}`;
+        personas.push({ name, isUserDefined: source.isUserDefined, path: infoPath });
       }
     }
 
@@ -310,40 +524,23 @@ export class PersonaRegistry {
    */
   hasPersona(name: string): boolean {
     this.loadUserPersonas();
-    return (
-      this.userPersonasCache.has(name) ||
-      pluginRegistries.personas.has(name) ||
-      this.bundledPersonasCache.has(name)
-    );
+    return this.sources.some((s) => s.has(name));
   }
 
   /**
-   * Get path to a persona file (user overrides built-in).
-   * Returns a disk path for user personas, a logical `<name>.md` path for bundled
-   * personas (resolved by TemplateEngine), and `plugin:<name>` for plugin-registered
-   * personas (which have no file on disk — their ParsedPersona is resolved via
-   * parsePersona's plugin short-circuit before any file I/O is attempted).
+   * Get the disk path to a persona file (user overrides bundled).
+   * Returns a real disk path for user personas, a logical `<name>.md` for
+   * bundled personas, and null for plugin personas (which have no file on disk).
+   * Callers needing the body should use parsePersona; callers needing to render
+   * should use render.
    */
   getPersonaPath(name: string): string | null {
     this.loadUserPersonas();
-
-    // Check user personas first
-    if (this.userPersonasCache.has(name)) {
-      return this.userPersonasCache.get(name)!;
+    for (const source of this.sources) {
+      if (source.has(name)) {
+        return source.infoPath(name);
+      }
     }
-
-    // Check built-in personas - return logical path
-    if (this.bundledPersonasCache.has(name)) {
-      return `${name}.md`; // TemplateEngine will resolve this in bundled or file mode
-    }
-
-    // Plugin personas have no file path; return a sentinel consistent with listAvailablePersonas.
-    // Callers that only need a non-null presence check (e.g. prompt-manager's guard) are safe;
-    // callers that need the actual body should use parsePersona instead.
-    if (pluginRegistries.personas.has(name)) {
-      return `plugin:${name}`;
-    }
-
     return null;
   }
 
@@ -364,81 +561,29 @@ export class PersonaRegistry {
    */
   parsePersona(name: string): ParsedPersona {
     this.loadUserPersonas();
-    if (!this.userPersonasCache.has(name) && pluginRegistries.personas.has(name)) {
-      return pluginRegistries.personas.resolve(name); // plugin source (user disk still wins)
+    for (const source of this.sources) {
+      if (source.has(name)) {
+        return source.parse(name);
+      }
     }
-    this.validatePersona(name);
-
-    const raw = this.readPersonaContent(name);
-
-    let parsed: matter.GrayMatterFile<string>;
-    try {
-      parsed = matter(raw);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      throw new PersonaParseError(`Failed to parse YAML frontmatter for persona '${name}': ${msg}`);
-    }
-
-    const validated = personaConfigSchema.safeParse(parsed.data);
-    if (!validated.success) {
-      const issues = validated.error.issues
-        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
-        .join('; ');
-      throw new PersonaParseError(`Invalid frontmatter for persona '${name}': ${issues}`);
-    }
-
-    return { config: this.resolveMcpPaths(validated.data), body: parsed.content };
+    const available = this.listAvailablePersonas().map((p) => p.name);
+    throw new PersonaNotFoundError(name, available);
   }
 
   /**
-   * Resolve relative `command`/`args` of host-placement MCP servers
-   * against `mcpBaseDir`. Host-placement servers run from the embedder's package
-   * root (where the server scripts live), not lace's cwd, so a relative path
-   * must be anchored there. toolRuntime-placement servers run inside the persona
-   * container — their relative paths are container-side and are left untouched.
-   * Absolute paths and bare command names (no `./`/`../`) pass through, so this
-   * is idempotent over already-absolute configs.
+   * Render the named persona's template body with the given context.
+   * Dispatches to the winning source's render method — no path-string sniffing.
+   * Throws PersonaNotFoundError if the persona does not exist.
    */
-  private resolveMcpPaths(config: PersonaConfig): PersonaConfig {
-    const baseDir = this.mcpBaseDir;
-    if (baseDir === undefined || config.mcpServers === undefined) return config;
-
-    let changed = false;
-    const mcpServers: NonNullable<PersonaConfig['mcpServers']> = {};
-    for (const [serverId, server] of Object.entries(config.mcpServers)) {
-      const resolved = resolveMcpServerCommandArgs(server, baseDir);
-      if (resolved !== server) changed = true;
-      mcpServers[serverId] = resolved;
-    }
-
-    return changed ? { ...config, mcpServers } : config;
-  }
-
-  // Reads raw persona file content. User overrides bundled; bundled falls back to embedded files.
-  private readPersonaContent(name: string): string {
+  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
     this.loadUserPersonas();
-
-    const userPath = this.userPersonasCache.get(name);
-    if (userPath) {
-      return fs.readFileSync(userPath, 'utf-8');
-    }
-
-    const bundledFsPath = path.join(this.bundledPersonasPath, `${name}.md`);
-    if (fs.existsSync(bundledFsPath)) {
-      return fs.readFileSync(bundledFsPath, 'utf-8');
-    }
-
-    // Bun embedded files fallback (production standalone). Sync-over-async to match TemplateEngine.
-    if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
-      const suffix = `agent-personas/${name}.md`;
-      for (const file of Bun.embeddedFiles) {
-        if ((file as File).name.endsWith(suffix)) {
-          return readEmbeddedFileSync(file);
-        }
+    for (const source of this.sources) {
+      if (source.has(name)) {
+        return source.render(name, engine, context);
       }
     }
-
-    throw new PersonaParseError(`Could not locate persona file for '${name}'`);
+    const available = this.listAvailablePersonas().map((p) => p.name);
+    throw new PersonaNotFoundError(name, available);
   }
 }
 
