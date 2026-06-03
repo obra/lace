@@ -43,6 +43,14 @@ export interface CompactionContext {
     system?: string;
     signal?: AbortSignal;
   }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
+  /**
+   * Free-text steering hint forwarded from the compact caller:
+   * - compact_session / ent.session.compact passes the request's `guidance` field
+   * - /compact passes the remainder of the command line
+   * - auto-fired (runner post-turn) leaves this absent
+   * Built-in strategies (track-based) currently ignore it; custom strategies may use it.
+   */
+  guidance?: string;
 }
 
 export type CompactResult =

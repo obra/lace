@@ -12,6 +12,7 @@ import {
 import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import {
@@ -159,13 +160,24 @@ export async function handleSlashCommand(
           modelId: effectiveConfig.modelId,
         });
         const name = compactionStrategyNameForSession(sessionDir);
-        const raw = await resolveCompactionStrategy(name)
-          .compact(events, {
+        // args is the free-text tail after /compact — thread as guidance.
+        const guidance = args.trim() || undefined;
+        const compactionCtx = {
+          // Legacy fields kept for track-based strategy back-compat until Task 6
+          // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
+          provider,
+          modelId: effectiveConfig.modelId,
+          // New ctx.query + guidance from buildCompactionContext.
+          ...buildCompactionContext({
             threadId: sessionId,
             sessionDir,
-            provider,
-            modelId: effectiveConfig.modelId,
-          })
+            connectionId: effectiveConfig.connectionId ?? '',
+            modelId: effectiveConfig.modelId ?? '',
+            guidance,
+          }),
+        };
+        const raw = await resolveCompactionStrategy(name)
+          .compact(events, compactionCtx)
           .finally(() => provider.cleanup());
         const result = validatePreserved(raw);
 

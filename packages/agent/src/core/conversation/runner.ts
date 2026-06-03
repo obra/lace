@@ -48,6 +48,7 @@ import { logger } from '@lace/agent/utils/logger';
 import { computePressure, shouldFireCompaction } from './compaction-trigger';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 /**
@@ -1066,13 +1067,32 @@ export class ConversationRunner {
           const strategy = resolveCompactionStrategy(
             this.config.persona ? compactionStrategyNameForSession(sessionDir) : 'track-based'
           );
+          // guidance wired in Task 3
+          const compactionCtx = {
+            // Legacy fields kept for track-based strategy back-compat until Task 6
+            // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
+            provider,
+            modelId: modelId ?? undefined,
+            // New ctx.query + guidance fields from buildCompactionContext.
+            // connectionId is optional in RunnerConfig; when absent, ctx.query is
+            // omitted and the built-in falls back to ctx.provider as before.
+            ...(this.config.connectionId
+              ? buildCompactionContext({
+                  threadId: sessionId,
+                  sessionDir,
+                  connectionId: this.config.connectionId,
+                  modelId: modelId ?? '',
+                  // guidance: undefined — wired in Task 3
+                })
+              : { threadId: sessionId, sessionDir }),
+          };
           const raw = await strategy.compact(
             // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
             // is the typed union. The shapes are identical on disk — this cast is
             // safe because the event-log writer and event-types agree on the wire
             // format.
             allEvents as unknown as TypedDurableEvent[],
-            { threadId: sessionId, sessionDir, provider, modelId: modelId ?? undefined }
+            compactionCtx
           );
           const result = validatePreserved(raw);
           if (!('noop' in result)) {

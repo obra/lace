@@ -39,6 +39,7 @@ import {
 } from '../../message-building/message-builder';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
@@ -461,7 +462,7 @@ export function registerSessionOperationHandlers(
   peer.onRequest('ent/session/compact', async (params: unknown) => {
     assertSessionReady(state);
 
-    const parsed = params as { strategy?: string } | undefined;
+    const parsed = params as { strategy?: string; guidance?: string } | undefined;
 
     return await runExclusive(async () => {
       const sessionDir = state.activeSession!.dir;
@@ -486,12 +487,21 @@ export function registerSessionOperationHandlers(
         const events = rawEvents.events as unknown as TypedDurableEvent[];
 
         const name = parsed?.strategy ?? compactionStrategyNameForSession(sessionDir);
-        const raw = await resolveCompactionStrategy(name).compact(events, {
-          threadId: state.activeSession!.meta.sessionId,
-          sessionDir,
+        const compactionCtx = {
+          // Legacy fields kept for track-based strategy back-compat until Task 6
+          // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
           provider,
           modelId: effectiveConfig.modelId,
-        });
+          // New ctx.query + guidance from buildCompactionContext.
+          ...buildCompactionContext({
+            threadId: state.activeSession!.meta.sessionId,
+            sessionDir,
+            connectionId: effectiveConfig.connectionId ?? '',
+            modelId: effectiveConfig.modelId ?? '',
+            guidance: parsed?.guidance,
+          }),
+        };
+        const raw = await resolveCompactionStrategy(name).compact(events, compactionCtx);
         const result = validatePreserved(raw);
 
         if ('noop' in result) {
