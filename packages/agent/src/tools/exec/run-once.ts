@@ -74,6 +74,7 @@ export function runExecToolProcess(
     };
     child.on('error', () => finish(null));
     child.on('close', (code) => finish(code));
+    child.stdin.on('error', () => {}); // swallow EPIPE when the child exits before reading stdin
     child.stdin.end(opts.stdin);
   });
 }

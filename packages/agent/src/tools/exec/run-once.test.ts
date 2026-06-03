@@ -41,4 +41,14 @@ describe('runExecToolProcess', () => {
     });
     expect(r.timedOut).toBe(true);
   });
+  it('resolves cleanly when child exits before reading stdin (no EPIPE crash)', async () => {
+    // fail-tool.sh does `echo boom >&2; exit 3` — it never reads stdin
+    const r = await runExecToolProcess(path.join(FIX, 'fail-tool.sh'), ['lace-tool-invoke'], {
+      stdin: JSON.stringify({ input: {}, context: { sessionId: 's', persona: 'p' } }),
+      cwd: FIX,
+      timeoutMs: 5000,
+    });
+    expect(r.exitCode).toBe(3);
+    expect(r.stderr).toContain('boom');
+  });
 });
