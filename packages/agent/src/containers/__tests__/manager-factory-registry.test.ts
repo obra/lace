@@ -1,5 +1,5 @@
 // ABOUTME: E1 registry tests — built-in runtimes registered; resolve by name
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   registerBuiltinRuntimes,
   createDefaultContainerManager,
@@ -13,13 +13,17 @@ describe('runtime registry', () => {
   const originalDockerBin = process.env.LACE_DOCKER_BIN;
 
   beforeEach(() => {
+    delete process.env.LACE_DOCKER_BIN;
+    resetRegistriesForTest();
+    registerBuiltinRuntimes();
+  });
+
+  afterEach(() => {
     if (originalDockerBin === undefined) {
       delete process.env.LACE_DOCKER_BIN;
     } else {
       process.env.LACE_DOCKER_BIN = originalDockerBin;
     }
-    resetRegistriesForTest();
-    registerBuiltinRuntimes();
   });
 
   it('registers docker + apple built-ins (owner builtin)', () => {
