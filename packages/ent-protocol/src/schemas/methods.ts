@@ -145,8 +145,8 @@ const InitializeParamsSchema = z
     skillDirs: z.array(NonEmptyStringSchema).optional(),
     // Named-mount registry consulted when a persona with
     // `runtime.type: 'container'` is materialized. Each persona declares
-    // logical mount names + container-side targets; this registry pins the
-    // matching host path and readonly flag. Mount names must match
+    // logical mount names; this registry pins the matching host path,
+    // container-side path, and readonly flag. Mount names must match
     // ^[a-z][a-z0-9-]*$ . Defaults to {} when omitted.
     containerMounts: z
       .record(
@@ -154,6 +154,7 @@ const InitializeParamsSchema = z
         z
           .object({
             hostPath: NonEmptyStringSchema,
+            containerPath: NonEmptyStringSchema,
             readonly: z.boolean(),
           })
           .strict()

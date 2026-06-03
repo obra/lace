@@ -126,8 +126,12 @@ describe('protocol shapes (representative examples)', () => {
           clientInfo: { name: 'test-client', version: '0.0.0' },
           capabilities: { streaming: true },
           containerMounts: {
-            scratch: { hostPath: '/var/lace/scratch', readonly: false },
-            knowledge: { hostPath: '/var/lace/knowledge', readonly: true },
+            scratch: { hostPath: '/var/lace/scratch', containerPath: '/work', readonly: false },
+            knowledge: {
+              hostPath: '/var/lace/knowledge',
+              containerPath: '/knowledge',
+              readonly: true,
+            },
           },
         },
       })
@@ -174,7 +178,11 @@ describe('protocol shapes (representative examples)', () => {
           clientInfo: { name: 'test-client', version: '0.0.0' },
           capabilities: { streaming: true },
           containerMounts: {
-            Scratch: { hostPath: '/var/lace/scratch', readonly: false },
+            Scratch: {
+              hostPath: '/var/lace/scratch',
+              containerPath: '/work',
+              readonly: false,
+            },
           },
         },
       })
@@ -191,7 +199,41 @@ describe('protocol shapes (representative examples)', () => {
           clientInfo: { name: 'test-client', version: '0.0.0' },
           capabilities: { streaming: true },
           containerMounts: {
-            scratch: { hostPath: '/var/lace/scratch' },
+            scratch: { hostPath: '/var/lace/scratch', containerPath: '/work' },
+          },
+        },
+      })
+    ).toThrow();
+
+    // missing containerPath on a mount entry is rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-missing-container-path',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            scratch: { hostPath: '/var/lace/scratch', readonly: false },
+          },
+        },
+      })
+    ).toThrow();
+
+    // empty containerPath on a mount entry is rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-empty-container-path',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            scratch: { hostPath: '/var/lace/scratch', containerPath: '', readonly: false },
           },
         },
       })

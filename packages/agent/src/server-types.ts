@@ -213,5 +213,6 @@ export type AgentServerState = {
 // Single entry in the embedder-supplied containerMounts registry.
 export type MountRegistryEntry = {
   hostPath: string;
+  containerPath: string;
   readonly: boolean;
 };

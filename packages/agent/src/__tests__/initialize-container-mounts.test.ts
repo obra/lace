@@ -54,8 +54,12 @@ describe('initialize containerMounts', () => {
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
 
     const mounts = {
-      scratch: { hostPath: '/var/lace/scratch', readonly: false },
-      knowledge: { hostPath: '/var/lace/knowledge', readonly: true },
+      scratch: { hostPath: '/var/lace/scratch', containerPath: '/work', readonly: false },
+      knowledge: {
+        hostPath: '/var/lace/knowledge',
+        containerPath: '/knowledge',
+        readonly: true,
+      },
     };
 
     await client.request('initialize', defaultInitializeParams({}, { containerMounts: mounts }));
@@ -127,7 +131,7 @@ describe('initialize containerMounts', () => {
         'initialize',
         defaultInitializeParams(
           {},
-          { containerMounts: { Scratch: { hostPath: '/x', readonly: false } } }
+          { containerMounts: { Scratch: { hostPath: '/x', containerPath: '/y', readonly: false } } }
         )
       )
     ).rejects.toThrow();
@@ -145,7 +149,7 @@ describe('initialize containerMounts', () => {
     await expect(
       client.request('initialize', {
         ...defaultInitializeParams(),
-        containerMounts: { scratch: { hostPath: '/x' } },
+        containerMounts: { scratch: { hostPath: '/x', containerPath: '/y' } },
       })
     ).rejects.toThrow();
 
@@ -162,7 +166,43 @@ describe('initialize containerMounts', () => {
         'initialize',
         defaultInitializeParams(
           {},
-          { containerMounts: { scratch: { hostPath: '', readonly: false } } }
+          { containerMounts: { scratch: { hostPath: '', containerPath: '/y', readonly: false } } }
+        )
+      )
+    ).rejects.toThrow();
+
+    client.close();
+    server.close();
+  });
+
+  it('rejects mount entry missing containerPath', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await expect(
+      client.request(
+        'initialize',
+        defaultInitializeParams(
+          {},
+          { containerMounts: { scratch: { hostPath: '/x', readonly: false } } }
+        )
+      )
+    ).rejects.toThrow();
+
+    client.close();
+    server.close();
+  });
+
+  it('rejects mount entry with empty containerPath', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await expect(
+      client.request(
+        'initialize',
+        defaultInitializeParams(
+          {},
+          { containerMounts: { scratch: { hostPath: '/x', containerPath: '', readonly: false } } }
         )
       )
     ).rejects.toThrow();

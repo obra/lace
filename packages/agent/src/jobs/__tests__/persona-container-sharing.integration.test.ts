@@ -195,7 +195,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
       containerSharing: 'per_invocation',
       image: TEST_PER_INVOCATION_IMAGE,
       workingDirectory: '/work',
-      mounts: {},
+      mounts: [],
       env: {},
     };
 
@@ -229,7 +229,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
       containerSharing: 'persistent',
       image: TEST_PERSISTENT_IMAGE,
       workingDirectory: '/tmp',
-      mounts: {},
+      mounts: [],
       env: {},
     };
 

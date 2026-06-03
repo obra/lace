@@ -21,7 +21,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         env: { FOO: 'bar' },
         ports: [{ host: 6080, container: 6080 }],
       },
@@ -74,7 +74,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         env: { FOO: 'persona', KEEP: 'runtime' },
       },
       containerMounts: {},
@@ -100,10 +100,12 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'persistent',
         image: 'sen-box:dev',
         workingDirectory: '/home/agent',
-        mounts: { home: '/home/agent' },
+        mounts: ['home'],
         env: { HOME: '/home/agent' },
       },
-      containerMounts: { home: { hostPath: '/host/home', readonly: false } },
+      containerMounts: {
+        home: { hostPath: '/host/home', containerPath: '/home/agent', readonly: false },
+      },
     });
 
     expect(binding.toolRuntime).toMatchObject({
@@ -129,7 +131,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-browser:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
       },
       containerMounts: {},
@@ -152,7 +154,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         capAdd: ['NET_ADMIN'],
       },
       containerMounts: {},
@@ -175,7 +177,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         network: 'quarantine',
       },
       containerMounts: {},
@@ -198,7 +200,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
       },
       containerMounts: {},
     });
@@ -221,7 +223,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'example/app@sha256:' + 'a'.repeat(64),
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
       },
       containerMounts: {},
     });
@@ -247,7 +249,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
           containerSharing: 'per_invocation',
           image: 'node:24-bookworm',
           workingDirectory: '/work',
-          mounts: { missing: '/work' },
+          mounts: ['missing'],
         },
         containerMounts: {},
       })
@@ -261,7 +263,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     containerSharing: 'per_invocation' as const,
     image: 'devcontainer:latest',
     workingDirectory: '/workspace',
-    mounts: {},
+    mounts: [],
   };
 
   const persistentRuntime = {
@@ -269,7 +271,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     containerSharing: 'persistent' as const,
     image: 'sen-box:dev',
     workingDirectory: '/home/agent',
-    mounts: {},
+    mounts: [],
   };
 
   it('passes childSessionId and scratchDirHostPath through to buildPersonaContainerSpec', () => {

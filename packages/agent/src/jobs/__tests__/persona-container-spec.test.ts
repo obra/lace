@@ -17,7 +17,7 @@ const perInvocationRuntime: PersonaContainerRuntime = {
   containerSharing: 'per_invocation',
   image: 'devcontainer:latest',
   workingDirectory: '/workspace',
-  mounts: {},
+  mounts: [],
 };
 
 const persistentRuntime: PersonaContainerRuntime = {
@@ -25,7 +25,7 @@ const persistentRuntime: PersonaContainerRuntime = {
   containerSharing: 'persistent',
   image: 'sen-box:dev',
   workingDirectory: '/home/agent',
-  mounts: {},
+  mounts: [],
 };
 
 describe('buildPersonaContainerSpec per_invocation', () => {
@@ -58,14 +58,14 @@ describe('buildPersonaContainerSpec per_invocation', () => {
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
         ...perInvocationRuntime,
-        mounts: { identity: '/etc/identity' },
+        mounts: ['identity'],
         env: { FOO: 'bar' },
         ports: [{ host: 9222, container: 9222 }],
         sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
       },
       containerMounts: {
-        identity: { hostPath: '/host/identity', readonly: true },
-        unused: { hostPath: '/host/unused', readonly: false },
+        identity: { hostPath: '/host/identity', containerPath: '/etc/identity', readonly: true },
+        unused: { hostPath: '/host/unused', containerPath: '/unused', readonly: false },
       },
     });
 
@@ -140,7 +140,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
         personaName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
-        runtime: { ...perInvocationRuntime, mounts: { missing: '/missing' } },
+        runtime: { ...perInvocationRuntime, mounts: ['missing'] },
         containerMounts: {},
       })
     ).toThrow(/unknown mount 'missing'/);
@@ -153,8 +153,10 @@ describe('buildPersonaContainerSpec per_invocation', () => {
         personaName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
-        runtime: { ...perInvocationRuntime, mounts: { scratch: '/work' } },
-        containerMounts: { scratch: { hostPath: '/host/scratch', readonly: false } },
+        runtime: { ...perInvocationRuntime, mounts: ['scratch'] },
+        containerMounts: {
+          scratch: { hostPath: '/host/scratch', containerPath: '/work', readonly: false },
+        },
       })
     ).toThrow(/scratch/);
   });
@@ -187,20 +189,18 @@ describe('buildPersonaContainerSpec persistent', () => {
       personaName: 'sen',
       runtime: {
         ...persistentRuntime,
-        mounts: {
-          persona: '/personas',
-          'lace-data': '/data',
-          credentials: '/credentials',
-          lace: '/lace',
-          scratch: '/work',
-        },
+        mounts: ['persona', 'lace-data', 'credentials', 'lace', 'scratch'],
       },
       containerMounts: {
-        persona: { hostPath: '/host/personas', readonly: true },
-        'lace-data': { hostPath: '/host/data', readonly: false },
-        credentials: { hostPath: '/host/credentials', readonly: true },
-        lace: { hostPath: '/host/lace', readonly: true },
-        scratch: { hostPath: '/host/scratch', readonly: false },
+        persona: { hostPath: '/host/personas', containerPath: '/personas', readonly: true },
+        'lace-data': { hostPath: '/host/data', containerPath: '/data', readonly: false },
+        credentials: {
+          hostPath: '/host/credentials',
+          containerPath: '/credentials',
+          readonly: true,
+        },
+        lace: { hostPath: '/host/lace', containerPath: '/lace', readonly: true },
+        scratch: { hostPath: '/host/scratch', containerPath: '/work', readonly: false },
       },
     });
 
@@ -219,10 +219,14 @@ describe('buildPersonaContainerSpec persistent', () => {
       personaName: 'sen',
       runtime: persistentRuntime,
       containerMounts: {
-        persona: { hostPath: '/host/personas', readonly: true },
-        'lace-data': { hostPath: '/host/data', readonly: false },
-        credentials: { hostPath: '/host/credentials', readonly: true },
-        lace: { hostPath: '/host/lace', readonly: true },
+        persona: { hostPath: '/host/personas', containerPath: '/personas', readonly: true },
+        'lace-data': { hostPath: '/host/data', containerPath: '/data', readonly: false },
+        credentials: {
+          hostPath: '/host/credentials',
+          containerPath: '/credentials',
+          readonly: true,
+        },
+        lace: { hostPath: '/host/lace', containerPath: '/lace', readonly: true },
       },
     });
 
@@ -240,7 +244,7 @@ describe('buildPersonaContainerSpec persistent', () => {
         sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
       },
       containerMounts: {
-        'lace-data': { hostPath: '/host/data', readonly: false },
+        'lace-data': { hostPath: '/host/data', containerPath: '/data', readonly: false },
       },
     });
 

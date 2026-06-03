@@ -35,14 +35,14 @@ export class PersonaContainerSpecError extends Error {
 function resolvePersonaMountsAndEnv(input: {
   personaName: string;
   containerSharing: 'per_invocation' | 'persistent';
-  runtimeMounts: Record<string, string>;
+  runtimeMounts: readonly string[];
   runtimeEnv: Record<string, string> | undefined;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
 }): { mounts: ContainerMount[]; env: Record<string, string> } {
   const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts } = input;
 
   const mounts: ContainerMount[] = [];
-  for (const [mountName, target] of Object.entries(runtimeMounts)) {
+  for (const mountName of runtimeMounts) {
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
     // the per-invocation work directory at /work. Persistent personas may still
     // use 'scratch' as a named mount resolved through the registry.
@@ -62,7 +62,7 @@ function resolvePersonaMountsAndEnv(input: {
     }
     mounts.push({
       source: entry.hostPath,
-      target,
+      target: entry.containerPath,
       readonly: entry.readonly,
     });
   }

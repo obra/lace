@@ -39,10 +39,17 @@ function parseContainerMounts(raw: unknown): Record<string, MountRegistryEntry> 
     if (typeof entry.hostPath !== 'string' || entry.hostPath.length === 0) {
       invalidParams();
     }
+    if (typeof entry.containerPath !== 'string' || entry.containerPath.length === 0) {
+      invalidParams();
+    }
     if (typeof entry.readonly !== 'boolean') {
       invalidParams();
     }
-    result[name] = { hostPath: entry.hostPath, readonly: entry.readonly };
+    result[name] = {
+      hostPath: entry.hostPath,
+      containerPath: entry.containerPath,
+      readonly: entry.readonly,
+    };
   }
   return result;
 }

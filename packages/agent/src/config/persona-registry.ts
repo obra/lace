@@ -52,9 +52,9 @@ const runtimeContainerSchema = z
     containerSharing: containerSharingSchema,
     image: z.string().min(1),
     workingDirectory: z.string().min(1),
-    // mountName → containerTarget. Resolved against the embedder-provided
-    // containerMounts registry at materialization time.
-    mounts: z.record(mountNameSchema, z.string().min(1)),
+    // Mount names resolved against the embedder-provided containerMounts
+    // registry at materialization time. The registry owns container paths.
+    mounts: z.array(mountNameSchema),
     env: z.record(z.string(), z.string()).optional().default({}),
     ports: z.array(portMappingSchema).optional(),
     // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
