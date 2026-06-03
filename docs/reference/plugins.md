@@ -273,6 +273,10 @@ this.createError(text)   // → { status: 'failed',    content: [{ type: 'text',
 // read the body in a test as: result.content[0].text ; check result.status
 ```
 
+To bring in a tool that runs *outside* the process — a standalone executable or an
+MCP server — see [External Tools](../external-tools.md) (a separate ingestion
+mechanism, not the `tools` registry).
+
 ### CompactionStrategy (`@lace/agent/compaction/types`)
 
 ```ts

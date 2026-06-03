@@ -21,6 +21,9 @@ You can contribute four kinds of thing:
 
 A single plugin can contribute any mix of these.
 
+> Bringing in a tool that lives *outside* the process — a standalone executable or
+> an MCP server — is a separate mechanism; see [External Tools](external-tools.md).
+
 ## Hello, tool
 
 The smallest useful plugin: one tool. A plugin exports `register(api)` and
