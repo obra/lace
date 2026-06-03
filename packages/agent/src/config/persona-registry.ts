@@ -105,6 +105,15 @@ const personaConfigSchema = z
       .optional(),
     runtime: runtimeSchema.optional().default({ type: 'root' }),
     maxTurns: z.number().int().positive().optional(),
+    compaction: z
+      .object({
+        strategy: z.string().optional(),
+        breakpoints: z
+          .array(z.object({ at: z.number(), action: z.enum(['notify', 'compact']) }).strict())
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((config, ctx) => {

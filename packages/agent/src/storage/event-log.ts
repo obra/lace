@@ -58,7 +58,7 @@ export function legacyEventLogPath(sessionId: string): string {
   return path.join(agentSessionsDir(), sessionId, 'events.jsonl');
 }
 
-function personaForSessionDir(sessionDir: string): string | null {
+export function personaForSessionDir(sessionDir: string): string | null {
   const cached = personaCache.get(sessionDir);
   if (cached !== undefined) return cached;
   let persona: string | null = null;
