@@ -44,10 +44,10 @@ export interface ContainerSpec {
   // longer advertises.
   managedMountTargetPrefixes?: string[];
 
-  // SELECTOR fields carried for the docker shim runtime,
+  // SELECTOR fields carried for PlaneRuntime,
   // whose create() emits the closed `spawn <persona> <parent> <child> <jobId>`
   // command instead of a full `docker create` argv. SELECTOR ONLY — never an
-  // authority source: the shim validates `persona` against its closed enum and
+  // authority source: the plane validates `persona` against its closed enum and
   // rebuilds the container spec itself. Ignored by DockerContainerRuntime.
   persona?: string;
   parentSession?: string;

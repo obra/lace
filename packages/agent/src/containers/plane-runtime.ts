@@ -27,12 +27,18 @@ export interface PlaneRunResult {
   exitCode: number;
 }
 
+export interface PlaneRunOptions {
+  timeout?: number;
+}
+
 export interface PlaneRunner {
-  run(args: string[]): Promise<PlaneRunResult>;
+  run(args: string[], options?: PlaneRunOptions): Promise<PlaneRunResult>;
 }
 
 type ExecFileError = Error & {
   code?: number | string;
+  killed?: boolean;
+  signal?: string;
   stdout?: string;
   stderr?: string;
 };
@@ -45,9 +51,10 @@ function synthesizeJobId(sessionId: string): string {
 class ExecFilePlaneRunner implements PlaneRunner {
   constructor(private readonly planeBin: string) {}
 
-  async run(args: string[]): Promise<PlaneRunResult> {
+  async run(args: string[], options: PlaneRunOptions = {}): Promise<PlaneRunResult> {
     try {
       const { stdout, stderr } = await execFileAsync(this.planeBin, args, {
+        timeout: options.timeout,
         maxBuffer: 10 * 1024 * 1024,
       });
       return {
@@ -86,7 +93,7 @@ export class PlaneRuntime implements ContainerRuntime {
         config.name ?? config.id
       );
     }
-    const requestedName = config.name ?? config.id ?? config.jobId ?? persona;
+    const requestedName = config.id ?? config.name ?? config.jobId ?? persona;
 
     const parentSession = config.parentSession ?? '';
     const childSession = config.childSession ?? '';
@@ -117,14 +124,22 @@ export class PlaneRuntime implements ContainerRuntime {
 
   async start(containerId: string): Promise<void> {
     const info = this.containers.get(containerId);
-    if (info) {
-      info.state = 'running';
-      info.startedAt = new Date();
+    if (!info || info.state === 'running') {
+      return;
     }
+    throw new ContainerError(
+      `PlaneRuntime cannot start stopped plane container ${containerId}; create/spawn is the only supported start path`,
+      containerId
+    );
   }
 
-  async stop(containerId: string): Promise<void> {
-    await this.runChecked(['stop', containerId], containerId, 'plane stop failed');
+  async stop(containerId: string, timeout?: number): Promise<void> {
+    const args = ['stop'];
+    if (timeout !== undefined) {
+      args.push('-t', String(Math.max(0, Math.floor(timeout / 1000))));
+    }
+    args.push(containerId);
+    await this.runChecked(args, containerId, 'plane stop failed');
     this.updateContainerState(containerId, 'stopped');
   }
 
@@ -157,8 +172,15 @@ export class PlaneRuntime implements ContainerRuntime {
     args.push(containerId, ...commandWithExecEnvironment(options));
 
     try {
-      return await this.runner.run(args);
+      return await this.runner.run(args, { timeout: options.timeout ?? 30000 });
     } catch (error: unknown) {
+      if (this.isTimeoutError(error)) {
+        throw new ContainerError(
+          'Execution timeout',
+          containerId,
+          error instanceof Error ? error : undefined
+        );
+      }
       const message = error instanceof Error ? error.message : String(error);
       throw new ContainerError(
         `Failed to exec in plane container: ${message}`,
@@ -230,5 +252,10 @@ export class PlaneRuntime implements ContainerRuntime {
         info.stoppedAt = new Date();
       }
     }
+  }
+
+  private isTimeoutError(error: unknown): boolean {
+    const err = error as ExecFileError;
+    return err.killed === true || err.signal === 'SIGTERM';
   }
 }

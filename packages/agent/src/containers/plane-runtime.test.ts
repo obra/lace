@@ -36,7 +36,7 @@ describe('PlaneRuntime', () => {
     expect(id).toBe('sen-x-abc');
   });
 
-  it('falls back to the requested name when spawn prints no name', async () => {
+  it('falls back to id before name when spawn prints no name', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: '\n',
       stderr: '',
@@ -44,9 +44,9 @@ describe('PlaneRuntime', () => {
     });
     const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
 
-    await expect(rt.create({ ...spawnRequest(), name: 'requested-box' })).resolves.toBe(
-      'requested-box'
-    );
+    await expect(
+      rt.create({ ...spawnRequest(), id: 'container-id', name: 'requested-box' })
+    ).resolves.toBe('container-id');
   });
 
   it('rejects when persona is missing', async () => {
@@ -82,7 +82,22 @@ describe('PlaneRuntime', () => {
     ]);
   });
 
-  it('start is a no-op that marks cached state running', async () => {
+  it('start is a no-op for already-running cached containers', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-start\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+
+    await rt.start(id);
+
+    expect(rt.inspect(id).state).toBe('running');
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it('start rejects stopped cached containers without changing cached state', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-start\n',
       stderr: '',
@@ -92,9 +107,9 @@ describe('PlaneRuntime', () => {
     const id = await rt.create(spawnRequest());
     await rt.stop(id);
 
-    await rt.start(id);
+    await expect(rt.start(id)).rejects.toThrow(/cannot start stopped plane container/i);
 
-    expect(rt.inspect(id).state).toBe('running');
+    expect(rt.inspect(id).state).toBe('stopped');
     expect(run).toHaveBeenCalledTimes(2);
   });
 
@@ -134,19 +149,38 @@ describe('PlaneRuntime', () => {
       })
     ).resolves.toEqual({ stdout: 'out', stderr: 'err', exitCode: 7 });
 
-    expect(run).toHaveBeenLastCalledWith([
-      'exec',
-      '-w',
-      '/work',
-      '-e',
-      'A=1',
-      '-e',
-      'B=2',
-      id,
-      'node',
-      '-e',
-      'process.exit(7)',
-    ]);
+    expect(run).toHaveBeenLastCalledWith(
+      ['exec', '-w', '/work', '-e', 'A=1', '-e', 'B=2', id, 'node', '-e', 'process.exit(7)'],
+      { timeout: 30000 }
+    );
+  });
+
+  it('exec forwards timeout to the plane runner', async () => {
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ stdout: 'sen-x-timeout\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+
+    await rt.exec(id, { command: ['true'], timeout: 1234 });
+
+    expect(run).toHaveBeenLastCalledWith(['exec', id, 'true'], { timeout: 1234 });
+  });
+
+  it('exec maps timeout runner errors to Execution timeout', async () => {
+    const timeoutError = Object.assign(new Error('spawn ETIMEDOUT'), {
+      killed: true,
+      signal: 'SIGTERM',
+    });
+    const run = vi
+      .fn()
+      .mockResolvedValueOnce({ stdout: 'sen-x-timeout-error\n', stderr: '', exitCode: 0 })
+      .mockRejectedValueOnce(timeoutError);
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+
+    await expect(rt.exec(id, { command: ['sleep', '10'] })).rejects.toThrow(/Execution timeout/);
   });
 
   it('exec rejects stdin until streaming exec is implemented', async () => {
@@ -189,5 +223,19 @@ describe('PlaneRuntime', () => {
     expect(() => rt.inspect(id)).toThrow(/Container not found/);
     expect(run).toHaveBeenNthCalledWith(2, ['stop', id]);
     expect(run).toHaveBeenNthCalledWith(3, ['rm', '-f', id]);
+  });
+
+  it('stop translates timeout milliseconds to whole seconds', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-stop-timeout\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+
+    await rt.stop(id, 2500);
+
+    expect(run).toHaveBeenLastCalledWith(['stop', '-t', '2', id]);
   });
 });
