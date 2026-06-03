@@ -234,7 +234,7 @@ export function hasPendingImmediateInjects(sessionDir: string, afterEventSeq: nu
  * Returns the existing `turn_end` event for `turnId` if one has already been
  * written to this session's transcript, or `null` otherwise. Used by
  * `appendDurableEvent` to enforce the "at most one turn_end per turnId"
- * storage invariant (PRI-1818 #2). Also used by `repairOrphanTurnStarts` to
+ * storage invariant. Also used by `repairOrphanTurnStarts` to
  * guard against synthesizing a duplicate close for a turn that was already
  * closed since the initial scan. The invariant exists because two distinct
  * code paths can each try to close the same turn: the conversation runner's
@@ -398,7 +398,7 @@ export function appendDurableEvent(
   state: SessionState,
   event: Omit<DurableEvent, 'eventSeq' | 'timestamp'>
 ): { nextState: SessionState; written: DurableEvent } {
-  // Storage-layer invariant (PRI-1818 #2): at most one turn_end per turnId.
+  // Storage-layer invariant: at most one turn_end per turnId.
   // The conversation runner closes turns on its happy path; the prompt.ts
   // catch-handler also writes a fallback turn_end on errors. The runner runs
   // first, so when both fire, the runner's write wins and the fallback is

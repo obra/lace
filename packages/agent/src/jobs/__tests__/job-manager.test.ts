@@ -937,7 +937,7 @@ describe('JobManager', () => {
       expect(jobArg.type).toBe('bash');
     });
 
-    it('does not call setupProgressTimer when no explicit progressIntervalMs is provided (PRI-1707)', async () => {
+    it('does not call setupProgressTimer when no explicit progressIntervalMs is provided', async () => {
       const setupProgressTimer = vi.fn();
       const deps = createDeps({ setupProgressTimer });
       const manager = new JobManager(deps);
@@ -950,7 +950,7 @@ describe('JobManager', () => {
     it('works without setupProgressTimer even when progressIntervalMs is set', async () => {
       // Deps without setupProgressTimer - should not throw. We deliberately
       // pass progressIntervalMs so the opt-in branch actually exercises the
-      // `?.()` optional-chain on the missing dep (PRI-1707). Without the
+      // `?.()` optional-chain on the missing dep. Without the
       // explicit interval the branch would short-circuit before reaching
       // setupProgressTimer at all, and this test would silently lie.
       const deps = createDeps();
@@ -1020,7 +1020,7 @@ describe('JobManager', () => {
     });
   });
 
-  describe('createJob — preallocated subagent session fields (PRI-1796)', () => {
+  describe('createJob — preallocated subagent session fields', () => {
     it('createJob with newSubagentSessionId stores it and marks subagentSessionPreallocated', async () => {
       const deps = createDeps();
       const manager = new JobManager(deps);

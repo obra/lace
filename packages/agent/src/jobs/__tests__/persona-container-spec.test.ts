@@ -248,7 +248,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
   });
 
-  it('passes runtime capAdd and network through to spec (PRI-1919)', () => {
+  it('passes runtime capAdd and network through to spec', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
@@ -266,7 +266,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.network).toBe('quarantine');
   });
 
-  it('passes runtime gatewayRoute through to spec (PRI-1919)', () => {
+  it('passes runtime gatewayRoute through to spec', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
@@ -282,7 +282,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.gatewayRoute).toBe('172.31.250.1');
   });
 
-  it('passes gatewayRoute through containerSpecToRuntimeSpec (PRI-1919)', () => {
+  it('passes gatewayRoute through containerSpecToRuntimeSpec', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
@@ -300,7 +300,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     });
   });
 
-  it('injects SEN_BROWSER_CDP_SOCKET env when browserCdpSocket is set (PRI-2002)', () => {
+  it('injects SEN_BROWSER_CDP_SOCKET env when browserCdpSocket is set', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
@@ -319,7 +319,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     });
   });
 
-  it('does not inject SEN_BROWSER_CDP_SOCKET env when browserCdpSocket is absent (PRI-2002)', () => {
+  it('does not inject SEN_BROWSER_CDP_SOCKET env when browserCdpSocket is absent', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
@@ -333,7 +333,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.env.SEN_BROWSER_CDP_SOCKET).toBeUndefined();
   });
 
-  it('injects SEN_BROWSER_CDP_SOCKET env for persistent personas (PRI-2002)', () => {
+  it('injects SEN_BROWSER_CDP_SOCKET env for persistent personas', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
@@ -350,7 +350,7 @@ describe('buildPersonaContainerSpec persistent', () => {
     });
   });
 
-  it('passes browserCdpSocket through containerSpecToRuntimeSpec (PRI-2002)', () => {
+  it('passes browserCdpSocket through containerSpecToRuntimeSpec', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',

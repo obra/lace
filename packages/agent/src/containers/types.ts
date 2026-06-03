@@ -38,19 +38,19 @@ export interface ContainerConfig {
   restartPolicy?: 'unless-stopped';
 
   // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-  // Absent or empty ⇒ no --sysctl flag emitted. PRI-1790: sen-browser needs
+  // Absent or empty ⇒ no --sysctl flag emitted. sen-browser needs
   // `net.ipv6.conf.lo.disable_ipv6=0` so chrome's port-availability check
   // can bind to `::1`.
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // Absent or empty ⇒ no --cap-add flags emitted. PRI-1919: persona containers
-  // need NET_ADMIN to replace the default route via the transparent egress gateway.
+  // Absent or empty ⇒ no --cap-add flags emitted. Persona containers need
+  // NET_ADMIN to replace the default route via the transparent egress gateway.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // Absent ⇒ no --network flag emitted (docker default). PRI-1919: persona
-  // containers join the quarantine network for transparent egress.
+  // Absent ⇒ no --network flag emitted (docker default). Persona containers
+  // join the quarantine network for transparent egress.
   network?: string;
 
   // IPv4 address of the egress gateway. When set, a privileged one-shot
@@ -58,13 +58,13 @@ export interface ContainerConfig {
   // `docker start` to replace the default route:
   //   ip route replace default via <gatewayRoute>
   // The persona container itself does NOT need NET_ADMIN — the sidecar holds
-  // the privilege and exits immediately. PRI-1919 transparent egress gateway.
+  // the privilege and exits immediately. Transparent egress gateway.
   gatewayRoute?: string;
 
-  // PRI-2012 Root A SELECTOR fields (carried from ContainerSpec). The
-  // ShimContainerRuntime's create() emits `spawn <persona> <parent> <child>
-  // <jobId>` from these instead of a full `docker create` argv. SELECTOR ONLY;
-  // DockerContainerRuntime ignores them.
+  // SELECTOR fields carried from ContainerSpec. The ShimContainerRuntime's
+  // create() emits `spawn <persona> <parent> <child> <jobId>` from these
+  // instead of a full `docker create` argv. SELECTOR ONLY; DockerContainerRuntime
+  // ignores them.
   persona?: string;
   parentSession?: string;
   childSession?: string;
@@ -157,8 +157,8 @@ export interface ContainerRuntime {
    * Resolve the container's IPv4 address on the named docker network, or
    * undefined when unavailable (network absent, container gone, daemon error,
    * or the runtime has no network concept — e.g. AppleContainerRuntime).
-   * Optional: only runtimes backing the PRI-1919 transparent egress gateway
-   * implement it; ContainerManager treats its absence as "no source IP".
+   * Optional: only runtimes backing the transparent egress gateway implement it;
+   * ContainerManager treats its absence as "no source IP".
    */
   inspectNetworkIp?(containerId: string, networkName: string): Promise<string | undefined>;
 }

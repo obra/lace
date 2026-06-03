@@ -1,4 +1,4 @@
-// ABOUTME: Guards the runtime-binding Zod validator — esp. that the PRI-2012 selector fields pass .strict() (bug-#7 reproduction guard).
+// ABOUTME: Guards the runtime-binding Zod validator — esp. that the selector fields pass .strict() (bug-#7 reproduction guard).
 // ABOUTME: If a transitive container-spec validator omits the selector fields, a real shim binding fails validation; this test catches that at CI.
 
 import { describe, it, expect } from 'vitest';
@@ -23,7 +23,7 @@ function containerBinding(specExtra: Record<string, unknown> = {}): unknown {
   };
 }
 
-describe('parseRuntimeExecutionBinding — PRI-2012 selector-field completeness (bug-#7 guard)', () => {
+describe('parseRuntimeExecutionBinding — selector-field completeness (bug-#7 guard)', () => {
   it('accepts a container binding carrying all four selector fields', () => {
     const b = parseRuntimeExecutionBinding(
       containerBinding({

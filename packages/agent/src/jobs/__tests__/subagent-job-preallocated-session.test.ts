@@ -1,4 +1,4 @@
-// ABOUTME: Tests for preallocated subagent sessionId plumbing through subagent-job (PRI-1796 Chunk D.2)
+// ABOUTME: Tests for preallocated subagent sessionId plumbing through subagent-job (Chunk D.2)
 // When job.subagentSessionPreallocated is true, session/new must receive the preallocated
 // sessionId. When resumeSessionId is used, session/resume must be called instead.
 
@@ -103,7 +103,7 @@ function makeSubagentJobDeps(overrides: {
   };
 }
 
-describe('runSubagentJobProcess — preallocated sessionId (PRI-1796)', () => {
+describe('runSubagentJobProcess — preallocated sessionId', () => {
   let sessionRootDir: string;
   let parentSessionId: string;
   let parentSessionDir: string;

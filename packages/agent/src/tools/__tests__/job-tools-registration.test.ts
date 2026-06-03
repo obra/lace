@@ -23,7 +23,7 @@ describe('ToolExecutor job tools registration', () => {
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('job_output');
     // Description must teach the job-vs-session distinction and steer the
-    // model toward job_notify rather than blocking waits (PRI-1692).
+    // model toward job_notify rather than blocking waits.
     expect(tool?.description).toMatch(/job/i);
     expect(tool?.description).toMatch(/session/i);
     expect(tool?.description).toMatch(/job_notify/);
@@ -48,7 +48,7 @@ describe('ToolExecutor job tools registration', () => {
     expect(tool).toBeDefined();
     expect(tool?.name).toBe('job_kill');
     // job_kill description must explain that the SESSION survives kill so
-    // the parent can resume the subagent — PRI-1692 mental model.
+    // the parent can resume the subagent.
     expect(tool?.description).toMatch(/session/i);
     expect(tool?.description).toMatch(/resume/i);
   });

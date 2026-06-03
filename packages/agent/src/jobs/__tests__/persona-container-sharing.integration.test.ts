@@ -141,7 +141,7 @@ function forceRemoveContainer(name: string): void {
 // test suite
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integration', () => {
+describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () => {
   let runtime: DockerContainerRuntime;
   let containerManager: ContainerManager;
 

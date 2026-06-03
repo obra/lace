@@ -1,4 +1,4 @@
-// ABOUTME: Regression test for PRI-1786 Task 5B — when a delegate job carries
+// ABOUTME: Regression test — when a delegate job carries
 // ABOUTME: a projected container runtimeBinding, the subagent must spawn
 // ABOUTME: natively, pass the parent host workDir as cwd to
 // ABOUTME: session/new, forward config.runtimeBinding, and write a
@@ -105,7 +105,7 @@ function appendTestDurableEvent(
   );
 }
 
-describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', () => {
+describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
   let laceDir: string;
   let sessionRootDir: string;
   let parentSessionId: string;
@@ -835,7 +835,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding (PRI-1786)', (
     expect(state.jobManager.getJob(mappedJobId)?.containerExecutionMetadata).toBeUndefined();
   });
 
-  it('forwards child container_network_attached/detached updates to the parent (PRI-1919)', async () => {
+  it('forwards child container_network_attached/detached updates to the parent', async () => {
     const emittedUpdates: unknown[] = [];
     const emitSessionUpdate = vi.fn(async (update: unknown) => {
       emittedUpdates.push(update);

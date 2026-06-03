@@ -118,7 +118,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     });
   });
 
-  it('threads persona-declared sysctls into the projected descriptor (PRI-1790)', () => {
+  it('threads persona-declared sysctls into the projected descriptor', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser-driver',
@@ -141,7 +141,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     });
   });
 
-  it('threads persona-declared capAdd into the projected descriptor (PRI-1919)', () => {
+  it('threads persona-declared capAdd into the projected descriptor', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
@@ -164,7 +164,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     });
   });
 
-  it('threads persona-declared network into the projected descriptor (PRI-1919)', () => {
+  it('threads persona-declared network into the projected descriptor', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
@@ -255,7 +255,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
   });
 });
 
-describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminator (PRI-1796)', () => {
+describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminator', () => {
   const perInvocationRuntime = {
     type: 'container' as const,
     containerSharing: 'per_invocation' as const,

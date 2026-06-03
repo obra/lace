@@ -1,5 +1,5 @@
 // ABOUTME: Tests for PerInvocationReaper — idle TTL teardown for per_invocation containers
-// ABOUTME: PRI-1796 Chunk E: verifies schedule/cancel/dispose lifecycle with fake timers
+// ABOUTME: Chunk E: verifies schedule/cancel/dispose lifecycle with fake timers
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';

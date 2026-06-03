@@ -1,5 +1,5 @@
 // ABOUTME: Integration test for the createFinalizeJob → fanoutToInject →
-// injectNotification path (PRI-1692 Acceptance #5, PRI-1744). Spins up a real
+// injectNotification path. Spins up a real
 // JobManager and the real createQueueJobNotification factory used in
 // production by server.ts, then verifies that subscribers cause the
 // <notification kind="job-..."> block to be written to events.jsonl via the
@@ -71,7 +71,7 @@ function makeStateStub(jobManager: JobManager, sessionDir: string): AgentServerS
   } as unknown as AgentServerState;
 }
 
-describe('createFinalizeJob → fanoutToInject integration (PRI-1744)', () => {
+describe('createFinalizeJob → fanoutToInject integration', () => {
   let laceDir: string;
   let sessionDir: string;
   let savedLaceDir: string | undefined;

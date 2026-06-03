@@ -86,7 +86,7 @@ export class BedrockProvider extends AIProvider {
     const anthropicMessages = convertToAnthropicFormat(messages);
     const systemPrompt = this.getEffectiveSystemPrompt(messages);
 
-    // PRI-1803: Bedrock supports 1h TTL only on an explicit model allowlist
+    // Bedrock supports 1h TTL only on an explicit model allowlist
     // (Opus/Sonnet/Haiku 4.5). Anything else silently falls back to 5m if
     // 1h is sent — wasteful since 1h writes cost 2× 5m writes. Gate per
     // model so we always ship the longest TTL the model actually accepts.

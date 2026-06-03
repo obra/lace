@@ -57,26 +57,26 @@ export type ToolRuntimeDescriptor =
         ports?: RuntimePortDescriptor[];
         restartPolicy?: 'unless-stopped';
         // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-        // PRI-1790: sen-browser declares `net.ipv6.conf.lo.disable_ipv6=0`
+        // sen-browser declares `net.ipv6.conf.lo.disable_ipv6=0`
         // so superpowers-chrome's port-availability check can bind to `::1`.
         sysctls?: Record<string, string>;
         // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-        // PRI-1919: persona containers need NET_ADMIN for transparent egress gateway.
+        // Persona containers need NET_ADMIN for transparent egress gateway.
         capAdd?: string[];
         // Docker network name forwarded to `docker create --network <name>`.
-        // PRI-1919: persona containers join the quarantine network.
+        // Persona containers join the quarantine network.
         network?: string;
         // IPv4 address of the egress gateway. When set, a privileged one-shot
-        // sidecar sets the persona's default route after start. PRI-1919.
+        // sidecar sets the persona's default route after start.
         gatewayRoute?: string;
-        // PRI-2002: when true, the persona is a quarantined browser-driver whose
+        // When true, the persona is a quarantined browser-driver whose
         // Chrome CDP is exposed over a unix socket on the shared sen-browser-cdp
         // mount. Lace injects SEN_BROWSER_CDP_SOCKET and emits the matching
         // browserCdpSocketPath on network attach so the credential helper can
         // reach it. Mount scope IS the access-control boundary: only personas
         // with this flag get the socket dir + env.
         browserCdpSocket?: boolean;
-        // PRI-2012 Root A SELECTOR fields — carried across the wire for the
+        // Root A SELECTOR fields — carried across the wire for the
         // ShimContainerRuntime's create()->spawn. SELECTOR ONLY; the shim
         // re-validates persona against its closed enum + rebuilds the spec.
         persona?: string;
@@ -94,7 +94,7 @@ export interface RuntimeExecutionBinding {
   toolRuntime: ToolRuntimeDescriptor;
   // Present on persona container bindings; absent on host/bounded-host bindings.
   // Lets post-exit handlers (Chunk E) branch on lifecycle without inspecting
-  // toolRuntime internals (PRI-1796).
+  // toolRuntime internals.
   containerSharing?: 'per_invocation' | 'persistent';
 }
 

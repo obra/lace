@@ -146,7 +146,7 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with sysctls (PRI-1790)', () => {
+  it('accepts projected container binding with sysctls', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
@@ -166,7 +166,7 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with capAdd (PRI-1919)', () => {
+  it('accepts projected container binding with capAdd', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
@@ -186,7 +186,7 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with network (PRI-1919)', () => {
+  it('accepts projected container binding with network', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
@@ -206,7 +206,7 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with gatewayRoute (PRI-1919)', () => {
+  it('accepts projected container binding with gatewayRoute', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
@@ -226,7 +226,7 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with browserCdpSocket (PRI-2002)', () => {
+  it('accepts projected container binding with browserCdpSocket', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,

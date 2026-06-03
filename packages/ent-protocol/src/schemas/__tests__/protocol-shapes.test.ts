@@ -566,7 +566,7 @@ describe('protocol shapes (representative examples)', () => {
     ).toThrow();
   });
 
-  it('parses container network attached/detached session updates (PRI-1919)', () => {
+  it('parses container network attached/detached session updates', () => {
     expect(() =>
       EntProtocolNotificationSchema.parse({
         jsonrpc: '2.0',
@@ -614,7 +614,7 @@ describe('protocol shapes (representative examples)', () => {
     ).toThrow();
   });
 
-  it('carries browserCdpSocketPath on container_network_attached (PRI-2002)', () => {
+  it('carries browserCdpSocketPath on container_network_attached', () => {
     const parsed = EntProtocolNotificationSchema.parse({
       jsonrpc: '2.0',
       method: 'session/update',
@@ -745,7 +745,7 @@ describe('protocol shapes (representative examples)', () => {
     ).not.toThrow();
   });
 
-  it('accepts host/spawn/env request and response shapes (PRI-1867)', () => {
+  it('accepts host/spawn/env request and response shapes', () => {
     expect(() =>
       schema('HostSpawnEnvRequestSchema').parse({
         jsonrpc: '2.0',

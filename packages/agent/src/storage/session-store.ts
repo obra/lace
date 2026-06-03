@@ -22,7 +22,7 @@ import type { RuntimeExecutionBinding } from '../tools/runtime/types';
  * session/fork) versus user-facing calls (ent/mcp/servers/upsert).
  *
  * Missing `source` is treated as `embedder` for migration compatibility with
- * state.json files written before this field existed (see PRI-1754).
+ * state.json files written before this field existed.
  */
 export type McpServerSource = 'embedder' | 'user';
 
@@ -221,7 +221,7 @@ export function listSessions(cwd?: string): Array<{
  * for actual session-open (cold start from disk) AND for mid-flight
  * in-memory refreshes after a write. The crash-recovery scan must only run
  * on a true open — synthesizing a turn_end for the active in-flight turn
- * would corrupt the durable log. See PRI-1818.
+ * would corrupt the durable log.
  */
 export type LoadSessionOptions = {
   /**
@@ -256,7 +256,7 @@ export function loadSession(sessionId: string, options?: LoadSessionOptions): Lo
     // stopReason='process_died' so the durable log honors the invariant that
     // every turn_start has a matching turn_end. Must run BEFORE any new event
     // is appended by the opener so the new turn's eventSeq sits after the
-    // synthesized one. See PRI-1818.
+    // synthesized one.
     const repair = repairOrphanTurnStarts(sessionDir, state);
     if (repair.synthesized > 0) {
       state = repair.nextState;

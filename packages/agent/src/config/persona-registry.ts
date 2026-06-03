@@ -57,19 +57,19 @@ const runtimeContainerSchema = z
     env: z.record(z.string(), z.string()).optional().default({}),
     ports: z.array(portMappingSchema).optional(),
     // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-    // PRI-1790: sen-browser needs `net.ipv6.conf.lo.disable_ipv6=0` so the
+    // sen-browser needs `net.ipv6.conf.lo.disable_ipv6=0` so the
     // container has an `::1` for superpowers-chrome's port-availability check.
     sysctls: z.record(sysctlKeySchema, z.string()).optional(),
     // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-    // PRI-1919: persona containers need NET_ADMIN for the transparent egress gateway.
+    // Persona containers need NET_ADMIN for the transparent egress gateway.
     capAdd: z.array(z.string().regex(/^[A-Z_]+$/)).optional(),
     // Docker network name forwarded to `docker create --network <name>`.
-    // PRI-1919: persona containers join the quarantine network.
+    // Persona containers join the quarantine network.
     network: z.string().min(1).optional(),
     // IPv4 address of the egress gateway for the post-start netns-init sidecar.
-    // PRI-1919: sets the persona's default route to route all egress via the broker.
+    // Sets the persona's default route to route all egress via the broker.
     gatewayRoute: z.string().min(1).optional(),
-    // PRI-2002: when true, this persona is a quarantined browser-driver. Lace
+    // When true, this persona is a quarantined browser-driver. Lace
     // injects SEN_BROWSER_CDP_SOCKET and emits browserCdpSocketPath on attach so
     // the credential helper can reach the persona's Chrome CDP over a unix socket
     // on the shared sen-browser-cdp mount. Only this persona gets that mount + env.
@@ -162,7 +162,7 @@ export class PersonaNotFoundError extends Error {
 export interface PersonaRegistryOptions {
   bundledPersonasPath: string;
   userPersonasPaths: readonly string[]; // ordered: earlier overrides later
-  // PRI-1912: embedder package root. Relative `command`/`args` of host-placement
+  // Embedder package root. Relative `command`/`args` of host-placement
   // MCP servers in a persona are resolved against this at parse time (the
   // embedder spawns them from a cwd that differs from where the server scripts
   // live). Undefined ⇒ relative paths are left verbatim.
@@ -359,7 +359,7 @@ export class PersonaRegistry {
   }
 
   /**
-   * PRI-1912: resolve relative `command`/`args` of host-placement MCP servers
+   * Resolve relative `command`/`args` of host-placement MCP servers
    * against `mcpBaseDir`. Host-placement servers run from the embedder's package
    * root (where the server scripts live), not lace's cwd, so a relative path
    * must be anchored there. toolRuntime-placement servers run inside the persona

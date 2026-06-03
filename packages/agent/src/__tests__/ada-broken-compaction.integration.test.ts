@@ -1,4 +1,4 @@
-// ABOUTME: Integration regression test for Ada's bricked session (PRI-1712)
+// ABOUTME: Integration regression test for Ada's bricked session
 // ABOUTME: Loads Ada's actual events.jsonl rescued from prod and asserts the rebuilt
 // ABOUTME: provider message array has no orphaned tool_result blocks — the exact
 // ABOUTME: failure shape that produced Anthropic 400 invalid_request_error.
@@ -38,37 +38,34 @@ function validateAnthropicAdjacency(messages: ProviderMessage[]): string | null 
   return null;
 }
 
-describe.skipIf(!existsSync(ADA_EVENTS))(
-  "PRI-1712 regression: Ada's rescued broken-compaction session",
-  () => {
-    let tempDir: string;
+describe.skipIf(!existsSync(ADA_EVENTS))("Ada's rescued broken-compaction session", () => {
+  let tempDir: string;
 
-    beforeAll(() => {
-      tempDir = mkdtempSync(join(tmpdir(), 'lace-ada-rescue-'));
-      copyFileSync(ADA_EVENTS, join(tempDir, 'events.jsonl'));
-    });
+  beforeAll(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-ada-rescue-'));
+    copyFileSync(ADA_EVENTS, join(tempDir, 'events.jsonl'));
+  });
 
-    afterAll(() => {
-      rmSync(tempDir, { recursive: true, force: true });
-    });
+  afterAll(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
 
-    it('rebuilds without producing any orphan tool_result blocks', () => {
-      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  it('rebuilds without producing any orphan tool_result blocks', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
-      const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
+    const { messages } = buildProviderMessagesFromDurableEvents(tempDir);
 
-      expect(messages.length).toBeGreaterThan(0);
+    expect(messages.length).toBeGreaterThan(0);
 
-      const failure = validateAnthropicAdjacency(messages);
-      expect(failure).toBeNull();
+    const failure = validateAnthropicAdjacency(messages);
+    expect(failure).toBeNull();
 
-      // Ada's broken file had 4 tool_results and 3 tool_uses with one initial
-      // orphan. The defensive pass must have logged at least one WARN.
-      const orphanWarns = warnSpy.mock.calls.filter(
-        (c) => typeof c[0] === 'string' && c[0].includes('orphaned tool_result')
-      );
-      expect(orphanWarns.length).toBeGreaterThan(0);
-      warnSpy.mockRestore();
-    });
-  }
-);
+    // Ada's broken file had 4 tool_results and 3 tool_uses with one initial
+    // orphan. The defensive pass must have logged at least one WARN.
+    const orphanWarns = warnSpy.mock.calls.filter(
+      (c) => typeof c[0] === 'string' && c[0].includes('orphaned tool_result')
+    );
+    expect(orphanWarns.length).toBeGreaterThan(0);
+    warnSpy.mockRestore();
+  });
+});

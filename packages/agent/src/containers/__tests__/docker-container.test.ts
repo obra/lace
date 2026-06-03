@@ -622,7 +622,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('inspectNetworkIp (PRI-1919)', () => {
+  describe('inspectNetworkIp', () => {
     it('returns the IPAddress for the named network', async () => {
       setExecFileResponses([
         {
@@ -745,7 +745,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('sysctls (PRI-1790)', () => {
+  describe('sysctls', () => {
     it('emits --sysctl key=value for each entry in config.sysctls', async () => {
       await runtime.create({
         name: 'svc',
@@ -846,7 +846,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('capAdd + network (PRI-1919)', () => {
+  describe('capAdd + network', () => {
     it('emits --cap-add NET_ADMIN and --network quarantine when runtime sets them', async () => {
       await runtime.create({
         name: 'svc',
@@ -936,7 +936,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('gatewayRoute netns-init (PRI-1919)', () => {
+  describe('gatewayRoute netns-init', () => {
     it('runs netns-init sidecar with the gatewayRoute after start', async () => {
       const id = await runtime.create({
         name: 'persona',

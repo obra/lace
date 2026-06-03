@@ -465,7 +465,7 @@ scoped persona`
   });
 
   it('persona tools: is verbatim allowlist — MCP-only persona gets only declared tools', async () => {
-    // PRI-1900: persona tools: is now a complete allowlist, not additive.
+    // persona tools: is now a complete allowlist, not additive.
     // A persona that declares only MCP-namespaced tools gets exactly those;
     // if it also needs builtins it must list them explicitly.
     writeFileSync(
@@ -584,7 +584,7 @@ mcp-only persona`
     });
   });
 
-  describe('PRI-1911 regression: state.personaRegistry (set by initialize) reaches DelegateTool', () => {
+  describe('regression: state.personaRegistry (set by initialize) reaches DelegateTool', () => {
     // This test guards the full wiring chain:
     //   initialize(userPersonasPaths=[D]) → state.personaRegistry
     //   → createToolExecutorForMode(state.personaRegistry)

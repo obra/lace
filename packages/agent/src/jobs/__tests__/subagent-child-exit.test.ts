@@ -1,4 +1,4 @@
-// ABOUTME: Tests for subagent child-exit handling — PRI-1774
+// ABOUTME: Tests for subagent child-exit handling
 // ABOUTME: When a subagent process crashes mid-RPC the parent must persist its
 // ABOUTME: stderr to the per-job .log file AND wake the pending RPC so the job
 // ABOUTME: transitions to a terminal state instead of hanging forever.
@@ -11,7 +11,7 @@ import { persistSubagentChildExit } from '../subagent-exit-handler';
 
 describe('persistSubagentChildExit', () => {
   it('writes the captured stderr buffer to the per-job .log file', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pri-1774-'));
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-exit-'));
     try {
       const outputPath = join(dir, 'jobs', 'job_x.log');
 
@@ -34,7 +34,7 @@ describe('persistSubagentChildExit', () => {
   });
 
   it('records the signal name when a signal terminated the child', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pri-1774-'));
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-exit-'));
     try {
       const outputPath = join(dir, 'jobs', 'job_y.log');
 
@@ -55,7 +55,7 @@ describe('persistSubagentChildExit', () => {
   });
 
   it('is a no-op when exitCode is 0 (normal shutdown)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pri-1774-'));
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-exit-'));
     try {
       const outputPath = join(dir, 'jobs', 'job_z.log');
 
@@ -74,7 +74,7 @@ describe('persistSubagentChildExit', () => {
   });
 
   it('still writes a header even if stderr is empty (so the log is not silent)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pri-1774-'));
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-exit-'));
     try {
       const outputPath = join(dir, 'jobs', 'job_q.log');
 

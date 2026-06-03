@@ -1,5 +1,5 @@
 // ABOUTME: Tests for maybeScheduleReapAfter helper — verifies reaper wiring in subagent-job exit paths
-// ABOUTME: PRI-1796 Chunk E: schedule reap for per_invocation containers after child exits
+// ABOUTME: Chunk E: schedule reap for per_invocation containers after child exits
 
 import { describe, it, expect, vi } from 'vitest';
 import { maybeScheduleReapAfter } from '../subagent-job';
@@ -192,7 +192,7 @@ describe('maybeScheduleReapAfter', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796: maybeScheduleReapAfter uses job.containerSpecName instead of
+  // maybeScheduleReapAfter uses job.containerSpecName instead of
   // digging into runtimeBinding, so reap scheduling does not depend on the
   // projected binding still being present.
   // ---------------------------------------------------------------------------

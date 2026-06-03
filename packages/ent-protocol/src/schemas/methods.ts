@@ -134,7 +134,7 @@ const InitializeParamsSchema = z
     // Ordered persona search paths (earlier paths win). When omitted, the
     // agent uses its default user-persona directory under laceDir.
     userPersonasPaths: z.array(NonEmptyStringSchema).optional(),
-    // PRI-1912: embedder package root. lace resolves relative `command`/`args`
+    // Embedder package root. lace resolves relative `command`/`args`
     // of host-placement MCP servers declared in a persona against this base (the
     // server scripts live under the embedder's package, not lace's cwd).
     mcpBaseDir: NonEmptyStringSchema.optional(),
@@ -647,7 +647,7 @@ const SessionPromptResultSchema = z.union([
         'incomplete',
         'permission_cancelled',
         'failed',
-        // PRI-1818: fine-grained error stopReasons written by the runner's
+        // Fine-grained error stopReasons written by the runner's
         // finally block when the agentic loop threw. The runner rethrows after
         // writing turn_end, so these values do not flow through the RPC response
         // on a real run; they are listed for schema parity with the durable
@@ -2048,7 +2048,7 @@ const SessionUpdateJobStartedSchema = z
   })
   .strict();
 
-// PRI-1919: a gateway-routed persona container finished materializing and has
+// A gateway-routed persona container finished materializing and has
 // an assigned quarantine-network IP. Fires after the container is running (and
 // the netns-init sidecar has run), so the embedder can register the
 // source-IP → identity mapping for the transparent egress gateway without
@@ -2060,13 +2060,13 @@ const SessionUpdateContainerNetworkAttachedSchema = z
     containerId: NonEmptyStringSchema,
     sourceIp: NonEmptyStringSchema,
     networkName: NonEmptyStringSchema,
-    // PRI-2002: per-job CDP unix-socket path on the shared host CDP dir, so the
+    // Per-job CDP unix-socket path on the shared host CDP dir, so the
     // credential helper can reach this container's quarantined browser Chrome.
     browserCdpSocketPath: NonEmptyStringSchema.optional(),
   })
   .strict();
 
-// PRI-1919: a gateway-routed persona container was torn down. The embedder
+// A gateway-routed persona container was torn down. The embedder
 // drops its source-IP → identity mapping so it does not outlive the container.
 const SessionUpdateContainerNetworkDetachedSchema = z
   .object({
@@ -2107,7 +2107,7 @@ const SessionUpdateTurnEndSchema = z
       'incomplete',
       'permission_cancelled',
       'failed',
-      // PRI-1818: fine-grained error stopReasons written by the runner's
+      // Fine-grained error stopReasons written by the runner's
       // finally block when the agentic loop threw. Match the
       // SessionPromptResultSchema enum so durable turn_end events and the
       // session/update notification share a single shape.
@@ -2395,7 +2395,7 @@ export const SessionRequestPermissionResponseSchema = z
 // (e.g. sen-core's per-spawn placeholder tokens). The embedder may return an
 // empty record, or not implement the method at all — lace treats both as
 // "no extra env" and proceeds with the base executionEnv. The spawn is never
-// blocked by this call. See PRI-1867 M4.
+// blocked by this call.
 const HostSpawnEnvParamsSchema = z
   .object({
     jobId: NonEmptyStringSchema,

@@ -107,7 +107,7 @@ export class ToolExecutor {
   }
 
   getAllTools(): Tool[] {
-    // PRI-1804 #2 (revised after adversarial review): use BYTE-STABLE
+    // Revised after adversarial review: use BYTE-STABLE
     // comparison, not localeCompare. localeCompare without an explicit
     // locale arg uses the host's default locale; on machines with Turkish
     // or other non-English locales, sort order shifts and the tools-array

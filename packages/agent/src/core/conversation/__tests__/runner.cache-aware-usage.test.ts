@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1817 tests — runner persists all four token categories
+// ABOUTME: Tests — runner persists all four token categories
 // (input, output, cache_creation, cache_read) and computes real cache-aware
 // costUsd. Covers schema widening, accumulator, cost formula, and the
 // "costUsd is 0.00 in production" bug fix.
@@ -145,7 +145,7 @@ function makeMockDeps(
   };
 }
 
-describe('ConversationRunner cache-aware usage (PRI-1817)', () => {
+describe('ConversationRunner cache-aware usage', () => {
   let laceDir: string;
   let sessionDir: string;
   let sessionId: string;
@@ -340,7 +340,7 @@ describe('ConversationRunner cache-aware usage (PRI-1817)', () => {
     expect(usage.costUsd).toBeCloseTo(0.0625, 4);
   });
 
-  it('writes a non-zero costUsd when pricing is available (PRI-1817 bug)', async () => {
+  it('writes a non-zero costUsd when pricing is available', async () => {
     // The original bug: turn_end.usage.costUsd was always 0 in production
     // because the state-owned providerCatalog was never loaded before
     // getModelPricing ran. With pricing in hand the runner must emit a
@@ -437,8 +437,8 @@ describe('ConversationRunner cache-aware usage (PRI-1817)', () => {
   });
 });
 
-describe('TurnEndEventData old-shape tolerance (PRI-1817)', () => {
-  // Old transcripts written before PRI-1817 do not have cacheCreationInputTokens
+describe('TurnEndEventData old-shape tolerance', () => {
+  // Old transcripts without the cache-aware schema do not have cacheCreationInputTokens
   // / cacheReadInputTokens fields on turn_end.usage. The deserializer must
   // tolerate this without throwing.
   it('reads an old-shape turn_end event without throwing', () => {

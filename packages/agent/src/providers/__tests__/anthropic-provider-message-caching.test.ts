@@ -44,7 +44,7 @@ vi.mock('../../utils/provider-logging.js', () => ({
 
 type CacheControl = { type: 'ephemeral'; ttl?: string };
 
-describe('AnthropicProvider message-level cache_control (PRI-1799)', () => {
+describe('AnthropicProvider message-level cache_control', () => {
   let provider: AnthropicProvider;
   let mockTool: Tool;
 
@@ -214,7 +214,7 @@ describe('AnthropicProvider message-level cache_control (PRI-1799)', () => {
   });
 });
 
-describe('AnthropicProvider stable-anchor breakpoint (PRI-1802)', () => {
+describe('AnthropicProvider stable-anchor breakpoint', () => {
   let provider: AnthropicProvider;
   let mockTool: Tool;
 

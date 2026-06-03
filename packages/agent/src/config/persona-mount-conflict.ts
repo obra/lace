@@ -1,5 +1,5 @@
 // ABOUTME: R6 invariant — per_invocation personas must not share mount-registry
-// ABOUTME: names with persistent personas. PRI-1796.
+// ABOUTME: names with persistent personas.
 
 import type { PersonaRegistry, ParsedPersona } from './persona-registry';
 import type { MountRegistryEntry } from '@lace/agent/server-types';

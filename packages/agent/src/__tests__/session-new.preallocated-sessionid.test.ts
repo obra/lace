@@ -1,4 +1,4 @@
-// ABOUTME: Tests for host-preallocated sessionId support in session/new (PRI-1796 Chunk D.2)
+// ABOUTME: Tests for host-preallocated sessionId support in session/new (Chunk D.2)
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
@@ -21,7 +21,7 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   return { client, server };
 }
 
-describe('session/new preallocated sessionId (PRI-1796)', () => {
+describe('session/new preallocated sessionId', () => {
   let originalLaceDir: string | undefined;
   let tempDir: string;
 

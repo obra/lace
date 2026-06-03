@@ -164,7 +164,7 @@ Body.`;
     });
   });
 
-  it('parses runtime.type=container with sysctls (PRI-1790)', () => {
+  it('parses runtime.type=container with sysctls', () => {
     const content = `---
 runtime:
   type: container
@@ -185,7 +185,7 @@ Body.`;
     });
   });
 
-  it('parses runtime.type=container with capAdd (PRI-1919)', () => {
+  it('parses runtime.type=container with capAdd', () => {
     const content = `---
 runtime:
   type: container
@@ -206,7 +206,7 @@ Body.`;
     });
   });
 
-  it('parses runtime.type=container with network (PRI-1919)', () => {
+  it('parses runtime.type=container with network', () => {
     const content = `---
 runtime:
   type: container
@@ -226,7 +226,7 @@ Body.`;
     });
   });
 
-  it('parses runtime.type=container with gatewayRoute (PRI-1919)', () => {
+  it('parses runtime.type=container with gatewayRoute', () => {
     const content = `---
 runtime:
   type: container
@@ -246,7 +246,7 @@ Body.`;
     });
   });
 
-  it('parses runtime.type=container with browserCdpSocket (PRI-2002)', () => {
+  it('parses runtime.type=container with browserCdpSocket', () => {
     const content = `---
 runtime:
   type: container

@@ -60,7 +60,7 @@ interface DockerPsRowJson {
 export class DockerContainerRuntime extends BaseContainerRuntime {
   // protected (not private): ShimContainerRuntime extends this + overrides
   // create()/start() to drive the sen-docker shim, reusing dockerBin + the
-  // configs/containers bookkeeping + resolveContainerName (PRI-2012 Root A).
+  // configs/containers bookkeeping + resolveContainerName.
   protected readonly dockerBin: string;
   // Stores the full ContainerConfig keyed by container id so start() can
   // access gatewayRoute and image after create() has returned.
@@ -139,7 +139,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('--network', config.network);
     }
 
-    // A gateway-routed persona (PRI-1919) cannot use docker's embedded resolver
+    // A gateway-routed persona cannot use docker's embedded resolver
     // (127.0.0.11): once netns-init points the default route at the broker, the
     // embedded resolver's external forwarding dies. The broker is both the
     // gateway and a DNS forwarder, so point resolv.conf at it. DNS to the
@@ -282,7 +282,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
    * main↔persona is via `docker exec` (not L3, unaffected); persona→gateway and
    * persona→external are allowed; persona↔persona is denied. The gateway bridge
    * keeps docker's default icc (enabled) — enable_icc=false would also drop the
-   * persona→gateway hop. PRI-1919 transparent egress gateway.
+   * persona→gateway hop. Transparent egress gateway.
    */
   private async runNetnsInit(
     containerId: string,
@@ -681,7 +681,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
    * Resolve the container's IPv4 address on `networkName` via `docker inspect`.
    * Returns undefined when the network is absent, the container is gone, or the
    * inspect fails — callers degrade gracefully (the transparent egress gateway
-   * skips the source-IP mapping rather than blocking). PRI-1919.
+   * skips the source-IP mapping rather than blocking).
    */
   async inspectNetworkIp(containerId: string, networkName: string): Promise<string | undefined> {
     try {

@@ -351,7 +351,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
-  // PRI-1919: surface gateway-routed persona container network lifecycle as
+  // Surface gateway-routed persona container network lifecycle as
   // session updates so the embedder registers/drops the source-IP → identity
   // mapping in lock-step with the container (race-free; no docker-inspect poll).
   state.containerManager?.setNetworkLifecycleObserver({
@@ -460,7 +460,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runShellProcess: (job) => void runShellJobProcess(job),
     runSubagentProcess: (job) => void runSubagentJobProcess(job),
     setupProgressTimer: (job) => setupProgressTimer(job),
-    // PRI-1867 M4: ask the embedder for per-spawn env additions via the
+    // Ask the embedder for per-spawn env additions via the
     // host-bound `host/spawn/env` JSON-RPC method. Errors (missing handler,
     // bad response shape, transport error) are absorbed by JobManager and
     // never block the spawn — see job-manager.ts for the recovery path.

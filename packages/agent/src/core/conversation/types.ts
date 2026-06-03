@@ -100,7 +100,7 @@ export interface RunnerDependencies {
 
   /**
    * Get model pricing for cost calculation. The runner expects cache pricing
-   * for both creation and read tiers (PRI-1817); providers without cache
+   * for both creation and read tiers; providers without cache
    * pricing must return the base input rate for both so the cost formula
    * stays correct on uncached workloads.
    */
@@ -154,7 +154,7 @@ export interface RunnerDependencies {
   /**
    * Update session cost and token usage.
    *
-   * PRI-1817: `cacheCreationInputTokens` and `cacheReadInputTokens` are
+   * `cacheCreationInputTokens` and `cacheReadInputTokens` are
    * optional so callers/tests that don't track cache accounting can omit
    * them; the session-state accumulator treats absent fields as zero.
    */
@@ -181,7 +181,7 @@ export interface RunnerDependencies {
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 
   /**
-   * Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+   * Idle TTL reaper for per_invocation containers (Chunk E).
    * Threaded into ToolContext so the delegate tool can cancel a pending
    * destruction timer when a resume invocation arrives.
    */
@@ -229,12 +229,12 @@ export interface RunParams {
  * compaction, supervision UI). The runner rethrows after writing turn_end, so
  * the returned `RunResult` never carries these values on a real run — they are
  * included in the union for type compatibility with the internal stopReason
- * variable that gets persisted to the durable log. See PRI-1818.
+ * variable that gets persisted to the durable log.
  *
  * `process_died` is intentionally NOT included — that label is written by the
  * crash-recovery scan at session-open time when an orphan `turn_start` is
- * found (PRI-1818 #3). `prompt_handler_caught` is the prompt.ts defense-in-
- * depth fallback label (PRI-1818 #2) and is similarly not in this union.
+ * found. `prompt_handler_caught` is the prompt.ts defense-in-
+ * depth fallback label and is similarly not in this union.
  */
 export interface RunResult {
   /** Unique identifier for this turn */

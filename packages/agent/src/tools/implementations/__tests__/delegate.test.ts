@@ -470,7 +470,7 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796 per_invocation response shape tests
+  // per_invocation response shape tests
   // ---------------------------------------------------------------------------
 
   it('background per_invocation response includes subagentSessionId and scratchDir', async () => {
@@ -749,7 +749,7 @@ describe('DelegateTool', () => {
     expect(opts.newSubagentSessionId).toBeUndefined();
   });
 
-  // PRI-1796 Chunk E: reaper cancel wiring
+  // reaper cancel wiring
   describe('per_invocation reaper cancel wiring', () => {
     function makePerInvocationPersonaRegistry(): PersonaRegistry {
       return {
@@ -937,7 +937,7 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796: minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
+  // minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
   // ---------------------------------------------------------------------------
   it('mints childSessionId in SessionIdSchema format (hyphenated UUID)', async () => {
     const personaRegistry = {
@@ -989,7 +989,7 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796 Chunk F: PersonaSharingViolationError propagation
+  // PersonaSharingViolationError propagation
   // ---------------------------------------------------------------------------
   it('delegate fails with PersonaSharingViolationError when per_invocation persona conflicts with persistent', async () => {
     // box-shell: persistent with mounts.home

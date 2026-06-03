@@ -61,7 +61,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     },
     // Tag the binding with the lifecycle so post-exit handlers (Chunk E) can
     // branch on per_invocation vs persistent without inspecting toolRuntime
-    // internals (PRI-1796).
+    // internals.
     containerSharing: input.runtime.containerSharing,
   };
 

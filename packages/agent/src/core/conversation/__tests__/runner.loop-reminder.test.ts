@@ -1,4 +1,4 @@
-// ABOUTME: Behavioral regression test for PRI-1804 #4 — the loop-check
+// ABOUTME: Behavioral regression test — the loop-check
 // reminder must appear in providerMessages at the right interval and must
 // NOT be persisted as a durable context_injected event.
 
@@ -148,7 +148,7 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
   };
 }
 
-describe('PRI-1804 #4 regression — loop reminder must not double-inject', () => {
+describe('loop reminder regression — loop reminder must not double-inject', () => {
   let sessionDir: string;
   let cwd: string;
 

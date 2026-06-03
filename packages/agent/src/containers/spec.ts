@@ -5,7 +5,7 @@ import type { ContainerMount, ContainerState, PortMapping } from './types';
 
 export type { PortMapping };
 
-// PRI-2002: the credential helper and the quarantined browser-driver share one
+// The credential helper and the quarantined browser-driver share one
 // host dir (the `sen-browser-cdp` named mount, container path `/sen-browser-cdp`);
 // each container gets a uniquely-named socket on it. A TOP-LEVEL path (NOT under
 // `/run`, which is itself the `sen-cred` mount) — a nested mount target inside
@@ -34,25 +34,25 @@ export interface ContainerSpec {
   // auto-restarts them after host reboot.
   restartPolicy?: 'unless-stopped';
   // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-  // Personas declare these in `runtime.sysctls`; PRI-1790 added support so
-  // sen-browser can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome
-  // launcher's port-availability check.
+  // Personas declare these in `runtime.sysctls`; added support so sen-browser
+  // can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome launcher's
+  // port-availability check.
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // PRI-1919: persona containers need NET_ADMIN to replace the default route
-  // via the transparent egress gateway.
+  // Persona containers need NET_ADMIN to replace the default route via the
+  // transparent egress gateway.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // PRI-1919: persona containers join the quarantine network.
+  // Persona containers join the quarantine network.
   network?: string;
 
   // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
-  // sets the persona's default route after `docker start`. PRI-1919.
+  // sets the persona's default route after `docker start`.
   gatewayRoute?: string;
 
-  // PRI-2002: when true, this is a quarantined browser-driver spec. The
+  // When true, this is a quarantined browser-driver spec. The
   // SEN_BROWSER_CDP_SOCKET env is injected at spec-build time (the in-container
   // relay listens there); ContainerManager.notifyNetworkAttached emits the
   // matching browserCdpSocketPath so the credential helper can reach the
@@ -65,7 +65,7 @@ export interface ContainerSpec {
   // longer advertises.
   managedMountTargetPrefixes?: string[];
 
-  // PRI-2012 Root A SELECTOR fields. Carried for the sen-docker shim runtime,
+  // SELECTOR fields carried for the sen-docker shim runtime,
   // whose create() emits the closed `spawn <persona> <parent> <child> <jobId>`
   // command instead of a full `docker create` argv. SELECTOR ONLY — never an
   // authority source: the shim validates `persona` against its closed enum and

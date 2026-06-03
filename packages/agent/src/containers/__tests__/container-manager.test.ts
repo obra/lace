@@ -468,7 +468,7 @@ describe('ContainerManager', () => {
     });
   });
 
-  describe('network lifecycle observer (PRI-1919)', () => {
+  describe('network lifecycle observer', () => {
     const gatewaySpec: ContainerSpec = {
       ...baseSpec,
       network: 'ada-sen_quarantine',
@@ -541,7 +541,7 @@ describe('ContainerManager', () => {
       });
     });
 
-    it('populates browserCdpSocketPath in onAttached when browserCdpSocket is set (PRI-2002)', async () => {
+    it('populates browserCdpSocketPath in onAttached when browserCdpSocket is set', async () => {
       const onAttached = vi.fn();
       manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
 
@@ -557,7 +557,7 @@ describe('ContainerManager', () => {
       });
     });
 
-    it('leaves browserCdpSocketPath undefined in onAttached when the flag is absent (PRI-2002)', async () => {
+    it('leaves browserCdpSocketPath undefined in onAttached when the flag is absent', async () => {
       const onAttached = vi.fn();
       manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
 

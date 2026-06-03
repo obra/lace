@@ -46,21 +46,21 @@ const ContainerRuntimeDescriptorSchema = z
           .array(z.object({ host: z.number().int(), container: z.number().int() }).strict())
           .optional(),
         restartPolicy: z.literal('unless-stopped').optional(),
-        // PRI-1790: forwarded verbatim to `docker create --sysctl key=value`.
+        // Forwarded verbatim to `docker create --sysctl key=value`.
         // Validated as opaque key/value pairs at this layer — the persona
         // schema enforces the dot-separated key shape upstream.
         sysctls: z.record(z.string(), z.string()).optional(),
-        // PRI-1919: forwarded to `docker create --cap-add <cap>` per entry.
+        // Forwarded to `docker create --cap-add <cap>` per entry.
         capAdd: z.array(z.string().min(1)).optional(),
-        // PRI-1919: forwarded to `docker create --network <name>`.
+        // Forwarded to `docker create --network <name>`.
         network: z.string().min(1).optional(),
-        // PRI-1919: IPv4 address of the egress gateway for the post-start
+        // IPv4 address of the egress gateway for the post-start
         // netns-init sidecar. Validated as a non-empty string (loose IPv4).
         gatewayRoute: z.string().min(1).optional(),
-        // PRI-2002: when true, lace injects SEN_BROWSER_CDP_SOCKET + emits
+        // When true, lace injects SEN_BROWSER_CDP_SOCKET + emits
         // browserCdpSocketPath for this quarantined browser-driver persona.
         browserCdpSocket: z.boolean().optional(),
-        // PRI-2012 Root A SELECTOR fields — carried for the ShimContainerRuntime's
+        // Root A SELECTOR fields — carried for the ShimContainerRuntime's
         // create()->spawn. MUST be in this .strict() schema or a shim binding fails
         // validation (bug-#7 class). SELECTOR ONLY; the shim re-validates persona.
         persona: z.string().min(1).optional(),
@@ -91,7 +91,7 @@ const RuntimeExecutionBindingSchema = z
       ContainerRuntimeDescriptorSchema,
     ]),
     // Present on persona container bindings; absent on host/bounded-host bindings.
-    // Lets post-exit handlers branch on lifecycle without inspecting toolRuntime (PRI-1796).
+    // Lets post-exit handlers branch on lifecycle without inspecting toolRuntime.
     containerSharing: z.enum(['per_invocation', 'persistent']).optional(),
   })
   .strict();

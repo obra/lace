@@ -1,6 +1,6 @@
-// ABOUTME: Tests for JobManager subscription registry (PRI-1692 Phase 1)
+// ABOUTME: Tests for JobManager subscription registry
 // Covers subscribe/unsubscribe/fanoutToInject for per-jobId terminal-state
-// subscriptions. After PRI-1744, fanout delivers via an `inject` callback that
+// subscriptions. Fanout delivers via an `inject` callback that
 // the caller wires to injectNotification; this test exercises the gating
 // semantics by spying on that callback.
 

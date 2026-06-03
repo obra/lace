@@ -170,7 +170,7 @@ Parameters:
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
         // R6 security invariant: per_invocation personas must not share
-        // mount-registry names with persistent personas (PRI-1796 Chunk F).
+        // mount-registry names with persistent personas.
         // Readonly mounts are excluded — they carry no write path so they are
         // not an adversarial-write threat.
         assertNoMountConflict(persona, parsed, this.personaRegistry, context.containerMounts ?? {});
@@ -230,7 +230,7 @@ Parameters:
       }
     }
 
-    // Cancel any pending idle-TTL reap for this per_invocation container (PRI-1796 Chunk E).
+    // Cancel any pending idle-TTL reap for this per_invocation container.
     // Fresh delegates call cancelReap idempotently (no timer exists — safe no-op).
     // Resume delegates cancel the timer that was set when the prior invocation's
     // subagent exited, preserving the container for this new invocation window.

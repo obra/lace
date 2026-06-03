@@ -1,4 +1,4 @@
-// ABOUTME: Tests for the R6 mount-conflict validator (PRI-1796).
+// ABOUTME: Tests for the R6 mount-conflict validator.
 // Tests that per_invocation personas cannot share mount-registry names
 // with persistent personas, and that the boot-time warning function fires correctly.
 

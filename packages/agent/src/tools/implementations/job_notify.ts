@@ -1,4 +1,4 @@
-// ABOUTME: job_notify tool - subscribe to job lifecycle events (PRI-1692 Phases 1-2)
+// ABOUTME: job_notify tool - subscribe to job lifecycle events
 // Lets the parent agent register interest in a job's lifecycle transitions
 // (terminal states + optional progress with a filter regex) and return to
 // other work; when the job transitions, lace synthesizes a

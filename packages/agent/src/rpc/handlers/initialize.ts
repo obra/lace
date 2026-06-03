@@ -120,7 +120,7 @@ export function registerInitializeHandler(
       state.personaRegistry = new PersonaRegistry({
         bundledPersonasPath: resolveResourcePath(import.meta.url, 'agent-personas'),
         userPersonasPaths: userPaths,
-        // PRI-1912: base for resolving relative host-placement MCP paths.
+        // Base for resolving relative host-placement MCP paths.
         ...(typeof parsed.mcpBaseDir === 'string' ? { mcpBaseDir: parsed.mcpBaseDir } : {}),
       });
     }
@@ -136,7 +136,7 @@ export function registerInitializeHandler(
     // persona. Readonly mounts are not a threat and are excluded. Never throws —
     // a bad persona config is surfaced here but doesn't prevent the embedder
     // from finishing initialization. The spawn-time assertNoMountConflict in
-    // delegate.ts provides the hard reject (PRI-1796).
+    // delegate.ts provides the hard reject.
     try {
       warnMountConflicts(state.personaRegistry, state.containerMounts);
     } catch (err) {

@@ -54,7 +54,7 @@ export interface ToolContext {
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 
-  // Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+  // Idle TTL reaper for per_invocation containers.
   // When a delegate invocation starts (fresh or resume), the tool calls
   // cancelReap so the container survives for the new invocation window.
   // The subagent-job exit handler schedules a new reap after each child exits.

@@ -1555,7 +1555,7 @@ describe('ConversationRunner', () => {
       });
     });
 
-    describe('bash(background=true) — operator opt-in progress (PRI-1707)', () => {
+    describe('bash(background=true) — operator opt-in progress', () => {
       class BashBackgroundProvider extends AIProvider {
         callCount = 0;
         constructor(private readonly toolArgs: Record<string, unknown>) {

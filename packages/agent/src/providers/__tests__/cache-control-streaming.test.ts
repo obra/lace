@@ -92,7 +92,7 @@ function writeSseStream(res: import('node:http').ServerResponse): void {
   res.end();
 }
 
-describe('PRI-1799/streaming smoke — cache_control on the stream path', () => {
+describe('streaming smoke — cache_control on the stream path', () => {
   let server: Server;
   let baseURL: string;
   const captured: { body: string }[] = [];

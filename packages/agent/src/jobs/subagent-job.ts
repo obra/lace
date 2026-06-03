@@ -119,7 +119,7 @@ export interface SubagentJobDependencies {
    */
   topLevelPeer: JsonRpcPeer;
   /**
-   * Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+   * Idle TTL reaper for per_invocation containers (Chunk E).
    * When present, schedules container destruction after the subagent exits.
    * Optional so callers that have no container runtime can omit it.
    */
@@ -139,7 +139,7 @@ export function maybeScheduleReapAfter(
   if (job.containerSharing !== 'per_invocation') return;
   if (!job.subagentSessionId) return;
   // Use the pre-computed containerSpecName stored on the job. The delegate tool
-  // computes it once while building the projected runtime binding (PRI-1796).
+  // computes it once while building the projected runtime binding.
   if (!job.containerSpecName) return;
   reaper.scheduleReap(job.subagentSessionId, job.containerSpecName);
 }
@@ -537,7 +537,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         return undefined;
       }
 
-      // PRI-1919: a persona container materializes inside the subagent process,
+      // A persona container materializes inside the subagent process,
       // so its container_network_attached/detached updates surface here in the
       // child's session stream. Forward them up unchanged (the containerId /
       // containerName are docker-side identifiers, shared across processes — no
@@ -914,7 +914,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         ...currentState.personaRegistry.getUserPersonasPaths(),
       ];
       const subagentSkillDirs = [...subagentHostSkillDirs];
-      // PRI-1912: the child re-parses personas, so it needs the same MCP base
+      // The child re-parses personas, so it needs the same MCP base
       // dir to resolve relative host-placement command/args.
       const subagentMcpBaseDir = currentState.personaRegistry.getMcpBaseDir();
 
@@ -1161,7 +1161,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       }
 
       await finalizeJob(job);
-      // Schedule idle TTL teardown for per_invocation containers (PRI-1796 Chunk E).
+      // Schedule idle TTL teardown for per_invocation containers (Chunk E).
       // The reaper cancels this timer when a resume delegate call arrives, preserving
       // the container for the next invocation window.
       maybeScheduleReapAfter(job, reaper);

@@ -56,7 +56,7 @@ describe('PersonaRegistry', () => {
     expect(lacePersona?.path).toContain('agent-personas');
   });
 
-  it('resolves host-placement relative MCP command/args against mcpBaseDir (PRI-1912)', () => {
+  it('resolves host-placement relative MCP command/args against mcpBaseDir', () => {
     mkdirSync(userPersonaDir, { recursive: true });
     writeFileSync(
       path.join(userPersonaDir, 'worker.md'),

@@ -25,7 +25,7 @@ class EchoTool extends Tool {
   }
 }
 
-describe('PRI-1804 invariant — message prefix is byte-stable across consecutive turns', () => {
+describe('message prefix is byte-stable across consecutive turns', () => {
   let server: Server;
   let baseURL: string;
   const captured: string[] = [];

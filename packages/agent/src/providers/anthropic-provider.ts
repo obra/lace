@@ -49,7 +49,7 @@ interface AnthropicProviderConfig extends ProviderConfig {
   [key: string]: unknown; // Allow for additional properties
 }
 
-// PRI-1806 #4: Anthropic-direct API supports 1h ephemeral cache TTL GA — no
+// Anthropic-direct API supports 1h ephemeral cache TTL GA — no
 // `anthropic-beta` header required (verified against
 // platform.claude.com/docs/en/build-with-claude/prompt-caching on 2026-05-23).
 // SDK 0.60 types `ttl: '5m' | '1h'`.
@@ -96,7 +96,7 @@ export class AnthropicProvider extends AIProvider {
    * Helper method for token counting with explicit control over all parameters.
    * Allows precise counting of individual components (system, tools, messages).
    *
-   * PRI-1806 #2: mirrors the wire shape of `_createRequestPayload` — same
+   * Mirrors the wire shape of `_createRequestPayload` — same
    * cache_control breakpoints on system, last tool, and message tail/anchor.
    * Without this, the counted token total drifts from what we actually send
    * (cache_control fields add a small but real overhead, and the array-shaped
@@ -172,7 +172,7 @@ export class AnthropicProvider extends AIProvider {
    * The `context` carries the request's model and the previous-turn response
    * id we compared against, so the INFO log gives the on-call engineer enough
    * to pivot from a Loki line straight to the specific request/response pair
-   * in the SDK logs (PRI-1796).
+   * in the SDK logs.
    */
   private _extractCacheMissReason(
     message: BetaMessage,
@@ -201,7 +201,7 @@ export class AnthropicProvider extends AIProvider {
   ): Anthropic.Beta.Messages.MessageCreateParams {
     const anthropicMessages = convertToAnthropicFormat(messages);
 
-    // PRI-1799/1802/1805: attach a rolling-tail + stable-anchor pair of
+    // Attach a rolling-tail + stable-anchor pair of
     // cache_control breakpoints on the message stream so the conversation
     // prefix stays cached across idle gaps and survives Anthropic's
     // 20-raw-block lookback window even on heavy tool-use turns.
@@ -220,7 +220,7 @@ export class AnthropicProvider extends AIProvider {
     }));
     const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
 
-    // PRI-1806 #1: defensive cap at Anthropic's 4-marker hard limit. With
+    // Defensive cap at Anthropic's 4-marker hard limit. With
     // current placement (system + last-tool + anchor + tail) we're at 4
     // exactly; this enforces it if anything upstream stamps additional
     // markers.
@@ -387,7 +387,7 @@ export class AnthropicProvider extends AIProvider {
               promptTokens: response.usage.input_tokens,
               completionTokens: response.usage.output_tokens,
               totalTokens: response.usage.input_tokens + response.usage.output_tokens,
-              // PRI-1817: surface cache accounting so the runner can compute
+              // Surface cache accounting so the runner can compute
               // real cost. Anthropic returns these on every Messages API
               // response — null/missing means zero (no cache activity).
               cacheCreationInputTokens: response.usage.cache_creation_input_tokens ?? 0,
@@ -483,7 +483,7 @@ export class AnthropicProvider extends AIProvider {
                   promptTokens: usage.input_tokens || 0,
                   completionTokens: usage.output_tokens || 0,
                   totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
-                  // PRI-1817: progressive cache totals so UI consumers (e.g.
+                  // Progressive cache totals so UI consumers (e.g.
                   // sen-core's bot-debugging channel formatter) can show the
                   // cache breakdown mid-turn without waiting for the final
                   // message.
@@ -543,7 +543,7 @@ export class AnthropicProvider extends AIProvider {
                   promptTokens: message.usage.input_tokens,
                   completionTokens: message.usage.output_tokens,
                   totalTokens: message.usage.input_tokens + message.usage.output_tokens,
-                  // PRI-1817: final-message cache totals.
+                  // Final-message cache totals.
                   cacheCreationInputTokens: message.usage.cache_creation_input_tokens ?? 0,
                   cacheReadInputTokens: message.usage.cache_read_input_tokens ?? 0,
                 },
@@ -597,7 +597,7 @@ export class AnthropicProvider extends AIProvider {
                   promptTokens: finalMessage.usage.input_tokens,
                   completionTokens: finalMessage.usage.output_tokens,
                   totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
-                  // PRI-1817: see non-streaming branch above.
+                  // See non-streaming branch above for cache totals.
                   cacheCreationInputTokens: finalMessage.usage.cache_creation_input_tokens ?? 0,
                   cacheReadInputTokens: finalMessage.usage.cache_read_input_tokens ?? 0,
                 }

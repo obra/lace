@@ -1,7 +1,7 @@
-// ABOUTME: Tests for JobManager subscriber-side filter regex (PRI-1692 Phase 2)
+// ABOUTME: Tests for JobManager subscriber-side filter regex
 // Covers regex application to progress notifications, no-op on terminal-state
 // kinds, multi-subscriber filter isolation, and invalid-regex rejection.
-// After PRI-1744 the notification is delivered via an `inject` callback; the
+// The notification is delivered via an `inject` callback; the
 // test spies on that callback to assert filter pass/drop behavior.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -23,7 +23,7 @@ function recordedInject(calls: string[], tag: string): () => void {
   };
 }
 
-describe('JobManager filter regex (PRI-1692 Phase 2)', () => {
+describe('JobManager filter regex', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

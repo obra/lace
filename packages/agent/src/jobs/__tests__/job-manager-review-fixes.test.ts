@@ -1,5 +1,5 @@
 // ABOUTME: Regression tests for the issues surfaced in adversarial review of
-// PRI-1692 Phase 2:
+// the Phase 2 progress fanout:
 //  - terminal fanout must flush every pending progress batch for the jobId,
 //    even on subs whose `on` doesn't include the terminal kind (otherwise a
 //    progress-only sub fires a stale post-terminal phantom);
@@ -42,7 +42,7 @@ function makeRunningJob(jobId: string): JobState {
   } as JobState;
 }
 
-describe('JobManager review-driven fixes (PRI-1692 Phase 2)', () => {
+describe('JobManager review-driven fixes (Phase 2)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

@@ -61,7 +61,7 @@ describe('classifyHttpError', () => {
       });
     });
 
-    it('returns null for the PRI-1796 tool_use ids 400 (not context-overflow)', () => {
+    it('returns null for the tool_use ids 400 (not context-overflow)', () => {
       const err = makeAnthropic400({
         type: 'invalid_request_error',
         message:

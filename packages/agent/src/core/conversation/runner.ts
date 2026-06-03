@@ -53,7 +53,7 @@ import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
  * Non-enumerable sentinel applied to errors thrown out of `executeToolCall`.
  * Lets `mapErrorToStopReason` distinguish a tool throw from a provider throw
  * without inspecting the loop's lexical state. The field is non-enumerable so
- * it doesn't pollute JSON serialization of the error. See PRI-1818.
+ * it doesn't pollute JSON serialization of the error.
  */
 const PHASE_TOOL = 'tool';
 const PHASE_KEY = '__lacePhase';
@@ -253,7 +253,7 @@ function extractInjectedText(content: unknown): string {
  * Read durable events newer than `afterEventSeq` and return any
  * priority='immediate' context_injected events plus the highest eventSeq seen.
  *
- * Existed because of PRI-1691: a sessionPrompt can be in flight while a peer
+ * A sessionPrompt can be in flight while a peer
  * calls ent/session/inject, which writes a context_injected event with
  * priority='immediate'. Without this re-read, the runner would only pick that
  * event up on the NEXT turn — functionally identical to queueing.
@@ -383,7 +383,7 @@ export class ConversationRunner {
     const provider = await this.deps.createProvider();
     const modelPricing = await this.deps.getModelPricing();
 
-    // Track token usage across the turn. PRI-1817: track all four Anthropic
+    // Track token usage across the turn. Track all four Anthropic
     // categories so events.jsonl carries the full breakdown — without
     // cache_creation/cache_read, cost reconstruction from disk under-counts
     // by ~70% on heavily-cached workloads.
@@ -424,12 +424,12 @@ export class ConversationRunner {
     // We start from the last turn_end rather than the very latest event so that
     // any context_injected events written between turns (after turn_end but
     // before run() was called) are picked up on the first iteration, not
-    // silently skipped (PRI-1744).
+    // silently skipped.
     let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
-    // PRI-1818: captured by the outer catch and rethrown after the finally
+    // Captured by the outer catch and rethrown after the finally
     // block so the turn_end write always runs. `undefined` means the loop
     // completed cleanly and there is nothing to rethrow.
     let caughtError: unknown;
@@ -465,7 +465,7 @@ export class ConversationRunner {
 
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
-        // PRI-1691: pick up any priority='immediate' context_injected events
+        // Pick up any priority='immediate' context_injected events
         // that landed since we last looked. These come from ent/session/inject
         // RPCs fired by peers while this turn is in flight; without this
         // re-read they would not be visible until the next sessionPrompt.
@@ -479,7 +479,7 @@ export class ConversationRunner {
         lastSeenEventSeq = newWatermark;
 
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
-        // stuck loops. PRI-1804 #4 (revised after adversarial review): push
+        // stuck loops. Revised after adversarial review: push
         // the reminder into providerMessages in-memory ONLY. Do NOT persist
         // it as a context_injected event — persisting caused the next
         // iteration's readImmediateInjectsSince to re-read and re-append
@@ -637,7 +637,7 @@ export class ConversationRunner {
           lastCallCacheCreationInputTokens = cacheCreationInputTokens;
           lastCallCacheReadInputTokens = cacheReadInputTokens;
 
-          // PRI-1817: real cache-aware cost. Anthropic bills cache_creation
+          // Real cache-aware cost. Anthropic bills cache_creation
           // at a premium over base input, cache_read at a steep discount.
           // Pre-cache-aware code computed `input * costPer1mIn` only, which
           // happens to coincide with reality on the cold-cache path but
@@ -920,7 +920,7 @@ export class ConversationRunner {
                 writeAndAdvance,
               });
             } catch (toolErr) {
-              // PRI-1818: log at ERROR with toolName + toolCallId so the next
+              // Log at ERROR with toolName + toolCallId so the next
               // occurrence of message_then_no_tool_use surfaces in agent.log
               // (the 19 Ada cases had no error logged at all — the throw was
               // entirely silent). The outer catch + finally then produce the
@@ -971,7 +971,7 @@ export class ConversationRunner {
         stopReason = 'cancelled';
       }
     } catch (loopError) {
-      // PRI-1818: never let a throw skip the turn_end write. Capture the
+      // Never let a throw skip the turn_end write. Capture the
       // error, derive a fine-grained stopReason from it, and let the finally
       // block close out the durable log. The error is rethrown after the
       // finally so callers (prompt.ts, the job layer, SDK consumers) still
@@ -1010,7 +1010,7 @@ export class ConversationRunner {
       // The turn_end write itself is wrapped because the process may be in a
       // degraded state (disk full, mutex stuck, parent crashed). Losing the
       // write is bad but recoverable on next session-open by the crash-
-      // recovery scan (PRI-1818 #3); throwing here would shadow the caught
+      // recovery scan; throwing here would shadow the caught
       // error.
       try {
         await writeAndAdvance({
@@ -1328,7 +1328,7 @@ export class ConversationRunner {
       }
 
       const { command, description, progressIntervalMs } = parsedBashInput.data;
-      // Forward operator-configured progressIntervalMs (PRI-1707) — without
+      // Forward operator-configured progressIntervalMs — without
       // this, the bash tool's schema-documented progressIntervalMs is
       // silently dropped here and the job's progress timer never arms.
       const { jobId } = await this.deps.startShellJob({

@@ -134,7 +134,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads descriptor sysctls into the materialized spec (PRI-1790)', async () => {
+  it('threads descriptor sysctls into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.sysctls = { 'net.ipv6.conf.lo.disable_ipv6': '0' };
@@ -156,7 +156,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads descriptor capAdd into the materialized spec (PRI-1919)', async () => {
+  it('threads descriptor capAdd into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.capAdd = ['NET_ADMIN'];
@@ -175,7 +175,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads descriptor network into the materialized spec (PRI-1919)', async () => {
+  it('threads descriptor network into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.network = 'quarantine';
@@ -194,7 +194,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads descriptor gatewayRoute into the materialized spec (PRI-1919)', async () => {
+  it('threads descriptor gatewayRoute into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.gatewayRoute = '172.31.250.1';
@@ -213,7 +213,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads descriptor browserCdpSocket into the materialized spec (PRI-2002)', async () => {
+  it('threads descriptor browserCdpSocket into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.browserCdpSocket = true;

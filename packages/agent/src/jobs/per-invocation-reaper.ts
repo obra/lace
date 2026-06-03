@@ -1,5 +1,5 @@
 // ABOUTME: PerInvocationReaper — schedules container teardown after idle TTL
-// ABOUTME: PRI-1796 R5: per_invocation containers survive child exit so resume works,
+// ABOUTME: Per_invocation containers survive child exit so resume works,
 // ABOUTME: then are destroyed after an idle window if no resume arrives.
 
 import type { ContainerManager } from '@lace/agent/containers/container-manager';

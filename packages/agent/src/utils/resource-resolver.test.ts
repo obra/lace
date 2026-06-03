@@ -111,7 +111,7 @@ describe('resource-resolver', () => {
 
   describe('built dist contains agent-personas at the resolver-expected location', () => {
     // These tests run after `pretest` rebuilds the package, so the dist tree must reflect
-    // the current build script. They guard against PRI-1710 (missing persona dir → WARN)
+    // the current build script. They guard against missing persona dir → WARN
     // AND against a `cp -r` rebuild bug that would nest dist/config/agent-personas/agent-personas/.
     const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
     const distPersonas = path.resolve(packageRoot, 'dist/config/agent-personas');

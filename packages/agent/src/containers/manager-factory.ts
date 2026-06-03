@@ -9,10 +9,9 @@ import { AppleContainerRuntime } from './apple-container';
 import type { ContainerRuntime } from './types';
 
 const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
-// PRI-2012 Root A: when set, lace drives the sen-docker shim instead of docker
-// directly. The value is the wrapper binary (e.g. /usr/local/bin/sen-docker-client)
-// that the runtime shells out to. Stage 3 of the cutover sets it; unset = direct
-// docker (Stage 1 / non-shim hosts).
+// When set, lace drives the sen-docker shim instead of docker directly. The value
+// is the wrapper binary (e.g. /usr/local/bin/sen-docker-client) that the runtime
+// shells out to. Unset = direct docker.
 const DOCKER_BIN_ENV = 'LACE_DOCKER_BIN';
 
 // The docker-backed runtime: the sen-docker shim when LACE_DOCKER_BIN is set

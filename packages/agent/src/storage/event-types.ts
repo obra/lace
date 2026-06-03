@@ -74,13 +74,13 @@ export type TurnEndEventData = {
     outputTokens: number;
     /**
      * Cache-creation input tokens (Anthropic `cache_creation_input_tokens`).
-     * Older transcripts written before PRI-1817 omit this; readers must
+     * Older transcripts written before this field was added omit this; readers must
      * default to 0 when absent.
      */
     cacheCreationInputTokens?: number;
     /**
      * Cache-read input tokens (Anthropic `cache_read_input_tokens`).
-     * Older transcripts written before PRI-1817 omit this; readers must
+     * Older transcripts written before this field was added omit this; readers must
      * default to 0 when absent.
      */
     cacheReadInputTokens?: number;
@@ -105,7 +105,7 @@ export type TurnEndEventData = {
  * container restart) between `turn_start` and the matching `turn_end`.
  * Surfaces crash-driven turn aborts in the durable log so downstream
  * consumers (cost accounting, compaction, UI) can distinguish them from
- * clean terminations. See PRI-1818.
+ * clean terminations.
  */
 export const PROCESS_DIED_STOP_REASON = 'process_died';
 
@@ -113,7 +113,7 @@ export const PROCESS_DIED_STOP_REASON = 'process_died';
  * stopReason value used by prompt.ts when the conversation runner threw an
  * unhandled error and the handler had to synthesize a fallback turn_end to
  * preserve the "every turn_start has a matching turn_end" invariant
- * (PRI-1818 #2). Distinct from runner-internal stopReasons so cost
+ * Distinct from runner-internal stopReasons so cost
  * accounting and reliability dashboards can identify defense-in-depth fires.
  */
 export const PROMPT_HANDLER_CAUGHT_STOP_REASON = 'prompt_handler_caught';

@@ -1,7 +1,7 @@
 // ABOUTME: Tests for ConversationRunner per-iteration re-read of context_injected events
-// Verifies PRI-1691: injections with priority='immediate' arriving mid-turn appear
+// Verifies: injections with priority='immediate' arriving mid-turn appear
 // in the next provider call's messages, not after the turn ends.
-// Also verifies PRI-1744: context_injected events written between turns (after
+// Also verifies: context_injected events written between turns (after
 // turn_end but before run()) are picked up via findLastTurnEndEventSeq watermark.
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -165,7 +165,7 @@ function injectContextEvent(
   writeSessionState(sessionDir, nextState);
 }
 
-describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', () => {
+describe('ConversationRunner - mid-turn context_injected re-read', () => {
   let laceDir: string;
   let sessionDir: string;
   let sessionId: string;
@@ -520,7 +520,7 @@ describe('ConversationRunner - mid-turn context_injected re-read (PRI-1691)', ()
   });
 });
 
-describe('ConversationRunner - between-turn context_injected watermark (PRI-1744)', () => {
+describe('ConversationRunner - between-turn context_injected watermark', () => {
   let laceDir: string;
   let sessionDir: string;
   let sessionId: string;

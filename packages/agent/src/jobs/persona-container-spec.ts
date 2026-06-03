@@ -45,12 +45,12 @@ function resolvePersonaMountsAndEnv(input: {
   for (const [mountName, target] of Object.entries(runtimeMounts)) {
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
     // the per-invocation work directory at /work. Persistent personas may still
-    // use 'scratch' as a named mount resolved through the registry (PRI-1796).
+    // use 'scratch' as a named mount resolved through the registry.
     if (mountName === 'scratch' && containerSharing === 'per_invocation') {
       throw new PersonaContainerSpecError(
         `containerSharing: per_invocation persona '${personaName}' declares mount 'scratch' — ` +
           `reserved for lace's auto-injection of the per-invocation work directory ` +
-          `at /work. Remove it from the persona file (PRI-1796).`
+          `at /work. Remove it from the persona file.`
       );
     }
     const entry = containerMounts[mountName];
@@ -163,14 +163,14 @@ export function buildPersonaContainerSpec(input: {
       ...(runtime.network ? { network: runtime.network } : {}),
       ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
       ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
-      // PRI-2012 Root A selector fields (persistent has no child session).
+      // Root A selector fields (persistent has no child session).
       persona: personaName,
       parentSession: parentSessionId,
     };
   }
 
   // per_invocation: compose a name unique to this child session so concurrent
-  // delegates of the same persona from the same parent don't collide (PRI-1796).
+  // delegates of the same persona from the same parent don't collide.
   // Auto-inject the per-invocation scratch directory at /work so the subagent
   // has an isolated writable workspace for the duration of this invocation.
   const perInvocationMounts: ContainerMount[] = [
@@ -195,14 +195,14 @@ export function buildPersonaContainerSpec(input: {
     ...(runtime.network ? { network: runtime.network } : {}),
     ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
     ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
-    // PRI-2012 Root A selector fields.
+    // Root A selector fields.
     persona: personaName,
     parentSession: parentSessionId,
     childSession: input.childSessionId,
   };
 }
 
-// PRI-2002: when the persona is a browser-driver, inject SEN_BROWSER_CDP_SOCKET
+// When the persona is a browser-driver, inject SEN_BROWSER_CDP_SOCKET
 // so the in-container relay knows where to listen. Keyed off the container name
 // so it matches the lifecycle browserCdpSocketPath exactly. Returns env
 // unchanged when the flag is absent — the security invariant that only a
@@ -242,7 +242,7 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
     ...(spec.browserCdpSocket ? { browserCdpSocket: true } : {}),
-    // PRI-2012 Root A selector fields — carried across the wire for the shim.
+    // Root A selector fields — carried across the wire for the shim.
     ...(spec.persona ? { persona: spec.persona } : {}),
     ...(spec.parentSession ? { parentSession: spec.parentSession } : {}),
     ...(spec.childSession ? { childSession: spec.childSession } : {}),

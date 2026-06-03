@@ -346,7 +346,7 @@ describe('GeminiProvider', () => {
   });
 
   describe('Message Format Conversion', () => {
-    it('should use setSystemPrompt as systemInstruction and ignore role:system messages (PRI-1804 invariant)', async () => {
+    it('should use setSystemPrompt as systemInstruction and ignore role:system messages', async () => {
       // The system prompt is set via setSystemPrompt() at session start; role:system
       // messages in the input are ignored by getEffectiveSystemPrompt.
       provider.setSystemPrompt('You are a helpful assistant');

@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1817 tests — getModelPricing returns cache-tier pricing and
+// ABOUTME: getModelPricing returns cache-tier pricing and
 // ensures the provider catalog is loaded before lookup. This is the bug fix
 // for "costUsd is always 0.00 in production": the state-owned catalog was
 // silently unloaded on first session/prompt.
@@ -76,7 +76,7 @@ function makeMockState(opts: {
   } as unknown as AgentServerState;
 }
 
-describe('getModelPricing (PRI-1817)', () => {
+describe('getModelPricing', () => {
   // Save and clear any test-provider env so isTestProviderEnabled() returns false.
   const savedEnv: Record<string, string | undefined> = {};
   beforeEach(() => {

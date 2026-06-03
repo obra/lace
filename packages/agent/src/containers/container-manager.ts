@@ -115,8 +115,8 @@ function formatMount(mount: ContainerMount): string {
 }
 
 /**
- * Observes container network lifecycle for gateway-routed (PRI-1919 transparent
- * egress) personas. The embedder wires this to emit `container_network_attached`
+ * Observes container network lifecycle for gateway-routed (transparent egress)
+ * personas. The embedder wires this to emit `container_network_attached`
  * / `container_network_detached` session updates so it can register/drop the
  * source-IP → identity mapping in lock-step with the container's lifetime.
  */
@@ -126,8 +126,8 @@ export interface ContainerNetworkLifecycleObserver {
     containerId: string;
     sourceIp: string;
     networkName: string;
-    // PRI-2002: per-job CDP unix-socket path on the shared host CDP dir, so the
-    // credential helper can reach this container's quarantined browser Chrome.
+    // Per-job CDP unix-socket path on the shared host CDP dir, so the credential
+    // helper can reach this container's quarantined browser Chrome.
     // Present only for browserCdpSocket-enabled specs.
     browserCdpSocketPath?: string;
   }): void;
@@ -143,8 +143,8 @@ export class ContainerManager {
   constructor(private readonly runtime: ContainerRuntime) {}
 
   /**
-   * Register the network lifecycle observer (PRI-1919). Late-bound because the
-   * manager is constructed before the session-update emitter exists.
+   * Register the network lifecycle observer. Late-bound because the manager is
+   * constructed before the session-update emitter exists.
    */
   setNetworkLifecycleObserver(observer: ContainerNetworkLifecycleObserver): void {
     this.networkObserver = observer;
@@ -172,8 +172,8 @@ export class ContainerManager {
         containerId,
         sourceIp,
         networkName: spec.network,
-        // PRI-2002: same path as the injected SEN_BROWSER_CDP_SOCKET env, so the
-        // credential helper reaches the same socket the in-container relay opens.
+        // Same path as the injected SEN_BROWSER_CDP_SOCKET env, so the credential
+        // helper reaches the same socket the in-container relay opens.
         // Only for browserCdpSocket-enabled specs; undefined otherwise.
         ...(spec.browserCdpSocket ? { browserCdpSocketPath: browserCdpSocketPath(spec.name) } : {}),
       });
@@ -243,8 +243,8 @@ export class ContainerManager {
       capAdd: spec.capAdd,
       network: spec.network,
       gatewayRoute: spec.gatewayRoute,
-      // PRI-2012 Root A selector fields — the ShimContainerRuntime reads these in
-      // create() to emit `spawn <persona> <parent> <child> <jobId>`.
+      // Selector fields — the ShimContainerRuntime reads these in create() to
+      // emit `spawn <persona> <parent> <child> <jobId>`.
       persona: spec.persona,
       parentSession: spec.parentSession,
       childSession: spec.childSession,
