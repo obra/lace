@@ -2,8 +2,11 @@
 // ABOUTME: Verifies provider lifecycle (build + cleanup) and response adaptation
 
 import { describe, it, expect, vi } from 'vitest';
-import type { ProviderMessage, ProviderResponse } from '@lace/agent/providers/base-provider';
-import type { AIProvider } from '@lace/agent/providers/base-provider';
+import type {
+  AIProvider,
+  ProviderMessage,
+  ProviderResponse,
+} from '@lace/agent/providers/base-provider';
 import { oneShotQuery } from '../one-shot-query';
 
 function makeStubProvider(opts: {
@@ -41,7 +44,7 @@ describe('oneShotQuery', () => {
 
     expect(result).toEqual({ text: 'SUMMARY', usage });
     expect(createProviderStub).toHaveBeenCalledWith({ connectionId: 'c', modelId: 'm' });
-    expect(provider.createResponse).toHaveBeenCalledWith(messages, [], 'm');
+    expect(provider.createResponse).toHaveBeenCalledWith(messages, [], 'm', undefined);
     expect(provider.cleanup).toHaveBeenCalledTimes(1);
   });
 
@@ -60,5 +63,20 @@ describe('oneShotQuery', () => {
     ).rejects.toThrow('LLM failure');
 
     expect(provider.cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards AbortSignal as the 4th argument to createResponse', async () => {
+    const usage = { promptTokens: 1, completionTokens: 1, totalTokens: 2 };
+    const provider = makeStubProvider({ responseContent: 'OK', usage });
+    const createProviderStub = vi.fn().mockResolvedValue(provider);
+
+    const controller = new AbortController();
+    const messages: ProviderMessage[] = [{ role: 'user', content: 'hi' }];
+    await oneShotQuery(
+      { connectionId: 'c', model: 'm', messages, signal: controller.signal },
+      { createProviderForTurn: createProviderStub }
+    );
+
+    expect(provider.createResponse).toHaveBeenCalledWith(messages, [], 'm', controller.signal);
   });
 });

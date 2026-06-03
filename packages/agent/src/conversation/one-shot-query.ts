@@ -29,7 +29,7 @@ export async function oneShotQuery(
   const factory = deps?.createProviderForTurn ?? defaultCreateProviderForTurn;
   const provider = await factory({ connectionId: opts.connectionId, modelId: opts.model });
   try {
-    const r = await provider.createResponse(opts.messages, [], opts.model);
+    const r = await provider.createResponse(opts.messages, [], opts.model, opts.signal);
     return { text: r.content, usage: r.usage };
   } finally {
     await provider.cleanup?.();
