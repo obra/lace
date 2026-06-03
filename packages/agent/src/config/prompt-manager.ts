@@ -78,7 +78,14 @@ export class PromptManager {
       }
 
       const context = await this.variableManager.getTemplateContext();
-      const prompt = this.templateEngine.render(`${persona}.md`, context);
+
+      // Plugin personas have no file on disk — their body lives in memory.
+      // personaPath starts with "plugin:" in that case; use the in-memory body
+      // so the same variable substitution applies without requiring a file read.
+      const isPluginPersona = personaPath.startsWith('plugin:');
+      const prompt = isPluginPersona
+        ? this.templateEngine.renderString(this.personaRegistry.parsePersona(persona).body, context)
+        : this.templateEngine.render(`${persona}.md`, context);
 
       logger.debug('System prompt generated successfully', {
         persona,

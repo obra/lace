@@ -38,6 +38,25 @@ export class TemplateEngine {
   }
 
   /**
+   * Render a template string directly (no file I/O) with the provided context.
+   * Applies the same @path include expansion and mustache substitution as `render`.
+   * Use this when the template body is already in memory (e.g. plugin-contributed
+   * personas whose body is registered at runtime rather than written to disk).
+   */
+  renderString(content: string, context: TemplateContext): string {
+    try {
+      this.processedIncludes.clear();
+      const processedContent = this.processIncludes(content, '.');
+      return mustache.render(processedContent, context);
+    } catch (error) {
+      logger.error('Failed to render template string', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.getFallbackContent('<string>');
+    }
+  }
+
+  /**
    * Load template content from embedded files or file system
    */
   private loadTemplate(templatePath: string): string {
