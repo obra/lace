@@ -176,7 +176,7 @@ const TAIL_TURNS = 10;
  */
 export async function compact(
   events: TypedDurableEvent[],
-  ctx: CompactionContext
+  _ctx: CompactionContext
 ): Promise<CompactResult> {
   const { earlier, tail } = splitAtTailBoundary(events, TAIL_TURNS);
 

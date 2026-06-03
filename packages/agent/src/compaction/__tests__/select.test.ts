@@ -1,5 +1,5 @@
 // ABOUTME: Tests for compactionBreakpointsForSession — default and persona-override paths
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Breakpoint } from '../select';
 
 // Mock the two external dependencies so we don't need real files or a registry

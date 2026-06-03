@@ -7,7 +7,7 @@
 // mock compactionBreakpointsForSession so the runner wiring tests do not depend
 // on the singleton personaRegistry seeing test-specific persona files.
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -27,7 +27,6 @@ import type { Tool } from '@lace/agent/tools/tool';
 import { ToolExecutor } from '@lace/agent/tools/executor';
 import { registerBuiltinTools } from '@lace/agent/tools/builtins';
 import { resetRegistriesForTest } from '@lace/agent/plugins';
-import type { Breakpoint } from '@lace/agent/compaction/select';
 
 // ---------------------------------------------------------------------------
 // Mock compactionBreakpointsForSession so persona file loading is not required

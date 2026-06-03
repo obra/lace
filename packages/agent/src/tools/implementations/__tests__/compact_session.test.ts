@@ -77,7 +77,7 @@ describe('CompactSessionTool', () => {
       const ctx = makeCtx();
       const result = await tool.execute({ guidance: 'keep notes' }, ctx);
       const text = result.content[0].text ?? '';
-      expect(text).not.toMatch(/  /); // no double space
+      expect(text).not.toMatch(/ {2}/); // no double space
     });
   });
 
@@ -94,7 +94,7 @@ describe('CompactSessionTool', () => {
       const ctx = makeCtx();
       const result = await tool.execute({}, ctx);
       const text = result.content[0].text ?? '';
-      expect(text).not.toMatch(/  /); // no double space
+      expect(text).not.toMatch(/ {2}/); // no double space
     });
   });
 

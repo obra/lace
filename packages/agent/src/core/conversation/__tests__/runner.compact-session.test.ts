@@ -3,7 +3,7 @@
 // ABOUTME: post-turn block to fire compaction (even at low pressure) and that
 // ABOUTME: guidance flows into buildCompactionContext.
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
