@@ -218,19 +218,30 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(materializedSpec.gatewayRoute).toBe('172.31.250.1');
   });
 
-  it('omits docker authority fields from selector persona specs', async () => {
+  it('rejects mixed selector and docker authority descriptor specs', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.persona = 'browser-driver';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await expect(
+      runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd })
+    ).rejects.toThrow(/selector.*authority|authority.*selector/i);
+    expect(manager.materialize).not.toHaveBeenCalled();
+  });
+
+  it('omits docker authority fields from selector-only persona specs', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    delete projectedDescriptor.spec.containerId;
     projectedDescriptor.spec.persona = 'browser-driver';
     projectedDescriptor.spec.parentSession = 'sess_parent_projected';
     projectedDescriptor.spec.childSession = 'sess_child_projected';
     projectedDescriptor.spec.jobId = 'job_projected';
-    projectedDescriptor.spec.ports = [{ host: 7777, container: 7777 }];
-    projectedDescriptor.spec.restartPolicy = 'unless-stopped';
-    projectedDescriptor.spec.sysctls = { 'net.ipv6.conf.lo.disable_ipv6': '0' };
-    projectedDescriptor.spec.capAdd = ['NET_ADMIN'];
-    projectedDescriptor.spec.network = 'quarantine';
-    projectedDescriptor.spec.gatewayRoute = '172.31.250.1';
     const runtime = new ProjectedContainerToolRuntime({
       id: 'rt_container',
       containerManager: manager,
@@ -246,6 +257,7 @@ describe('ProjectedContainerToolRuntime', () => {
       childSession: 'sess_child_projected',
       jobId: 'job_projected',
     });
+    expect(materializedSpec.containerId).toBeUndefined();
     expect(materializedSpec.ports).toBeUndefined();
     expect(materializedSpec.restartPolicy).toBeUndefined();
     expect(materializedSpec.sysctls).toBeUndefined();

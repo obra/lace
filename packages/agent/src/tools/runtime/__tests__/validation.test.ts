@@ -1,6 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { buildDefaultBoundedHostRuntimeBinding, parseRuntimeExecutionBinding } from '../validation';
 
+function containerBinding(specExtra: Record<string, unknown> = {}): unknown {
+  return {
+    schemaVersion: 1,
+    identity: { runtimeId: 'rt_container' },
+    toolRuntime: {
+      type: 'container',
+      cwd: '/work',
+      spec: {
+        name: 'sess1-box',
+        image: 'sen-box:dev',
+        workingDirectory: '/work',
+        mounts: [],
+        ...specExtra,
+      },
+    },
+  };
+}
+
 describe('runtime binding validation', () => {
   it('defaults missing host state to boundedHost runtime', () => {
     expect(
@@ -129,20 +147,74 @@ describe('runtime binding validation', () => {
 
   it('accepts projected container binding with a tag-only image reference', () => {
     expect(() =>
-      parseRuntimeExecutionBinding({
-        schemaVersion: 1,
-        identity: { runtimeId: 'rt_container_tag' },
-        toolRuntime: {
-          type: 'container',
-          cwd: '/workspace',
-          spec: {
-            name: 'proj',
-            image: 'sen-box:dev',
-            workingDirectory: '/workspace',
-            mounts: [],
-          },
-        },
-      })
+      parseRuntimeExecutionBinding(
+        containerBinding({
+          name: 'proj',
+          workingDirectory: '/workspace',
+        })
+      )
+    ).not.toThrow();
+  });
+
+  it('rejects selector specs mixed with ports authority', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding(
+        containerBinding({
+          persona: 'browser-driver',
+          ports: [{ host: 7777, container: 7777 }],
+        })
+      )
+    ).toThrow(/selector.*authority|authority.*selector/i);
+  });
+
+  it('rejects jobId-only selector specs mixed with network authority', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding(
+        containerBinding({
+          jobId: 'job_projected',
+          network: 'quarantine',
+        })
+      )
+    ).toThrow(/selector.*authority|authority.*selector/i);
+  });
+
+  it('rejects selector specs mixed with explicit containerId authority', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding(
+        containerBinding({
+          parentSession: 'sess_parent_projected',
+          containerId: 'container_123',
+        })
+      )
+    ).toThrow(/selector.*authority|authority.*selector/i);
+  });
+
+  it('accepts selector-only projected container specs', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding(
+        containerBinding({
+          persona: 'browser-driver',
+          parentSession: 'sess_parent_projected',
+          childSession: 'sess_child_projected',
+          jobId: 'job_projected',
+        })
+      )
+    ).not.toThrow();
+  });
+
+  it('accepts generic authority-only projected container specs', () => {
+    expect(() =>
+      parseRuntimeExecutionBinding(
+        containerBinding({
+          containerId: 'container_123',
+          ports: [{ host: 7777, container: 7777 }],
+          restartPolicy: 'unless-stopped',
+          sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
+          capAdd: ['NET_ADMIN'],
+          network: 'quarantine',
+          gatewayRoute: '172.31.250.1',
+        })
+      )
     ).not.toThrow();
   });
 

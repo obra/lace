@@ -54,6 +54,17 @@ type ContainerToolRuntimeDescriptor = Extract<ToolRuntimeDescriptor, { type: 'co
 
 export type ProjectedContainerToolRuntimeDescriptor = Omit<ContainerToolRuntimeDescriptor, 'type'>;
 
+const CONTAINER_SELECTOR_FIELDS = ['persona', 'parentSession', 'childSession', 'jobId'] as const;
+const CONTAINER_AUTHORITY_FIELDS = [
+  'containerId',
+  'ports',
+  'restartPolicy',
+  'sysctls',
+  'capAdd',
+  'network',
+  'gatewayRoute',
+] as const;
+
 interface ProjectedContainerSecretContext {
   runtimeId: string;
   sessionId?: string;
@@ -165,10 +176,26 @@ function definedEnvironment(
   return Object.keys(environment).length > 0 ? environment : undefined;
 }
 
+function hasDefinedField(value: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, field) && value[field] !== undefined;
+}
+
+function assertNoMixedSelectorAuthority(
+  spec: ProjectedContainerToolRuntimeDescriptor['spec']
+): void {
+  const record = spec as Record<string, unknown>;
+  const hasSelector = CONTAINER_SELECTOR_FIELDS.some((field) => hasDefinedField(record, field));
+  const hasAuthority = CONTAINER_AUTHORITY_FIELDS.some((field) => hasDefinedField(record, field));
+  if (!hasSelector || !hasAuthority) return;
+
+  throw new Error('Container selector fields cannot be combined with docker authority fields');
+}
+
 async function containerSpecFromDescriptor(
   descriptor: ProjectedContainerToolRuntimeDescriptor,
   secretContext: ProjectedContainerSecretContext
 ): Promise<{ spec: ContainerSpec; hooks?: ContainerLifecycleHooks }> {
+  assertNoMixedSelectorAuthority(descriptor.spec);
   const secretEntries = Object.entries(descriptor.spec.secretEnv ?? {});
   const resolvedSecrets =
     secretEntries.length === 0

@@ -2,6 +2,21 @@ import { z } from 'zod';
 import { buildRuntimeId } from './identity';
 import type { RuntimeExecutionBinding } from './types';
 
+const CONTAINER_SELECTOR_FIELDS = ['persona', 'parentSession', 'childSession', 'jobId'] as const;
+const CONTAINER_AUTHORITY_FIELDS = [
+  'containerId',
+  'ports',
+  'restartPolicy',
+  'sysctls',
+  'capAdd',
+  'network',
+  'gatewayRoute',
+] as const;
+
+function hasDefinedField(value: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, field) && value[field] !== undefined;
+}
+
 const RuntimeSecretReferenceSchema = z
   .object({
     namespace: z.enum(['session', 'project', 'host-service']),
@@ -65,7 +80,19 @@ const ContainerRuntimeDescriptorSchema = z
         childSession: z.string().min(1).optional(),
         jobId: z.string().min(1).optional(),
       })
-      .strict(),
+      .strict()
+      .superRefine((spec, ctx) => {
+        const hasSelector = CONTAINER_SELECTOR_FIELDS.some((field) => hasDefinedField(spec, field));
+        const hasAuthority = CONTAINER_AUTHORITY_FIELDS.some((field) =>
+          hasDefinedField(spec, field)
+        );
+        if (!hasSelector || !hasAuthority) return;
+
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Container selector fields cannot be combined with docker authority fields',
+        });
+      }),
     helper: z
       .object({
         mode: z.enum(['copy', 'mount', 'image']),
