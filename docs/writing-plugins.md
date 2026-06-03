@@ -78,8 +78,14 @@ available to the agent and every subagent.
 
 ## Contributing the other kinds
 
-The pattern is identical — register into a different `api` field. Full type shapes
-are in the [reference](reference/plugins.md#entry-type-contracts); the essentials:
+A single `register(api)` may register **any number** of entries — call
+`api.tools.register(name, instance)` once per tool. Bundling several related tools
+into one **toolset** plugin (e.g. `acme/parse`, `acme/compare`, `acme/bump`) is a
+common, encouraged shape.
+
+Registering into a *different* registry is the same pattern — just a different
+`api` field. Full type shapes are in the
+[reference](reference/plugins.md#entry-type-contracts); the essentials:
 
 ### A compaction strategy
 
