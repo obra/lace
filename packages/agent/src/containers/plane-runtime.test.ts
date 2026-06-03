@@ -17,6 +17,7 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 import { PlaneRuntime, type PlaneRunner } from './plane-runtime';
+import { ContainerError, ContainerNotFoundError } from './types';
 import type { PlaneSpawnRequest } from './types';
 
 interface FakeChild {
@@ -139,10 +140,11 @@ describe('PlaneRuntime', () => {
     const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
     const id = await rt.create(spawnRequest());
 
+    run.mockClear();
     await rt.start(id);
+    expect(run).not.toHaveBeenCalled();
 
-    expect(rt.inspect(id).state).toBe('running');
-    expect(run).toHaveBeenCalledTimes(1);
+    await expect(rt.inspect(id)).resolves.toMatchObject({ state: 'running' });
   });
 
   it('start rejects stopped cached containers without changing cached state', async () => {
@@ -154,11 +156,12 @@ describe('PlaneRuntime', () => {
     const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
     const id = await rt.create(spawnRequest());
     await rt.stop(id);
+    run.mockClear();
 
     await expect(rt.start(id)).rejects.toThrow(/cannot start stopped plane container/i);
+    expect(run).not.toHaveBeenCalled();
 
-    expect(rt.inspect(id).state).toBe('stopped');
-    expect(run).toHaveBeenCalledTimes(2);
+    await expect(rt.inspect(id)).resolves.toMatchObject({ state: 'stopped' });
   });
 
   it('start rejects unknown container ids', async () => {
@@ -189,7 +192,7 @@ describe('PlaneRuntime', () => {
       'sess_child',
       'job_1',
     ]);
-    expect(rt.inspect('sen-x-adopt').state).toBe('running');
+    await expect(rt.inspect('sen-x-adopt')).resolves.toMatchObject({ state: 'running' });
   });
 
   it('exec emits the buffered plane exec verb with workdir and env args', async () => {
@@ -387,21 +390,24 @@ describe('PlaneRuntime', () => {
   });
 
   it('stop and remove go through the plane client and update cache', async () => {
-    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
-      stdout: 'sen-x-rm\n',
-      stderr: '',
-      exitCode: 0,
-    });
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'sen-x-rm\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'exited\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'sha256:abc123\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: '', stderr: 'no such container: sen-x-rm', exitCode: 1 });
     const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
     const id = await rt.create(spawnRequest());
 
     await rt.stop(id);
-    expect(rt.inspect(id).state).toBe('stopped');
+    await expect(rt.inspect(id)).resolves.toMatchObject({ state: 'stopped' });
 
     await rt.remove(id);
-    expect(() => rt.inspect(id)).toThrow(/Container not found/);
+    await expect(rt.inspect(id)).rejects.toThrow(/Container not found/);
     expect(run).toHaveBeenNthCalledWith(2, ['stop', id]);
-    expect(run).toHaveBeenNthCalledWith(3, ['rm', '-f', id]);
+    expect(run).toHaveBeenNthCalledWith(5, ['rm', '-f', id]);
   });
 
   it('stop translates timeout milliseconds to whole seconds', async () => {
@@ -416,5 +422,112 @@ describe('PlaneRuntime', () => {
     await rt.stop(id, 2500);
 
     expect(run).toHaveBeenLastCalledWith(['stop', '-t', '2', id]);
+  });
+
+  it('inspect uses closed plane query keys, maps running, and preserves cached mounts', async () => {
+    const mounts = [{ source: '/host/work', target: '/work' }];
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'sen-x-inspect\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'running\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'sha256:abc123\n', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create({ ...spawnRequest(), mounts } as never);
+
+    await expect(rt.inspect(id)).resolves.toEqual({
+      id,
+      state: 'running',
+      mounts,
+    });
+
+    expect(run).toHaveBeenNthCalledWith(2, ['inspect', 'state', id]);
+    expect(run).toHaveBeenNthCalledWith(3, ['inspect', 'image', id]);
+  });
+
+  it('daemonInspect discovers an owned container that is not in cache', async () => {
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'created\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'sha256:abc123\n', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+    await expect(rt.daemonInspect('sen-x-owned')).resolves.toEqual({
+      id: 'sen-x-owned',
+      state: 'created',
+    });
+
+    expect(run).toHaveBeenNthCalledWith(1, ['inspect', 'state', 'sen-x-owned']);
+    expect(run).toHaveBeenNthCalledWith(2, ['inspect', 'image', 'sen-x-owned']);
+  });
+
+  it.each([
+    ['no-such', 'no such container: sen-x-missing'],
+    ['unowned', 'container is not owned by this agent'],
+  ])(
+    'inspect throws ContainerNotFoundError for %s plane inspect errors',
+    async (_label, stderr) => {
+      const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+        stdout: '',
+        stderr,
+        exitCode: 1,
+      });
+      const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+      await expect(rt.inspect('sen-x-missing')).rejects.toThrow(ContainerNotFoundError);
+    }
+  );
+
+  it.each([
+    ['no-such', 'no such container: sen-x-missing'],
+    ['unowned', 'container is not owned by this agent'],
+  ])('daemonInspect returns null for %s plane inspect errors', async (_label, stderr) => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: '',
+      stderr,
+      exitCode: 1,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+    await expect(rt.daemonInspect('sen-x-missing')).resolves.toBeNull();
+  });
+
+  it('inspect throws ContainerError for other plane inspect failures', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: '',
+      stderr: 'plane socket unavailable',
+      exitCode: 2,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+    await expect(rt.inspect('sen-x-error')).rejects.toThrow(ContainerError);
+    await expect(rt.inspect('sen-x-error')).rejects.not.toThrow(ContainerNotFoundError);
+  });
+
+  it('daemonInspect throws ContainerError for other plane inspect failures', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: '',
+      stderr: 'plane socket unavailable',
+      exitCode: 2,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+    await expect(rt.daemonInspect('sen-x-error')).rejects.toThrow(ContainerError);
+    await expect(rt.daemonInspect('sen-x-error')).rejects.not.toThrow(ContainerNotFoundError);
+  });
+
+  it.each([
+    ['exited', 'stopped'],
+    ['paused', 'failed'],
+  ])('maps plane state %s to %s', async (planeState, containerState) => {
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: `${planeState}\n`, stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'sha256:abc123\n', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+    await expect(rt.daemonInspect(`sen-x-${planeState}`)).resolves.toEqual({
+      id: `sen-x-${planeState}`,
+      state: containerState,
+    });
   });
 });

@@ -303,12 +303,18 @@ export class PlaneRuntime implements ContainerRuntime {
     };
   }
 
-  inspect(containerId: string): ContainerInfo {
-    const info = this.containers.get(containerId);
-    if (!info) {
-      throw new ContainerNotFoundError(containerId);
+  async inspect(containerId: string): Promise<ContainerInfo> {
+    try {
+      return await this.inspectPlaneContainer(containerId, { updateCache: true });
+    } catch (error) {
+      if (error instanceof ContainerNotFoundError) throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContainerError(
+        `Failed to inspect plane container: ${message}`,
+        containerId,
+        error instanceof Error ? error : undefined
+      );
     }
-    return info;
   }
 
   async list(): Promise<ContainerInfo[]> {
@@ -317,10 +323,15 @@ export class PlaneRuntime implements ContainerRuntime {
 
   async daemonInspect(containerId: string): Promise<ContainerInfo | null> {
     try {
-      return this.inspect(containerId);
+      return await this.inspectPlaneContainer(containerId);
     } catch (error) {
       if (error instanceof ContainerNotFoundError) return null;
-      throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ContainerError(
+        `Failed to daemon-inspect plane container: ${message}`,
+        containerId,
+        error instanceof Error ? error : undefined
+      );
     }
   }
 
@@ -366,5 +377,56 @@ export class PlaneRuntime implements ContainerRuntime {
   private isTimeoutError(error: unknown): boolean {
     const err = error as ExecFileError;
     return err.killed === true || err.signal === 'SIGTERM';
+  }
+
+  private async inspectPlaneContainer(
+    containerId: string,
+    options: { updateCache?: boolean } = {}
+  ): Promise<ContainerInfo> {
+    const state = await this.inspectQuery(containerId, 'state');
+    await this.inspectQuery(containerId, 'image');
+
+    const cached = this.containers.get(containerId);
+    const info: ContainerInfo = {
+      id: containerId,
+      state: this.mapPlaneState(state, cached?.state),
+    };
+    if (cached?.mounts) {
+      info.mounts = cached.mounts;
+    }
+    if (options.updateCache && cached) {
+      this.containers.set(containerId, { ...cached, ...info });
+    }
+    return info;
+  }
+
+  private async inspectQuery(containerId: string, key: 'state' | 'image'): Promise<string> {
+    const result = await this.runner.run(['inspect', key, containerId]);
+    if (result.exitCode === 0) {
+      return result.stdout.trim();
+    }
+    const detail = result.stderr || `exit code ${result.exitCode}`;
+    if (this.isPlaneNotFoundError(detail)) {
+      throw new ContainerNotFoundError(containerId);
+    }
+    throw new ContainerError(`plane inspect ${key} failed: ${detail}`, containerId);
+  }
+
+  private mapPlaneState(statusText: string, cachedState?: ContainerState): ContainerState {
+    const status = statusText.trim().toLowerCase();
+    if (status === 'running') return 'running';
+    if (status === 'created') return 'created';
+    if (status === 'exited' || status === 'dead' || status === 'removing') return 'stopped';
+    if (status === '') return cachedState ?? 'failed';
+    return cachedState ?? 'failed';
+  }
+
+  private isPlaneNotFoundError(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('no such container') ||
+      normalized.includes('not owned') ||
+      normalized.includes('unowned')
+    );
   }
 }
