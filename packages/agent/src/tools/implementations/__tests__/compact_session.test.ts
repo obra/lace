@@ -5,10 +5,19 @@ import { describe, it, expect } from 'vitest';
 import { CompactSessionTool } from '../compact_session';
 import type { ToolContext } from '@lace/agent/tools/types';
 
+/** Mirrors what the runner does: seed a mutable compactionRequest cell. */
 function makeCtx(overrides: Partial<ToolContext> = {}): ToolContext {
   return {
     signal: new AbortController().signal,
+    compactionRequest: { requested: false },
     ...overrides,
+  } as ToolContext;
+}
+
+/** Context without a compactionRequest cell — simulates a runner bug. */
+function makeCtxNoCell(): ToolContext {
+  return {
+    signal: new AbortController().signal,
   } as ToolContext;
 }
 
@@ -39,6 +48,13 @@ describe('CompactSessionTool', () => {
     expect(result.status).toBe('failed');
   });
 
+  it('schema rejects unknown keys (.strict())', async () => {
+    const tool = new CompactSessionTool();
+    const ctx = makeCtx();
+    const result = await tool.execute({ unknownKey: 'oops' } as Record<string, unknown>, ctx);
+    expect(result.status).toBe('failed');
+  });
+
   describe('execute with guidance', () => {
     it('sets ctx.compactionRequest.requested = true and preserves guidance', async () => {
       const tool = new CompactSessionTool();
@@ -55,6 +71,14 @@ describe('CompactSessionTool', () => {
       expect(text.toLowerCase()).toContain('end your turn');
       expect(text.toLowerCase()).toMatch(/schedul/);
     });
+
+    it('result message has no double space', async () => {
+      const tool = new CompactSessionTool();
+      const ctx = makeCtx();
+      const result = await tool.execute({ guidance: 'keep notes' }, ctx);
+      const text = result.content[0].text ?? '';
+      expect(text).not.toMatch(/  /); // no double space
+    });
   });
 
   describe('execute without guidance', () => {
@@ -63,6 +87,14 @@ describe('CompactSessionTool', () => {
       const ctx = makeCtx();
       await tool.execute({}, ctx);
       expect(ctx.compactionRequest).toEqual({ requested: true });
+    });
+
+    it('result message has no double space', async () => {
+      const tool = new CompactSessionTool();
+      const ctx = makeCtx();
+      const result = await tool.execute({}, ctx);
+      const text = result.content[0].text ?? '';
+      expect(text).not.toMatch(/  /); // no double space
     });
   });
 
@@ -77,16 +109,28 @@ describe('CompactSessionTool', () => {
     expect(result.content[0].type).toBe('text');
   });
 
-  it('handles absent compactionRequest on ctx gracefully (still returns sensible message)', async () => {
-    // At runtime the runner always injects the cell, but the tool must be robust
-    // if ctx.compactionRequest is somehow absent.
-    const tool = new CompactSessionTool();
-    // Pass a ctx without compactionRequest pre-seeded (default makeCtx has none).
-    const ctx = makeCtx();
-    const result = await tool.execute({}, ctx);
-    expect(result.status).toBe('completed');
-    const text = result.content[0].text ?? '';
-    expect(text.length).toBeGreaterThan(0);
+  describe('absent compactionRequest cell (runner bug guard)', () => {
+    it('returns a failure result — does not pretend to succeed', async () => {
+      const tool = new CompactSessionTool();
+      const ctx = makeCtxNoCell();
+      const result = await tool.execute({}, ctx);
+      expect(result.status).toBe('failed');
+    });
+
+    it('does NOT fabricate ctx.compactionRequest', async () => {
+      const tool = new CompactSessionTool();
+      const ctx = makeCtxNoCell();
+      await tool.execute({}, ctx);
+      expect(ctx.compactionRequest).toBeUndefined();
+    });
+
+    it('failure message explains the problem', async () => {
+      const tool = new CompactSessionTool();
+      const ctx = makeCtxNoCell();
+      const result = await tool.execute({}, ctx);
+      const text = result.content[0].text ?? '';
+      expect(text.toLowerCase()).toContain('compaction could not be scheduled');
+    });
   });
 
   it('annotations mark it as safeInternal', () => {
