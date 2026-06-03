@@ -43,6 +43,21 @@ export interface PluginApi {
   personas: PluginRegistrar<PersonaDef>;
 }
 
+/**
+ * The shape a plugin module must satisfy. Export `register` (required),
+ * `meta` (recommended), and `manifest` (required when declaring capabilities).
+ *
+ * Usage:
+ *   const _: PluginModule = { meta, manifest, register }; // type-check
+ *   // or (TypeScript 4.9+):
+ *   export { meta, manifest, register } satisfies PluginModule;
+ */
+export interface PluginModule {
+  register(api: PluginApi): void;
+  meta?: PluginMeta;
+  manifest?: import('./manifest').CapabilityManifest;
+}
+
 export function makeRegistries(): PluginRegistries {
   return {
     tools: new Registry<Tool>('tools'),

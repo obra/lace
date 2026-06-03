@@ -12,6 +12,7 @@ export {
   type PluginRegistries,
   type PluginRegistrar,
   type PersonaDef,
+  type PluginModule,
 } from './api';
 export {
   recordManifest,
