@@ -328,7 +328,7 @@ describe('DockerContainerRuntime', () => {
       await runtime.remove(id);
 
       expect(findCallWithSubcommand('rm')).toEqual(['rm', '-f', id]);
-      expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
+      expect(() => runtime.inspect(id)).toThrow(ContainerNotFoundError);
     });
 
     it('remove cleans local state even if docker reports no-such-container', async () => {
@@ -349,7 +349,7 @@ describe('DockerContainerRuntime', () => {
       ]);
 
       await runtime.remove(id);
-      expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
+      expect(() => runtime.inspect(id)).toThrow(ContainerNotFoundError);
     });
 
     it('start throws ContainerNotFoundError on unknown container id', async () => {
@@ -1099,10 +1099,6 @@ describe('DockerContainerRuntime', () => {
       const info = runtime.inspect('sen-box-shell');
       expect(info.id).toBe('sen-box-shell');
       expect(info.state).toBe('running');
-      // Mount registration is in place.
-      expect(runtime.translateToContainer('/host/work/index.ts', 'sen-box-shell')).toBe(
-        '/work/index.ts'
-      );
     });
 
     it('throws when config.id is missing', async () => {
@@ -1190,23 +1186,6 @@ describe('DockerContainerRuntime', () => {
           'running'
         )
       ).rejects.toBeInstanceOf(ContainerError);
-    });
-  });
-
-  describe('translateToContainer / translateToHost', () => {
-    it('translates host paths to container paths via registered mounts', async () => {
-      const id = await runtime.create({
-        name: 'paths',
-        image: 'alpine:latest',
-        workingDirectory: '/workspace',
-        mounts: [{ source: '/host/proj', target: '/workspace' }],
-      });
-      expect(runtime.translateToContainer('/host/proj/src/index.ts', id)).toBe(
-        '/workspace/src/index.ts'
-      );
-      expect(runtime.translateToHost('/workspace/src/index.ts', id)).toBe(
-        '/host/proj/src/index.ts'
-      );
     });
   });
 });

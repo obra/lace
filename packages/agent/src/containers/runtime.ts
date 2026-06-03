@@ -12,8 +12,6 @@ import {
   ContainerState,
   ContainerNotFoundError,
 } from './types';
-import { logger } from '@lace/agent/utils/logger';
-import { join } from 'path';
 
 export abstract class BaseContainerRuntime implements ContainerRuntime {
   protected containers = new Map<string, ContainerInfo>();
@@ -69,47 +67,6 @@ export abstract class BaseContainerRuntime implements ContainerRuntime {
 
   list(): Promise<ContainerInfo[]> {
     return Promise.resolve(Array.from(this.containers.values()));
-  }
-
-  translateToContainer(hostPath: string, containerId: string): string {
-    const mounts = this.mountMap.get(containerId);
-    if (!mounts) {
-      throw new ContainerNotFoundError(containerId);
-    }
-
-    // Find the mount point that contains this path
-    for (const [hostMount, containerMount] of mounts.entries()) {
-      if (hostPath.startsWith(hostMount)) {
-        const relativePath = hostPath.slice(hostMount.length);
-        // Handle exact mount point (no relative path)
-        if (relativePath === '') {
-          return containerMount + '/';
-        }
-        return join(containerMount, relativePath);
-      }
-    }
-
-    // No mount found - path is not accessible in container
-    logger.warn('Path not accessible in container', { hostPath, containerId });
-    return hostPath; // Return as-is, will fail in container
-  }
-
-  translateToHost(containerPath: string, containerId: string): string {
-    const mounts = this.mountMap.get(containerId);
-    if (!mounts) {
-      throw new ContainerNotFoundError(containerId);
-    }
-
-    // Reverse lookup: find container mount that contains this path
-    for (const [hostMount, containerMount] of mounts.entries()) {
-      if (containerPath.startsWith(containerMount)) {
-        const relativePath = containerPath.slice(containerMount.length);
-        return join(hostMount, relativePath);
-      }
-    }
-
-    logger.warn('Container path has no host mapping', { containerPath, containerId });
-    return containerPath; // Return as-is
   }
 
   protected updateContainerState(containerId: string, state: ContainerState): void {

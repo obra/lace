@@ -161,10 +161,6 @@ export interface ContainerRuntime {
    * implement it; ContainerManager treats its absence as "no source IP".
    */
   inspectNetworkIp?(containerId: string, networkName: string): Promise<string | undefined>;
-
-  // Path translation
-  translateToContainer(hostPath: string, containerId: string): string;
-  translateToHost(containerPath: string, containerId: string): string;
 }
 
 export class ContainerError extends Error {
