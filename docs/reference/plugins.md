@@ -64,6 +64,10 @@ export function register(api: PluginApi): void {
 export default { meta, register } satisfies PluginModule;
 ```
 
+Prefer the `satisfies PluginModule` form for the compile-time check. (Some older
+examples assign to a throwaway `const _typeCheck: PluginModule = …; void _typeCheck;`
+to work around stub types — `satisfies` is cleaner when your values are fully typed.)
+
 `PluginMeta`:
 
 ```ts
@@ -246,6 +250,25 @@ To invoke a tool directly (e.g. in a test), call its **public** `execute`
 ToolContext)`. `ToolContext` has many optional fields; the only **required** one
 is `signal: AbortSignal`. A minimal context is
 `{ signal: new AbortController().signal, persona: 'researcher' }`.
+
+Useful `ToolContext` fields for real tools (all optional except `signal`):
+
+| Field | Use |
+| --- | --- |
+| `signal: AbortSignal` | **required** — cancellation |
+| `persona?: string` | authoritative session identity (the keystone) |
+| `workingDirectory?: string` | session cwd — resolve relative paths against it, fall back to `process.cwd()` |
+| `threadId?` / `projectId?` | session/project identity metadata |
+| `toolTempDir?: string` | per-call scratch dir (via `getToolTempDir(ctx)`) |
+| `processEnv?: NodeJS.ProcessEnv` | env for subprocess execution |
+
+**Result helpers** (what they return — assert these in tests):
+
+```ts
+this.createResult(text)  // → { status: 'completed', content: [{ type: 'text', text }] }
+this.createError(text)   // → { status: 'failed',    content: [{ type: 'text', text }] }
+// read the body in a test as: result.content[0].text ; check result.status
+```
 
 ### CompactionStrategy (`@lace/agent/compaction/types`)
 
