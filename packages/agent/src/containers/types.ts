@@ -8,11 +8,7 @@ export interface PortMapping {
   container: number;
 }
 
-export interface ContainerConfig {
-  // Container identification (optional - will be generated if not provided)
-  id?: string;
-  name?: string;
-
+export interface DockerCreateConfig {
   // Image to run. Required: every container must know its image at create time.
   image: string;
 
@@ -60,16 +56,26 @@ export interface ContainerConfig {
   // The persona container itself does NOT need NET_ADMIN — the sidecar holds
   // the privilege and exits immediately. Transparent egress gateway.
   gatewayRoute?: string;
+}
 
-  // SELECTOR fields carried from ContainerSpec. The ShimContainerRuntime's
-  // create() emits `spawn <persona> <parent> <child> <jobId>` from these
-  // instead of a full `docker create` argv. SELECTOR ONLY; DockerContainerRuntime
-  // ignores them.
-  persona?: string;
+export interface PlaneSpawnRequest {
+  // Container identity fields may be supplied by ContainerManager for fallback naming.
+  id?: string;
+  name?: string;
+
+  // Selector fields for plane spawn: `spawn <persona> <parent> <child> <jobId>`.
+  persona: string;
   parentSession?: string;
   childSession?: string;
   jobId?: string;
 }
+
+export type ContainerConfig = DockerCreateConfig &
+  Partial<PlaneSpawnRequest> & {
+    // Container identification (optional - will be generated if not provided)
+    id?: string;
+    name?: string;
+  };
 
 export interface ContainerMount {
   source: string; // Host path

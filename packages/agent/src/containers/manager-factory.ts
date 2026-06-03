@@ -4,24 +4,15 @@
 import { logger } from '@lace/agent/utils/logger';
 import { ContainerManager } from './container-manager';
 import { DockerContainerRuntime } from './docker-container';
-import { ShimContainerRuntime } from './shim-container-runtime';
+import { PlaneRuntime } from './plane-runtime';
 import { AppleContainerRuntime } from './apple-container';
 import { registries } from '@lace/agent/plugins';
 import type { ContainerRuntime } from './types';
 
 export const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
-// When set, lace drives an external docker shim instead of docker directly. The value
-// is the wrapper binary that the runtime shells out to. Unset = direct docker.
 const DOCKER_BIN_ENV = 'LACE_DOCKER_BIN';
 
-// The docker-backed runtime: the external shim when LACE_DOCKER_BIN is set
-// (create()->spawn over the wrapper), else direct DockerContainerRuntime.
 function makeDockerRuntime(): ContainerRuntime {
-  const shimBin = process.env[DOCKER_BIN_ENV]?.trim();
-  if (shimBin) {
-    logger.info('containers.manager_factory.shim', { dockerBin: shimBin });
-    return new ShimContainerRuntime(shimBin);
-  }
   return new DockerContainerRuntime();
 }
 
@@ -57,13 +48,23 @@ function makeLazyRuntime(factory: () => ContainerRuntime): ContainerRuntime {
  * side-effects (async daemon start) when running on Linux.
  */
 export function registerBuiltinRuntimes(): void {
-  if (registries.runtimes.has('docker')) return;
-  registries.runtimes.register('docker', makeDockerRuntime(), 'builtin');
-  registries.runtimes.register(
-    'apple',
-    makeLazyRuntime(() => new AppleContainerRuntime()),
-    'builtin'
-  );
+  if (!registries.runtimes.has('docker')) {
+    registries.runtimes.register('docker', makeDockerRuntime(), 'builtin');
+  }
+
+  const planeBin = process.env[DOCKER_BIN_ENV]?.trim();
+  if (planeBin && !registries.runtimes.has('plane')) {
+    logger.info('containers.manager_factory.plane', { dockerBin: planeBin });
+    registries.runtimes.register('plane', new PlaneRuntime(planeBin), 'builtin');
+  }
+
+  if (!registries.runtimes.has('apple')) {
+    registries.runtimes.register(
+      'apple',
+      makeLazyRuntime(() => new AppleContainerRuntime()),
+      'builtin'
+    );
+  }
 }
 
 export function createDefaultContainerManager(

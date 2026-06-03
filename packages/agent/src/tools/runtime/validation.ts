@@ -57,9 +57,9 @@ const ContainerRuntimeDescriptorSchema = z
         // IPv4 address of the egress gateway for the post-start
         // netns-init sidecar. Validated as a non-empty string (loose IPv4).
         gatewayRoute: z.string().min(1).optional(),
-        // Root A SELECTOR fields — carried for the ShimContainerRuntime's
-        // create()->spawn. MUST be in this .strict() schema or a shim binding fails
-        // validation (bug-#7 class). SELECTOR ONLY; the shim re-validates persona.
+        // Root A SELECTOR fields — carried for PlaneRuntime's create()->spawn.
+        // MUST be in this .strict() schema or a plane binding fails validation
+        // (bug-#7 class). SELECTOR ONLY; the plane re-validates persona.
         persona: z.string().min(1).optional(),
         parentSession: z.string().min(1).optional(),
         childSession: z.string().min(1).optional(),

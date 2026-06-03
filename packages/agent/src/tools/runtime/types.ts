@@ -70,8 +70,8 @@ export type ToolRuntimeDescriptor =
         // sidecar sets the persona's default route after start.
         gatewayRoute?: string;
         // Root A SELECTOR fields — carried across the wire for the
-        // ShimContainerRuntime's create()->spawn. SELECTOR ONLY; the shim
-        // re-validates persona against its closed enum + rebuilds the spec.
+        // PlaneRuntime's create()->spawn. SELECTOR ONLY; the plane re-validates
+        // persona against its closed enum + rebuilds the spec.
         persona?: string;
         parentSession?: string;
         childSession?: string;

@@ -259,7 +259,7 @@ async function containerSpecFromDescriptor(
     spec.gatewayRoute = descriptor.spec.gatewayRoute;
   }
   // Root A selector fields — carried through to the ContainerSpec so the
-  // ShimContainerRuntime's create()->spawn can read them.
+  // PlaneRuntime's create()->spawn can read them.
   if (descriptor.spec.persona) {
     spec.persona = descriptor.spec.persona;
   }

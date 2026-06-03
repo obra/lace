@@ -58,9 +58,6 @@ interface DockerPsRowJson {
 }
 
 export class DockerContainerRuntime extends BaseContainerRuntime {
-  // protected (not private): ShimContainerRuntime extends this + overrides
-  // create()/start() to drive the external docker shim, reusing dockerBin + the
-  // configs/containers bookkeeping + resolveContainerName.
   protected readonly dockerBin: string;
   // Stores the full ContainerConfig keyed by container id so start() can
   // access gatewayRoute and image after create() has returned.
