@@ -53,6 +53,8 @@ export interface RunnerConfig {
   runtimeBinding?: RuntimeExecutionBinding;
   /** Maximum budget in USD for this session */
   maxBudgetUsd?: number;
+  /** Persona name for this session; stamped into every ToolContext. */
+  persona?: string;
 }
 
 /**

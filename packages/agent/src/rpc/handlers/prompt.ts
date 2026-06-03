@@ -290,6 +290,7 @@ export function registerPromptHandler(
         environment: effectiveConfig.environment as Record<string, string> | undefined,
         runtimeBinding: state.activeSession.state.config?.runtimeBinding,
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
+        ...(state.activeSession.meta.persona ? { persona: state.activeSession.meta.persona } : {}),
       };
 
       const sessionIdForCache = state.activeSession.meta.sessionId;

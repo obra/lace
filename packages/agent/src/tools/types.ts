@@ -44,6 +44,12 @@ export interface ToolContext {
   activeSessionId?: string;
   activeSessionDir?: string;
 
+  /** Authoritative persona for the active session, resolved SERVER-SIDE. Never from
+   *  tool arguments — the keystone invariant. */
+  persona?: string;
+  /** Per-call timeout for out-of-process tools (one-shot-exec). */
+  timeoutMs?: number;
+
   // Reminder scheduling (provided by the session runner for manage_reminders).
   reminderScheduler?: ReminderScheduler;
 
