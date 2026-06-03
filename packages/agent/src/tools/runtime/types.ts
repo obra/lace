@@ -44,11 +44,7 @@ export type ToolRuntimeDescriptor =
         name: string;
         containerId?: string;
         // Persona-declared image reference. Passed verbatim to docker create —
-        // may be a tag, a RepoDigest, or anything else docker accepts. The
-        // post-create `.Image` capture (see projected-container.ts) is the
-        // immutable identity used for audit/tracking. Pre-resolution was
-        // dropped because locally-built images (e.g. embedder dev images)
-        // have no registry digest to pin to.
+        // may be a tag, a RepoDigest, or anything else docker accepts.
         image: string;
         workingDirectory: string;
         mounts: RuntimeMountDescriptor[];
@@ -66,8 +62,7 @@ export type ToolRuntimeDescriptor =
         // Docker network name forwarded to `docker create --network <name>`.
         // Persona containers join the quarantine network.
         network?: string;
-        // IPv4 address of the egress gateway. When set, a privileged one-shot
-        // sidecar sets the persona's default route after start.
+        // IPv4 address of the egress gateway broker.
         gatewayRoute?: string;
         // Root A SELECTOR fields — carried across the wire for the
         // PlaneRuntime's create()->spawn. SELECTOR ONLY; the plane re-validates

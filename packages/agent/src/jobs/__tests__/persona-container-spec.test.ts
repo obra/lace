@@ -2,8 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  buildPersonaContainerSpec,
-  containerSpecToRuntimeSpec,
+  buildProjectedRuntimeSpec,
   PersonaContainerSpecError,
   type PersonaContainerRuntime,
 } from '@lace/agent/jobs/persona-container-spec';
@@ -28,9 +27,9 @@ const persistentRuntime: PersonaContainerRuntime = {
   mounts: [],
 };
 
-describe('buildPersonaContainerSpec per_invocation', () => {
+describe('buildProjectedRuntimeSpec per_invocation', () => {
   it('composes a per-child spec name and injects scratch at /work', () => {
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
       childSessionId: CHILD_SESSION_ID,
@@ -45,13 +44,15 @@ describe('buildPersonaContainerSpec per_invocation', () => {
       workingDirectory: '/workspace',
       env: {},
     });
-    expect(spec.mounts).toEqual([{ source: SCRATCH_PATH, target: '/work', readonly: false }]);
+    expect(spec.mounts).toEqual([
+      { hostPath: SCRATCH_PATH, containerPath: '/work', readonly: false },
+    ]);
     expect(spec.restartPolicy).toBeUndefined();
     expect(spec.containerId).toBeUndefined();
   });
 
-  it('resolves declared mounts and passes env, ports, and sysctls through', () => {
-    const spec = buildPersonaContainerSpec({
+  it('resolves declared mounts and env without docker authority fields', () => {
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
       childSessionId: CHILD_SESSION_ID,
@@ -70,17 +71,17 @@ describe('buildPersonaContainerSpec per_invocation', () => {
     });
 
     expect(spec.mounts).toEqual([
-      { source: '/host/identity', target: '/etc/identity', readonly: true },
-      { source: SCRATCH_PATH, target: '/work', readonly: false },
+      { hostPath: '/host/identity', containerPath: '/etc/identity', readonly: true },
+      { hostPath: SCRATCH_PATH, containerPath: '/work', readonly: false },
     ]);
     expect(spec.env).toEqual({ FOO: 'bar' });
-    expect(spec.ports).toEqual([{ host: 9222, container: 9222 }]);
-    expect(spec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
+    expect(spec.ports).toBeUndefined();
+    expect(spec.sysctls).toBeUndefined();
   });
 
   it('rejects missing per-invocation naming inputs', () => {
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
         scratchDirHostPath: SCRATCH_PATH,
@@ -90,7 +91,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
     ).toThrow(/childSessionId/);
 
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
         childSessionId: CHILD_SESSION_ID,
@@ -102,7 +103,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
 
   it('rejects unsafe name components and unknown mounts', () => {
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: 'evil; rm -rf /',
         personaName: 'shell',
         childSessionId: CHILD_SESSION_ID,
@@ -113,7 +114,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
     ).toThrow(/Invalid parentSessionId/);
 
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: '../etc/passwd',
         childSessionId: CHILD_SESSION_ID,
@@ -124,7 +125,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
     ).toThrow(/Invalid personaName/);
 
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
         childSessionId: '!!!',
@@ -135,7 +136,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
     ).toThrow(PersonaContainerSpecError);
 
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
         childSessionId: CHILD_SESSION_ID,
@@ -148,7 +149,7 @@ describe('buildPersonaContainerSpec per_invocation', () => {
 
   it('reserves the scratch mount name only for per_invocation personas', () => {
     expect(() =>
-      buildPersonaContainerSpec({
+      buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
         childSessionId: CHILD_SESSION_ID,
@@ -162,9 +163,9 @@ describe('buildPersonaContainerSpec per_invocation', () => {
   });
 });
 
-describe('buildPersonaContainerSpec persistent', () => {
-  it('produces a stable per-persona daemon spec', () => {
-    const spec = buildPersonaContainerSpec({
+describe('buildProjectedRuntimeSpec persistent', () => {
+  it('produces a stable per-persona projected spec without docker authority fields', () => {
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'box-shell',
       runtime: persistentRuntime,
@@ -173,18 +174,18 @@ describe('buildPersonaContainerSpec persistent', () => {
 
     expect(spec).toMatchObject({
       name: 'box-shell',
-      containerId: 'box-box-shell',
       image: 'sen-box:dev',
       workingDirectory: '/home/agent',
       env: {},
-      restartPolicy: 'unless-stopped',
     });
     expect(spec.mounts).toEqual([]);
+    expect(spec.containerId).toBeUndefined();
+    expect(spec.restartPolicy).toBeUndefined();
     expect(spec.ports).toBeUndefined();
   });
 
   it('resolves declared mounts, including names that used to be legacy auto-injected', () => {
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'sen',
       runtime: {
@@ -205,16 +206,16 @@ describe('buildPersonaContainerSpec persistent', () => {
     });
 
     expect(spec.mounts).toEqual([
-      { source: '/host/personas', target: '/personas', readonly: true },
-      { source: '/host/data', target: '/data', readonly: false },
-      { source: '/host/credentials', target: '/credentials', readonly: true },
-      { source: '/host/lace', target: '/lace', readonly: true },
-      { source: '/host/scratch', target: '/work', readonly: false },
+      { hostPath: '/host/personas', containerPath: '/personas', readonly: true },
+      { hostPath: '/host/data', containerPath: '/data', readonly: false },
+      { hostPath: '/host/credentials', containerPath: '/credentials', readonly: true },
+      { hostPath: '/host/lace', containerPath: '/lace', readonly: true },
+      { hostPath: '/host/scratch', containerPath: '/work', readonly: false },
     ]);
   });
 
   it('does not mount registry entries that the persona did not declare', () => {
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'sen',
       runtime: persistentRuntime,
@@ -234,8 +235,8 @@ describe('buildPersonaContainerSpec persistent', () => {
     expect(spec.env).toEqual({});
   });
 
-  it('passes runtime env and sysctls through without LACE_DIR override', () => {
-    const spec = buildPersonaContainerSpec({
+  it('passes runtime env without LACE_DIR override and drops sysctls', () => {
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'sen',
       runtime: {
@@ -249,11 +250,11 @@ describe('buildPersonaContainerSpec persistent', () => {
     });
 
     expect(spec.env).toEqual({ LACE_DIR: '/persona/lace', OTHER: 'keep' });
-    expect(spec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
+    expect(spec.sysctls).toBeUndefined();
   });
 
-  it('passes runtime capAdd and network through to spec', () => {
-    const spec = buildPersonaContainerSpec({
+  it('drops runtime capAdd, network, and gatewayRoute from the projected spec', () => {
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
       childSessionId: CHILD_SESSION_ID,
@@ -262,52 +263,20 @@ describe('buildPersonaContainerSpec persistent', () => {
         ...perInvocationRuntime,
         capAdd: ['NET_ADMIN'],
         network: 'quarantine',
-      },
-      containerMounts: {},
-    });
-
-    expect(spec.capAdd).toEqual(['NET_ADMIN']);
-    expect(spec.network).toBe('quarantine');
-  });
-
-  it('passes runtime gatewayRoute through to spec', () => {
-    const spec = buildPersonaContainerSpec({
-      parentSessionId: PARENT_SESSION_ID,
-      personaName: 'shell',
-      childSessionId: CHILD_SESSION_ID,
-      scratchDirHostPath: SCRATCH_PATH,
-      runtime: {
-        ...perInvocationRuntime,
         gatewayRoute: '172.31.250.1',
       },
       containerMounts: {},
     });
 
-    expect(spec.gatewayRoute).toBe('172.31.250.1');
-  });
-
-  it('passes gatewayRoute through containerSpecToRuntimeSpec', () => {
-    const spec = buildPersonaContainerSpec({
-      parentSessionId: PARENT_SESSION_ID,
-      personaName: 'shell',
-      childSessionId: CHILD_SESSION_ID,
-      scratchDirHostPath: SCRATCH_PATH,
-      runtime: {
-        ...perInvocationRuntime,
-        gatewayRoute: '172.31.250.1',
-      },
-      containerMounts: {},
-    });
-
-    expect(containerSpecToRuntimeSpec({ spec })).toMatchObject({
-      gatewayRoute: '172.31.250.1',
-    });
+    expect(spec.capAdd).toBeUndefined();
+    expect(spec.network).toBeUndefined();
+    expect(spec.gatewayRoute).toBeUndefined();
   });
 });
 
-describe('containerSpecToRuntimeSpec', () => {
-  it('converts daemon mounts to projected runtime mounts', () => {
-    const spec = buildPersonaContainerSpec({
+describe('buildProjectedRuntimeSpec selector fields', () => {
+  it('carries selector fields needed by the plane', () => {
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
       childSessionId: CHILD_SESSION_ID,
@@ -316,12 +285,15 @@ describe('containerSpecToRuntimeSpec', () => {
       containerMounts: {},
     });
 
-    expect(containerSpecToRuntimeSpec({ spec })).toMatchObject({
+    expect(spec).toMatchObject({
       name: 'pppppppp-shell-cccccccc',
       image: 'devcontainer:latest',
       workingDirectory: '/workspace',
       mounts: [{ hostPath: SCRATCH_PATH, containerPath: '/work', readonly: false }],
       env: { FOO: 'bar' },
+      persona: 'shell',
+      parentSession: PARENT_SESSION_ID,
+      childSession: CHILD_SESSION_ID,
     });
   });
 });

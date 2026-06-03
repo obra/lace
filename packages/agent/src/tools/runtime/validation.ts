@@ -54,8 +54,8 @@ const ContainerRuntimeDescriptorSchema = z
         capAdd: z.array(z.string().min(1)).optional(),
         // Forwarded to `docker create --network <name>`.
         network: z.string().min(1).optional(),
-        // IPv4 address of the egress gateway for the post-start
-        // netns-init sidecar. Validated as a non-empty string (loose IPv4).
+        // IPv4 address of the egress gateway broker. Validated as a
+        // non-empty string at this layer.
         gatewayRoute: z.string().min(1).optional(),
         // Root A SELECTOR fields — carried for PlaneRuntime's create()->spawn.
         // MUST be in this .strict() schema or a plane binding fails validation

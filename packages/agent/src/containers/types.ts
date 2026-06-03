@@ -49,12 +49,7 @@ export interface DockerCreateConfig {
   // join the quarantine network for transparent egress.
   network?: string;
 
-  // IPv4 address of the egress gateway. When set, a privileged one-shot
-  // sidecar container is launched into the persona's network namespace after
-  // `docker start` to replace the default route:
-  //   ip route replace default via <gatewayRoute>
-  // The persona container itself does NOT need NET_ADMIN — the sidecar holds
-  // the privilege and exits immediately. Transparent egress gateway.
+  // IPv4 address of the egress gateway broker.
   gatewayRoute?: string;
 }
 

@@ -34,8 +34,7 @@ export interface ContainerSpec {
   // Persona containers join the quarantine network.
   network?: string;
 
-  // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
-  // sets the persona's default route after `docker start`.
+  // IPv4 address of the egress gateway broker.
   gatewayRoute?: string;
 
   // Mount target namespaces owned by Lace. When adopting a daemon-side

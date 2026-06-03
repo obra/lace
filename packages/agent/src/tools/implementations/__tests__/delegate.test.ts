@@ -318,8 +318,12 @@ describe('DelegateTool', () => {
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect((options.runtimeBinding as RuntimeExecutionBinding).toolRuntime).toMatchObject({
       type: 'container',
-      spec: { name: 'box-shell', containerId: 'box-box-shell', restartPolicy: 'unless-stopped' },
+      spec: { name: 'box-shell', persona: 'box-shell' },
     });
+    const containerRuntime = (options.runtimeBinding as RuntimeExecutionBinding)
+      .toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>;
+    expect(containerRuntime.spec.containerId).toBeUndefined();
+    expect(containerRuntime.spec.restartPolicy).toBeUndefined();
   });
 
   it('uses containerMounts from context when building projected binding', async () => {
