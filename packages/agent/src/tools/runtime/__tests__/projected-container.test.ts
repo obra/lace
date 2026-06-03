@@ -230,6 +230,12 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(mockChildProcessSpawn).not.toHaveBeenCalled();
   });
 
+  it('does not import child_process for direct docker inspect shellouts', async () => {
+    const source = await readFile(new URL('../projected-container.ts', import.meta.url), 'utf8');
+
+    expect(source).not.toContain('child_process');
+  });
+
   it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = {

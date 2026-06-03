@@ -43,6 +43,9 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     containerMounts: input.containerMounts,
   });
 
+  // Delegate builds this binding before JobManager.createJob allocates the
+  // final Lace job id. Do not synthesize one here; PlaneRuntime uses its
+  // fallback identity until a later lifecycle can thread the real job id.
   runtimeSpec.env = { ...runtimeSpec.env, ...(input.executionEnv ?? {}) };
 
   const binding: RuntimeExecutionBinding = {

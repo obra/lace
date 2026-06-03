@@ -334,6 +334,9 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
           workingDirectory: '/work',
           mounts: [],
           env: { EXISTING: '1' },
+          persona: 'browser-driver',
+          parentSession: parentSessionId,
+          childSession: 'sess_child_projected',
         },
         helper: {
           mode: 'image',
@@ -433,9 +436,9 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
       jobId: job.jobId,
       runtimeId: 'rt_projected_identity',
       containerSpecName: 'parent-browser-child',
-      containerId: 'lace-parent-browser-child',
     });
     expect(metadata).not.toHaveProperty('token');
+    expect(metadata).not.toHaveProperty('containerId');
     expect(typeof metadata.tokenFingerprint).toBe('string');
     expect(metadata.tokenFingerprint).not.toBe('');
 

@@ -98,6 +98,29 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     ).toEqual({ FOO: 'execution', KEEP: 'runtime', SEN_AGENT_TOKEN: 'token' });
   });
 
+  it('does not invent a jobId before delegate allocates the Lace job', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'node:24-bookworm',
+        workingDirectory: '/work',
+        mounts: [],
+      },
+      containerMounts: {},
+    });
+
+    const runtime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(runtime.spec.jobId).toBeUndefined();
+  });
+
   it('builds a projected binding for persistent lifecycle containers', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess1',

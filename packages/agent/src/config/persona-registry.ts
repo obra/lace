@@ -58,15 +58,15 @@ const runtimeContainerSchema = z
     mounts: z.array(mountNameSchema),
     env: z.record(z.string(), z.string()).optional().default({}),
     ports: z.array(portMappingSchema).optional(),
-    // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-    // Browser personas need `net.ipv6.conf.lo.disable_ipv6=0` so the
-    // container has an `::1` for superpowers-chrome's port-availability check.
+    // Linux kernel sysctls for runtimes that directly materialize persona
+    // containers. Lace projected persona specs omit this docker authority; the
+    // plane rebuilds it from the persona.
     sysctls: z.record(sysctlKeySchema, z.string()).optional(),
-    // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-    // Persona containers need NET_ADMIN for the transparent egress gateway.
+    // Linux capabilities for runtimes that directly materialize persona
+    // containers. Lace projected persona specs omit this docker authority.
     capAdd: z.array(z.string().regex(/^[A-Z_]+$/)).optional(),
-    // Docker network name forwarded to `docker create --network <name>`.
-    // Persona containers join the quarantine network.
+    // Docker network name for runtimes that directly materialize persona
+    // containers. Lace projected persona specs carry selectors instead.
     network: z.string().min(1).optional(),
     // IPv4 address of the egress gateway broker.
     gatewayRoute: z.string().min(1).optional(),

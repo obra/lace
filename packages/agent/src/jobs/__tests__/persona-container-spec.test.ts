@@ -1,6 +1,6 @@
 // ABOUTME: Unit tests for persona container spec construction
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   buildProjectedRuntimeSpec,
   PersonaContainerSpecError,
@@ -26,6 +26,42 @@ const persistentRuntime: PersonaContainerRuntime = {
   workingDirectory: '/home/agent',
   mounts: [],
 };
+
+type ProjectedSpecKeys = keyof ReturnType<typeof buildProjectedRuntimeSpec>;
+type ForbiddenProjectedPersonaKeys = Extract<
+  ProjectedSpecKeys,
+  | 'containerId'
+  | 'ports'
+  | 'restartPolicy'
+  | 'sysctls'
+  | 'capAdd'
+  | 'network'
+  | 'gatewayRoute'
+  | 'browserCdpSocket'
+>;
+
+describe('buildProjectedRuntimeSpec types', () => {
+  // eslint-disable-next-line vitest/expect-expect -- expectTypeOf performs compile-time assertions.
+  it('does not expose docker authority fields in the projected persona spec type', () => {
+    expectTypeOf<ForbiddenProjectedPersonaKeys>().toEqualTypeOf<never>();
+  });
+
+  it('rejects forbidden docker authority field access at compile time', () => {
+    const spec = buildProjectedRuntimeSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: perInvocationRuntime,
+      containerMounts: {},
+    });
+
+    // @ts-expect-error projected persona specs do not expose docker authority fields.
+    expect(spec.capAdd).toBeUndefined();
+    // @ts-expect-error projected persona specs do not expose docker authority fields.
+    expect(spec.network).toBeUndefined();
+  });
+});
 
 describe('buildProjectedRuntimeSpec per_invocation', () => {
   it('composes a per-child spec name and injects scratch at /work', () => {

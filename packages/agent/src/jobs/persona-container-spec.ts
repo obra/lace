@@ -2,10 +2,7 @@
 // ABOUTME: Branches on containerSharing (per_invocation vs persistent) and resolves mounts against the registry
 
 import type { MountRegistryEntry } from '@lace/agent/server-types';
-import type {
-  RuntimeExecutionBinding,
-  RuntimeMountDescriptor,
-} from '@lace/agent/tools/runtime/types';
+import type { RuntimeMountDescriptor } from '@lace/agent/tools/runtime/types';
 
 // Single source of truth for the persona container runtime shape: the
 // `type: 'container'` arm of the persona schema's discriminated union.
@@ -96,10 +93,32 @@ export function buildPerInvocationSpecName(input: {
   return `${sessionIdShort(input.parentSessionId)}-${input.personaName}-${sessionIdShort(input.childSessionId)}`;
 }
 
-type ProjectedRuntimeSpec = Extract<
-  RuntimeExecutionBinding['toolRuntime'],
-  { type: 'container' }
->['spec'];
+export interface ProjectedPersonaRuntimeSpec {
+  name: string;
+  image: string;
+  workingDirectory: string;
+  mounts: RuntimeMountDescriptor[];
+  env: Record<string, string>;
+  persona: string;
+  parentSession: string;
+  childSession?: string;
+  jobId?: string;
+}
+
+type AssertNoForbiddenProjectedPersonaKeys<T extends never> = T;
+type _ProjectedPersonaSpecHasNoDockerAuthorityFields = AssertNoForbiddenProjectedPersonaKeys<
+  Extract<
+    keyof ProjectedPersonaRuntimeSpec,
+    | 'containerId'
+    | 'ports'
+    | 'restartPolicy'
+    | 'sysctls'
+    | 'capAdd'
+    | 'network'
+    | 'gatewayRoute'
+    | 'browserCdpSocket'
+  >
+>;
 
 export function buildProjectedRuntimeSpec(input: {
   parentSessionId: string;
@@ -110,7 +129,7 @@ export function buildProjectedRuntimeSpec(input: {
   childSessionId?: string;
   scratchDirHostPath?: string;
   jobId?: string;
-}): ProjectedRuntimeSpec {
+}): ProjectedPersonaRuntimeSpec {
   const { parentSessionId, personaName, runtime, containerMounts } = input;
 
   if (!SPEC_NAME_COMPONENT_RE.test(parentSessionId)) {

@@ -204,8 +204,7 @@ Parameters:
           // declare mounts fail with a clear "unknown mount" error.
           //
           // The persona-declared image string (tag or digest) flows through
-          // verbatim — no pre-resolution. The projected runtime captures the
-          // daemon's `.Image` field post-create for audit (see projected-container.ts).
+          // verbatim — no lace-side pre-resolution or docker inspect.
           projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
             parentSessionId: context.activeSessionId ?? 'delegate',
             personaName: persona,

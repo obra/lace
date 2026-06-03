@@ -52,15 +52,15 @@ export type ToolRuntimeDescriptor =
         secretEnv?: Record<string, RuntimeSecretReference>;
         ports?: RuntimePortDescriptor[];
         restartPolicy?: 'unless-stopped';
-        // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-        // Some embedder images declare `net.ipv6.conf.lo.disable_ipv6=0`
-        // so superpowers-chrome's port-availability check can bind to `::1`.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these; the plane
+        // rebuilds persona docker authority from selectors/persona config.
         sysctls?: Record<string, string>;
-        // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-        // Persona containers need NET_ADMIN for transparent egress gateway.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these.
         capAdd?: string[];
-        // Docker network name forwarded to `docker create --network <name>`.
-        // Persona containers join the quarantine network.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these.
         network?: string;
         // IPv4 address of the egress gateway broker.
         gatewayRoute?: string;
