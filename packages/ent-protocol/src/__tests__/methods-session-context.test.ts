@@ -3,6 +3,8 @@ import {
   EntSessionContextBreakdownResponseSchema,
   EntSessionTokenUsageRequestSchema,
   EntSessionTokenUsageResponseSchema,
+  SessionPromptRequestSchema,
+  EntSessionInjectRequestSchema,
 } from '../schemas/methods';
 
 const baseRequest = { jsonrpc: '2.0', id: 1 } as const;
@@ -39,6 +41,70 @@ describe('Ent protocol session context schemas', () => {
         },
       })
     ).not.toThrow();
+  });
+
+  // track field tests for session/prompt and ent/session/inject
+  describe('track field on session/prompt', () => {
+    const validPromptRequest = {
+      ...baseRequest,
+      method: 'session/prompt',
+      params: {
+        content: [{ type: 'text', text: 'hello' }],
+      },
+    } as const;
+
+    it('accepts session/prompt with a valid track value', () => {
+      const result = SessionPromptRequestSchema.parse({
+        ...validPromptRequest,
+        params: { ...validPromptRequest.params, track: 'slack:T:C/123' },
+      });
+      expect(result.params.track).toBe('slack:T:C/123');
+    });
+
+    it('accepts session/prompt without track (track is optional)', () => {
+      expect(() => SessionPromptRequestSchema.parse(validPromptRequest)).not.toThrow();
+    });
+
+    it('rejects session/prompt with track: empty string', () => {
+      expect(() =>
+        SessionPromptRequestSchema.parse({
+          ...validPromptRequest,
+          params: { ...validPromptRequest.params, track: '' },
+        })
+      ).toThrow();
+    });
+  });
+
+  describe('track field on ent/session/inject', () => {
+    const validInjectRequest = {
+      ...baseRequest,
+      method: 'ent/session/inject',
+      params: {
+        content: [{ type: 'text', text: 'hello' }],
+        priority: 'normal',
+      },
+    } as const;
+
+    it('accepts ent/session/inject with a valid track value', () => {
+      const result = EntSessionInjectRequestSchema.parse({
+        ...validInjectRequest,
+        params: { ...validInjectRequest.params, track: 'slack:T:C/123' },
+      });
+      expect(result.params.track).toBe('slack:T:C/123');
+    });
+
+    it('accepts ent/session/inject without track (track is optional)', () => {
+      expect(() => EntSessionInjectRequestSchema.parse(validInjectRequest)).not.toThrow();
+    });
+
+    it('rejects ent/session/inject with track: empty string', () => {
+      expect(() =>
+        EntSessionInjectRequestSchema.parse({
+          ...validInjectRequest,
+          params: { ...validInjectRequest.params, track: '' },
+        })
+      ).toThrow();
+    });
   });
 
   it('accepts ent/session/context_breakdown response shape', () => {

@@ -216,6 +216,7 @@ export async function injectIntoActiveSession(
     content: unknown[];
     priority: 'immediate' | 'normal' | 'deferred';
     idempotencyKey?: unknown;
+    track?: unknown;
   }
 ): Promise<{ durableHandoffStatus: DurableHandoffStatus } | undefined> {
   return await runExclusive(() => {
@@ -249,6 +250,8 @@ export async function injectIntoActiveSession(
       }
     }
 
+    const track =
+      typeof parsed.track === 'string' && parsed.track.length > 0 ? parsed.track : undefined;
     let sessionState: SessionState = readSessionState(state.activeSession.dir);
     const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
       type: 'context_injected',
@@ -256,6 +259,7 @@ export async function injectIntoActiveSession(
         content: Array.isArray(parsed.content) ? parsed.content : [],
         priority: parsed.priority,
         ...(idempotencyKey ? { idempotencyKey } : {}),
+        ...(track !== undefined ? { track } : {}),
       },
     });
     sessionState = nextState;
@@ -634,6 +638,7 @@ export function registerSessionOperationHandlers(
       content: unknown[];
       priority: 'immediate' | 'normal' | 'deferred';
       idempotencyKey?: unknown;
+      track?: unknown;
     };
     const priority =
       parsed?.priority === 'immediate' ||
@@ -645,6 +650,7 @@ export function registerSessionOperationHandlers(
       content: Array.isArray(parsed?.content) ? parsed.content : [],
       priority,
       idempotencyKey: parsed?.idempotencyKey,
+      track: parsed?.track,
     });
   });
 

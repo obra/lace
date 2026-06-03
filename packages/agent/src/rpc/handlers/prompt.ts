@@ -75,6 +75,7 @@ export function registerPromptHandler(
     outputFormat?: unknown;
     maxTurns?: number;
     idempotencyKey?: unknown;
+    track?: unknown;
   }) => {
     assertInitialized(state);
     rejectHandoffSourceMetadata(params);
@@ -180,11 +181,14 @@ export function registerPromptHandler(
     let promptWritten = false;
 
     try {
+      const track =
+        typeof params.track === 'string' && params.track.length > 0 ? params.track : undefined;
       await writeAndAdvance({
         type: 'prompt',
         data: {
           content: promptContent,
           ...(idempotencyKey ? { idempotencyKey } : {}),
+          ...(track !== undefined ? { track } : {}),
         },
       });
       promptWritten = true;
@@ -509,6 +513,7 @@ export function registerPromptHandler(
         outputFormat?: unknown;
         maxTurns?: number;
         idempotencyKey?: unknown;
+        track?: unknown;
       }
     );
   });

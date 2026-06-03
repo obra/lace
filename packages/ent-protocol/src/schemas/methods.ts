@@ -507,6 +507,7 @@ const SessionPromptParamsSchema = z
     content: z.array(ContentBlockSchema),
     maxTurns: z.number().optional(),
     idempotencyKey: NonEmptyStringSchema.optional(),
+    track: NonEmptyStringSchema.optional(),
     outputFormat: z
       .object({
         type: z.literal('json_schema'),
@@ -926,6 +927,7 @@ const EntSessionInjectParamsSchema = z
     content: z.array(ContentBlockSchema),
     priority: z.enum(['immediate', 'normal', 'deferred']),
     idempotencyKey: NonEmptyStringSchema.optional(),
+    track: NonEmptyStringSchema.optional(),
   })
   .strict();
 
