@@ -110,7 +110,11 @@ const personaConfigSchema = z
       .object({
         strategy: z.string().optional(),
         breakpoints: z
-          .array(z.object({ at: z.number(), action: z.enum(['notify', 'compact']) }).strict())
+          .array(
+            z
+              .object({ at: z.number().min(0).max(1), action: z.enum(['notify', 'compact']) })
+              .strict()
+          )
           .optional(),
       })
       .strict()

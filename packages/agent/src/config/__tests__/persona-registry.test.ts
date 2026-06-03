@@ -448,6 +448,55 @@ Body.`;
     expect(result.config.model).toBe('user-model');
     expect(result.body.trim()).toBe('User body');
   });
+
+  it('parses compaction.breakpoints with valid at values in [0,1]', () => {
+    const content = `---
+compaction:
+  strategy: summarize
+  breakpoints:
+    - at: 0.9
+      action: compact
+    - at: 0.5
+      action: notify
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'compaction-valid.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    const result = registry.parsePersona('compaction-valid');
+    expect(result.config.compaction?.breakpoints).toEqual([
+      { at: 0.9, action: 'compact' },
+      { at: 0.5, action: 'notify' },
+    ]);
+  });
+
+  it('rejects compaction.breakpoints with at > 1 (e.g. at: 90 typo)', () => {
+    const content = `---
+compaction:
+  breakpoints:
+    - at: 90
+      action: compact
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'compaction-too-high.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('compaction-too-high')).toThrow();
+  });
+
+  it('rejects compaction.breakpoints with at < 0', () => {
+    const content = `---
+compaction:
+  breakpoints:
+    - at: -0.1
+      action: notify
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'compaction-negative.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(() => registry.parsePersona('compaction-negative')).toThrow();
+  });
 });
 
 describe('PersonaRegistry user search paths', () => {
