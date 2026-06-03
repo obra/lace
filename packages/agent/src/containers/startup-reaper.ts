@@ -3,23 +3,6 @@
 
 import { logger } from '@lace/agent/utils/logger';
 import { ContainerManager } from './container-manager';
-import { createDefaultContainerManager } from './manager-factory';
-
-/**
- * Construct a ContainerManager appropriate for the host platform. Returns null
- * when no supported container runtime exists (e.g. Windows). Callers should
- * treat null as "skip container work".
- *
- * Honors the same LACE_CONTAINER_RUNTIME override as the agent server.
- *
- * Default platform mapping:
- *   - darwin → AppleContainerRuntime (macOS `container` CLI)
- *   - linux  → DockerContainerRuntime (docker CLI)
- *   - other  → null
- */
-export function createContainerManagerForPlatform(): ContainerManager | null {
-  return createDefaultContainerManager();
-}
 
 /**
  * Reap every lace-prefixed container on the host that is not in liveSpecNames.
