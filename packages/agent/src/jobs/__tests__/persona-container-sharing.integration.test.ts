@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { ContainerManager } from '@lace/agent/containers/container-manager';
 import { DockerContainerRuntime } from '@lace/agent/containers/docker-container';
-import { buildPersonaContainerSpec } from '@lace/agent/jobs/persona-container-spec';
+import type { ContainerSpec } from '@lace/agent/containers/spec';
+import { buildProjectedRuntimeSpec } from '@lace/agent/jobs/persona-container-spec';
 import { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 
@@ -57,7 +58,7 @@ function newSessionId(): string {
   return `sess_${uuidv4().replace(/-/g, '').slice(0, 24)}`;
 }
 
-/** Compute the spec name that buildPersonaContainerSpec will use for per_invocation. */
+/** Compute the spec name that buildProjectedRuntimeSpec will use for per_invocation. */
 function perInvocationSpecName(
   parentSessionId: string,
   personaName: string,
@@ -137,6 +138,24 @@ function forceRemoveContainer(name: string): void {
   }
 }
 
+function containerSpecFromProjectedSpec(
+  spec: ReturnType<typeof buildProjectedRuntimeSpec>,
+  containerId?: string
+): ContainerSpec {
+  return {
+    name: spec.name,
+    ...(containerId ? { containerId } : {}),
+    image: spec.image,
+    workingDirectory: spec.workingDirectory,
+    mounts: spec.mounts.map((mount) => ({
+      source: mount.hostPath,
+      target: mount.containerPath,
+      readonly: mount.readonly,
+    })),
+    env: spec.env,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // test suite
 // ---------------------------------------------------------------------------
@@ -195,13 +214,13 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
       containerSharing: 'per_invocation',
       image: TEST_PER_INVOCATION_IMAGE,
       workingDirectory: '/work',
-      mounts: {},
+      mounts: [],
       env: {},
     };
 
     await mkdir(scratchDirHostPath, { recursive: true });
 
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId,
       personaName,
       runtime: perInvocationRuntime,
@@ -214,7 +233,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
     const dockerName = `lace-${specName}`;
     createdContainerNames.push(dockerName);
 
-    await containerManager.materialize(spec);
+    await containerManager.materialize(containerSpecFromProjectedSpec(spec));
 
     return { specName, dockerName };
   }
@@ -229,11 +248,11 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
       containerSharing: 'persistent',
       image: TEST_PERSISTENT_IMAGE,
       workingDirectory: '/tmp',
-      mounts: {},
+      mounts: [],
       env: {},
     };
 
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess_parentforpersistent',
       personaName,
       runtime: persistentRuntime,
@@ -241,11 +260,10 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
     });
 
     const specName = spec.name;
-    // Persistent containers use spec.containerId = `<prefix>-<persona>` (no lace- prefix).
     const dockerName = `box-${personaName}`;
     createdContainerNames.push(dockerName);
 
-    await containerManager.materialize(spec);
+    await containerManager.materialize(containerSpecFromProjectedSpec(spec, dockerName));
 
     return { specName, dockerName };
   }

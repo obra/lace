@@ -8,11 +8,7 @@ export interface PortMapping {
   container: number;
 }
 
-export interface ContainerConfig {
-  // Container identification (optional - will be generated if not provided)
-  id?: string;
-  name?: string;
-
+export interface DockerCreateConfig {
   // Image to run. Required: every container must know its image at create time.
   image: string;
 
@@ -28,10 +24,6 @@ export interface ContainerConfig {
   // may ignore (see AppleContainerRuntime).
   ports?: PortMapping[];
 
-  // Resource limits (optional for now)
-  memory?: number; // bytes
-  cpuShares?: number;
-
   // Docker --restart policy. Only 'unless-stopped' is supported in v1; used by
   // persistent container runtimes so the daemon resurrects them after host reboot.
   // Absent ⇒ no restart flag emitted (default no-restart behavior).
@@ -44,32 +36,41 @@ export interface ContainerConfig {
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // Absent or empty ⇒ no --cap-add flags emitted. Persona containers need
-  // NET_ADMIN to replace the default route via the transparent egress gateway.
+  // Absent or empty ⇒ no --cap-add flags emitted. Used by direct docker
+  // container specs that need extra kernel authority.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // Absent ⇒ no --network flag emitted (docker default). Persona containers
-  // join the quarantine network for transparent egress.
+  // Absent ⇒ no --network flag emitted (docker default).
   network?: string;
 
-  // IPv4 address of the egress gateway. When set, a privileged one-shot
-  // sidecar container is launched into the persona's network namespace after
-  // `docker start` to replace the default route:
-  //   ip route replace default via <gatewayRoute>
-  // The persona container itself does NOT need NET_ADMIN — the sidecar holds
-  // the privilege and exits immediately. Transparent egress gateway.
+  // IPv4 address of the egress gateway broker.
   gatewayRoute?: string;
+}
 
-  // SELECTOR fields carried from ContainerSpec. The ShimContainerRuntime's
-  // create() emits `spawn <persona> <parent> <child> <jobId>` from these
-  // instead of a full `docker create` argv. SELECTOR ONLY; DockerContainerRuntime
-  // ignores them.
-  persona?: string;
+type AssertNoForbiddenDockerCreateConfigKeys<T extends never> = T;
+type _DockerCreateConfigHasNoResourceLimitFields = AssertNoForbiddenDockerCreateConfigKeys<
+  Extract<keyof DockerCreateConfig, 'memory' | 'cpuShares'>
+>;
+
+export interface PlaneSpawnRequest {
+  // Container identity fields may be supplied by ContainerManager for fallback naming.
+  id?: string;
+  name?: string;
+
+  // Selector fields for plane spawn: `spawn <persona> <parent> <child> <jobId>`.
+  persona: string;
   parentSession?: string;
   childSession?: string;
   jobId?: string;
 }
+
+export type ContainerConfig = DockerCreateConfig &
+  Partial<PlaneSpawnRequest> & {
+    // Container identification (optional - will be generated if not provided)
+    id?: string;
+    name?: string;
+  };
 
 export interface ContainerMount {
   source: string; // Host path

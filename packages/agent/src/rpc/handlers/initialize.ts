@@ -39,10 +39,17 @@ function parseContainerMounts(raw: unknown): Record<string, MountRegistryEntry> 
     if (typeof entry.hostPath !== 'string' || entry.hostPath.length === 0) {
       invalidParams();
     }
+    if (typeof entry.containerPath !== 'string' || entry.containerPath.length === 0) {
+      invalidParams();
+    }
     if (typeof entry.readonly !== 'boolean') {
       invalidParams();
     }
-    result[name] = { hostPath: entry.hostPath, readonly: entry.readonly };
+    result[name] = {
+      hostPath: entry.hostPath,
+      containerPath: entry.containerPath,
+      readonly: entry.readonly,
+    };
   }
   return result;
 }
@@ -125,10 +132,11 @@ export function registerInitializeHandler(
       });
     }
 
-    // Embedder-supplied named-mount registry. Persona containers resolve their
-    // `runtime.mounts[name]` against this map at materialization time. Always
-    // stored on state (defaults to {}). Parse before the R6 boot scan so the
-    // readonly flags are available for conflict filtering.
+    // Embedder-supplied named-mount registry. Persona containers list mount
+    // names in `runtime.mounts`; this registry supplies host paths, container
+    // paths, and readonly flags. Always stored on state (defaults to {}). Parse
+    // before the R6 boot scan so the readonly flags are available for conflict
+    // filtering.
     state.containerMounts = parseContainerMounts(parsed.containerMounts);
 
     // R6 boot-time invariant: log a WARN for any per_invocation persona that

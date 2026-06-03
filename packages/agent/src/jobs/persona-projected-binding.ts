@@ -8,11 +8,7 @@ import type {
   RuntimeHelperDescriptor,
 } from '@lace/agent/tools/runtime/types';
 import { fileURLToPath } from 'node:url';
-import {
-  buildPersonaContainerSpec,
-  containerSpecToRuntimeSpec,
-  type PersonaContainerRuntime,
-} from './persona-container-spec';
+import { buildProjectedRuntimeSpec, type PersonaContainerRuntime } from './persona-container-spec';
 
 const HELPER_CONTAINER_PATH = '/usr/local/bin/lace-runtime-helper.js';
 
@@ -38,7 +34,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   childSessionId?: string;
   scratchDirHostPath?: string;
 }): RuntimeExecutionBinding {
-  const spec = buildPersonaContainerSpec({
+  const runtimeSpec = buildProjectedRuntimeSpec({
     parentSessionId: input.parentSessionId,
     personaName: input.personaName,
     childSessionId: input.childSessionId,
@@ -47,7 +43,9 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     containerMounts: input.containerMounts,
   });
 
-  const runtimeSpec = containerSpecToRuntimeSpec({ spec });
+  // Delegate builds this binding before JobManager.createJob allocates the
+  // final Lace job id. Do not synthesize one here; PlaneRuntime uses its
+  // fallback identity until a later lifecycle can thread the real job id.
   runtimeSpec.env = { ...runtimeSpec.env, ...(input.executionEnv ?? {}) };
 
   const binding: RuntimeExecutionBinding = {

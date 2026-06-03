@@ -26,16 +26,13 @@ export interface ContainerSpec {
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // Persona containers need NET_ADMIN to replace the default route via the
-  // transparent egress gateway.
+  // Used by direct docker container specs that need extra kernel authority.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // Persona containers join the quarantine network.
   network?: string;
 
-  // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
-  // sets the persona's default route after `docker start`.
+  // IPv4 address of the egress gateway broker.
   gatewayRoute?: string;
 
   // Mount target namespaces owned by Lace. When adopting a daemon-side
@@ -44,10 +41,10 @@ export interface ContainerSpec {
   // longer advertises.
   managedMountTargetPrefixes?: string[];
 
-  // SELECTOR fields carried for the docker shim runtime,
+  // SELECTOR fields carried for PlaneRuntime,
   // whose create() emits the closed `spawn <persona> <parent> <child> <jobId>`
   // command instead of a full `docker create` argv. SELECTOR ONLY — never an
-  // authority source: the shim validates `persona` against its closed enum and
+  // authority source: the plane validates `persona` against its closed enum and
   // rebuilds the container spec itself. Ignored by DockerContainerRuntime.
   persona?: string;
   parentSession?: string;

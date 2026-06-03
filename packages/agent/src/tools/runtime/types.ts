@@ -44,11 +44,7 @@ export type ToolRuntimeDescriptor =
         name: string;
         containerId?: string;
         // Persona-declared image reference. Passed verbatim to docker create —
-        // may be a tag, a RepoDigest, or anything else docker accepts. The
-        // post-create `.Image` capture (see projected-container.ts) is the
-        // immutable identity used for audit/tracking. Pre-resolution was
-        // dropped because locally-built images (e.g. embedder dev images)
-        // have no registry digest to pin to.
+        // may be a tag, a RepoDigest, or anything else docker accepts.
         image: string;
         workingDirectory: string;
         mounts: RuntimeMountDescriptor[];
@@ -56,22 +52,21 @@ export type ToolRuntimeDescriptor =
         secretEnv?: Record<string, RuntimeSecretReference>;
         ports?: RuntimePortDescriptor[];
         restartPolicy?: 'unless-stopped';
-        // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-        // Some embedder images declare `net.ipv6.conf.lo.disable_ipv6=0`
-        // so superpowers-chrome's port-availability check can bind to `::1`.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these; the plane
+        // rebuilds persona docker authority from selectors/persona config.
         sysctls?: Record<string, string>;
-        // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-        // Persona containers need NET_ADMIN for transparent egress gateway.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these.
         capAdd?: string[];
-        // Docker network name forwarded to `docker create --network <name>`.
-        // Persona containers join the quarantine network.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these.
         network?: string;
-        // IPv4 address of the egress gateway. When set, a privileged one-shot
-        // sidecar sets the persona's default route after start.
+        // IPv4 address of the egress gateway broker.
         gatewayRoute?: string;
         // Root A SELECTOR fields — carried across the wire for the
-        // ShimContainerRuntime's create()->spawn. SELECTOR ONLY; the shim
-        // re-validates persona against its closed enum + rebuilds the spec.
+        // PlaneRuntime's create()->spawn. SELECTOR ONLY; the plane re-validates
+        // persona against its closed enum + rebuilds the spec.
         persona?: string;
         parentSession?: string;
         childSession?: string;

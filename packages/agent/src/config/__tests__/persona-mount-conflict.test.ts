@@ -71,7 +71,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /home
   mounts:
-    home: /home`
+    - home`
     );
     writePersona(
       'cattle',
@@ -81,7 +81,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /data
   mounts:
-    data: /data`
+    - data`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('cattle');
@@ -102,7 +102,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'worker',
@@ -112,7 +112,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('worker');
@@ -120,7 +120,7 @@ describe('persona-mount-conflict validator', () => {
     let caught: unknown;
     try {
       assertNoMountConflict('worker', parsed, reg, {
-        knowledge: { hostPath: '/srv/knowledge', readonly: false },
+        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
       });
     } catch (err) {
       caught = err;
@@ -147,9 +147,7 @@ describe('persona-mount-conflict validator', () => {
           containerSharing: 'per_invocation' as const,
           image: 'img:latest',
           workingDirectory: '/work',
-          mounts: {
-            scratch: '/work',
-          },
+          mounts: ['scratch'],
           env: {},
         },
       },
@@ -167,9 +165,7 @@ describe('persona-mount-conflict validator', () => {
             containerSharing: 'persistent' as const,
             image: 'img:latest',
             workingDirectory: '/home',
-            mounts: {
-              scratch: '/home/scratch',
-            },
+            mounts: ['scratch'],
             env: {},
           },
         },
@@ -196,7 +192,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /personas
   mounts:
-    persona: /personas`
+    - persona`
     );
     writePersona(
       'worker',
@@ -206,7 +202,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /work
   mounts:
-    persona: /personas`
+    - persona`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('worker');
@@ -228,7 +224,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /home
   mounts:
-    home: /home`
+    - home`
     );
     writePersona(
       'pet-b',
@@ -238,7 +234,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /home
   mounts:
-    home: /home`
+    - home`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('pet-b');
@@ -259,7 +255,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'worker',
@@ -269,14 +265,16 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const { logger } = await import('@lace/agent/utils/logger');
 
     // Should not throw
     expect(() =>
-      warnMountConflicts(reg, { knowledge: { hostPath: '/srv/knowledge', readonly: false } })
+      warnMountConflicts(reg, {
+        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
+      })
     ).not.toThrow();
 
     // Should have logged a warn with the conflict details
@@ -302,7 +300,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /home
   mounts:
-    home: /home`
+    - home`
     );
     writePersona(
       'worker',
@@ -312,7 +310,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /data
   mounts:
-    data: /data`
+    - data`
     );
     const reg = makeRegistry();
     const { logger } = await import('@lace/agent/utils/logger');
@@ -332,7 +330,7 @@ describe('persona-mount-conflict validator', () => {
     // Write an invalid persona (bad YAML that the schema will reject)
     fs.writeFileSync(
       path.join(tempDir, 'broken.md'),
-      `---\nruntime:\n  type: container\n  containerSharing: BOGUS_VALUE\n  image: img:latest\n  workingDirectory: /w\n  mounts: {}\n---\nBody.`
+      `---\nruntime:\n  type: container\n  containerSharing: BOGUS_VALUE\n  image: img:latest\n  workingDirectory: /w\n  mounts: []\n---\nBody.`
     );
     writePersona(
       'brain',
@@ -342,7 +340,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /home
   mounts:
-    home: /home`
+    - home`
     );
     writePersona(
       'worker',
@@ -352,7 +350,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /data
   mounts:
-    data: /data`
+    - data`
     );
     const reg = makeRegistry();
     const { logger } = await import('@lace/agent/utils/logger');
@@ -386,7 +384,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /logs
   mounts:
-    logs: /logs`
+    - logs`
     );
     writePersona(
       'pet-b',
@@ -396,7 +394,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /logs2
   mounts:
-    logs: /logs2`
+    - logs`
     );
     writePersona(
       'cattle-c',
@@ -406,7 +404,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /cattle-logs
   mounts:
-    logs: /cattle-logs`
+    - logs`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('cattle-c');
@@ -414,7 +412,7 @@ describe('persona-mount-conflict validator', () => {
     let caught: unknown;
     try {
       assertNoMountConflict('cattle-c', parsed, reg, {
-        logs: { hostPath: '/srv/logs', readonly: false },
+        logs: { hostPath: '/srv/logs', containerPath: '/logs', readonly: false },
       });
     } catch (err) {
       caught = err;
@@ -441,7 +439,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'shell',
@@ -451,7 +449,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('shell');
@@ -459,7 +457,7 @@ describe('persona-mount-conflict validator', () => {
     // Registry says 'knowledge' is readonly — no threat, should not throw.
     expect(() =>
       assertNoMountConflict('shell', parsed, reg, {
-        knowledge: { hostPath: '/srv/knowledge', readonly: true },
+        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: true },
       })
     ).not.toThrow();
   });
@@ -476,7 +474,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'shell',
@@ -486,7 +484,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('shell');
@@ -494,7 +492,7 @@ describe('persona-mount-conflict validator', () => {
     let caught: unknown;
     try {
       assertNoMountConflict('shell', parsed, reg, {
-        knowledge: { hostPath: '/srv/knowledge', readonly: false },
+        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
       });
     } catch (err) {
       caught = err;
@@ -517,7 +515,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'shell',
@@ -527,7 +525,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const parsed = reg.parsePersona('shell');
@@ -557,7 +555,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'shell',
@@ -567,14 +565,16 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const { logger } = await import('@lace/agent/utils/logger');
 
     // Registry marks 'knowledge' readonly — not a threat, no WARN expected.
     expect(() =>
-      warnMountConflicts(reg, { knowledge: { hostPath: '/srv/knowledge', readonly: true } })
+      warnMountConflicts(reg, {
+        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: true },
+      })
     ).not.toThrow();
 
     const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
@@ -594,7 +594,7 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /knowledge
   mounts:
-    knowledge: /knowledge`
+    - knowledge`
     );
     writePersona(
       'shell',
@@ -604,13 +604,15 @@ describe('persona-mount-conflict validator', () => {
   image: img:latest
   workingDirectory: /shared
   mounts:
-    knowledge: /shared`
+    - knowledge`
     );
     const reg = makeRegistry();
     const { logger } = await import('@lace/agent/utils/logger');
 
     // Registry marks 'knowledge' read-write — genuine threat → WARN expected.
-    warnMountConflicts(reg, { knowledge: { hostPath: '/srv/knowledge', readonly: false } });
+    warnMountConflicts(reg, {
+      knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
+    });
 
     expect(logger.warn).toHaveBeenCalledWith(
       'persona_mount_conflict',

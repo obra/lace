@@ -216,7 +216,11 @@ function buildContainerExecutionContext(input: {
   }
 
   const token = randomBytes(32).toString('base64url');
-  const containerId = resolveContainerId(input.runtimeBinding.toolRuntime.spec);
+  const spec = input.runtimeBinding.toolRuntime.spec;
+  const hasPlaneSelectors = Boolean(
+    spec.persona || spec.parentSession || spec.childSession || spec.jobId
+  );
+  const containerId = !spec.containerId && hasPlaneSelectors ? undefined : resolveContainerId(spec);
   return {
     executionEnv: { [input.identity.tokenEnvName]: token },
     metadata: {

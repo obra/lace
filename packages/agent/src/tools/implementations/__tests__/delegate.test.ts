@@ -188,7 +188,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -236,7 +236,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'sen-box:dev',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -287,7 +287,7 @@ describe('DelegateTool', () => {
             containerSharing: 'persistent',
             image: 'example/sen-box@sha256:' + 'a'.repeat(64),
             workingDirectory: '/home/agent',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -318,8 +318,12 @@ describe('DelegateTool', () => {
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect((options.runtimeBinding as RuntimeExecutionBinding).toolRuntime).toMatchObject({
       type: 'container',
-      spec: { name: 'box-shell', containerId: 'box-box-shell', restartPolicy: 'unless-stopped' },
+      spec: { name: 'box-shell', persona: 'box-shell' },
     });
+    const containerRuntime = (options.runtimeBinding as RuntimeExecutionBinding)
+      .toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>;
+    expect(containerRuntime.spec.containerId).toBeUndefined();
+    expect(containerRuntime.spec.restartPolicy).toBeUndefined();
   });
 
   it('uses containerMounts from context when building projected binding', async () => {
@@ -333,7 +337,7 @@ describe('DelegateTool', () => {
             containerSharing: 'persistent',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/work',
-            mounts: { data: '/work' },
+            mounts: ['data'],
             env: {},
           },
         },
@@ -361,7 +365,9 @@ describe('DelegateTool', () => {
         signal: new AbortController().signal,
         jobManager,
         runtimeBinding,
-        containerMounts: { data: { hostPath: '/host/data', readonly: false } },
+        containerMounts: {
+          data: { hostPath: '/host/data', containerPath: '/work', readonly: false },
+        },
       }
     );
 
@@ -482,7 +488,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -537,7 +543,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -591,7 +597,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -666,7 +672,7 @@ describe('DelegateTool', () => {
             containerSharing: 'persistent',
             image: 'example/sen-box:latest',
             workingDirectory: '/home/agent',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -710,7 +716,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -760,7 +766,7 @@ describe('DelegateTool', () => {
               containerSharing: 'per_invocation',
               image: 'example/subagent:latest',
               workingDirectory: '/workspace',
-              mounts: {},
+              mounts: [],
               env: {},
             },
           },
@@ -896,7 +902,7 @@ describe('DelegateTool', () => {
               containerSharing: 'persistent',
               image: 'example/sen-box:latest',
               workingDirectory: '/home/agent',
-              mounts: {},
+              mounts: [],
               env: {},
             },
           },
@@ -948,7 +954,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -1004,7 +1010,7 @@ describe('DelegateTool', () => {
                 containerSharing: 'persistent',
                 image: 'img:latest',
                 workingDirectory: '/home',
-                mounts: { home: '/home' },
+                mounts: ['home'],
                 env: {},
               },
             },
@@ -1019,7 +1025,7 @@ describe('DelegateTool', () => {
               containerSharing: 'per_invocation',
               image: 'img:latest',
               workingDirectory: '/shared',
-              mounts: { home: '/shared' },
+              mounts: ['home'],
               env: {},
             },
           },

@@ -90,8 +90,8 @@ runtime:
   image: ghcr.io/example/lace-shell:latest
   workingDirectory: /workspace
   mounts:
-    scratch: /workspace/scratch
-    knowledge: /workspace/knowledge
+    - scratch
+    - knowledge
   env:
     FOO: bar
   ports:
@@ -108,10 +108,101 @@ Body.`;
       containerSharing: 'per_invocation',
       image: 'ghcr.io/example/lace-shell:latest',
       workingDirectory: '/workspace',
-      mounts: { scratch: '/workspace/scratch', knowledge: '/workspace/knowledge' },
+      mounts: ['scratch', 'knowledge'],
       env: { FOO: 'bar' },
       ports: [{ host: 8080, container: 80 }],
+      browserCdpSocket: false,
     });
+  });
+
+  it('parses runtime.type=container with browserCdpSocket defaulting false', () => {
+    const content = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: sen-browser:dev
+  workingDirectory: /work
+  mounts: []
+  browserCdpSocket: true
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'browser-cdp-runtime.md'), content);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('browser-cdp-runtime').config.runtime).toMatchObject({
+      type: 'container',
+      browserCdpSocket: true,
+    });
+
+    const omitted = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /work
+  mounts: []
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'no-browser-cdp-runtime.md'), omitted);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('no-browser-cdp-runtime').config.runtime).toMatchObject({
+      type: 'container',
+      browserCdpSocket: false,
+    });
+  });
+
+  it('clamps container runtime ports to u16 bounds', () => {
+    const atBounds = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /work
+  mounts: []
+  ports:
+    - host: 65535
+      container: 0
+    - host: 0
+      container: 65535
+---
+Body.`;
+    writeFileSync(path.join(tempBundledDir, 'port-bounds.md'), atBounds);
+    registry = makeRegistry([userPersonaDir]);
+
+    expect(registry.parsePersona('port-bounds').config.runtime).toMatchObject({
+      type: 'container',
+      ports: [
+        { host: 65535, container: 0 },
+        { host: 0, container: 65535 },
+      ],
+    });
+
+    const outOfRangeCases = [
+      { name: 'host-below-lower-bound', host: -1, container: 80 },
+      { name: 'host-over-upper-bound', host: 65536, container: 80 },
+      { name: 'container-below-lower-bound', host: 8080, container: -1 },
+      { name: 'container-over-upper-bound', host: 8080, container: 65536 },
+    ];
+
+    for (const { name, host, container } of outOfRangeCases) {
+      const content = `---
+runtime:
+  type: container
+  containerSharing: per_invocation
+  image: img:latest
+  workingDirectory: /work
+  mounts: []
+  ports:
+    - host: ${host}
+      container: ${container}
+---
+Body.`;
+      writeFileSync(path.join(tempBundledDir, `port-${name}.md`), content);
+      registry = makeRegistry([userPersonaDir]);
+
+      expect(() => registry.parsePersona(`port-${name}`)).toThrow(/ports/i);
+    }
   });
 
   it('parses runtime.type=container with empty mounts and defaulted env', () => {
@@ -121,7 +212,7 @@ runtime:
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
-  mounts: {}
+  mounts: []
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'container-minimal.md'), content);
@@ -133,8 +224,9 @@ Body.`;
       containerSharing: 'per_invocation',
       image: 'img:latest',
       workingDirectory: '/w',
-      mounts: {},
+      mounts: [],
       env: {},
+      browserCdpSocket: false,
     });
   });
 
@@ -146,7 +238,7 @@ runtime:
   image: ghcr.io/example/sen-box:latest
   workingDirectory: /home/agent
   mounts:
-    home: /home/agent
+    - home
   env:
     HOME: /home/agent
 ---
@@ -159,8 +251,9 @@ Body.`;
       containerSharing: 'persistent',
       image: 'ghcr.io/example/sen-box:latest',
       workingDirectory: '/home/agent',
-      mounts: { home: '/home/agent' },
+      mounts: ['home'],
       env: { HOME: '/home/agent' },
+      browserCdpSocket: false,
     });
   });
 
@@ -171,7 +264,7 @@ runtime:
   containerSharing: per_invocation
   image: sen-browser:dev
   workingDirectory: /work
-  mounts: {}
+  mounts: []
   sysctls:
     net.ipv6.conf.lo.disable_ipv6: "0"
 ---
@@ -192,7 +285,7 @@ runtime:
   containerSharing: per_invocation
   image: sen-box:dev
   workingDirectory: /work
-  mounts: {}
+  mounts: []
   capAdd:
     - NET_ADMIN
 ---
@@ -213,7 +306,7 @@ runtime:
   containerSharing: per_invocation
   image: sen-box:dev
   workingDirectory: /work
-  mounts: {}
+  mounts: []
   network: quarantine
 ---
 Body.`;
@@ -233,7 +326,7 @@ runtime:
   containerSharing: per_invocation
   image: sen-box:dev
   workingDirectory: /work
-  mounts: {}
+  mounts: []
   gatewayRoute: "172.31.250.1"
 ---
 Body.`;
@@ -254,7 +347,7 @@ runtime:
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /w
-  mounts: {}
+  mounts: []
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'legacy-placement.md'), content);
@@ -269,7 +362,7 @@ runtime:
   type: container
   containerSharing: per_invocation
   workingDirectory: /w
-  mounts: {}
+  mounts: []
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'no-image.md'), content);
@@ -301,7 +394,7 @@ runtime:
   image: img:latest
   workingDirectory: /w
   mounts:
-    Scratch: /w/scratch
+    - Scratch
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'bad-mount-upper.md'), upper);
@@ -315,7 +408,7 @@ runtime:
   image: img:latest
   workingDirectory: /w
   mounts:
-    1scratch: /w/scratch
+    - 1scratch
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'bad-mount-digit.md'), leadingDigit);
@@ -329,7 +422,7 @@ runtime:
   type: box
   image: img:latest
   workingDirectory: /home/agent
-  mounts: {}
+  mounts: []
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'old-box.md'), content);
@@ -348,7 +441,7 @@ runtime:
   containerLifecycle: session
   image: node:24-bookworm
   workingDirectory: /work
-  mounts: {}
+  mounts: []
 ---
 body
 `;
@@ -365,7 +458,7 @@ runtime:
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home/agent
-  mounts: {}
+  mounts: []
   ports:
     - host: 8080
       container: 80

@@ -230,7 +230,7 @@ export class ContainerManager {
       capAdd: spec.capAdd,
       network: spec.network,
       gatewayRoute: spec.gatewayRoute,
-      // Selector fields — the ShimContainerRuntime reads these in create() to
+      // Selector fields — PlaneRuntime reads these in create() to
       // emit `spawn <persona> <parent> <child> <jobId>`.
       persona: spec.persona,
       parentSession: spec.parentSession,

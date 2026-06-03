@@ -68,24 +68,10 @@ export class PromptManager {
     try {
       logger.debug('Generating system prompt using template system', { persona });
 
-      // Validate persona exists
       this.personaRegistry.validatePersona(persona);
 
-      // Get persona template path
-      const personaPath = this.personaRegistry.getPersonaPath(persona);
-      if (!personaPath) {
-        throw new Error(`Persona '${persona}' not found`);
-      }
-
       const context = await this.variableManager.getTemplateContext();
-
-      // Plugin personas have no file on disk — their body lives in memory.
-      // personaPath starts with "plugin:" in that case; use the in-memory body
-      // so the same variable substitution applies without requiring a file read.
-      const isPluginPersona = personaPath.startsWith('plugin:');
-      const prompt = isPluginPersona
-        ? this.templateEngine.renderString(this.personaRegistry.parsePersona(persona).body, context)
-        : this.templateEngine.render(`${persona}.md`, context);
+      const prompt = this.personaRegistry.render(persona, this.templateEngine, context);
 
       logger.debug('System prompt generated successfully', {
         persona,

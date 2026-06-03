@@ -2,6 +2,21 @@ import { z } from 'zod';
 import { buildRuntimeId } from './identity';
 import type { RuntimeExecutionBinding } from './types';
 
+const CONTAINER_SELECTOR_FIELDS = ['persona', 'parentSession', 'childSession', 'jobId'] as const;
+const CONTAINER_AUTHORITY_FIELDS = [
+  'containerId',
+  'ports',
+  'restartPolicy',
+  'sysctls',
+  'capAdd',
+  'network',
+  'gatewayRoute',
+] as const;
+
+function hasDefinedField(value: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, field) && value[field] !== undefined;
+}
+
 const RuntimeSecretReferenceSchema = z
   .object({
     namespace: z.enum(['session', 'project', 'host-service']),
@@ -54,18 +69,30 @@ const ContainerRuntimeDescriptorSchema = z
         capAdd: z.array(z.string().min(1)).optional(),
         // Forwarded to `docker create --network <name>`.
         network: z.string().min(1).optional(),
-        // IPv4 address of the egress gateway for the post-start
-        // netns-init sidecar. Validated as a non-empty string (loose IPv4).
+        // IPv4 address of the egress gateway broker. Validated as a
+        // non-empty string at this layer.
         gatewayRoute: z.string().min(1).optional(),
-        // Root A SELECTOR fields — carried for the ShimContainerRuntime's
-        // create()->spawn. MUST be in this .strict() schema or a shim binding fails
-        // validation (bug-#7 class). SELECTOR ONLY; the shim re-validates persona.
+        // Root A SELECTOR fields — carried for PlaneRuntime's create()->spawn.
+        // MUST be in this .strict() schema or a plane binding fails validation
+        // (bug-#7 class). SELECTOR ONLY; the plane re-validates persona.
         persona: z.string().min(1).optional(),
         parentSession: z.string().min(1).optional(),
         childSession: z.string().min(1).optional(),
         jobId: z.string().min(1).optional(),
       })
-      .strict(),
+      .strict()
+      .superRefine((spec, ctx) => {
+        const hasSelector = CONTAINER_SELECTOR_FIELDS.some((field) => hasDefinedField(spec, field));
+        const hasAuthority = CONTAINER_AUTHORITY_FIELDS.some((field) =>
+          hasDefinedField(spec, field)
+        );
+        if (!hasSelector || !hasAuthority) return;
+
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Container selector fields cannot be combined with docker authority fields',
+        });
+      }),
     helper: z
       .object({
         mode: z.enum(['copy', 'mount', 'image']),

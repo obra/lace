@@ -182,9 +182,9 @@ export type AgentServerState = {
   // Set by the initialize handler when the client supplies skillDirs.
   skillDirs?: string[];
   // Embedder-supplied named-mount registry. Consulted at persona-container
-  // materialization to resolve persona `runtime.mounts[name]` into a host
-  // path + readonly flag. Always present; defaults to {} when initialize
-  // omits the param.
+  // materialization to resolve persona `runtime.mounts` names into host paths,
+  // container paths, and readonly flags. Always present; defaults to {} when
+  // initialize omits the param.
   containerMounts: Record<string, MountRegistryEntry>;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
   // Persona-container materialization (K-49e). null when the host platform
@@ -213,5 +213,6 @@ export type AgentServerState = {
 // Single entry in the embedder-supplied containerMounts registry.
 export type MountRegistryEntry = {
   hostPath: string;
+  containerPath: string;
   readonly: boolean;
 };

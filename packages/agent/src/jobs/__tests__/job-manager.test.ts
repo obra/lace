@@ -762,6 +762,82 @@ describe('JobManager', () => {
       expect(eventArg.data.runtimeBinding).toEqual(runtimeBinding);
     });
 
+    it('keeps explicit generic containerId in container execution metadata', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+      const runtimeBinding: RuntimeExecutionBinding = {
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_generic_container' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/workspace',
+          spec: {
+            name: 'generic-container',
+            containerId: 'explicit-container-id',
+            image: 'example/app:latest',
+            workingDirectory: '/workspace',
+            mounts: [],
+          },
+        },
+      };
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Do something',
+        persona: 'generic',
+        runtimeBinding,
+        containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
+      });
+
+      expect(result.job.containerExecutionMetadata).toMatchObject({
+        containerId: 'explicit-container-id',
+        runtimeId: 'rt_generic_container',
+      });
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.data.containerExecutionMetadata).toMatchObject({
+        containerId: 'explicit-container-id',
+      });
+    });
+
+    it('omits synthesized containerId metadata for jobId-only selector specs', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+      const runtimeBinding: RuntimeExecutionBinding = {
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_plane_selector' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/workspace',
+          spec: {
+            name: 'plane-selector-container',
+            image: 'example/app:latest',
+            workingDirectory: '/workspace',
+            mounts: [],
+            jobId: 'job_plane_selector',
+          },
+        },
+      };
+
+      const result = await manager.createJob('delegate', {
+        prompt: 'Do something',
+        persona: 'generic',
+        runtimeBinding,
+        containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
+      });
+
+      expect(result.job.containerExecutionMetadata).toMatchObject({
+        runtimeId: 'rt_plane_selector',
+      });
+      expect(result.job.containerExecutionMetadata).not.toHaveProperty('containerId');
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.data.containerExecutionMetadata).not.toHaveProperty('containerId');
+    });
+
     it('emits job_started update', async () => {
       const emitUpdate = vi.fn().mockResolvedValue(undefined);
       const deps = createDeps({ emitUpdate });

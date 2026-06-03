@@ -21,7 +21,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         env: { FOO: 'bar' },
         ports: [{ host: 6080, container: 6080 }],
       },
@@ -36,7 +36,9 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         image: 'node:24-bookworm',
         workingDirectory: '/work',
         env: { FOO: 'bar' },
-        ports: [{ host: 6080, container: 6080 }],
+        persona: 'shell',
+        parentSession: PARENT_SESSION_ID,
+        childSession: CHILD_SESSION_ID,
       },
       helper: {
         mode: 'mount',
@@ -44,6 +46,11 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
       },
     });
+    const containerRuntime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(containerRuntime.spec.ports).toBeUndefined();
 
     // Helper descriptor must be present on every projected binding.
     expect(
@@ -74,7 +81,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'node:24-bookworm',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         env: { FOO: 'persona', KEEP: 'runtime' },
       },
       containerMounts: {},
@@ -91,6 +98,29 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     ).toEqual({ FOO: 'execution', KEEP: 'runtime', SEN_AGENT_TOKEN: 'token' });
   });
 
+  it('does not invent a jobId before delegate allocates the Lace job', () => {
+    const binding = buildPersonaProjectedRuntimeBinding({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'node:24-bookworm',
+        workingDirectory: '/work',
+        mounts: [],
+      },
+      containerMounts: {},
+    });
+
+    const runtime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(runtime.spec.jobId).toBeUndefined();
+  });
+
   it('builds a projected binding for persistent lifecycle containers', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess1',
@@ -100,10 +130,12 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'persistent',
         image: 'sen-box:dev',
         workingDirectory: '/home/agent',
-        mounts: { home: '/home/agent' },
+        mounts: ['home'],
         env: { HOME: '/home/agent' },
       },
-      containerMounts: { home: { hostPath: '/host/home', readonly: false } },
+      containerMounts: {
+        home: { hostPath: '/host/home', containerPath: '/home/agent', readonly: false },
+      },
     });
 
     expect(binding.toolRuntime).toMatchObject({
@@ -111,14 +143,20 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       cwd: '/home/agent',
       spec: {
         name: 'box-shell',
-        containerId: 'box-box-shell',
         image: 'sen-box:dev',
-        restartPolicy: 'unless-stopped',
+        persona: 'box-shell',
+        parentSession: 'sess1',
       },
     });
+    const containerRuntime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(containerRuntime.spec.containerId).toBeUndefined();
+    expect(containerRuntime.spec.restartPolicy).toBeUndefined();
   });
 
-  it('threads persona-declared sysctls into the projected descriptor', () => {
+  it('drops persona-declared sysctls from the projected descriptor', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser-driver',
@@ -129,19 +167,20 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-browser:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
       },
       containerMounts: {},
     });
 
-    expect(binding.toolRuntime).toMatchObject({
-      type: 'container',
-      spec: { sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' } },
-    });
+    const runtime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(runtime.spec.sysctls).toBeUndefined();
   });
 
-  it('threads persona-declared capAdd into the projected descriptor', () => {
+  it('drops persona-declared capAdd from the projected descriptor', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
@@ -152,19 +191,20 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         capAdd: ['NET_ADMIN'],
       },
       containerMounts: {},
     });
 
-    expect(binding.toolRuntime).toMatchObject({
-      type: 'container',
-      spec: { capAdd: ['NET_ADMIN'] },
-    });
+    const runtime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(runtime.spec.capAdd).toBeUndefined();
   });
 
-  it('threads persona-declared network into the projected descriptor', () => {
+  it('drops persona-declared network from the projected descriptor', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
@@ -175,16 +215,17 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
         network: 'quarantine',
       },
       containerMounts: {},
     });
 
-    expect(binding.toolRuntime).toMatchObject({
-      type: 'container',
-      spec: { network: 'quarantine' },
-    });
+    const runtime = binding.toolRuntime as Extract<
+      RuntimeExecutionBinding['toolRuntime'],
+      { type: 'container' }
+    >;
+    expect(runtime.spec.network).toBeUndefined();
   });
 
   it('passes the persona-declared image reference through verbatim (tag, digest, anything)', () => {
@@ -198,7 +239,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'sen-box:dev',
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
       },
       containerMounts: {},
     });
@@ -221,7 +262,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         containerSharing: 'per_invocation',
         image: 'example/app@sha256:' + 'a'.repeat(64),
         workingDirectory: '/work',
-        mounts: {},
+        mounts: [],
       },
       containerMounts: {},
     });
@@ -247,7 +288,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
           containerSharing: 'per_invocation',
           image: 'node:24-bookworm',
           workingDirectory: '/work',
-          mounts: { missing: '/work' },
+          mounts: ['missing'],
         },
         containerMounts: {},
       })
@@ -261,7 +302,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     containerSharing: 'per_invocation' as const,
     image: 'devcontainer:latest',
     workingDirectory: '/workspace',
-    mounts: {},
+    mounts: [],
   };
 
   const persistentRuntime = {
@@ -269,10 +310,10 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     containerSharing: 'persistent' as const,
     image: 'sen-box:dev',
     workingDirectory: '/home/agent',
-    mounts: {},
+    mounts: [],
   };
 
-  it('passes childSessionId and scratchDirHostPath through to buildPersonaContainerSpec', () => {
+  it('passes childSessionId and scratchDirHostPath through to the projected runtime spec', () => {
     // sess_aaaaaaaa11111111 → parent short 'aaaaaaaa'
     // sess_bbbbbbbb22222222 → child  short 'bbbbbbbb'
     const binding = buildPersonaProjectedRuntimeBinding({

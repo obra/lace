@@ -7,6 +7,20 @@ import type { ContainerLifecycleHooks, ContainerSpec } from '../../../containers
 import { ProjectedContainerToolRuntime } from '../projected-container';
 import { InMemoryRuntimeSecretResolver } from '../secrets';
 
+const { mockChildProcessSpawn } = vi.hoisted(() => ({
+  mockChildProcessSpawn: vi.fn(() => {
+    throw new Error('unexpected child_process.spawn');
+  }),
+}));
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    spawn: mockChildProcessSpawn,
+  };
+});
+
 function createFakeExecStreamHandle() {
   return {
     stdin: new PassThrough(),
@@ -105,7 +119,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('materializes the descriptor spec before process start so explicit containerId is honored', async () => {
+  it('materializes the generic descriptor spec before process start with docker authority fields', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.env = { BASE: 'yes' };
@@ -129,12 +143,15 @@ describe('ProjectedContainerToolRuntime', () => {
       ports: [{ host: 7777, container: 7777 }],
       restartPolicy: 'unless-stopped',
     });
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.ports).toEqual([{ host: 7777, container: 7777 }]);
+    expect(materializedSpec.restartPolicy).toBe('unless-stopped');
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
     );
   });
 
-  it('threads descriptor sysctls into the materialized spec', async () => {
+  it('threads generic descriptor sysctls into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.sysctls = { 'net.ipv6.conf.lo.disable_ipv6': '0' };
@@ -146,17 +163,14 @@ describe('ProjectedContainerToolRuntime', () => {
 
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
-    expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
-      })
-    );
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
     );
   });
 
-  it('threads descriptor capAdd into the materialized spec', async () => {
+  it('threads generic descriptor capAdd into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.capAdd = ['NET_ADMIN'];
@@ -168,14 +182,11 @@ describe('ProjectedContainerToolRuntime', () => {
 
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
-    expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        capAdd: ['NET_ADMIN'],
-      })
-    );
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.capAdd).toEqual(['NET_ADMIN']);
   });
 
-  it('threads descriptor network into the materialized spec', async () => {
+  it('threads generic descriptor network into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.network = 'quarantine';
@@ -187,14 +198,11 @@ describe('ProjectedContainerToolRuntime', () => {
 
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
-    expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        network: 'quarantine',
-      })
-    );
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.network).toBe('quarantine');
   });
 
-  it('threads descriptor gatewayRoute into the materialized spec', async () => {
+  it('threads generic descriptor gatewayRoute into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.gatewayRoute = '172.31.250.1';
@@ -206,11 +214,76 @@ describe('ProjectedContainerToolRuntime', () => {
 
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
-    expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        gatewayRoute: '172.31.250.1',
-      })
-    );
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.gatewayRoute).toBe('172.31.250.1');
+  });
+
+  it('rejects mixed selector and docker authority descriptor specs', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.persona = 'browser-driver';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await expect(
+      runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd })
+    ).rejects.toThrow(/selector.*authority|authority.*selector/i);
+    expect(manager.materialize).not.toHaveBeenCalled();
+  });
+
+  it('omits docker authority fields from selector-only persona specs', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    delete projectedDescriptor.spec.containerId;
+    projectedDescriptor.spec.persona = 'browser-driver';
+    projectedDescriptor.spec.parentSession = 'sess_parent_projected';
+    projectedDescriptor.spec.childSession = 'sess_child_projected';
+    projectedDescriptor.spec.jobId = 'job_projected';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec).toMatchObject({
+      persona: 'browser-driver',
+      parentSession: 'sess_parent_projected',
+      childSession: 'sess_child_projected',
+      jobId: 'job_projected',
+    });
+    expect(materializedSpec.containerId).toBeUndefined();
+    expect(materializedSpec.ports).toBeUndefined();
+    expect(materializedSpec.restartPolicy).toBeUndefined();
+    expect(materializedSpec.sysctls).toBeUndefined();
+    expect(materializedSpec.capAdd).toBeUndefined();
+    expect(materializedSpec.network).toBeUndefined();
+    expect(materializedSpec.gatewayRoute).toBeUndefined();
+  });
+
+  it('does not shell out to docker inspect after materialization', async () => {
+    mockChildProcessSpawn.mockClear();
+    const manager = createFakeContainerManager();
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    expect(mockChildProcessSpawn).not.toHaveBeenCalled();
+  });
+
+  it('does not import child_process for direct docker inspect shellouts', async () => {
+    const source = await readFile(new URL('../projected-container.ts', import.meta.url), 'utf8');
+
+    expect(source).not.toContain('child_process');
   });
 
   it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
@@ -289,12 +362,13 @@ describe('ProjectedContainerToolRuntime', () => {
       expect.objectContaining({
         name: 'box-shell',
         containerId: 'sen-box-shell',
-        restartPolicy: 'unless-stopped',
         mounts: expect.arrayContaining([
           { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
         ]),
       })
     );
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.restartPolicy).toBe('unless-stopped');
   });
 
   it('copies host-provided runtime helpers before creating copy-mode containers', async () => {
@@ -429,6 +503,41 @@ describe('ProjectedContainerToolRuntime', () => {
       expect.objectContaining({
         environment: { MCP_ONLY: 'visible' },
         environmentMode: 'replace',
+      })
+    );
+  });
+
+  it('does not forward descriptor env as per-exec environment', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.env = {
+      NODE_EXTRA_CA_CERTS: '/etc/ssl/proxy-ca.pem',
+      HOME: '/home/sen',
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], {
+      cwd: runtime.cwd,
+      env: { TERM: 'xterm-256color' },
+    });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: {
+          NODE_EXTRA_CA_CERTS: '/etc/ssl/proxy-ca.pem',
+          HOME: '/home/sen',
+        },
+      })
+    );
+    expect(manager.execStream).toHaveBeenCalledWith(
+      'projected-runtime',
+      expect.objectContaining({
+        environment: { TERM: 'xterm-256color' },
+        environmentMode: 'inherit',
       })
     );
   });

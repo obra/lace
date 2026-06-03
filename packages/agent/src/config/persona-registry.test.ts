@@ -128,15 +128,17 @@ describe('PersonaRegistry', () => {
     );
   });
 
-  it('returns correct persona paths', () => {
+  it('resolves known personas; unknown persona is absent', () => {
     writeFileSync(path.join(tempBundledDir, 'lace.md'), 'Default persona');
     registry = makeRegistry();
 
-    const path1 = registry.getPersonaPath('lace');
-    expect(path1).toBe('lace.md'); // Built-in personas return logical path
+    // Bundled persona is discoverable.
+    expect(registry.hasPersona('lace')).toBe(true);
+    expect(registry.listAvailablePersonas().map((p) => p.name)).toContain('lace');
 
-    const path2 = registry.getPersonaPath('nonexistent');
-    expect(path2).toBeNull();
+    // Unknown persona is not present.
+    expect(registry.hasPersona('nonexistent')).toBe(false);
+    expect(registry.listAvailablePersonas().map((p) => p.name)).not.toContain('nonexistent');
   });
 
   it('hasPersona returns correct boolean values', () => {
