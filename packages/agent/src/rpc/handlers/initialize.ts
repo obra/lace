@@ -132,10 +132,11 @@ export function registerInitializeHandler(
       });
     }
 
-    // Embedder-supplied named-mount registry. Persona containers resolve their
-    // `runtime.mounts[name]` against this map at materialization time. Always
-    // stored on state (defaults to {}). Parse before the R6 boot scan so the
-    // readonly flags are available for conflict filtering.
+    // Embedder-supplied named-mount registry. Persona containers list mount
+    // names in `runtime.mounts`; this registry supplies host paths, container
+    // paths, and readonly flags. Always stored on state (defaults to {}). Parse
+    // before the R6 boot scan so the readonly flags are available for conflict
+    // filtering.
     state.containerMounts = parseContainerMounts(parsed.containerMounts);
 
     // R6 boot-time invariant: log a WARN for any per_invocation persona that

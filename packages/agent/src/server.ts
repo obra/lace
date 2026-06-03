@@ -125,8 +125,8 @@ export function createAgentServerState(): AgentServerState {
 /**
  * Read-only accessor for the embedder-supplied containerMounts registry.
  * Returns the registry as set by the most recent initialize call (defaults to {}).
- * Persona-container materialization (K-49e) consults this to resolve
- * `runtime.mounts[name]` into a host path + readonly flag.
+ * Persona-container materialization consults persona `runtime.mounts` names
+ * through this registry to resolve host paths, container paths, and readonly flags.
  */
 export function getContainerMounts(
   state: AgentServerState
