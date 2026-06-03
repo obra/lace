@@ -18,6 +18,7 @@ import { JobNotifyTool } from './implementations/job_notify';
 import { TodoReadTool } from './implementations/todo_read';
 import { TodoWriteTool } from './implementations/todo_write';
 import { ManageRemindersTool } from './implementations/manage_reminders';
+import { CompactSessionTool } from './implementations/compact_session';
 
 /** The per-session option-taking built-ins; the executor owns their names. */
 export const PER_SESSION_BUILTIN_NAMES = new Set(['delegate', 'use_skill']);
@@ -51,6 +52,7 @@ export function registerBuiltinTools(): void {
     new TodoReadTool(),
     new TodoWriteTool(),
     new ManageRemindersTool(),
+    new CompactSessionTool(),
   ]) {
     registries.tools.register(t.name, t, 'builtin');
   }

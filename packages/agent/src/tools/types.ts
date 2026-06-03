@@ -65,6 +65,11 @@ export interface ToolContext {
   // cancelReap so the container survives for the new invocation window.
   // The subagent-job exit handler schedules a new reap after each child exits.
   perInvocationReaper?: PerInvocationReaper;
+
+  // Per-turn compaction request cell. The runner creates this object at the
+  // start of each turn and passes the same reference into every tool
+  // execution context. compact_session mutates it; the post-turn block reads it.
+  compactionRequest?: { requested: boolean; guidance?: string };
 }
 
 export interface ToolAnnotations {

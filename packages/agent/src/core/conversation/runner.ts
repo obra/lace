@@ -465,6 +465,12 @@ export class ConversationRunner {
     let partialAssistantText = '';
     let pauseResumeCount = 0;
 
+    // Per-turn compaction request cell. compact_session mutates this during
+    // tool execution; the post-turn block reads it to decide whether to fire.
+    // A single shared object is used so the tool (which receives the same
+    // reference via ToolContext) mutates the runner's local state in place.
+    const compactionRequest: { requested: boolean; guidance?: string } = { requested: false };
+
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
         // Pick up any priority='immediate' context_injected events
@@ -920,6 +926,7 @@ export class ConversationRunner {
                 sessionId,
                 runtimeBinding,
                 writeAndAdvance,
+                compactionRequest,
               });
             } catch (toolErr) {
               // Log at ERROR with toolName + toolCallId so the next
@@ -1060,14 +1067,13 @@ export class ConversationRunner {
         };
         const contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
         const pressure = computePressure(usage, contextWindowSize);
-        if (shouldFireCompaction({ stopReason, pressure })) {
+        if (compactionRequest.requested || shouldFireCompaction({ stopReason, pressure })) {
           const allEvents = readDurableEvents(sessionDir, {
             limit: Number.MAX_SAFE_INTEGER,
           }).events;
           const strategy = resolveCompactionStrategy(
             this.config.persona ? compactionStrategyNameForSession(sessionDir) : 'track-based'
           );
-          // guidance wired in Task 3
           const compactionCtx = {
             // Legacy fields kept for track-based strategy back-compat until Task 6
             // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
@@ -1081,7 +1087,7 @@ export class ConversationRunner {
               sessionDir,
               connectionId: this.config.connectionId,
               modelId: modelId ?? undefined,
-              // guidance: undefined — wired in Task 3
+              guidance: compactionRequest.guidance,
             }),
           };
           const raw = await strategy.compact(
@@ -1165,6 +1171,7 @@ export class ConversationRunner {
     sessionId: string;
     runtimeBinding: RuntimeExecutionBinding;
     writeAndAdvance: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
+    compactionRequest: { requested: boolean; guidance?: string };
   }): Promise<{
     streamTurnSeq: number;
     coreResult: CoreToolResult;
@@ -1191,6 +1198,7 @@ export class ConversationRunner {
       sessionId,
       runtimeBinding,
       writeAndAdvance,
+      compactionRequest,
     } = params;
     const { toolExecutor } = params;
     let { streamTurnSeq } = params;
@@ -1535,6 +1543,7 @@ export class ConversationRunner {
       abortController,
       turnId,
       runtimeBinding,
+      compactionRequest,
     });
 
     const protocolResult = protocolToolResultFromCore(coreResult);
@@ -1611,6 +1620,7 @@ export class ConversationRunner {
     abortController: AbortController;
     turnId: string;
     runtimeBinding: RuntimeExecutionBinding;
+    compactionRequest: { requested: boolean; guidance?: string };
   }): Promise<CoreToolResult> {
     const {
       toolName,
@@ -1625,6 +1635,7 @@ export class ConversationRunner {
       abortController,
       turnId,
       runtimeBinding,
+      compactionRequest,
     } = params;
 
     // Note: bash with background=true is handled before permission check and never reaches here.
@@ -1682,6 +1693,7 @@ export class ConversationRunner {
         ...(this.deps.perInvocationReaper
           ? { perInvocationReaper: this.deps.perInvocationReaper }
           : {}),
+        compactionRequest,
       }
     );
   }
