@@ -259,3 +259,6 @@ Ship the plugin as its **own package**, separate from `@lace/agent`:
   the credential-path work. Don't rely on it as a live security control yet.
 - **Registry identity depends on a single `@lace/agent`.** If your tests or build
   accidentally load two copies, registrations vanish silently. Mark it external.
+- **Repo lint is enforced on commit** (eslint `--fix` + prettier via a pre-commit
+  hook). Notably `prefer-const` and `no-unused-vars` — suppress an intentionally
+  unused value with `void x`. Run `npx eslint <files> --fix` before committing.
