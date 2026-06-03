@@ -21,7 +21,6 @@ import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-s
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
-import { ensureScratchGcReminder } from './scratch-gc-reminder';
 
 const delegateSchema = z
   .object({
@@ -195,11 +194,6 @@ Parameters:
               personaName: persona,
               childSessionId: childSessionId!,
             });
-
-            // Schedule GC reminder (best-effort — the helper wraps in try/catch).
-            if (context.reminderScheduler && context.activeSessionId) {
-              await ensureScratchGcReminder(context.reminderScheduler, context.activeSessionId);
-            }
           }
 
           // Project the persona container into a host-side RuntimeExecutionBinding.
