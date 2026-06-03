@@ -186,6 +186,9 @@ A plugin ships as a **separate package** from `@lace/agent`.
   Import *values* only where unavoidable: the `Tool` base class (you must
   `extends Tool`) is a concrete export you genuinely need; everything else the
   plugin needs is handed in through `api`.
+- **Node stdlib and your own deps import normally** at the top level (`node:fs`,
+  `node:path`, third-party packages, …). The "external" rule applies *only* to
+  `@lace/agent` — it is the kernel whose registry singletons must not be duplicated.
 - **Do not import kernel runtime singletons as values** (`registries`, `logger`,
   the loader). Use `api`.
 
