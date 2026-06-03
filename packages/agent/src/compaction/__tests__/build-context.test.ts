@@ -1,5 +1,5 @@
 // ABOUTME: Tests for buildCompactionContext — binds ctx.query to oneShotQuery and threads guidance
-// ABOUTME: Verifies prompt→messages mapping, model defaulting, and guidance passthrough
+// ABOUTME: Verifies prompt→messages mapping, model defaulting, guidance passthrough, and connection guard
 
 import { describe, it, expect, vi } from 'vitest';
 import { buildCompactionContext } from '../build-context';
@@ -48,23 +48,7 @@ describe('buildCompactionContext', () => {
     );
   });
 
-  it('ctx.query({prompt, system}) prepends a system message', async () => {
-    const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
-    const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
-
-    await ctx.query!({ prompt: 'user text', system: 'be concise' });
-
-    expect(fakeOneShotQuery).toHaveBeenCalledWith(
-      expect.objectContaining({
-        messages: [
-          { role: 'system', content: 'be concise' },
-          { role: 'user', content: 'user text' },
-        ],
-      })
-    );
-  });
-
-  it('ctx.query({messages}) passes messages through directly (bypassing prompt mapping)', async () => {
+  it('ctx.query({messages}) passes non-empty messages through directly (bypassing prompt mapping)', async () => {
     const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
     const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
 
@@ -75,6 +59,19 @@ describe('buildCompactionContext', () => {
     await ctx.query!({ messages });
 
     expect(fakeOneShotQuery).toHaveBeenCalledWith(expect.objectContaining({ messages }));
+  });
+
+  it('ctx.query({messages: []}) treats empty messages as no-messages and falls back to prompt', async () => {
+    const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
+    const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
+
+    await ctx.query!({ messages: [], prompt: 'fallback prompt' });
+
+    expect(fakeOneShotQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [{ role: 'user', content: 'fallback prompt' }],
+      })
+    );
   });
 
   it('forwards AbortSignal to oneShotQuery', async () => {
@@ -91,5 +88,29 @@ describe('buildCompactionContext', () => {
     const ctx = buildCompactionContext(BASE_OPTS);
     expect(ctx.threadId).toBe('thread-1');
     expect(ctx.sessionDir).toBe('/tmp/session');
+  });
+
+  it('ctx.query is absent when connectionId is falsy', () => {
+    const ctx = buildCompactionContext({ ...BASE_OPTS, connectionId: undefined });
+    expect(ctx.query).toBeUndefined();
+  });
+
+  it('ctx.query is absent when modelId is falsy', () => {
+    const ctx = buildCompactionContext({ ...BASE_OPTS, modelId: undefined });
+    expect(ctx.query).toBeUndefined();
+  });
+
+  it('ctx.query is absent when both connectionId and modelId are absent', () => {
+    const ctx = buildCompactionContext({
+      threadId: 'thread-1',
+      sessionDir: '/tmp/session',
+    });
+    expect(ctx.query).toBeUndefined();
+  });
+
+  it('ctx.query is present when both connectionId and modelId are provided', () => {
+    const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
+    const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
+    expect(ctx.query).toBeDefined();
   });
 });

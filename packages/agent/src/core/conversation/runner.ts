@@ -1072,19 +1072,17 @@ export class ConversationRunner {
             // Legacy fields kept for track-based strategy back-compat until Task 6
             // (maybeShrinkBlock still reads ctx.provider / ctx.modelId).
             provider,
-            modelId: modelId ?? undefined,
+            modelId,
             // New ctx.query + guidance fields from buildCompactionContext.
-            // connectionId is optional in RunnerConfig; when absent, ctx.query is
-            // omitted and the built-in falls back to ctx.provider as before.
-            ...(this.config.connectionId
-              ? buildCompactionContext({
-                  threadId: sessionId,
-                  sessionDir,
-                  connectionId: this.config.connectionId,
-                  modelId: modelId ?? '',
-                  // guidance: undefined — wired in Task 3
-                })
-              : { threadId: sessionId, sessionDir }),
+            // buildCompactionContext omits ctx.query when connectionId/modelId is
+            // absent — no need for the conditional spread here any more.
+            ...buildCompactionContext({
+              threadId: sessionId,
+              sessionDir,
+              connectionId: this.config.connectionId,
+              modelId: modelId ?? undefined,
+              // guidance: undefined — wired in Task 3
+            }),
           };
           const raw = await strategy.compact(
             // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data

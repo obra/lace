@@ -168,11 +168,12 @@ export async function handleSlashCommand(
           provider,
           modelId: effectiveConfig.modelId,
           // New ctx.query + guidance from buildCompactionContext.
+          // buildCompactionContext omits ctx.query when connectionId/modelId is absent.
           ...buildCompactionContext({
             threadId: sessionId,
             sessionDir,
-            connectionId: effectiveConfig.connectionId ?? '',
-            modelId: effectiveConfig.modelId ?? '',
+            connectionId: effectiveConfig.connectionId,
+            modelId: effectiveConfig.modelId,
             guidance,
           }),
         };

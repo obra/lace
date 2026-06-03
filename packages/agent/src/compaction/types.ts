@@ -33,14 +33,14 @@ export interface CompactionContext {
   modelId?: string;
   /**
    * One-shot LLM query bound by the call site to the session connection.
-   * The binder converts {prompt, system} → messages and defaults `model` to
+   * The binder converts {prompt} → messages and defaults `model` to
    * the session modelId. Strategies that don't need an LLM ignore it.
+   * Absent when connectionId or modelId is unavailable at the call site.
    */
   query?: (opts: {
     messages?: ProviderMessage[];
     prompt?: string;
     model?: string;
-    system?: string;
     signal?: AbortSignal;
   }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
   /**

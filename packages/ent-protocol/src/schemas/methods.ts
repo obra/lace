@@ -794,6 +794,7 @@ export const EntAgentStatusResponseSchema = z
 const EntSessionCompactParamsSchema = z
   .object({
     strategy: z.literal('track-based').optional(),
+    guidance: z.string().min(1).optional(),
   })
   .strict();
 
