@@ -507,6 +507,41 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('does not forward descriptor env as per-exec environment', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.env = {
+      NODE_EXTRA_CA_CERTS: '/etc/ssl/proxy-ca.pem',
+      HOME: '/home/sen',
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], {
+      cwd: runtime.cwd,
+      env: { TERM: 'xterm-256color' },
+    });
+
+    expect(manager.materialize).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: {
+          NODE_EXTRA_CA_CERTS: '/etc/ssl/proxy-ca.pem',
+          HOME: '/home/sen',
+        },
+      })
+    );
+    expect(manager.execStream).toHaveBeenCalledWith(
+      'projected-runtime',
+      expect.objectContaining({
+        environment: { TERM: 'xterm-256color' },
+        environmentMode: 'inherit',
+      })
+    );
+  });
+
   it('kills the container process when aborted while execStream is starting', async () => {
     const containerHandle = createFakeExecStreamHandle();
     let resolveExecStream!: (handle: typeof containerHandle) => void;
