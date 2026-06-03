@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { PersonaRegistry } from '../persona-registry';
+import { PersonaRegistry, PersonaNotFoundError } from '../persona-registry';
 import { TemplateEngine } from '../template-engine';
 import { VariableProviderManager, SystemVariableProvider } from '../variable-providers';
 import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
@@ -130,5 +130,61 @@ describe('PersonaRegistry rendering characterization', () => {
     const result = engine.render('user-agent.md', context);
     expect(result).toContain('You are a user-defined test agent.');
     expect(result).not.toContain('plugin-defined');
+  });
+
+  // ── registry.render() dispatch tests ─────────────────────────────────────
+  // These exercise the new PersonaRegistry.render() method — the actual
+  // dispatch path introduced by the refactor. The old tests above exercise
+  // engine.render/renderString directly and do NOT cover registry dispatch.
+
+  it('registry.render — user persona: substitutes {{system.os}}', async () => {
+    const context = await makeMinimalContext(varManager);
+    const result = registry.render('user-agent', engine, context);
+
+    expect(result).toContain('You are a user-defined test agent.');
+    // The mustache variable must have been expanded — literal tag is gone.
+    expect(result).not.toContain('{{system.os}}');
+    // The substituted value is a non-empty string (the real OS name).
+    const match = result.match(/You are a user-defined test agent\. (.+)/);
+    expect(match).not.toBeNull();
+    expect(match![1].trim().length).toBeGreaterThan(0);
+  });
+
+  it('registry.render — plugin persona: renderString path, substitutes {{system.os}}', async () => {
+    registries.personas.register(
+      'plugin-agent',
+      { config: { runtime: { type: 'root' } } as never, body: PLUGIN_BODY },
+      'test-vendor'
+    );
+
+    const context = await makeMinimalContext(varManager);
+    const result = registry.render('plugin-agent', engine, context);
+
+    expect(result).toContain('You are a plugin-defined test agent.');
+    expect(result).not.toContain('{{system.os}}');
+    const match = result.match(/You are a plugin-defined test agent\. (.+)/);
+    expect(match).not.toBeNull();
+    expect(match![1].trim().length).toBeGreaterThan(0);
+  });
+
+  it('registry.render — user beats plugin for same name (precedence via dispatch)', async () => {
+    // Register a plugin persona with the same name as the user-disk persona.
+    registries.personas.register(
+      'user-agent',
+      { config: { runtime: { type: 'root' } } as never, body: PLUGIN_BODY },
+      'test-vendor'
+    );
+
+    const context = await makeMinimalContext(varManager);
+    // registry.render must pick the user-disk source first.
+    const result = registry.render('user-agent', engine, context);
+
+    expect(result).toContain('You are a user-defined test agent.');
+    expect(result).not.toContain('plugin-defined');
+  });
+
+  it('registry.render — throws PersonaNotFoundError for unknown name', async () => {
+    const context = await makeMinimalContext(varManager);
+    expect(() => registry.render('does-not-exist', engine, context)).toThrow(PersonaNotFoundError);
   });
 });

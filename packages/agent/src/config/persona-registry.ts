@@ -188,10 +188,11 @@ export interface PersonaSource {
   has(name: string): boolean;
   names(): string[];
   /**
-   * Disk path or logical path for display in PersonaInfo.
-   * Returns null for plugin personas (no file on disk).
+   * Display path for PersonaInfo.path: a real disk path for user personas,
+   * a logical `<name>.md` for bundled personas, and `plugin:<name>` for plugin
+   * personas (which have no file on disk).
    */
-  infoPath(name: string): string | null;
+  displayPath(name: string): string;
   parse(name: string): ParsedPersona;
   render(name: string, engine: TemplateEngine, context: TemplateContext): string;
 }
@@ -274,8 +275,8 @@ class UserDiskSource implements PersonaSource {
     return Array.from(this.getCache().keys());
   }
 
-  infoPath(name: string): string | null {
-    return this.getCache().get(name) ?? null;
+  displayPath(name: string): string {
+    return this.getCache().get(name) ?? name;
   }
 
   parse(name: string): ParsedPersona {
@@ -312,9 +313,8 @@ class PluginSource implements PersonaSource {
     return pluginRegistries.personas.names();
   }
 
-  infoPath(_name: string): string | null {
-    // Plugin personas have no file on disk.
-    return null;
+  displayPath(name: string): string {
+    return `plugin:${name}`;
   }
 
   parse(name: string): ParsedPersona {
@@ -351,7 +351,7 @@ class BundledSource implements PersonaSource {
     return Array.from(this.getCache());
   }
 
-  infoPath(name: string): string {
+  displayPath(name: string): string {
     return `${name}.md`;
   }
 
@@ -509,10 +509,11 @@ export class PersonaRegistry {
       for (const name of source.names()) {
         if (seen.has(name)) continue;
         seen.add(name);
-        // Plugin source returns null from infoPath; fall back to the sentinel
-        // string that callers (e.g. display layers) expect for plugin personas.
-        const infoPath = source.infoPath(name) ?? `plugin:${name}`;
-        personas.push({ name, isUserDefined: source.isUserDefined, path: infoPath });
+        personas.push({
+          name,
+          isUserDefined: source.isUserDefined,
+          path: source.displayPath(name),
+        });
       }
     }
 
@@ -525,23 +526,6 @@ export class PersonaRegistry {
   hasPersona(name: string): boolean {
     this.loadUserPersonas();
     return this.sources.some((s) => s.has(name));
-  }
-
-  /**
-   * Get the disk path to a persona file (user overrides bundled).
-   * Returns a real disk path for user personas, a logical `<name>.md` for
-   * bundled personas, and null for plugin personas (which have no file on disk).
-   * Callers needing the body should use parsePersona; callers needing to render
-   * should use render.
-   */
-  getPersonaPath(name: string): string | null {
-    this.loadUserPersonas();
-    for (const source of this.sources) {
-      if (source.has(name)) {
-        return source.infoPath(name);
-      }
-    }
-    return null;
   }
 
   /**

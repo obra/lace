@@ -62,7 +62,6 @@ describe('PersonaRegistry user-persona scan with missing path at construction', 
     expect(registry.listAvailablePersonas()).toEqual([]);
     expect(registry.listAvailablePersonas()).toEqual([]);
     expect(registry.hasPersona('anything')).toBe(false);
-    expect(registry.getPersonaPath('anything')).toBeNull();
   });
 
   it('caches a successful empty scan within TTL and re-scans after TTL', () => {
