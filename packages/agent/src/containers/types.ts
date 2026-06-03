@@ -48,6 +48,11 @@ export interface DockerCreateConfig {
   gatewayRoute?: string;
 }
 
+type AssertNoForbiddenDockerCreateConfigKeys<T extends never> = T;
+type _DockerCreateConfigHasNoResourceLimitFields = AssertNoForbiddenDockerCreateConfigKeys<
+  Extract<keyof DockerCreateConfig, 'memory' | 'cpuShares'>
+>;
+
 export interface PlaneSpawnRequest {
   // Container identity fields may be supplied by ContainerManager for fallback naming.
   id?: string;
