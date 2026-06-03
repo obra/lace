@@ -9,12 +9,10 @@ import type { ToolResult } from '@lace/ent-protocol';
 describe('formatToolAnnouncement', () => {
   it('emits a single-line [tool: name(input)] entry ending with newline', () => {
     const line = formatToolAnnouncement('file_read', {
-      path: '/var/sen/instance/persona/persona.md',
+      path: '/workspace/persona.md',
     });
     expect(line.endsWith('\n')).toBe(true);
-    expect(line.replace(/\n$/, '')).toBe(
-      '[tool: file_read({"path":"/var/sen/instance/persona/persona.md"})]'
-    );
+    expect(line.replace(/\n$/, '')).toBe('[tool: file_read({"path":"/workspace/persona.md"})]');
   });
 
   it('truncates very long inputs so the line stays readable', () => {
@@ -56,8 +54,7 @@ describe('formatToolResultLine', () => {
       content: [
         {
           type: 'error',
-          message:
-            'pattern "(Empty on first boot.)" not found in /var/sen/instance/persona/persona.md',
+          message: 'pattern "(Empty on first boot.)" not found in /workspace/persona.md',
         },
       ],
     };
