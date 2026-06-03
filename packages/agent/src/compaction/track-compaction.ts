@@ -101,11 +101,16 @@ export function groupEarlierEventsByTrack(
  * Kernel attributor for demuxByTrack: reproduces the groupEarlierEventsByTrack
  * attribution logic as a pure event→string function.
  *
- * Stateless per-event attribution. Note: turn-track inheritance (in-turn events
- * inherit from their turnId) is handled by groupEarlierEventsByTrack which holds
- * the turnToTrack Map. This attributor is used as a seam for custom strategies
- * that want to inject their own attribution; the kernel uses groupEarlierEventsByTrack
- * directly for the stateful turn-inheritance case.
+ * Per-event attribution, with turn-track inheritance supplied via the
+ * `turnToTrack` Map (in-turn events inherit their turn's opening track). The
+ * kernel's `compact()` routes through `demuxByTrack(earlier, (e) => kernelAttributor(e, turnToTrack))`
+ * — this IS the live path; custom strategies inject their own attributor the same way.
+ *
+ * Returns the sentinel `'__skip__'` for `context_compacted` events (which must be
+ * excluded from grouping). Any caller using this attributor with `demuxByTrack`
+ * MUST `groups.delete('__skip__')` before processing, or those events fall into a
+ * spurious bucket. `groupEarlierEventsByTrack` is retained only as a test-reference
+ * implementation.
  */
 export function kernelAttributor(e: TypedDurableEvent, turnToTrack: Map<string, string>): string {
   if (e.type === 'context_compacted') return '__skip__';
