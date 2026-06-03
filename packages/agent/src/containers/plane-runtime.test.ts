@@ -113,6 +113,17 @@ describe('PlaneRuntime', () => {
     expect(run).toHaveBeenCalledTimes(2);
   });
 
+  it('start rejects unknown container ids', async () => {
+    const run = vi.fn<PlaneRunner['run']>();
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+
+    await expect(rt.start('missing-container')).rejects.toThrow(
+      /Container not found: missing-container/
+    );
+
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it('adopt re-runs create through the idempotent spawn path', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-adopt\n',

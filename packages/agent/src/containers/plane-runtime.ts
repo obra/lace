@@ -124,7 +124,10 @@ export class PlaneRuntime implements ContainerRuntime {
 
   async start(containerId: string): Promise<void> {
     const info = this.containers.get(containerId);
-    if (!info || info.state === 'running') {
+    if (!info) {
+      throw new ContainerNotFoundError(containerId);
+    }
+    if (info.state === 'running') {
       return;
     }
     throw new ContainerError(
