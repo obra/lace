@@ -41,6 +41,6 @@ function insertRowInner(db: Db, row: RecallRow): void {
   const exists = db.prepare(`SELECT 1 FROM events WHERE event_id = ? LIMIT 1`).get(row.event_id);
   if (exists) return;
   db.prepare(
-    `INSERT INTO events (event_id, session_id, ts, persona, kind, content) VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(row.event_id, row.session_id, row.ts, row.persona, row.kind, row.content);
+    `INSERT INTO events (event_id, session_id, ts, persona, kind, content, track) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(row.event_id, row.session_id, row.ts, row.persona, row.kind, row.content, row.track);
 }

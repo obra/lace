@@ -171,6 +171,7 @@ describe('backfillIndex', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'one',
+      track: null,
     });
     insertRow(db, {
       event_id: `${sessionId}:2`,
@@ -179,6 +180,7 @@ describe('backfillIndex', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'two',
+      track: null,
     });
 
     const stats = backfillIndex(db, laceDir);
@@ -282,6 +284,7 @@ describe('backfillIndex', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'one',
+      track: null,
     });
     insertRow(db, {
       event_id: `${sessionId}:2`,
@@ -290,6 +293,7 @@ describe('backfillIndex', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'two',
+      track: null,
     });
     insertRow(db, {
       event_id: `${sessionId}:3`,
@@ -298,6 +302,7 @@ describe('backfillIndex', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'three',
+      track: null,
     });
     insertRow(db, {
       event_id: `${sessionId}:5`,
@@ -306,6 +311,7 @@ describe('backfillIndex', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'five',
+      track: null,
     });
 
     const stats = backfillIndex(db, laceDir);

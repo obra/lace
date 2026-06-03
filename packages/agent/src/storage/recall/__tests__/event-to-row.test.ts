@@ -33,6 +33,7 @@ describe('eventToRow', () => {
         persona: 'ada',
         kind: 'user_message',
         content: 'hello\nworld',
+        track: null,
       });
     });
 
@@ -287,6 +288,80 @@ describe('eventToRow', () => {
       const row = eventToRow(event, CTX);
       expect(row).not.toBeNull();
       expect(row?.content).toBe('[compaction: unknown]');
+    });
+  });
+
+  describe('track field', () => {
+    it('populates track from prompt event.data.track when present', () => {
+      const event = ev({
+        type: 'prompt',
+        content: [{ type: 'text', text: 'hello' }],
+        track: 'slack:T123:C456/1.0',
+      });
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row!.track).toBe('slack:T123:C456/1.0');
+    });
+
+    it('sets track to null on prompt when event.data.track is absent', () => {
+      const event = ev({
+        type: 'prompt',
+        content: [{ type: 'text', text: 'hello' }],
+      });
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row!.track).toBeNull();
+    });
+
+    it('populates track from context_injected event.data.track when present', () => {
+      const event = ev({
+        type: 'context_injected',
+        content: [{ type: 'text', text: 'injected' }],
+        track: 'slack:T1:C2/9.0',
+      });
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row!.track).toBe('slack:T1:C2/9.0');
+    });
+
+    it('sets track to null on context_injected when event.data.track is absent', () => {
+      const event = ev({
+        type: 'context_injected',
+        content: [{ type: 'text', text: 'injected' }],
+      });
+      const row = eventToRow(event, CTX);
+      expect(row!.track).toBeNull();
+    });
+
+    it('sets track to null on tool_use events (no data.track field)', () => {
+      const event = ev({
+        type: 'tool_use',
+        toolCallId: 'tc_1',
+        name: 'shell',
+        input: { command: 'ls' },
+      });
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row!.track).toBeNull();
+    });
+
+    it('sets track to null on message events (no data.track field)', () => {
+      const event = ev({ type: 'message', content: 'some text' });
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row!.track).toBeNull();
+    });
+
+    it('sets track to null on context_compacted events (no data.track field)', () => {
+      const event = ev({
+        type: 'context_compacted',
+        strategy: 'summarize',
+        preserved: [],
+        summary: 'a summary',
+      });
+      const row = eventToRow(event, CTX);
+      expect(row).not.toBeNull();
+      expect(row!.track).toBeNull();
     });
   });
 

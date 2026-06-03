@@ -29,6 +29,7 @@ const recallSchema = z.object({
   query: z.string().min(1).optional(),
   persona: z.union([personaElem, z.array(personaElem)]).optional(),
   session_id: z.string().min(1, 'session_id must be non-empty').optional(),
+  track: z.string().min(1, 'track must be non-empty').optional(),
   since: z.string().min(1, 'since must be non-empty').optional(),
   until: z.string().min(1, 'until must be non-empty').optional(),
   limit: z.number().int().positive().max(100).optional(),
@@ -152,6 +153,10 @@ export class RecallTool extends Tool {
     if (args.session_id !== undefined) {
       where.push('session_id = ?');
       params.push(args.session_id);
+    }
+    if (args.track !== undefined) {
+      where.push('track = ?');
+      params.push(args.track);
     }
     if (args.since !== undefined) {
       where.push('ts >= ?');

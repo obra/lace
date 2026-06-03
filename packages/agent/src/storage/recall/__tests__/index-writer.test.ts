@@ -16,6 +16,7 @@ const ROW: RecallRow = {
   persona: 'ada',
   kind: 'user_message',
   content: 'hello world',
+  track: null,
 };
 
 describe('insertRow', () => {
@@ -74,6 +75,22 @@ describe('insertRow', () => {
       persona: string | null;
     };
     expect(row.persona).toBeNull();
+  });
+
+  it('persists a non-null track value', () => {
+    insertRow(db, { ...ROW, event_id: 'sess_x:3', track: 'slack:T1:C1/1.0' });
+    const row = db.prepare(`SELECT track FROM events WHERE event_id = ?`).get('sess_x:3') as {
+      track: string | null;
+    };
+    expect(row.track).toBe('slack:T1:C1/1.0');
+  });
+
+  it('persists null track', () => {
+    insertRow(db, { ...ROW, event_id: 'sess_x:4', track: null });
+    const row = db.prepare(`SELECT track FROM events WHERE event_id = ?`).get('sess_x:4') as {
+      track: string | null;
+    };
+    expect(row.track).toBeNull();
   });
 
   it('stays idempotent across 100 same-row inserts (single-process; cross-process covered by probe)', () => {
