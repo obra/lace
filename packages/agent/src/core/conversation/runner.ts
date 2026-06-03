@@ -235,6 +235,8 @@ const FUTURE_TENSE_INTENT_PATTERN =
  */
 const MAX_PAUSE_RESUMES = 10;
 
+const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
+
 function hasFutureTenseIntent(text: string): boolean {
   if (!text) return false;
   return FUTURE_TENSE_INTENT_PATTERN.test(text);
@@ -1073,7 +1075,6 @@ export class ConversationRunner {
         const contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
         const pressure = computePressure(usage, contextWindowSize);
 
-        const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
         const isCleanStop = CLEAN_STOP_REASONS.has(stopReason);
 
         // Evaluate persona breakpoints (only on clean stops; compactionRequest
@@ -1081,12 +1082,7 @@ export class ConversationRunner {
         // request compaction at any stop reason).
         let breakpointCompactCrossed = false;
         if (isCleanStop) {
-          const breakpoints = this.config.persona
-            ? compactionBreakpointsForSession(sessionDir)
-            : [
-                { at: 0.6, action: 'compact' as const },
-                { at: 0.9, action: 'compact' as const },
-              ];
+          const breakpoints = compactionBreakpointsForSession(sessionDir);
           const currentHighestFiredAt = readSessionState(sessionDir).highestFiredBreakpointAt ?? 0;
           const ev = evaluateBreakpoints({
             pressure,

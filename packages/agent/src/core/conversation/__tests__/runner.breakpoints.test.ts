@@ -40,7 +40,10 @@ vi.mock('@lace/agent/compaction/select', async (importOriginal) => {
   };
 });
 
-import { compactionBreakpointsForSession } from '@lace/agent/compaction/select';
+import {
+  compactionBreakpointsForSession,
+  DEFAULT_BREAKPOINTS,
+} from '@lace/agent/compaction/select';
 const mockBreakpoints = vi.mocked(compactionBreakpointsForSession);
 
 // ---------------------------------------------------------------------------
@@ -498,8 +501,9 @@ describe('ConversationRunner - configurable breakpoints', () => {
   });
 
   it('default 0.6/0.9 breakpoints fire compact when no persona is configured', async () => {
-    // No persona → runner uses hardcoded fallback [0.6 compact, 0.9 compact]
-    // compactionBreakpointsForSession is NOT called when this.config.persona is falsy
+    // No persona → compactionBreakpointsForSession returns DEFAULT_BREAKPOINTS [0.6 compact, 0.9 compact].
+    // The call is unconditional; select.ts handles missing personas gracefully (returns defaults).
+    mockBreakpoints.mockReturnValue(DEFAULT_BREAKPOINTS);
     seedSession(sessionDir, sessionId, cwd); // no persona
 
     // 70% pressure → crosses default 0.6 compact threshold

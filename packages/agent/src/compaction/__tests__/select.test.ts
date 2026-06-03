@@ -15,15 +15,14 @@ vi.mock('@lace/agent/config/persona-registry', () => ({
 
 import { personaForSessionDir } from '@lace/agent/storage/event-log';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
-import { compactionBreakpointsForSession, compactionStrategyNameForSession } from '../select';
+import {
+  compactionBreakpointsForSession,
+  compactionStrategyNameForSession,
+  DEFAULT_BREAKPOINTS,
+} from '../select';
 
 const mockPersonaForSessionDir = vi.mocked(personaForSessionDir);
 const mockParsePersona = vi.mocked(personaRegistry.parsePersona);
-
-const DEFAULT_BREAKPOINTS: Breakpoint[] = [
-  { at: 0.6, action: 'compact' },
-  { at: 0.9, action: 'compact' },
-];
 
 beforeEach(() => {
   vi.clearAllMocks();

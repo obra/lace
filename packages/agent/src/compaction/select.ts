@@ -4,7 +4,7 @@ import { personaRegistry } from '@lace/agent/config/persona-registry';
 
 export type Breakpoint = { at: number; action: 'notify' | 'compact' };
 
-const DEFAULT_BREAKPOINTS: Breakpoint[] = [
+export const DEFAULT_BREAKPOINTS: Breakpoint[] = [
   { at: 0.6, action: 'compact' },
   { at: 0.9, action: 'compact' },
 ];
