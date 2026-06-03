@@ -86,6 +86,7 @@ export class MCPToolAdapter extends Tool {
       : z.object({}); // Safe fallback for tools without input schema
   }
 
+  // TODO(D2): MCP session keying + identity
   protected async executeValidated(
     args: Record<string, unknown>,
     _context?: ToolContext
