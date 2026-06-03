@@ -292,9 +292,21 @@ optional.
 **Reading the input events:** each `TypedDurableEvent` is
 `{ eventSeq, timestamp, type, data }`. Filter on the **envelope** `event.type`
 (the reliable discriminant) — *not* `event.data.type`, which may be absent on
-disk-loaded events. Valid `type` values include `'message'`, `'prompt'`,
-`'tool_use'`, `'turn_start'`, `'turn_end'`, `'context_compacted'`, … (see
-`event-types.ts` for the full union — there is no `'message_complete'`).
+disk-loaded events. The full `type` union (from `event-types.ts`) is:
+
+```
+'prompt' | 'message' | 'tool_use' | 'turn_start' | 'turn_end'
+| 'context_compacted' | 'context_injected' | 'system_prompt_set'
+| 'job_started' | 'job_finished' | 'job_update' | 'job_session_assigned'
+| 'permission_requested' | 'permission_decided' | 'permission_cancelled'
+| 'checkpoint_created' | 'files_rewound'
+```
+
+(There is no `'message_complete'`.) The conversational ones a strategy usually
+keys on: `'prompt'` (user), `'message'` (assistant), `'tool_use'` (tool call +
+result). When building test fixtures, a minimal `turn_end` data payload is
+`{ stopReason: 'end_turn', usage: { costUsd: 0 } }`; a `prompt`/`message` payload
+carries `{ content: string | ContentBlock[] }`.
 
 **The toolkit:** `@lace/agent/compaction/toolkit` exports
 `mergePreservedAdjacent(entries: PreservedEntry[])` — apply it to your preserved
@@ -302,8 +314,12 @@ list so message replay stays legal (drops empties, merges consecutive same-role
 entries, ensures a leading user-role entry; returns `[]` when nothing remains →
 return `{ noop: true }`). A `PreservedEntry` is
 `{ role: string; content: string | Block[]; toolCalls?: unknown[]; toolResults?: unknown[] }`
-where `Block = { type: string; [k: string]: unknown }`. This type is internal to
-the toolkit — inline the shape; it is not re-exported.
+where `Block = { type: string; [k: string]: unknown }`. `PreservedEntry` **is**
+exported from `@lace/agent/compaction/toolkit` — import the type rather than
+re-declaring it. For a text-stub strategy, leaving `toolCalls`/`toolResults` as
+`unknown[]` (or omitting them) is fine; if you carry real tool I/O through so the
+model replays it, they must be `CoreToolCall[]` / `CoreToolResult[]` (the shapes
+`message-builder` replays — see `track-compaction.ts`'s `PreservedMessage`).
 
 ### ContainerRuntime (`@lace/agent/containers/types`)
 
