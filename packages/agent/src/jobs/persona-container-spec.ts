@@ -1,7 +1,7 @@
 // ABOUTME: Build ContainerSpec from a persona's container runtime + mount registry
 // ABOUTME: Branches on containerSharing (per_invocation vs persistent) and resolves mounts against the registry
 
-import { browserCdpSocketPath, type ContainerSpec } from '@lace/agent/containers/spec';
+import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
@@ -156,13 +156,12 @@ export function buildPersonaContainerSpec(input: {
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
       mounts,
-      env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
+      env,
       restartPolicy: 'unless-stopped',
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
       ...(runtime.network ? { network: runtime.network } : {}),
       ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
-      ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
       // Root A selector fields (persistent has no child session).
       persona: personaName,
       parentSession: parentSessionId,
@@ -188,32 +187,17 @@ export function buildPersonaContainerSpec(input: {
     image: runtime.image,
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
-    env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
+    env,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
     ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
     ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
     ...(runtime.network ? { network: runtime.network } : {}),
     ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
-    ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
     // Root A selector fields.
     persona: personaName,
     parentSession: parentSessionId,
     childSession: input.childSessionId,
   };
-}
-
-// When the persona is a browser-driver, inject SEN_BROWSER_CDP_SOCKET
-// so the in-container relay knows where to listen. Keyed off the container name
-// so it matches the lifecycle browserCdpSocketPath exactly. Returns env
-// unchanged when the flag is absent — the security invariant that only a
-// browserCdpSocket persona gets this env.
-function withBrowserCdpSocketEnv(
-  env: Record<string, string>,
-  browserCdpSocket: boolean | undefined,
-  containerName: string
-): Record<string, string> {
-  if (!browserCdpSocket) return env;
-  return { ...env, SEN_BROWSER_CDP_SOCKET: browserCdpSocketPath(containerName) };
 }
 
 // Convert a daemon-shaped ContainerSpec into the projected runtime's spec
@@ -241,7 +225,6 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.capAdd ? { capAdd: spec.capAdd } : {}),
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
-    ...(spec.browserCdpSocket ? { browserCdpSocket: true } : {}),
     // Root A selector fields — carried across the wire for the shim.
     ...(spec.persona ? { persona: spec.persona } : {}),
     ...(spec.parentSession ? { parentSession: spec.parentSession } : {}),

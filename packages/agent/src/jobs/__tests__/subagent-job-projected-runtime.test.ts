@@ -889,7 +889,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
           containerId: 'sen-persistent-box',
           sourceIp: '172.31.250.3',
           networkName: 'quarantine',
-          browserCdpSocketPath: '/sen-browser-cdp/sen-persistent-box.sock',
         });
         await sessionUpdateHandler?.({
           type: 'container_network_detached',
@@ -937,7 +936,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
         containerId: 'sen-persistent-box',
         sourceIp: '172.31.250.3',
         networkName: 'quarantine',
-        browserCdpSocketPath: '/sen-browser-cdp/sen-persistent-box.sock',
       })
     );
     expect(emittedUpdates).toContainEqual(

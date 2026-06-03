@@ -57,9 +57,6 @@ const ContainerRuntimeDescriptorSchema = z
         // IPv4 address of the egress gateway for the post-start
         // netns-init sidecar. Validated as a non-empty string (loose IPv4).
         gatewayRoute: z.string().min(1).optional(),
-        // When true, lace injects SEN_BROWSER_CDP_SOCKET + emits
-        // browserCdpSocketPath for this quarantined browser-driver persona.
-        browserCdpSocket: z.boolean().optional(),
         // Root A SELECTOR fields — carried for the ShimContainerRuntime's
         // create()->spawn. MUST be in this .strict() schema or a shim binding fails
         // validation (bug-#7 class). SELECTOR ONLY; the shim re-validates persona.

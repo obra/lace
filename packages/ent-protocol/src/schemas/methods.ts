@@ -2060,9 +2060,6 @@ const SessionUpdateContainerNetworkAttachedSchema = z
     containerId: NonEmptyStringSchema,
     sourceIp: NonEmptyStringSchema,
     networkName: NonEmptyStringSchema,
-    // Per-job CDP unix-socket path on the shared host CDP dir, so the
-    // credential helper can reach this container's quarantined browser Chrome.
-    browserCdpSocketPath: NonEmptyStringSchema.optional(),
   })
   .strict();
 

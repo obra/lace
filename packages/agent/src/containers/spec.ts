@@ -5,19 +5,6 @@ import type { ContainerMount, ContainerState, PortMapping } from './types';
 
 export type { PortMapping };
 
-// The credential helper and the quarantined browser-driver share one
-// host dir (the CDP socket named mount); each container gets a uniquely-named
-// socket on it. A TOP-LEVEL path (NOT under `/run`, which is itself a credential
-// mount) — a nested mount target inside another mount's destination fails at
-// container init ("read-only file system"). Single source of truth for that path
-// so the browser CDP socket env injected at spec-build time and the lifecycle
-// browserCdpSocketPath cannot drift.
-const BROWSER_CDP_SOCKET_DIR = '/sen-browser-cdp';
-
-export function browserCdpSocketPath(containerName: string): string {
-  return `${BROWSER_CDP_SOCKET_DIR}/${containerName}.sock`;
-}
-
 export interface ContainerSpec {
   name: string;
   image: string;
@@ -50,13 +37,6 @@ export interface ContainerSpec {
   // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
   // sets the persona's default route after `docker start`.
   gatewayRoute?: string;
-
-  // When true, this is a quarantined browser-driver spec. The embedder's
-  // browser CDP socket env is injected at spec-build time (the in-container
-  // relay listens there); ContainerManager.notifyNetworkAttached emits the
-  // matching browserCdpSocketPath so the credential helper can reach the
-  // persona's Chrome CDP over the shared host CDP unix socket.
-  browserCdpSocket?: boolean;
 
   // Mount target namespaces owned by Lace. When adopting a daemon-side
   // persistent container, ContainerManager rejects stale extra mounts under

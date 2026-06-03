@@ -355,14 +355,13 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
   // session updates so the embedder registers/drops the source-IP → identity
   // mapping in lock-step with the container (race-free; no docker-inspect poll).
   state.containerManager?.setNetworkLifecycleObserver({
-    onAttached: ({ containerName, containerId, sourceIp, networkName, browserCdpSocketPath }) => {
+    onAttached: ({ containerName, containerId, sourceIp, networkName }) => {
       void emitSessionUpdate({
         type: 'container_network_attached',
         containerName,
         containerId,
         sourceIp,
         networkName,
-        ...(browserCdpSocketPath !== undefined ? { browserCdpSocketPath } : {}),
       });
     },
     onDetached: ({ containerName, containerId }) => {

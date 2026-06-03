@@ -69,13 +69,6 @@ export type ToolRuntimeDescriptor =
         // IPv4 address of the egress gateway. When set, a privileged one-shot
         // sidecar sets the persona's default route after start.
         gatewayRoute?: string;
-        // When true, the persona is a quarantined browser-driver whose
-        // Chrome CDP is exposed over a unix socket on a shared browser-cdp
-        // mount. Lace injects SEN_BROWSER_CDP_SOCKET and emits the matching
-        // browserCdpSocketPath on network attach so the credential helper can
-        // reach it. Mount scope IS the access-control boundary: only personas
-        // with this flag get the socket dir + env.
-        browserCdpSocket?: boolean;
         // Root A SELECTOR fields — carried across the wire for the
         // ShimContainerRuntime's create()->spawn. SELECTOR ONLY; the shim
         // re-validates persona against its closed enum + rebuilds the spec.

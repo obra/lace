@@ -246,26 +246,6 @@ Body.`;
     });
   });
 
-  it('parses runtime.type=container with browserCdpSocket', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: sen-browser:dev
-  workingDirectory: /work
-  mounts: {}
-  browserCdpSocket: true
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'cdp-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('cdp-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      browserCdpSocket: true,
-    });
-  });
-
   it('rejects legacy runtime.agentPlacement', () => {
     const content = `---
 runtime:

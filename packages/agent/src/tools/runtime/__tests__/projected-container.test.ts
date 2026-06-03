@@ -213,25 +213,6 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads descriptor browserCdpSocket into the materialized spec', async () => {
-    const manager = createFakeContainerManager();
-    const projectedDescriptor = descriptor();
-    projectedDescriptor.spec.browserCdpSocket = true;
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: manager,
-      descriptor: projectedDescriptor,
-    });
-
-    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
-
-    expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        browserCdpSocket: true,
-      })
-    );
-  });
-
   it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = {

@@ -69,11 +69,6 @@ const runtimeContainerSchema = z
     // IPv4 address of the egress gateway for the post-start netns-init sidecar.
     // Sets the persona's default route to route all egress via the broker.
     gatewayRoute: z.string().min(1).optional(),
-    // When true, this persona is a quarantined browser-driver. Lace
-    // injects SEN_BROWSER_CDP_SOCKET and emits browserCdpSocketPath on attach so
-    // the credential helper can reach the persona's Chrome CDP over a unix socket
-    // on the shared browser-cdp mount. Only this persona gets that mount + env.
-    browserCdpSocket: z.boolean().optional(),
   })
   .strict();
 

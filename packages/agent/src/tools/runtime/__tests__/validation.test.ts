@@ -226,26 +226,6 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with browserCdpSocket', () => {
-    expect(() =>
-      parseRuntimeExecutionBinding({
-        schemaVersion: 1,
-        identity: { runtimeId: 'rt_container_cdp' },
-        toolRuntime: {
-          type: 'container',
-          cwd: '/work',
-          spec: {
-            name: 'sess1-browser',
-            image: 'sen-browser:dev',
-            workingDirectory: '/work',
-            mounts: [],
-            browserCdpSocket: true,
-          },
-        },
-      })
-    ).not.toThrow();
-  });
-
   it('rejects legacy agentPlacement on runtime bindings', () => {
     expect(() =>
       parseRuntimeExecutionBinding({

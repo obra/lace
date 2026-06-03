@@ -556,9 +556,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             containerId: p.containerId,
             sourceIp: p.sourceIp,
             networkName: p.networkName,
-            ...(typeof p.browserCdpSocketPath === 'string'
-              ? { browserCdpSocketPath: p.browserCdpSocketPath }
-              : {}),
           });
         }
         return undefined;

@@ -13,7 +13,6 @@ import type {
   ExecStreamOptions,
 } from './types';
 import { ContainerError, ContainerNotFoundError } from './types';
-import { browserCdpSocketPath } from './spec';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
 
 // See ABOUTME above: every container id is namespaced under this prefix so
@@ -126,10 +125,6 @@ export interface ContainerNetworkLifecycleObserver {
     containerId: string;
     sourceIp: string;
     networkName: string;
-    // Per-job CDP unix-socket path on the shared host CDP dir, so the credential
-    // helper can reach this container's quarantined browser Chrome.
-    // Present only for browserCdpSocket-enabled specs.
-    browserCdpSocketPath?: string;
   }): void;
   onDetached(info: { containerName: string; containerId: string }): void;
 }
@@ -158,10 +153,6 @@ export class ContainerManager {
    */
   private async notifyNetworkAttached(spec: ContainerSpec, containerId: string): Promise<void> {
     if (!this.networkObserver) return;
-    // browserCdpSocketPath (below) piggybacks on this attach event, so a
-    // `browserCdpSocket: true` persona MUST also be gateway-routed — otherwise the
-    // env is injected but the path is never emitted (a silent half-wired state).
-    // True for every persona that exists today (the browser-driver is quarantined).
     if (!spec.gatewayRoute || !spec.network) return;
     if (typeof this.runtime.inspectNetworkIp !== 'function') return;
     try {
@@ -172,10 +163,6 @@ export class ContainerManager {
         containerId,
         sourceIp,
         networkName: spec.network,
-        // Same path as the injected browser CDP socket env, so the credential
-        // helper reaches the same socket the in-container relay opens.
-        // Only for browserCdpSocket-enabled specs; undefined otherwise.
-        ...(spec.browserCdpSocket ? { browserCdpSocketPath: browserCdpSocketPath(spec.name) } : {}),
       });
     } catch (error) {
       logger.warn('ContainerManager.notifyNetworkAttached failed', {
