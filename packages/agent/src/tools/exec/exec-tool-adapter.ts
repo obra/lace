@@ -41,10 +41,12 @@ export class ExecToolAdapter extends Tool {
     this.description = descriptor.description;
     this.schema = z.object({}).passthrough(); // lace does not validate; the binary is the source of truth
   }
-  // Advertise the binary's JSON Schema to the model; default required:[] (optional on descriptor, required on ToolInputSchema).
+  // Advertise the binary's JSON Schema to the model; default properties:{} and required:[]
+  // so a descriptor omitting either field still yields a structurally-complete ToolInputSchema.
   get inputSchema(): ToolInputSchema {
     return {
       ...this.descriptor.inputSchema,
+      properties: this.descriptor.inputSchema.properties ?? {},
       required: this.descriptor.inputSchema.required ?? [],
     } as ToolInputSchema;
   }

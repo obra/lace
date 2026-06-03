@@ -318,8 +318,11 @@ export class PersonaRegistry {
   }
 
   /**
-   * Get path to a persona file (user overrides built-in)
-   * Note: For built-in personas, returns logical path - actual loading handled by TemplateEngine
+   * Get path to a persona file (user overrides built-in).
+   * Returns a disk path for user personas, a logical `<name>.md` path for bundled
+   * personas (resolved by TemplateEngine), and `plugin:<name>` for plugin-registered
+   * personas (which have no file on disk — their ParsedPersona is resolved via
+   * parsePersona's plugin short-circuit before any file I/O is attempted).
    */
   getPersonaPath(name: string): string | null {
     this.loadUserPersonas();
@@ -332,6 +335,13 @@ export class PersonaRegistry {
     // Check built-in personas - return logical path
     if (this.bundledPersonasCache.has(name)) {
       return `${name}.md`; // TemplateEngine will resolve this in bundled or file mode
+    }
+
+    // Plugin personas have no file path; return a sentinel consistent with listAvailablePersonas.
+    // Callers that only need a non-null presence check (e.g. prompt-manager's guard) are safe;
+    // callers that need the actual body should use parsePersona instead.
+    if (pluginRegistries.personas.has(name)) {
+      return `plugin:${name}`;
     }
 
     return null;

@@ -19,27 +19,4 @@ describe('subagent plugin reach (env inheritance)', () => {
     expect(res.status).toBe(0);
     expect(res.stdout).toContain('reach-persona');
   });
-
-  it('spawnSubagent spreads process.env so LACE_PLUGINS is inherited by child (unit-level)', async () => {
-    // Unit-level assertion: spawnSubagent spreads ...process.env into the child env,
-    // so any LACE_PLUGINS set in the parent is automatically inherited.
-    // We verify this by importing spawnNativeSubagent's env construction pattern directly.
-    // The real check is in subagent-spawn.ts: env: { ...process.env, ...(executionEnv ?? {}) }
-    // We confirm the invariant holds by simulating it here.
-    const sentinel = '__LACE_PLUGINS_REACH_TEST__';
-    const original = process.env.LACE_PLUGINS;
-    try {
-      process.env.LACE_PLUGINS = sentinel;
-      // Simulate exactly what spawnSubagent does for env construction:
-      const executionEnv: Record<string, string> = {};
-      const childEnv = { ...process.env, ...executionEnv };
-      expect(childEnv['LACE_PLUGINS']).toBe(sentinel);
-    } finally {
-      if (original === undefined) {
-        delete process.env.LACE_PLUGINS;
-      } else {
-        process.env.LACE_PLUGINS = original;
-      }
-    }
-  });
 });

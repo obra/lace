@@ -57,6 +57,9 @@ export function mergePreservedAdjacent(entries: PreservedEntry[]): PreservedEntr
     else out.push({ ...raw });
   }
   // Ensure leading user-role: merge a leading assistant forward, else drop it.
+  // Folding a leading assistant into the following user entry places the user's
+  // content first and the assistant's content after it — a deliberate,
+  // replay-legal reorder (chronology may invert in this rare edge case).
   while (out.length > 0 && out[0].role !== 'user') {
     if (out.length === 1) {
       out.shift();
