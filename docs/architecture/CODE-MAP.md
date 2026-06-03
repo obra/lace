@@ -14,6 +14,10 @@
 - `packages/agent/src/main.ts`: agent process executable.
 - `packages/agent/src/index.ts`: agent package exports.
 - `packages/cli/src/main.ts`: CLI executable.
+- `packages/agent/src/plugins/`: the plugin system — one `LACE_PLUGINS` loader
+  feeding four registries (tools, compaction, runtimes, personas). Embedders
+  extend lace here. See [Writing Plugins](../writing-plugins.md) and the
+  [Plugin System Reference](../reference/plugins.md).
 
 ## Common Commands
 
