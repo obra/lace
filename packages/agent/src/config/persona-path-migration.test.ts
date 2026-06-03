@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1674 scenario test - verifies bundled personas still render byte-identically
+// ABOUTME: Scenario test - verifies bundled personas still render byte-identically
 // ABOUTME: after migrating from {{include:...}} to @path. Diffs against the committed baseline.
 
 import { describe, it, expect } from 'vitest';
@@ -9,9 +9,12 @@ import { TemplateEngine } from './template-engine';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const bundledPersonasDir = path.resolve(__dirname, '../../config/agent-personas');
-const baselineDir = path.resolve(__dirname, '../../../../tests/scenarios/pri-1674-baseline');
+const baselineDir = path.resolve(
+  __dirname,
+  '../../../../tests/scenarios/persona-path-migration-baseline'
+);
 
-describe('PRI-1674 @path migration scenario', () => {
+describe('@path migration scenario', () => {
   const personaFiles = fs.readdirSync(bundledPersonasDir).filter((name) => name.endsWith('.md'));
 
   it('discovers the expected set of bundled personas', () => {
