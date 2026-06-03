@@ -1469,6 +1469,129 @@ Import `createDefaultContainerManager`, `runStartupReaper` in `main.ts`; remove 
 
 ---
 
+# Part F — Reference plugin + whole-system integration test
+
+A single, heavily-commented example plugin that registers into **all four** registries, declares `meta` + `manifest` (including `credentials`), and calls `assertVersion`. It is (1) the integration proof the four registries coexist and reach every consumption site, and (2) the **template real authors copy** (sen's own plugin package mirrors this shape). Do this Part **after A–E** (it imports types/helpers from all of them).
+
+**Files:** Create `packages/agent/src/plugins/__examples__/reference-plugin.ts` (+ its small support types) and `packages/agent/src/plugins/__tests__/whole-system.integration.test.ts`.
+
+## Packaging contract (author-facing — put this as the file's top comment)
+
+A plugin ships in a **separate package from `@lace/agent`** (sen-core). It must NOT import lace's runtime singletons directly (that yields a second copy of `@lace/agent`, breaking registry identity). It receives everything through the `api` passed to `register(api)`. Build it bundled (esbuild/rollup) into one self-contained module with `@lace/agent` marked **external** (type-only imports are erased at build, so importing `type { PluginApi }` is fine). The module exports:
+- `register(api)` — required.
+- `meta: { name, namespace, version }` — recommended (loader falls back to the specifier).
+- `manifest: { capabilities }` — required if the plugin needs a privileged capability (e.g. `credentials`); absent ⇒ default-deny.
+Names are namespaced by convention (`<namespace>/<name>`) so two vendors can both ship a `greet`; `dup→fatal` catches accidental clashes. sen sets `LACE_PLUGINS=@sen/lace-plugin` (or a path) in the lace child's env; it then reaches root + every subagent automatically.
+
+## Phase F1 — The reference plugin
+
+- [ ] **Step 1: Implement** `packages/agent/src/plugins/__examples__/reference-plugin.ts`:
+
+```typescript
+// ABOUTME: Reference plugin — registers a tool, a compaction strategy, a runtime, and a
+// ABOUTME: persona through one register(api). The template real plugins (sen) copy.
+// Build: bundle with `@lace/agent` marked external; ship as a single module that exports
+// register + meta + manifest. NEVER import @lace/agent runtime singletons (value imports);
+// only type-only imports + whatever `api` hands you.
+
+import { z } from 'zod';
+import { Tool } from '@lace/agent/tools/tool';                       // type+base; provided by the kernel build
+import type { ToolResult, ToolContext } from '@lace/agent/tools/types';
+import type { PluginApi } from '@lace/agent/plugins';
+import type { CompactionStrategy } from '@lace/agent/compaction/types';
+import type { ContainerRuntime } from '@lace/agent/containers/types';
+
+export const meta = { name: 'reference', namespace: 'reference', version: '1.0.0' };
+export const manifest = { capabilities: ['credentials' as const] }; // declares it MAY use the credential path (gated by #6)
+
+// 1) A tool. Identity arrives via ctx.persona (server-side; the LLM cannot forge it).
+class GreetTool extends Tool {
+  name = 'reference/greet';
+  description = 'Greets, echoing the authoritative persona';
+  schema = z.object({ who: z.string() });
+  protected async executeValidated(args: { who: string }, ctx: ToolContext): Promise<ToolResult> {
+    return this.createResult(`hello ${args.who} from persona=${ctx.persona ?? 'unknown'}`);
+  }
+}
+
+// 2) A compaction strategy (trivial no-op here; real ones use the toolkit).
+const quietStrategy: CompactionStrategy = { name: 'reference/quiet', compact: async () => ({ noop: true }) };
+
+// 3) A container runtime (stub — a real one is sen's plane client). Cast keeps the example
+//    short; a real runtime implements every ContainerRuntime method.
+const memRuntime = { create: () => 'mem-0', /* ...full ContainerRuntime impl... */ } as unknown as ContainerRuntime;
+
+// 4) A persona (= ParsedPersona: frontmatter config + template body).
+const scoutPersona = { config: { runtime: { type: 'root' as const } }, body: 'You are Scout, a fast researcher.' };
+
+export function register(api: PluginApi): void {
+  api.assertVersion(1);                          // fail loud on kernel-major skew
+  api.tools.register('reference/greet', new GreetTool());
+  api.compaction.register('reference/quiet', quietStrategy);
+  api.runtimes.register('reference/mem', memRuntime);
+  api.personas.register('reference/scout', scoutPersona as never); // `as never` only because memRuntime/scout are stubs
+}
+```
+
+> The `as unknown as ContainerRuntime` / `as never` casts are ONLY because this example stubs the runtime + persona shapes. A real plugin supplies fully-typed values and needs no casts. Call this out in the comment so authors don't copy the casts.
+
+## Phase F2 — Whole-system integration test
+
+Loads the reference plugin via the real loader (mirroring boot order: built-ins first, then plugins) and asserts it is visible at **every** consumption site, plus the manifest grant.
+
+- [ ] **Step 1: Test** `packages/agent/src/plugins/__tests__/whole-system.integration.test.ts`:
+
+```typescript
+// ABOUTME: One plugin registers into all four registries; assert visibility at each site
+import { describe, it, expect, beforeEach } from 'vitest';
+import { loadPlugins, registries, resetRegistriesForTest, pluginMayUseCapability } from '@lace/agent/plugins';
+import { registerBuiltinTools } from '@lace/agent/tools/builtins';
+import { registerBuiltinCompaction, resolveCompactionStrategy } from '@lace/agent/compaction/strategy';
+import { registerBuiltinRuntimes, createDefaultContainerManager } from '@lace/agent/containers/manager-factory';
+import { ToolExecutor } from '@lace/agent/tools/executor';
+import { PersonaRegistry } from '@lace/agent/config/persona-registry';
+
+const REF = './__examples__/reference-plugin'; // loader-relative; see the A4 resolution note
+
+describe('whole plugin system — reference plugin reaches all four registries', () => {
+  beforeEach(async () => {
+    resetRegistriesForTest();
+    registerBuiltinTools(); registerBuiltinCompaction(); registerBuiltinRuntimes(); // built-ins first (uniform dup→fatal)
+    await loadPlugins(REF);                                                          // then the plugin
+  });
+
+  it('tools: the plugin tool is drawn into a session executor', () => {
+    const ex = new ToolExecutor();
+    ex.registerAllAvailableTools();
+    expect(ex.getTool('reference/greet')).toBeDefined();
+    expect(ex.getTool('bash')).toBeDefined(); // built-in still present
+  });
+  it('compaction: the plugin strategy resolves by name', () => {
+    expect(resolveCompactionStrategy('reference/quiet').name).toBe('reference/quiet');
+    expect(resolveCompactionStrategy('track-based').name).toBe('track-based'); // built-in still present
+  });
+  it('runtimes: the plugin runtime is selectable', () => {
+    expect(createDefaultContainerManager('linux', 'reference/mem')).not.toBeNull();
+  });
+  it('personas: the plugin persona resolves through PersonaRegistry', () => {
+    const pr = new PersonaRegistry({ bundledPersonasPath: '/nonexistent', userPersonasPaths: [] });
+    expect(pr.parsePersona('reference/scout').body).toContain('Scout');
+  });
+  it('manifest: the plugin owns its entries and the credential capability is granted', () => {
+    expect(registries.tools.owner('reference/greet')).toBe('reference');
+    expect(pluginMayUseCapability('reference', 'credentials')).toBe(true);
+    expect(pluginMayUseCapability('reference', 'credentials')).toBe(true);
+    expect(registries.tools.owner('bash')).toBe('builtin');
+  });
+});
+```
+
+- [ ] **Step 2: Verify + commit** — `npm run typecheck && npm test -- whole-system.integration`; `git commit -m "test(lace/plugins): reference plugin + whole-system integration across all four registries"`
+
+> This test is the single best smoke test for the whole mechanism: if a future change breaks owner tracking, the loader, a registrar, or any consumption-site wiring, it fails here. Keep it green.
+
+---
+
 # Final verification (after all Parts)
 
 ```bash
