@@ -5,11 +5,20 @@ import { isEventOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext, CompactResult } from './types';
-import type { ProviderMessage, ContentBlock } from '@lace/agent/providers/base-provider';
-import { coreToolResultFromProtocol, toNonEmptyString } from '../rpc/utils';
-import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
+import type { ProviderMessage } from '@lace/agent/providers/base-provider';
+import {
+  UNTRACKED,
+  splitAtTailBoundary,
+  buildPreservedTail,
+  buildPreservedWithPrefix,
+  jobSalience,
+  untrackedSalience,
+  systemSalience,
+  type TrackBlock,
+} from './toolkit';
 
-export const UNTRACKED = 'untracked' as const;
+// Re-export so the existing test imports keep working.
+export { UNTRACKED, splitAtTailBoundary };
 
 /**
  * Walk events and map each `turn_start.turnId` to the track of the
@@ -87,15 +96,41 @@ export function groupEarlierEventsByTrack(
   return groups;
 }
 
-export type TrackBlock = {
-  trackId: string;
-  /** Markdown body for this track. */
-  body: string;
-  /** Rough token estimate (char/4). */
-  estimatedTokens: number;
-};
+/**
+ * Kernel attributor for demuxByTrack: reproduces the groupEarlierEventsByTrack
+ * attribution logic as a pure event→string function.
+ *
+ * Stateless per-event attribution. Note: turn-track inheritance (in-turn events
+ * inherit from their turnId) is handled by groupEarlierEventsByTrack which holds
+ * the turnToTrack Map. This attributor is used as a seam for custom strategies
+ * that want to inject their own attribution; the kernel uses groupEarlierEventsByTrack
+ * directly for the stateful turn-inheritance case.
+ */
+export function kernelAttributor(e: TypedDurableEvent, turnToTrack: Map<string, string>): string {
+  if (e.type === 'context_compacted') return '__skip__';
 
-const estimate = (s: string) => Math.ceil(s.length / 4);
+  if (isEventOfType(e, 'context_injected')) {
+    return e.data.track ?? UNTRACKED;
+  }
+
+  if (isEventOfType(e, 'job_started') || isEventOfType(e, 'job_finished')) {
+    return `job:${e.data.jobId}`;
+  }
+
+  if (isEventOfType(e, 'prompt')) {
+    return e.data.track ?? UNTRACKED;
+  }
+
+  if (e.turnId && turnToTrack.has(e.turnId)) {
+    return turnToTrack.get(e.turnId)!;
+  }
+
+  return UNTRACKED;
+}
+
+// ---------------------------------------------------------------------------
+// Per-track salience (slack-specific parts stay here until Task 6)
+// ---------------------------------------------------------------------------
 
 /**
  * Per-track salience extraction. Returns null for tracks that should be
@@ -109,8 +144,7 @@ export function salienceForTrack(trackId: string, events: TypedDurableEvent[]): 
     return null;
   }
   if (trackId === 'system:idle-errors') {
-    const body = `${events.length} idle-error reports since last compaction.`;
-    return { trackId, body, estimatedTokens: estimate(body) };
+    return systemSalience(trackId, events);
   }
   if (trackId.startsWith('job:')) {
     return jobSalience(trackId, events);
@@ -152,30 +186,13 @@ async function maybeShrinkBlock(block: TrackBlock, ctx: CompactionContext): Prom
   }
   if (!summary.trim()) return block;
   const body = `### ${block.trackId}\n${summary}`;
+  const estimate = (s: string) => Math.ceil(s.length / 4);
   return { trackId: block.trackId, body, estimatedTokens: estimate(body) };
 }
 
-function jobSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
-  let description = '(unknown)';
-  let outcome: string | undefined;
-  for (const e of events) {
-    if (isEventOfType(e, 'job_started')) {
-      description = e.data.description ?? e.data.command ?? '(no description)';
-    } else if (isEventOfType(e, 'job_finished')) {
-      outcome = e.data.outcome;
-    }
-  }
-  const status = outcome ? statusGlyph(outcome) : '⏳ in-flight';
-  const body = `- ${trackId} ${description} → ${status}`;
-  return { trackId, body, estimatedTokens: estimate(body) };
-}
-
-function statusGlyph(outcome: string): string {
-  if (outcome === 'completed') return '✓ completed';
-  if (outcome === 'failed') return '✗ failed';
-  if (outcome === 'cancelled') return '⊘ cancelled';
-  return outcome;
-}
+// ---------------------------------------------------------------------------
+// Slack salience (stays in kernel until Task 6)
+// ---------------------------------------------------------------------------
 
 function dedupeConsecutive<T>(arr: T[], key: (item: T) => string): T[] {
   const out: T[] = [];
@@ -248,6 +265,50 @@ function xmlEscapeBody(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function extractText(e: TypedDurableEvent): string {
+  const data = e.data as { content?: unknown };
+  const content = data.content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter(
+        (b): b is { type: 'text'; text: string } =>
+          typeof b === 'object' && b !== null && (b as { type?: unknown }).type === 'text'
+      )
+      .map((b) => b.text)
+      .join('\n');
+  }
+  return '';
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1) + '…';
+}
+
+// Regex for extractCurrentMessages — module-level constant to avoid
+// re-compilation on each call. Not flagged global so it's safe for matchAll.
+const SLACK_MSG_RE = /<slack_message\s+([^>]+)>([\s\S]*?)<\/slack_message>/g;
+
+function extractCurrentMessages(
+  envelopeText: string
+): Array<{ actor: string; text: string }> | null {
+  // Parse new-envelope `<current count="N"><slack_message ref="..." from="@U|name">TEXT</slack_message>...</current>`
+  // and return { actor, text } objects. Returns null if no <current> block found.
+  const currentMatch = envelopeText.match(/<current[^>]*>([\s\S]*?)<\/current>/);
+  if (!currentMatch) return null;
+  const inner = currentMatch[1];
+  const msgs: Array<{ actor: string; text: string }> = [];
+  // Use matchAll with a copy of the regex to avoid shared lastIndex state across callers.
+  for (const m of inner.matchAll(new RegExp(SLACK_MSG_RE.source, 'g'))) {
+    const attrs = m[1];
+    const fromMatch = /\bfrom="([^"]+)"/.exec(attrs);
+    if (!fromMatch) continue; // from attr required per spec
+    msgs.push({ actor: fromMatch[1], text: m[2].trim() });
+  }
+  return msgs;
+}
+
 function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
   // Collect entries in chronological (eventSeq) order — interleaves inbound
   // prompt messages with outbound tool_use sends rather than segregating them.
@@ -318,122 +379,15 @@ function slackSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock
   }
 
   const body = `<slack-thread ref="${convRef}">\n${msgLines.join('\n')}\n</slack-thread>`;
+  const estimate = (s: string) => Math.ceil(s.length / 4);
   return { trackId, body, estimatedTokens: estimate(body) };
 }
 
-function untrackedSalience(trackId: string, events: TypedDurableEvent[]): TrackBlock {
-  const lines: string[] = [];
-  for (const e of events) {
-    if (isEventOfType(e, 'prompt')) {
-      const t = extractText(e).trim();
-      if (t) lines.push(`User: ${truncate(t, 500)}`);
-    } else if (isEventOfType(e, 'message')) {
-      const t = typeof e.data.content === 'string' ? e.data.content : extractText(e);
-      if (t.trim()) lines.push(`Assistant: ${truncate(t.trim(), 500)}`);
-    } else if (isEventOfType(e, 'context_injected')) {
-      const t = extractText(e).trim();
-      if (t) lines.push(`Note: ${truncate(t, 500)}`);
-    }
-  }
-  const body = lines.length > 0 ? lines.join('\n') : '(empty)';
-  return { trackId, body, estimatedTokens: estimate(body) };
-}
-
-function extractText(e: TypedDurableEvent): string {
-  const data = e.data as { content?: unknown };
-  const content = data.content;
-  if (typeof content === 'string') return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter(
-        (b): b is { type: 'text'; text: string } =>
-          typeof b === 'object' && b !== null && (b as { type?: unknown }).type === 'text'
-      )
-      .map((b) => b.text)
-      .join('\n');
-  }
-  return '';
-}
-
-// Regex for extractCurrentMessages — module-level constant to avoid
-// re-compilation on each call. Not flagged global so it's safe for matchAll.
-const SLACK_MSG_RE = /<slack_message\s+([^>]+)>([\s\S]*?)<\/slack_message>/g;
-
-function extractCurrentMessages(
-  envelopeText: string
-): Array<{ actor: string; text: string }> | null {
-  // Parse new-envelope `<current count="N"><slack_message ref="..." from="@U|name">TEXT</slack_message>...</current>`
-  // and return { actor, text } objects. Returns null if no <current> block found.
-  const currentMatch = envelopeText.match(/<current[^>]*>([\s\S]*?)<\/current>/);
-  if (!currentMatch) return null;
-  const inner = currentMatch[1];
-  const msgs: Array<{ actor: string; text: string }> = [];
-  // Use matchAll with a copy of the regex to avoid shared lastIndex state across callers.
-  for (const m of inner.matchAll(new RegExp(SLACK_MSG_RE.source, 'g'))) {
-    const attrs = m[1];
-    const fromMatch = /\bfrom="([^"]+)"/.exec(attrs);
-    if (!fromMatch) continue; // from attr required per spec
-    msgs.push({ actor: fromMatch[1], text: m[2].trim() });
-  }
-  return msgs;
-}
-
-function truncate(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return s.slice(0, max - 1) + '…';
-}
+// ---------------------------------------------------------------------------
+// Orchestrator
+// ---------------------------------------------------------------------------
 
 const TAIL_TURNS = 10;
-
-/**
- * Split events into [earlier, tail] at the boundary that gives `tailTurns`
- * complete turns at the end. A turn is `prompt + turn_start ... turn_end`.
- *
- * The boundary semantics (always set at a prompt or turn_start) guarantee that
- * turns are never split, so tool_use/result pairs (both on the same turn) are
- * always kept together in the same slice. No snap-left is needed.
- */
-export function splitAtTailBoundary(
-  events: TypedDurableEvent[],
-  tailTurns: number
-): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
-  if (tailTurns <= 0) {
-    return { earlier: events.slice(), tail: [] };
-  }
-
-  // Walk backwards counting turn_end events; the boundary is just before the
-  // prompt that opens the (tailTurns)-th turn from the end.
-  const turnEndIdxs: number[] = [];
-  for (let i = events.length - 1; i >= 0; i--) {
-    if (events[i].type === 'turn_end') turnEndIdxs.push(i);
-    if (turnEndIdxs.length >= tailTurns) break;
-  }
-  if (turnEndIdxs.length < tailTurns) {
-    return { earlier: [], tail: events.slice() };
-  }
-  const earliestTailTurnEndIdx = turnEndIdxs[turnEndIdxs.length - 1];
-  const targetTurnId = events[earliestTailTurnEndIdx].turnId;
-
-  // No turnId means we can't reliably find the matching turn_start (e.g.
-  // crash-recovery synthesized turn_end). Return all-as-tail rather than
-  // risk mis-attributing events to the wrong slice.
-  if (!targetTurnId) {
-    return { earlier: [], tail: events.slice() };
-  }
-
-  let boundary = earliestTailTurnEndIdx;
-  for (let i = earliestTailTurnEndIdx; i >= 0; i--) {
-    if (events[i].type === 'turn_start' && events[i].turnId === targetTurnId) {
-      if (i > 0 && events[i - 1].type === 'prompt') {
-        boundary = i - 1;
-      } else {
-        boundary = i;
-      }
-      break;
-    }
-  }
-  return { earlier: events.slice(0, boundary), tail: events.slice(boundary) };
-}
 
 /**
  * Track-based compaction orchestrator. Pure: returns the event the caller
@@ -483,123 +437,4 @@ export async function compact(
       },
     },
   };
-}
-
-/**
- * Prepend the compaction prefix to the preserved tail, merging into the first
- * entry when it is also user-role to prevent consecutive user messages.
- */
-function buildPreservedWithPrefix(prefix: string, tail: PreservedMessage[]): PreservedMessage[] {
-  if (tail.length === 0 || tail[0].role !== 'user') {
-    // No adjacency problem — prefix stands alone.
-    return [{ role: 'user', content: prefix }, ...tail];
-  }
-
-  // First tail entry is user-role: merge prefix into it.
-  const first = tail[0];
-  let mergedContent: string | ContentBlock[];
-  if (typeof first.content === 'string') {
-    mergedContent = prefix + '\n\n' + first.content;
-  } else {
-    // ContentBlock[] — build a merged block array preserving any existing blocks.
-    const prefixBlock: ContentBlock = { type: 'text', text: prefix };
-    mergedContent = [prefixBlock, ...first.content];
-  }
-
-  const mergedFirst: PreservedMessage = {
-    role: 'user',
-    content: mergedContent,
-    ...(first.toolCalls ? { toolCalls: first.toolCalls } : {}),
-    ...(first.toolResults ? { toolResults: first.toolResults } : {}),
-  };
-
-  return [mergedFirst, ...tail.slice(1)];
-}
-
-type PreservedMessage = {
-  role: 'user' | 'assistant' | 'system';
-  content: string | ContentBlock[];
-  toolCalls?: CoreToolCall[];
-  toolResults?: CoreToolResult[];
-};
-
-/**
- * Convert tail events into the PreservedMessage stream consumed by
- * message-builder.ts when replaying a context_compacted event.
- *
- * Mirrors the logic in message-builder.ts:buildProviderMessagesFromDurableEvents:
- * - `prompt`   → user entry
- * - `message`  → assistant entry
- * - `tool_use` → assistant entry (with toolCalls) + optional user entry (with toolResults)
- *
- * Consecutive tool_use events for the same turn are coalesced: tool calls are
- * appended to the previous assistant entry; tool results are appended to the
- * previous user entry when it already holds results.
- */
-function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
-  const result: PreservedMessage[] = [];
-
-  for (const e of events) {
-    if (isEventOfType(e, 'prompt')) {
-      // Pass through the original content (string or ContentBlock[]) so images
-      // in the tail are not discarded — extractText would drop image blocks.
-      result.push({ role: 'user', content: e.data.content });
-      continue;
-    }
-
-    if (isEventOfType(e, 'context_injected')) {
-      // Mirror message-builder.ts: injected context becomes a user-role message.
-      // Pass through the original content to preserve any image blocks.
-      result.push({ role: 'user', content: e.data.content });
-      continue;
-    }
-
-    if (isEventOfType(e, 'message')) {
-      // Pass through the original content to preserve any image blocks.
-      result.push({ role: 'assistant', content: e.data.content ?? '' });
-      continue;
-    }
-
-    if (isEventOfType(e, 'tool_use')) {
-      const toolCallId = toNonEmptyString(e.data.toolCallId);
-      const name = toNonEmptyString(e.data.name);
-      if (!toolCallId || !name) continue;
-
-      const toolCall: CoreToolCall = {
-        id: toolCallId,
-        name,
-        arguments:
-          typeof e.data.input === 'object' && e.data.input
-            ? (e.data.input as Record<string, unknown>)
-            : {},
-      };
-
-      // Coalesce into previous assistant entry if it exists, otherwise push new.
-      const last = result.length > 0 ? result[result.length - 1] : undefined;
-      if (last && last.role === 'assistant') {
-        last.toolCalls = [...(last.toolCalls ?? []), toolCall];
-      } else {
-        result.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-      }
-
-      if (e.data.result) {
-        const coreResult = coreToolResultFromProtocol(e.data.result, toolCallId);
-        // Coalesce into previous user entry if it already carries tool results.
-        const prev = result.length > 0 ? result[result.length - 1] : undefined;
-        const canAppend =
-          prev &&
-          prev.role === 'user' &&
-          Array.isArray(prev.toolResults) &&
-          prev.toolResults.length > 0;
-        if (canAppend && prev) {
-          prev.toolResults = [...(prev.toolResults ?? []), coreResult];
-        } else {
-          result.push({ role: 'user', content: '', toolResults: [coreResult] });
-        }
-      }
-      continue;
-    }
-  }
-
-  return result;
 }
