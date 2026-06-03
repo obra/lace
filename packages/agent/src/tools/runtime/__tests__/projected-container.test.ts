@@ -119,7 +119,7 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('materializes the descriptor spec before process start and omits docker authority fields', async () => {
+  it('materializes the generic descriptor spec before process start with docker authority fields', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.env = { BASE: 'yes' };
@@ -140,16 +140,18 @@ describe('ProjectedContainerToolRuntime', () => {
       workingDirectory: '/workspace',
       mounts: [{ source: '/host/repo', target: '/workspace', readonly: false }],
       env: { BASE: 'yes' },
+      ports: [{ host: 7777, container: 7777 }],
+      restartPolicy: 'unless-stopped',
     });
     const materializedSpec = manager.materialize.mock.calls[0][0];
-    expect(materializedSpec.ports).toBeUndefined();
-    expect(materializedSpec.restartPolicy).toBeUndefined();
+    expect(materializedSpec.ports).toEqual([{ host: 7777, container: 7777 }]);
+    expect(materializedSpec.restartPolicy).toBe('unless-stopped');
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
     );
   });
 
-  it('does not thread descriptor sysctls into the materialized spec', async () => {
+  it('threads generic descriptor sysctls into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.sysctls = { 'net.ipv6.conf.lo.disable_ipv6': '0' };
@@ -162,13 +164,13 @@ describe('ProjectedContainerToolRuntime', () => {
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
     const materializedSpec = manager.materialize.mock.calls[0][0];
-    expect(materializedSpec.sysctls).toBeUndefined();
+    expect(materializedSpec.sysctls).toEqual({ 'net.ipv6.conf.lo.disable_ipv6': '0' });
     expect(manager.materialize.mock.invocationCallOrder[0]).toBeLessThan(
       manager.execStream.mock.invocationCallOrder[0]
     );
   });
 
-  it('does not thread descriptor capAdd into the materialized spec', async () => {
+  it('threads generic descriptor capAdd into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.capAdd = ['NET_ADMIN'];
@@ -181,10 +183,10 @@ describe('ProjectedContainerToolRuntime', () => {
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
     const materializedSpec = manager.materialize.mock.calls[0][0];
-    expect(materializedSpec.capAdd).toBeUndefined();
+    expect(materializedSpec.capAdd).toEqual(['NET_ADMIN']);
   });
 
-  it('does not thread descriptor network into the materialized spec', async () => {
+  it('threads generic descriptor network into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.network = 'quarantine';
@@ -197,10 +199,10 @@ describe('ProjectedContainerToolRuntime', () => {
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
     const materializedSpec = manager.materialize.mock.calls[0][0];
-    expect(materializedSpec.network).toBeUndefined();
+    expect(materializedSpec.network).toBe('quarantine');
   });
 
-  it('does not thread descriptor gatewayRoute into the materialized spec', async () => {
+  it('threads generic descriptor gatewayRoute into the materialized spec', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();
     projectedDescriptor.spec.gatewayRoute = '172.31.250.1';
@@ -213,6 +215,42 @@ describe('ProjectedContainerToolRuntime', () => {
     await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
 
     const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec.gatewayRoute).toBe('172.31.250.1');
+  });
+
+  it('omits docker authority fields from selector persona specs', async () => {
+    const manager = createFakeContainerManager();
+    const projectedDescriptor = descriptor();
+    projectedDescriptor.spec.persona = 'browser-driver';
+    projectedDescriptor.spec.parentSession = 'sess_parent_projected';
+    projectedDescriptor.spec.childSession = 'sess_child_projected';
+    projectedDescriptor.spec.jobId = 'job_projected';
+    projectedDescriptor.spec.ports = [{ host: 7777, container: 7777 }];
+    projectedDescriptor.spec.restartPolicy = 'unless-stopped';
+    projectedDescriptor.spec.sysctls = { 'net.ipv6.conf.lo.disable_ipv6': '0' };
+    projectedDescriptor.spec.capAdd = ['NET_ADMIN'];
+    projectedDescriptor.spec.network = 'quarantine';
+    projectedDescriptor.spec.gatewayRoute = '172.31.250.1';
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: projectedDescriptor,
+    });
+
+    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
+
+    const materializedSpec = manager.materialize.mock.calls[0][0];
+    expect(materializedSpec).toMatchObject({
+      persona: 'browser-driver',
+      parentSession: 'sess_parent_projected',
+      childSession: 'sess_child_projected',
+      jobId: 'job_projected',
+    });
+    expect(materializedSpec.ports).toBeUndefined();
+    expect(materializedSpec.restartPolicy).toBeUndefined();
+    expect(materializedSpec.sysctls).toBeUndefined();
+    expect(materializedSpec.capAdd).toBeUndefined();
+    expect(materializedSpec.network).toBeUndefined();
     expect(materializedSpec.gatewayRoute).toBeUndefined();
   });
 
@@ -318,7 +356,7 @@ describe('ProjectedContainerToolRuntime', () => {
       })
     );
     const materializedSpec = manager.materialize.mock.calls[0][0];
-    expect(materializedSpec.restartPolicy).toBeUndefined();
+    expect(materializedSpec.restartPolicy).toBe('unless-stopped');
   });
 
   it('copies host-provided runtime helpers before creating copy-mode containers', async () => {

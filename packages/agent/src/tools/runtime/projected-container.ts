@@ -194,6 +194,32 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.containerId) {
     spec.containerId = descriptor.spec.containerId;
   }
+  const hasPlaneSelectors = Boolean(
+    descriptor.spec.persona ||
+      descriptor.spec.parentSession ||
+      descriptor.spec.childSession ||
+      descriptor.spec.jobId
+  );
+  if (!hasPlaneSelectors) {
+    if (descriptor.spec.ports) {
+      spec.ports = descriptor.spec.ports;
+    }
+    if (descriptor.spec.restartPolicy) {
+      spec.restartPolicy = descriptor.spec.restartPolicy;
+    }
+    if (descriptor.spec.sysctls) {
+      spec.sysctls = descriptor.spec.sysctls;
+    }
+    if (descriptor.spec.capAdd) {
+      spec.capAdd = descriptor.spec.capAdd;
+    }
+    if (descriptor.spec.network) {
+      spec.network = descriptor.spec.network;
+    }
+    if (descriptor.spec.gatewayRoute) {
+      spec.gatewayRoute = descriptor.spec.gatewayRoute;
+    }
+  }
   // Root A selector fields — carried through to the ContainerSpec so the
   // PlaneRuntime's create()->spawn can read them.
   if (descriptor.spec.persona) {
