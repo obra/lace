@@ -16,7 +16,7 @@
 //   meta           — recommended; loader falls back to the specifier as name
 //   manifest       — required when the plugin needs a privileged capability (e.g. credentials)
 //
-// Name convention: namespace the names you register (`<namespace>/<entry>`) so two
+// Name convention: namespace the names you register (`<namespace>:<entry>`) so two
 // vendors can each ship a tool named `greet` without colliding. dup→fatal catches
 // accidental name clashes at boot.
 //
@@ -24,6 +24,7 @@
 // inherits it automatically (spawnSubagent spreads process.env).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import * as path from 'path';
 import { z } from 'zod';
 import { Tool } from '@lace/agent/tools/tool'; // concrete base class; stays external at build
 import type { ToolResult, ToolContext } from '@lace/agent/tools/types';
@@ -41,7 +42,7 @@ export const manifest = { capabilities: ['credentials' as const] };
 // Identity (persona) arrives via ctx.persona, stamped server-side by the runner.
 // The LLM cannot forge it — args.persona is ignored even if the model passes it.
 class GreetTool extends Tool {
-  name = 'reference/greet';
+  name = 'reference:greet';
   description = 'Greets, echoing the authoritative persona assigned to the session';
   schema = z.object({ who: z.string() });
 
@@ -53,11 +54,11 @@ class GreetTool extends Tool {
 // ── 2) Compaction strategy ────────────────────────────────────────────────────
 // Trivial no-op here. A real strategy calls `compact(events, ctx)` from the
 // toolkit (compaction/toolkit.ts) and returns a CompactResult.
-// NOTE: The `as unknown as ContainerRuntime` / `as never` casts below are ONLY
-// because this example stubs the runtime + persona shapes. A real plugin
-// supplies fully-typed values and needs NO casts.
+// NOTE: The `as unknown as ContainerRuntime` cast below is ONLY because this
+// example stubs the runtime shape. A real plugin supplies a fully-typed value
+// and needs NO cast.
 const quietStrategy: CompactionStrategy = {
-  name: 'reference/quiet',
+  name: 'reference:quiet',
   compact: async () => ({ noop: true }),
 };
 
@@ -71,28 +72,23 @@ const memRuntime = {
 } as unknown as ContainerRuntime;
 
 // ── 4) Persona ────────────────────────────────────────────────────────────────
-// A PersonaDef = ParsedPersona: { config: PersonaConfig, body: string }.
-// config.runtime.type = 'root' means "run in the host process" (no container).
-// The `as never` cast is only because this stub doesn't satisfy the full
-// PersonaConfig schema (compaction fields etc. are absent).
-const scoutPersona = {
-  config: { runtime: { type: 'root' as const } },
-  body: 'You are Scout, a fast researcher.',
-};
+// Personas are file-based: place <entry>.md files in a sibling directory and
+// call api.personas.addDir(absDir). The plugin's meta.namespace namespaces each
+// file so its logical name becomes <namespace>:<entry> (e.g. reference:scout).
+// YAML frontmatter in the .md carries config fields (runtime, compaction, etc.).
 
 // ── register ─────────────────────────────────────────────────────────────────
 export function register(api: PluginApi): void {
   api.assertVersion(1); // fails loudly on kernel-major version skew
 
-  api.tools.register('reference/greet', new GreetTool());
-  api.compaction.register('reference/quiet', quietStrategy);
-  api.runtimes.register('reference/mem', memRuntime);
-  api.personas.register('reference/scout', scoutPersona as never);
+  api.tools.register('reference:greet', new GreetTool());
+  api.compaction.register('reference:quiet', quietStrategy);
+  api.runtimes.register('reference:mem', memRuntime);
+  api.personas.addDir(path.join(__dirname, 'reference-personas'));
 }
 
 // Satisfy PluginModule for type-safe authoring.
 // Real plugins: `export { meta, manifest, register } satisfies PluginModule`
-// (TypeScript 4.9+). The cast is used here so the stub compiles without
-// tightening the persona type.
+// (TypeScript 4.9+).
 const _typeCheck: PluginModule = { meta, manifest, register };
 void _typeCheck; // prevent 'unused variable' warning — this is type-only

@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadPlugins, resetRegistriesForTest } from '@lace/agent/plugins';
 import { PersonaRegistry } from '@lace/agent/config/persona-registry';
-import { TemplateEngine } from '@lace/agent/config/template-engine';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -12,7 +11,7 @@ import {
 
 // Loader resolves relative to src/plugins/loader.ts; __examples__ is a sibling of __tests__.
 const PLUGIN_SPEC = './__examples__/persona-plugin';
-const PERSONA_NAME = 'persona-example/security-reviewer';
+const PERSONA_NAME = 'persona-example:security-reviewer';
 
 describe('persona-plugin e2e', () => {
   beforeEach(async () => {
@@ -45,15 +44,11 @@ describe('persona-plugin e2e', () => {
     );
   });
 
-  it('registry.render substitutes {{system.sessionDate}} and removes the literal tag', async () => {
+  it('registry.renderPersona substitutes {{system.sessionDate}} and removes the literal tag', async () => {
     const registry = new PersonaRegistry({
       bundledPersonasPath: '/nonexistent',
       userPersonasPaths: [],
     });
-
-    // Build a real TemplateEngine (empty dirs — plugin body uses renderString path,
-    // so no disk I/O occurs for the persona itself).
-    const engine = new TemplateEngine([]);
 
     // Build a real context from SystemVariableProvider (the same provider the
     // kernel uses in production).
@@ -61,7 +56,7 @@ describe('persona-plugin e2e', () => {
     varManager.addProvider(new SystemVariableProvider());
     const context = await varManager.getTemplateContext();
 
-    const rendered = registry.render(PERSONA_NAME, engine, context);
+    const rendered = registry.renderPersona(PERSONA_NAME, context);
 
     // The literal mustache tag must be gone.
     expect(rendered).not.toContain('{{system.sessionDate}}');

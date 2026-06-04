@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadPlugins, resetRegistriesForTest } from '@lace/agent/plugins';
 import { PersonaRegistry } from '@lace/agent/config/persona-registry';
-import { TemplateEngine } from '@lace/agent/config/template-engine';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -12,7 +11,7 @@ import {
 
 // Loader resolves relative to src/plugins/loader.ts; __examples__ is a sibling of __tests__.
 const PLUGIN_SPEC = './__examples__/incident-responder-plugin';
-const PERSONA_NAME = 'incident-responder/incident-responder';
+const PERSONA_NAME = 'incident-responder:incident-responder';
 
 describe('incident-responder-plugin e2e', () => {
   beforeEach(async () => {
@@ -72,15 +71,11 @@ describe('incident-responder-plugin e2e', () => {
     expect(notifyBreakpoint?.at).toBe(0.8);
   });
 
-  it('registry.render substitutes {{system.sessionDate}} and {{system.os}}', async () => {
+  it('registry.renderPersona substitutes {{system.sessionDate}} and {{system.os}}', async () => {
     const registry = new PersonaRegistry({
       bundledPersonasPath: '/nonexistent',
       userPersonasPaths: [],
     });
-
-    // Build a real TemplateEngine (empty dirs — plugin body uses renderString path,
-    // so no disk I/O occurs for the persona body itself).
-    const engine = new TemplateEngine([]);
 
     // Build a real context from SystemVariableProvider (the same provider the
     // kernel uses in production).
@@ -88,7 +83,7 @@ describe('incident-responder-plugin e2e', () => {
     varManager.addProvider(new SystemVariableProvider());
     const context = await varManager.getTemplateContext();
 
-    const rendered = registry.render(PERSONA_NAME, engine, context);
+    const rendered = registry.renderPersona(PERSONA_NAME, context);
 
     // Both literal mustache tags must be gone.
     expect(rendered).not.toContain('{{system.sessionDate}}');
