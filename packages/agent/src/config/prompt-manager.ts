@@ -37,7 +37,7 @@ export class PromptManager {
     // Set up template directories with user overlay support
     this.templateDirs = options.templateDirs || this.getTemplateDirsWithOverlay();
 
-    this.templateEngine = new TemplateEngine(this.templateDirs);
+    this.templateEngine = new TemplateEngine(this.templateDirs, { useEmbedded: true });
     this.variableManager = new VariableProviderManager();
 
     // Add default variable providers
