@@ -190,7 +190,10 @@ export class SkillRegistry {
 
     // Check if this skill is already registered (earlier directory wins)
     if (this.skills.has(parsed.properties.name)) {
-      logger.debug(`Skill "${parsed.properties.name}" already registered, skipping ${skillDir}`);
+      const existingEntry = this.skills.get(parsed.properties.name)!;
+      logger.warn(
+        `Skill "${parsed.properties.name}" is shadowed: keeping ${existingEntry.metadata.skillDir}, ignoring ${skillDir}`
+      );
       return;
     }
 
