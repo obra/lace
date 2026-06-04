@@ -7,6 +7,10 @@ import { addPersonaDir, addSkillDir, resetContributedDirsForTest } from './contr
 import type { Tool } from '@lace/agent/tools/tool';
 import type { CompactionStrategy } from '@lace/agent/compaction/types';
 import type { ContainerRuntime } from '@lace/agent/containers/types';
+// Eager import. The api→register-exec→@lace/agent/plugins→api cycle is init-safe:
+// neither module accesses the other's bindings at module-evaluation time (only
+// inside function bodies), so ESM live bindings resolve by call time.
+import { registerExecDirInto } from '@lace/agent/tools/exec/register-exec';
 
 export const KERNEL_PLUGIN_VERSION = '1.0.0';
 export class PluginVersionError extends Error {
@@ -34,7 +38,7 @@ export interface PluginApi {
   readonly meta: PluginMeta;
   readonly kernelVersion: string;
   assertVersion(major: number): void;
-  tools: PluginRegistrar<Tool>;
+  tools: PluginRegistrar<Tool> & { registerExecDir(dir: string): void };
   compaction: PluginRegistrar<CompactionStrategy>;
   runtimes: PluginRegistrar<ContainerRuntime>;
   personas: { addDir(dir: string): void };
@@ -80,7 +84,11 @@ export function createPluginApi(meta: PluginMeta, registries: PluginRegistries):
         );
       }
     },
-    tools: registrar(registries.tools, meta.name),
+    tools: {
+      ...registrar(registries.tools, meta.name),
+      registerExecDir: (dir: string) =>
+        registerExecDirInto(dir, { namespace: meta.namespace, owner: meta.name }),
+    },
     compaction: registrar(registries.compaction, meta.name),
     runtimes: registrar(registries.runtimes, meta.name),
     personas: { addDir: (dir: string) => addPersonaDir(meta.namespace, dir) },
