@@ -65,4 +65,12 @@ describe('whole plugin system — reference plugin reaches all four registries',
     expect(registries.tools.owner('bash')).toBe('builtin');
     expect(pluginMayUseCapability('reference', 'credentials')).toBe(true);
   });
+
+  it('exec tools: plugin-contributed exec tool is registered and surfaced by ToolExecutor', () => {
+    expect(registries.tools.has('reference:echo-tool')).toBe(true);
+    expect(registries.tools.owner('reference:echo-tool')).toBe('reference');
+    const ex = new ToolExecutor();
+    ex.registerAllAvailableTools();
+    expect(ex.getTool('reference:echo-tool')).toBeDefined();
+  });
 });

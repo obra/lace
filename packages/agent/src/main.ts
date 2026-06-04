@@ -13,8 +13,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { runStartupReaper } from './containers/startup-reaper';
+import { fileURLToPath } from 'url';
 import { loadPlugins, PluginLoadError } from './plugins';
 import { registerBuiltinTools } from './tools/builtins';
+import { registerCoreExecTools } from './tools/exec/register-exec';
 import { registerBuiltinCompaction } from './compaction/strategy';
 import {
   registerBuiltinRuntimes,
@@ -101,6 +103,11 @@ process.stdin.on('end', () => void shutdown());
 async function boot(): Promise<void> {
   // Register built-ins BEFORE plugins so a plugin dup of a built-in name is fatal.
   registerBuiltinTools();
+  const coreExecDir = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../config/agent-exec-tools'
+  );
+  registerCoreExecTools(coreExecDir);
   registerBuiltinCompaction();
   registerBuiltinRuntimes();
 

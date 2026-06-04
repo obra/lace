@@ -83,6 +83,9 @@ export function register(api: PluginApi): void {
   api.assertVersion(1); // fails loudly on kernel-major version skew
 
   api.tools.register('reference:greet', new GreetTool());
+  api.tools.registerExecDir(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), 'reference-exec-tools')
+  );
   api.compaction.register('reference:quiet', quietStrategy);
   api.runtimes.register('reference:mem', memRuntime);
   api.personas.addDir(
