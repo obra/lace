@@ -18,6 +18,18 @@ export function resolveCompactionStrategy(name: string): CompactionStrategy {
   return registries.compaction.resolve(name);
 }
 
+export function assertCompactionStrategyRegistered(name: string | undefined): void {
+  if (!name) return; // unset → default 'track-based', always registered
+  try {
+    resolveCompactionStrategy(name);
+  } catch {
+    throw new Error(
+      `Compaction strategy "${name}" (selected by the persona) is not registered. ` +
+        `Is its plugin loaded via LACE_PLUGINS? Built-in strategies: track-based.`
+    );
+  }
+}
+
 export function validatePreserved(result: CompactResult): CompactResult {
   if ('noop' in result) return result;
   const repaired = mergePreservedAdjacent(

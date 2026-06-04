@@ -9,6 +9,7 @@ import {
   SessionNewResponseSchema,
   SessionPromptResponseSchema,
   SessionRequestPermissionResponseSchema,
+  EntSessionCompactRequestSchema,
 } from '../methods';
 
 function schema(name: string) {
@@ -810,6 +811,52 @@ describe('protocol shapes (representative examples)', () => {
         jsonrpc: '2.0',
         id: 'a_2',
         result: { env: {} },
+      })
+    ).not.toThrow();
+  });
+});
+
+describe('EntSessionCompactRequestSchema — strategy field accepts any non-empty string', () => {
+  it('accepts track-based (built-in strategy)', () => {
+    expect(() =>
+      EntSessionCompactRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'ent/session/compact',
+        params: { strategy: 'track-based' },
+      })
+    ).not.toThrow();
+  });
+
+  it('accepts a pluggable strategy name (e.g. sen-multiconv)', () => {
+    expect(() =>
+      EntSessionCompactRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'ent/session/compact',
+        params: { strategy: 'sen-multiconv' },
+      })
+    ).not.toThrow();
+  });
+
+  it('rejects an empty string strategy', () => {
+    expect(() =>
+      EntSessionCompactRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'ent/session/compact',
+        params: { strategy: '' },
+      })
+    ).toThrow();
+  });
+
+  it('accepts omitted strategy (uses session default)', () => {
+    expect(() =>
+      EntSessionCompactRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'ent/session/compact',
+        params: {},
       })
     ).not.toThrow();
   });

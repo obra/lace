@@ -61,6 +61,8 @@ import {
   parseRuntimeExecutionBinding,
 } from '../../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
+import { assertCompactionStrategyRegistered } from '../../compaction/strategy';
+import { compactionStrategyNameForSession } from '../../compaction/select';
 
 type SessionRestoreParams = {
   sessionId: string;
@@ -217,6 +219,12 @@ async function activateStoredSession(
     state.activeSession && state.activeSession.meta.sessionId !== params.sessionId;
 
   writeSessionState(loadedWithMcpServers.dir, loadedWithMcpServers.state);
+
+  // Fail fast if the persona stored in this session selects a compaction strategy
+  // whose plugin isn't loaded. Surfaces misconfiguration at session-open time rather
+  // than hours later at the first compaction.
+  assertCompactionStrategyRegistered(compactionStrategyNameForSession(loadedWithMcpServers.dir));
+
   if (switchingSessions) {
     await releaseRunningSessionWork(peer, state, runExclusive);
   }
@@ -445,6 +453,10 @@ export function registerSessionHandlers(
             })
           );
         }
+        // Fail fast if the persona selects a compaction strategy whose plugin isn't loaded.
+        // This surfaces the misconfiguration at session-open time rather than hours later
+        // at the first compaction.
+        assertCompactionStrategyRegistered(personaConfig.compaction?.strategy);
       } catch (err) {
         if (err instanceof PersonaNotFoundError || err instanceof PersonaParseError) {
           throw {

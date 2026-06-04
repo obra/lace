@@ -6,6 +6,7 @@ import {
   validatePreserved,
   resolveCompactionStrategy,
   registerBuiltinCompaction,
+  assertCompactionStrategyRegistered,
 } from './strategy';
 import { resetRegistriesForTest, registries } from '@lace/agent/plugins';
 import type { CompactResult } from './types';
@@ -104,6 +105,33 @@ describe('validatePreserved — no-op on already-legal preserved (byte-safe seam
     ]);
     const once = validatePreserved(input);
     expect(JSON.stringify(validatePreserved(once))).toBe(JSON.stringify(once));
+  });
+});
+
+describe('assertCompactionStrategyRegistered', () => {
+  beforeEach(() => {
+    resetRegistriesForTest();
+    registerBuiltinCompaction();
+  });
+
+  it('does not throw for undefined (no strategy set → default track-based)', () => {
+    expect(() => assertCompactionStrategyRegistered(undefined)).not.toThrow();
+  });
+
+  it('does not throw for the registered built-in track-based', () => {
+    expect(() => assertCompactionStrategyRegistered('track-based')).not.toThrow();
+  });
+
+  it('throws an Error for an unknown strategy name', () => {
+    expect(() => assertCompactionStrategyRegistered('nope')).toThrow(Error);
+  });
+
+  it('error message for unknown strategy includes the strategy name', () => {
+    expect(() => assertCompactionStrategyRegistered('nope')).toThrow(/nope/);
+  });
+
+  it('error message for unknown strategy mentions LACE_PLUGINS', () => {
+    expect(() => assertCompactionStrategyRegistered('sen-multiconv')).toThrow(/LACE_PLUGINS/);
   });
 });
 
