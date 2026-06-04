@@ -3,10 +3,10 @@
 
 import { Registry } from './registry';
 import { resetManifestsForTest } from './manifest';
+import { addPersonaDir, addSkillDir, resetContributedDirsForTest } from './contributed-dirs';
 import type { Tool } from '@lace/agent/tools/tool';
 import type { CompactionStrategy } from '@lace/agent/compaction/types';
 import type { ContainerRuntime } from '@lace/agent/containers/types';
-import type { ParsedPersona } from '@lace/agent/config/persona-registry';
 
 export const KERNEL_PLUGIN_VERSION = '1.0.0';
 export class PluginVersionError extends Error {
@@ -16,8 +16,6 @@ export class PluginVersionError extends Error {
   }
 }
 
-/** A plugin-contributed persona has the same shape disk personas parse to. */
-export type PersonaDef = ParsedPersona;
 export interface PluginMeta {
   name: string;
   namespace: string;
@@ -28,7 +26,6 @@ export interface PluginRegistries {
   tools: Registry<Tool>;
   compaction: Registry<CompactionStrategy>;
   runtimes: Registry<ContainerRuntime>;
-  personas: Registry<PersonaDef>;
 }
 export interface PluginRegistrar<T> {
   register(name: string, value: T): void;
@@ -40,7 +37,8 @@ export interface PluginApi {
   tools: PluginRegistrar<Tool>;
   compaction: PluginRegistrar<CompactionStrategy>;
   runtimes: PluginRegistrar<ContainerRuntime>;
-  personas: PluginRegistrar<PersonaDef>;
+  personas: { addDir(dir: string): void };
+  skills: { addDir(dir: string): void };
 }
 
 /**
@@ -63,7 +61,6 @@ export function makeRegistries(): PluginRegistries {
     tools: new Registry<Tool>('tools'),
     compaction: new Registry<CompactionStrategy>('compaction'),
     runtimes: new Registry<ContainerRuntime>('runtimes'),
-    personas: new Registry<PersonaDef>('personas'),
   };
 }
 
@@ -86,7 +83,8 @@ export function createPluginApi(meta: PluginMeta, registries: PluginRegistries):
     tools: registrar(registries.tools, meta.name),
     compaction: registrar(registries.compaction, meta.name),
     runtimes: registrar(registries.runtimes, meta.name),
-    personas: registrar(registries.personas, meta.name),
+    personas: { addDir: (dir: string) => addPersonaDir(meta.namespace, dir) },
+    skills: { addDir: (dir: string) => addSkillDir(meta.namespace, dir) },
   };
 }
 
@@ -100,6 +98,6 @@ export function resetRegistriesForTest(): void {
   registries.tools.clear();
   registries.compaction.clear();
   registries.runtimes.clear();
-  registries.personas.clear();
+  resetContributedDirsForTest();
   resetManifestsForTest();
 }
