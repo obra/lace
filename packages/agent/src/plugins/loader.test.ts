@@ -1,8 +1,9 @@
 // ABOUTME: Tests the LACE_PLUGINS loader against fixture modules
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { loadPlugins, parsePluginSpec, PluginLoadError } from './loader';
 import { makeRegistries } from './api';
 import { pluginMayUseCapability, resetManifestsForTest } from './manifest';
+import { personaDirs, resetContributedDirsForTest } from './contributed-dirs';
 
 const FIX = './__fixtures__';
 
@@ -17,15 +18,18 @@ describe('parsePluginSpec', () => {
 });
 
 describe('loadPlugins', () => {
+  beforeEach(() => resetContributedDirsForTest());
+
   it('no-ops on empty spec', async () => {
     const r = makeRegistries();
     expect((await loadPlugins(undefined, { registries: r })).loaded).toEqual([]);
   });
-  it('loads a good plugin, populates the registry with the declared meta as owner', async () => {
+  it('loads a good plugin, registers its tool with the declared meta as owner, and contributes a persona dir', async () => {
     const r = makeRegistries();
     await loadPlugins(`${FIX}/good-plugin`, { registries: r });
-    expect(r.personas.has('fixture-persona')).toBe(true);
-    expect(r.personas.owner('fixture-persona')).toBe('good');
+    expect(r.tools.has('good:fixture-tool')).toBe(true);
+    expect(r.tools.owner('good:fixture-tool')).toBe('good');
+    expect(personaDirs().some((d) => d.namespace === 'good')).toBe(true);
   });
   it('records the manifest so capability checks work', async () => {
     resetManifestsForTest();
@@ -55,7 +59,7 @@ describe('loadPlugins', () => {
       loadPlugins(`${FIX}/throws-on-register-plugin`, { registries: makeRegistries() })
     ).rejects.toThrow(/boom/);
   });
-  it('fatal: duplicate name across plugins', async () => {
+  it('fatal: duplicate tool name across plugins', async () => {
     await expect(
       loadPlugins(`${FIX}/good-plugin,${FIX}/dup-persona-plugin`, {
         registries: makeRegistries(),
