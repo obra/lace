@@ -10,8 +10,8 @@ import { getLaceDir } from './lace-dir';
 import { resolveMcpServerCommandArgs } from './mcp-path-resolution';
 import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import { logger } from '@lace/agent/utils/logger';
-import { registries as pluginRegistries } from '@lace/agent/plugins';
-import type { TemplateEngine, TemplateContext } from './template-engine';
+import { personaDirs } from '@lace/agent/plugins';
+import { TemplateEngine, type TemplateContext } from './template-engine';
 
 export interface PersonaInfo {
   name: string;
@@ -192,20 +192,26 @@ export interface PersonaRegistryOptions {
  * A single source of personas. Each source owns membership, parsing, and
  * rendering for the personas it provides. Sources are held in precedence order:
  * user > plugin > bundled. The first source that `has` a name wins.
+ *
+ * Rendering is source-scoped: each source owns its own TemplateEngine rooted
+ * at its directory, so @sections includes and other path references resolve
+ * from the source's own dir (not a shared engine). Pass only context.
  */
 export interface PersonaSource {
   readonly kind: 'user' | 'plugin' | 'bundled';
   readonly isUserDefined: boolean;
   has(name: string): boolean;
   names(): string[];
-  /**
-   * Display path for PersonaInfo.path: a real disk path for user personas,
-   * a logical `<name>.md` for bundled personas, and `plugin:<name>` for plugin
-   * personas (which have no file on disk).
-   */
+  /** Real disk path for PersonaInfo.path. */
   displayPath(name: string): string;
   parse(name: string): ParsedPersona;
-  render(name: string, engine: TemplateEngine, context: TemplateContext): string;
+  /** Source-scoped render — the engine is owned by the source. */
+  render(name: string, context: TemplateContext): string;
+  /**
+   * Returns the per-persona resource dir (<sourceDir>/<entry>/<kind>) if it
+   * exists on disk, else null.
+   */
+  resourceDir(name: string, kind: 'tools' | 'skills'): string | null;
 }
 
 // ── Shared file-based parse helper ───────────────────────────────────────────
@@ -261,79 +267,140 @@ function resolveMcpPaths(config: PersonaConfig, baseDir: string | undefined): Pe
   return changed ? { ...config, mcpServers } : config;
 }
 
-// ── User-disk source ──────────────────────────────────────────────────────────
+// ── File-dir source ───────────────────────────────────────────────────────────
+
+interface FileDirSourceOptions {
+  dir: string;
+  namespace?: string; // present for plugin sources; absent for user sources
+  isUserDefined: boolean;
+  kind: 'user' | 'plugin';
+  mcpBaseDir?: string;
+  /**
+   * For user sources the registry supplies a callback returning the shared
+   * (name → absolute path) cache maintained by PersonaRegistry. The source
+   * filters the shared cache to entries whose path is inside its own `dir`,
+   * so each user FileDirSource only claims the names it actually owns.
+   * For plugin sources this is omitted; the source manages its own discovery.
+   */
+  getSharedCache?: () => Map<string, string>;
+}
 
 /**
- * Persona source backed by the user's on-disk persona files.
- * The cache (and its TTL/anyPathScanned behaviour) is owned by PersonaRegistry
- * and accessed via the callback. `render` delegates to engine.render so @path
- * includes work correctly across the template directory search path.
+ * Persona source backed by a single on-disk directory.
+ *
+ * Logical name:
+ *   - plugin dir (namespace present): `${namespace}:${entry}`
+ *   - user dir (no namespace):        `${entry}`
+ *
+ * Rendering is source-scoped: owns a `TemplateEngine` rooted at `dir` with
+ * `useEmbedded:false`, so @sections includes resolve from this dir only and
+ * never fall through to bundled embedded files.
+ *
+ * For user dirs the shared cache (managed by PersonaRegistry with TTL/rescan)
+ * is filtered to paths inside this dir, preserving first-wins semantics across
+ * multiple user dirs while keeping each source's rendering within its own dir.
  */
-class UserDiskSource implements PersonaSource {
-  readonly kind = 'user' as const;
-  readonly isUserDefined = true;
+class FileDirSource implements PersonaSource {
+  readonly kind: 'user' | 'plugin';
+  readonly isUserDefined: boolean;
 
-  constructor(
-    private readonly getCache: () => Map<string, string>,
-    private readonly mcpBaseDir: string | undefined
-  ) {}
+  private readonly dir: string;
+  private readonly namespace: string | undefined;
+  private readonly mcpBaseDir: string | undefined;
+  private readonly engine: TemplateEngine;
+  // Callback into the shared user-personas cache (user sources only).
+  private readonly getSharedCache: (() => Map<string, string>) | undefined;
+  // Own cache for plugin dirs (static, no TTL needed).
+  private ownCache: Map<string, string> | null = null;
+
+  constructor(opts: FileDirSourceOptions) {
+    this.kind = opts.kind;
+    this.isUserDefined = opts.isUserDefined;
+    this.dir = path.resolve(opts.dir); // normalise to absolute
+    this.namespace = opts.namespace;
+    this.mcpBaseDir = opts.mcpBaseDir;
+    this.getSharedCache = opts.getSharedCache;
+    this.engine = new TemplateEngine([opts.dir], { useEmbedded: false });
+  }
+
+  private logicalName(entry: string): string {
+    return this.namespace ? `${this.namespace}:${entry}` : entry;
+  }
+
+  /** Entry filename stem from a logical name (strips `namespace:` prefix). */
+  private entryOf(name: string): string {
+    return this.namespace ? name.slice(this.namespace.length + 1) : name;
+  }
+
+  /**
+   * Returns the entries that belong to this source's own directory.
+   * For user sources: filters the shared cache to paths inside `this.dir`.
+   * For plugin sources: uses the lazily-populated own cache.
+   */
+  private ownEntries(): Map<string, string> {
+    if (this.getSharedCache) {
+      // Filter the shared cache: only claim names whose file path lives under
+      // this dir. This gives each user-dir source its own slice of names.
+      const shared = this.getSharedCache();
+      const result = new Map<string, string>();
+      for (const [name, filePath] of shared) {
+        if (filePath.startsWith(this.dir + path.sep) || filePath.startsWith(this.dir + '/')) {
+          result.set(name, filePath);
+        }
+      }
+      return result;
+    }
+    if (!this.ownCache) this.ownCache = this.scanDir();
+    return this.ownCache;
+  }
+
+  private scanDir(): Map<string, string> {
+    const result = new Map<string, string>();
+    try {
+      if (!fs.existsSync(this.dir)) return result;
+      for (const file of fs.readdirSync(this.dir)) {
+        if (!file.endsWith('.md')) continue;
+        const entry = file.slice(0, -3);
+        result.set(this.logicalName(entry), path.join(this.dir, file));
+      }
+    } catch (error) {
+      logger.debug('Persona dir scan failed', {
+        dir: this.dir,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+    return result;
+  }
 
   has(name: string): boolean {
-    return this.getCache().has(name);
+    return this.ownEntries().has(name);
   }
 
   names(): string[] {
-    return Array.from(this.getCache().keys());
+    return Array.from(this.ownEntries().keys());
   }
 
   displayPath(name: string): string {
-    return this.getCache().get(name) ?? name;
+    return this.ownEntries().get(name) ?? path.join(this.dir, `${this.entryOf(name)}.md`);
   }
 
   parse(name: string): ParsedPersona {
-    const filePath = this.getCache().get(name);
+    const filePath = this.ownEntries().get(name);
     if (!filePath) {
-      throw new PersonaParseError(`User persona '${name}' not found in cache`);
+      throw new PersonaParseError(`Persona '${name}' not found in dir ${this.dir}`);
     }
     return parseFileContent(name, fs.readFileSync(filePath, 'utf-8'), this.mcpBaseDir);
   }
 
-  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
-    // TemplateEngine searches its dirs in order; user dirs are listed first,
-    // so `${name}.md` resolves to the user file when present.
-    return engine.render(`${name}.md`, context);
-  }
-}
-
-// ── Plugin source ─────────────────────────────────────────────────────────────
-
-/**
- * Persona source backed by the plugin registry (registries.personas).
- * Plugin personas arrive pre-parsed and do NOT go through resolveMcpPaths.
- * `render` uses engine.renderString because plugin persona bodies are in-memory.
- */
-class PluginSource implements PersonaSource {
-  readonly kind = 'plugin' as const;
-  readonly isUserDefined = false;
-
-  has(name: string): boolean {
-    return pluginRegistries.personas.has(name);
+  render(name: string, context: TemplateContext): string {
+    const entry = this.entryOf(name);
+    return this.engine.render(`${entry}.md`, context);
   }
 
-  names(): string[] {
-    return pluginRegistries.personas.names();
-  }
-
-  displayPath(name: string): string {
-    return `plugin:${name}`;
-  }
-
-  parse(name: string): ParsedPersona {
-    return pluginRegistries.personas.resolve(name);
-  }
-
-  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
-    return engine.renderString(this.parse(name).body, context);
+  resourceDir(name: string, kind: 'tools' | 'skills'): string | null {
+    const entry = this.entryOf(name);
+    const dir = path.join(this.dir, entry, kind);
+    return fs.existsSync(dir) ? dir : null;
   }
 }
 
@@ -341,18 +408,26 @@ class PluginSource implements PersonaSource {
 
 /**
  * Persona source backed by the bundled (embedded) persona files.
- * `render` delegates to engine.render so @path includes and the Bun-embedded
- * fallback both work correctly.
+ * Owns an embedded-on TemplateEngine so that @path includes in bundled
+ * templates resolve from Bun's embedded file set in production builds.
+ * In development (useEmbedded:false would miss them), the engine also has
+ * the bundledPersonasPath on its FS search dirs.
  */
 class BundledSource implements PersonaSource {
   readonly kind = 'bundled' as const;
   readonly isUserDefined = false;
 
+  private readonly engine: TemplateEngine;
+
   constructor(
     private readonly getCache: () => Set<string>,
     private readonly bundledPersonasPath: string,
     private readonly mcpBaseDir: string | undefined
-  ) {}
+  ) {
+    // useEmbedded:true so Bun embedded files are checked first; FS fallback
+    // handles the development case where files are on disk.
+    this.engine = new TemplateEngine([bundledPersonasPath], { useEmbedded: true });
+  }
 
   has(name: string): boolean {
     return this.getCache().has(name);
@@ -363,7 +438,7 @@ class BundledSource implements PersonaSource {
   }
 
   displayPath(name: string): string {
-    return `${name}.md`;
+    return path.join(this.bundledPersonasPath, `${name}.md`);
   }
 
   parse(name: string): ParsedPersona {
@@ -371,8 +446,13 @@ class BundledSource implements PersonaSource {
     return parseFileContent(name, raw, this.mcpBaseDir);
   }
 
-  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
-    return engine.render(`${name}.md`, context);
+  render(name: string, context: TemplateContext): string {
+    return this.engine.render(`${name}.md`, context);
+  }
+
+  resourceDir(name: string, kind: 'tools' | 'skills'): string | null {
+    const dir = path.join(this.bundledPersonasPath, name, kind);
+    return fs.existsSync(dir) ? dir : null;
   }
 }
 
@@ -410,6 +490,9 @@ export class PersonaRegistry {
   private readonly mcpBaseDir: string | undefined;
 
   // Precedence-ordered sources: user > plugin > bundled.
+  // Plugin FileDirSources are appended between the user FileDirSources and the
+  // BundledSource during construction; they use personaDirs() which is populated
+  // by plugin loaders before the registry is used.
   private readonly sources: PersonaSource[];
 
   constructor(opts: PersonaRegistryOptions) {
@@ -417,9 +500,35 @@ export class PersonaRegistry {
     this.userPersonasPaths = opts.userPersonasPaths;
     this.mcpBaseDir = opts.mcpBaseDir;
 
+    // One FileDirSource per user path (no namespace, user-defined, TTL cache
+    // owned by PersonaRegistry and shared via callback filtered by dir).
+    const userSources: FileDirSource[] = opts.userPersonasPaths.map(
+      (dir) =>
+        new FileDirSource({
+          dir,
+          isUserDefined: true,
+          kind: 'user',
+          mcpBaseDir: opts.mcpBaseDir,
+          getSharedCache: () => this.userPersonasCache,
+        })
+    );
+
+    // One FileDirSource per plugin-contributed dir (namespaced, not user-defined).
+    // personaDirs() is read once at construction time — plugin dirs are static.
+    const pluginSources: FileDirSource[] = personaDirs().map(
+      ({ namespace, dir }) =>
+        new FileDirSource({
+          dir,
+          namespace,
+          isUserDefined: false,
+          kind: 'plugin',
+          mcpBaseDir: opts.mcpBaseDir,
+        })
+    );
+
     this.sources = [
-      new UserDiskSource(() => this.userPersonasCache, this.mcpBaseDir),
-      new PluginSource(),
+      ...userSources,
+      ...pluginSources,
       new BundledSource(() => this.bundledPersonasCache, this.bundledPersonasPath, this.mcpBaseDir),
     ];
 
@@ -567,18 +676,47 @@ export class PersonaRegistry {
 
   /**
    * Render the named persona's template body with the given context.
-   * Dispatches to the winning source's render method — no path-string sniffing.
+   * Each source renders with its own scoped TemplateEngine, so @sections and
+   * @path includes resolve from the source's own directory.
    * Throws PersonaNotFoundError if the persona does not exist.
    */
-  render(name: string, engine: TemplateEngine, context: TemplateContext): string {
+  renderPersona(name: string, context: TemplateContext): string {
     this.loadUserPersonas();
     for (const source of this.sources) {
       if (source.has(name)) {
-        return source.render(name, engine, context);
+        return source.render(name, context);
       }
     }
     const available = this.listAvailablePersonas().map((p) => p.name);
     throw new PersonaNotFoundError(name, available);
+  }
+
+  /**
+   * Returns the tools directory for the named persona
+   * (`<sourceDir>/<entry>/tools/`) if it exists on disk, else null.
+   */
+  personaToolsDir(name: string): string | null {
+    this.loadUserPersonas();
+    for (const source of this.sources) {
+      if (source.has(name)) {
+        return source.resourceDir(name, 'tools');
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Returns the skills directory for the named persona
+   * (`<sourceDir>/<entry>/skills/`) if it exists on disk, else null.
+   */
+  personaSkillsDir(name: string): string | null {
+    this.loadUserPersonas();
+    for (const source of this.sources) {
+      if (source.has(name)) {
+        return source.resourceDir(name, 'skills');
+      }
+    }
+    return null;
   }
 }
 
