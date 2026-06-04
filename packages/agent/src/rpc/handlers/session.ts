@@ -45,6 +45,8 @@ import { loadPromptConfig } from '../../config/prompts';
 import { logger } from '../../utils/logger';
 import { reconcileMcpServersForActiveSession } from './mcp-servers';
 import { SkillRegistry, getSkillDirectories } from '../../skills';
+import { composeSkillDirs } from '../../skills/compose-skill-dirs';
+import { getAgentSkillsDir } from '../../skills/agent-skills-dir';
 import { killAllRunningJobs } from '../../jobs';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
@@ -259,7 +261,11 @@ export async function composeAndWriteSystemPromptSet(params: {
 }): Promise<SessionState> {
   const { sessionDir, sessionState, persona, cwd, state, createToolExecutorForMode } = params;
 
-  const skillDirs = state.skillDirs ?? getSkillDirectories(cwd);
+  const skillDirs = composeSkillDirs(
+    { skillDirs: state.skillDirs ?? getSkillDirectories(cwd) },
+    state.personaRegistry.personaSkillsDir(persona),
+    { coreDir: getAgentSkillsDir() }
+  );
   const skillRegistry = new SkillRegistry({ skillDirs });
 
   const { toolsForProvider } = await createToolExecutorForMode(

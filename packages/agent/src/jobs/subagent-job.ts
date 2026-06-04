@@ -72,6 +72,8 @@ interface RpcErrorLike {
   data?: Record<string, unknown>;
 }
 
+// Deliberately ships the RAW embedder/workDir tier — the child re-composes
+// (persona → plugin → core → embedder) on its own initialize, preventing double-composition.
 function getSubagentHostSkillDirs(state: AgentServerState): string[] {
   if (state.skillDirs !== undefined) return state.skillDirs;
   return getSkillDirectories(state.activeSession?.meta.workDir);
