@@ -97,12 +97,57 @@ const spec = createNewAgentSpec('lace', 'anthropic', 'claude-3-sonnet');
 - Update any hardcoded agent specs in your code
 - Update any user-facing documentation showing agent creation syntax
 
+## Plugin-contributed personas
+
+Plugins can contribute personas by pointing the kernel at a directory of `.md`
+files. Each file becomes a persona named `<namespace>:<entry>` (where
+`namespace` is the plugin's declared namespace and `entry` is the filename
+without `.md`). Call `api.personas.addDir(dir)` inside your plugin's
+`register()` function:
+
+```ts
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export function register(api) {
+  api.personas.addDir(path.join(__dirname, 'personas'));
+}
+```
+
+Plugin personas slot between user-disk (higher priority) and bundled personas
+(lower priority) in the resolution order: **user-disk > plugin > bundled**.
+
+### Per-persona tools and skills
+
+A persona file at `<dir>/<entry>.md` may have sibling resource directories:
+
+```
+personas/
+  researcher.md              ← persona 'acme:researcher'
+  researcher/
+    tools/                   ← exec tools active only when this persona is running
+      fetch-papers           ← a +x binary speaking lace-tool-schema/lace-tool-invoke
+    skills/                  ← skills injected only for this persona
+```
+
+When `acme:researcher` is the active persona, lace additionally loads exec tools
+from `personas/researcher/tools/` and skills from `personas/researcher/skills/`.
+
+Per-persona exec tool names are taken directly from the binary's
+`lace-tool-schema` descriptor (no namespace prefix is added). These tools can
+override a same-named plugin-global or core exec tool, but **cannot** override a
+reserved kernel built-in (e.g. `bash`, `file_read`).
+
+See [Writing Plugins](writing-plugins.md) for the full `api.personas.addDir`
+walkthrough, and [External Tools](external-tools.md) for the exec tool protocol.
+
 ## Architecture
 
 ### File Structure
 
 ```
-packages/core/config/agent-personas/
+packages/agent/config/agent-personas/
 ├── lace.md                      # Default persona
 ├── coding-agent.md              # Coding specialist
 ├── helper-agent.md              # Productivity assistant
@@ -111,7 +156,7 @@ packages/core/config/agent-personas/
     ├── core-principles.md
     └── ...
 
-~/.lace/agent-personas/          # User overrides
+~/.lace/agent-personas/          # User overrides (higher priority)
 ├── my-custom-persona.md
 ├── lace.md                      # User override of default
 └── sections/                    # User section overrides
@@ -120,14 +165,15 @@ packages/core/config/agent-personas/
 
 ### Components
 
-- **PersonaRegistry**: Discovers and validates available personas
-- **PromptManager**: Generates persona-specific system prompts
-- **Agent**: Uses persona for system prompt generation
-- **TaskManager**: Spawns agents with correct personas from NewAgentSpec
+- **PersonaRegistry**: Discovers and validates available personas (user-disk,
+  plugin-contributed, and bundled sources in precedence order)
+- **TemplateEngine**: Renders persona body templates, resolving `@path` includes
+  and mustache variables
+- **Agent**: Uses the active persona for system prompt generation
 
 ### Integration Flow
 
 ```
-NewAgentSpec → parseNewAgentSpec() → PersonaRegistry.validate() →
-PromptManager.generateSystemPrompt(persona) → Agent with persona
+persona name → PersonaRegistry.parsePersona(name) → PersonaConfig + body →
+TemplateEngine.render(body, context) → system prompt for session
 ```

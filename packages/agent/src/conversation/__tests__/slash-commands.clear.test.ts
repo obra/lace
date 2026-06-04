@@ -128,7 +128,9 @@ describe('/clear writes system_prompt_set in the new session', () => {
       pendingPermissionRequests: new Map(),
       sessionMutex: Promise.resolve(),
       toolExecutorCache: new Map(),
-      personaRegistry: {} as AgentServerState['personaRegistry'],
+      personaRegistry: {
+        personaSkillsDir: () => null,
+      } as unknown as AgentServerState['personaRegistry'],
       containerMounts: {},
       containerManager: null,
     } as unknown as AgentServerState;

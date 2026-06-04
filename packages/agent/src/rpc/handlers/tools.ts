@@ -5,6 +5,8 @@ import type { AgentServerState, CreateToolExecutorFn } from '../../server-types'
 import { protocolToolInfoForCoreTool } from '../utils';
 import { assertInitialized } from '../utils';
 import { SkillRegistry, getSkillDirectories } from '../../skills';
+import { composeSkillDirs } from '../../skills/compose-skill-dirs';
+import { getAgentSkillsDir } from '../../skills/agent-skills-dir';
 
 /**
  * Register tool management handlers with the peer.
@@ -18,11 +20,15 @@ export function registerToolHandlers(
   peer.onRequest('ent/tools/list', async (_params: unknown) => {
     assertInitialized(state);
 
-    // Create skill registry if there's an active session. Embedder-supplied
-    // skillDirs (set during initialize) override workDir-based discovery.
+    // Create skill registry if there's an active session. Persona skills layer
+    // first, then plugin dirs, then core, then embedder/workDir (first-wins).
     let skillRegistry: SkillRegistry | undefined;
     if (state.activeSession) {
-      const skillDirs = state.skillDirs ?? getSkillDirectories(state.activeSession.meta.workDir);
+      const skillDirs = composeSkillDirs(
+        { skillDirs: state.skillDirs ?? getSkillDirectories(state.activeSession.meta.workDir) },
+        state.personaRegistry.personaSkillsDir(state.activeSession.meta.persona ?? 'lace'),
+        { coreDir: getAgentSkillsDir() }
+      );
       skillRegistry = new SkillRegistry({ skillDirs });
     }
 
@@ -32,7 +38,8 @@ export function registerToolHandlers(
       undefined, // jobManager
       skillRegistry,
       undefined, // toolScope
-      state.personaRegistry
+      state.personaRegistry,
+      state.activeSession?.meta.persona ?? 'lace'
     );
 
     const seenToolNames = new Set<string>();

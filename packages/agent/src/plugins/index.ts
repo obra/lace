@@ -11,9 +11,16 @@ export {
   type PluginMeta,
   type PluginRegistries,
   type PluginRegistrar,
-  type PersonaDef,
   type PluginModule,
 } from './api';
+export {
+  addPersonaDir,
+  personaDirs,
+  addSkillDir,
+  skillDirs,
+  resetContributedDirsForTest,
+  type ContributedDir,
+} from './contributed-dirs';
 export {
   recordManifest,
   pluginMayUseCapability,

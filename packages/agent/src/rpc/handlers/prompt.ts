@@ -28,6 +28,8 @@ import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { SkillRegistry, getSkillDirectories } from '@lace/agent/skills';
+import { composeSkillDirs } from '@lace/agent/skills/compose-skill-dirs';
+import { getAgentSkillsDir } from '@lace/agent/skills/agent-skills-dir';
 import { getOrCreateSessionToolExecutor } from '@lace/agent/server';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import {
@@ -277,9 +279,13 @@ export function registerPromptHandler(
           ? Math.max(1, Math.trunc((params as { maxTurns?: number }).maxTurns!))
           : ConversationRunner.DEFAULT_MAX_TURNS;
 
-      // Create skill registry for this session. Embedder-supplied skillDirs
-      // (set during initialize) override the default workDir-based discovery.
-      const skillDirs = state.skillDirs ?? getSkillDirectories(state.activeSession.meta.workDir);
+      // Create skill registry for this session. Persona skills layer first,
+      // then plugin dirs, then core, then embedder/workDir (first-wins).
+      const skillDirs = composeSkillDirs(
+        { skillDirs: state.skillDirs ?? getSkillDirectories(state.activeSession.meta.workDir) },
+        state.personaRegistry.personaSkillsDir(state.activeSession.meta.persona ?? 'lace'),
+        { coreDir: getAgentSkillsDir() }
+      );
       const skillRegistry = new SkillRegistry({ skillDirs });
 
       // Build runner config
@@ -299,6 +305,10 @@ export function registerPromptHandler(
 
       const sessionIdForCache = state.activeSession.meta.sessionId;
       const sessionToolScope = state.activeSession.state.config?.toolScope;
+      // Capture the session's active persona at executor-build time so
+      // fork and /clear always use the persona of the session being built,
+      // not whatever state.activeSession holds at call time.
+      const sessionActivePersona = state.activeSession.meta.persona ?? 'lace';
       // Forwards personaRegistry through explicitly so the data flow from
       // state.personaRegistry → DelegateTool is auditable (no closure capture
       // hiding the wiring). Per-session toolScope is captured because it is
@@ -321,7 +331,8 @@ export function registerPromptHandler(
               jobManager,
               skillReg,
               sessionToolScope,
-              personaReg
+              personaReg,
+              sessionActivePersona
             ),
           sessionToolScope
         )) as RunnerDependencies['createToolExecutor'];

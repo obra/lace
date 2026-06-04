@@ -17,6 +17,7 @@ import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import { registries } from '@lace/agent/plugins';
 import { registerBuiltinTools, PER_SESSION_BUILTIN_NAMES } from './builtins';
+import { discoverExecToolsSync } from './exec/discover';
 
 export interface RegisterToolsOptions {
   /** PersonaRegistry to wire into DelegateTool. Defaults to the global singleton. */
@@ -299,6 +300,23 @@ export class ToolExecutor {
     // Add skill tool if registry is provided
     if (skillRegistry) {
       this.registerTool('use_skill', new UseSkillTool(skillRegistry));
+    }
+  }
+
+  /**
+   * Inject tools discovered from a persona's tools directory.
+   * Reserved builtin names are silently skipped — persona tools are additive,
+   * not a replacement for platform builtins.
+   */
+  injectPersonaTools(toolsDir: string | null): void {
+    if (!toolsDir) return;
+    const reserved = new Set<string>([...LACE_BUILTIN_TOOL_NAMES, ...PER_SESSION_BUILTIN_NAMES]);
+    for (const tool of discoverExecToolsSync(toolsDir)) {
+      if (reserved.has(tool.name)) {
+        logger.warn('persona-tool.reserved.skipped', { name: tool.name });
+        continue;
+      }
+      this.registerTool(tool.name, tool);
     }
   }
 

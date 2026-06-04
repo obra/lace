@@ -1,35 +1,48 @@
 // ABOUTME: Discover one-shot-exec tools from a SCOPED directory (never $PATH)
 // ABOUTME: Skips non-executable files and binaries with invalid schema output (no throw)
-import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { logger } from '@lace/agent/utils/logger';
 import { parseExecToolDescriptor } from './descriptor';
 import { ExecToolAdapter } from './exec-tool-adapter';
-import { runExecToolProcess } from './run-once';
+import { runExecToolSchemaSync } from './run-once';
 
-export async function discoverExecTools(dir: string): Promise<ExecToolAdapter[]> {
+const PER_BINARY_MS = 5000;
+const TOTAL_BUDGET_MS = 30000;
+const MAX_BINARIES = 64;
+
+export function discoverExecToolsSync(dir: string, namePrefix = ''): ExecToolAdapter[] {
   let entries: string[];
   try {
-    entries = await fs.readdir(dir);
+    entries = readdirSync(dir);
   } catch {
     return [];
   }
   const out: ExecToolAdapter[] = [];
+  const startedAt = Date.now();
+  let count = 0;
   for (const entry of entries) {
-    const bin = path.join(dir, entry);
+    if (count >= MAX_BINARIES) {
+      logger.warn('exectool.discover.cap', { dir, cap: MAX_BINARIES });
+      break;
+    }
+    if (Date.now() - startedAt > TOTAL_BUDGET_MS) {
+      logger.warn('exectool.discover.budget', { dir });
+      break;
+    }
+    const bin = join(dir, entry);
     try {
-      const st = await fs.stat(bin);
+      const st = statSync(bin);
       if (!st.isFile() || (st.mode & 0o111) === 0) continue;
-      const { stdout, exitCode } = await runExecToolProcess(bin, ['lace-tool-schema'], {
-        stdin: '',
-        cwd: dir,
-        timeoutMs: 5000,
-      });
+      count++;
+      const { stdout, exitCode } = runExecToolSchemaSync(bin, dir, PER_BINARY_MS);
       if (exitCode !== 0) {
         logger.warn('exectool.schema.nonzero', { bin, exitCode });
         continue;
       }
-      out.push(new ExecToolAdapter(bin, parseExecToolDescriptor(stdout)));
+      const desc = parseExecToolDescriptor(stdout);
+      const name = namePrefix ? `${namePrefix}${desc.name}` : desc.name;
+      out.push(new ExecToolAdapter(bin, desc, name));
     } catch (err) {
       logger.warn('exectool.discover.skipped', {
         bin,

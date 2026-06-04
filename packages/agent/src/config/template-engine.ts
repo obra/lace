@@ -14,9 +14,15 @@ export interface TemplateContext {
 export class TemplateEngine {
   private readonly templateDirs: string[];
   private readonly processedIncludes = new Set<string>();
+  private readonly useEmbedded: boolean;
 
-  constructor(templateDirs: string | string[]) {
+  constructor(templateDirs: string | string[], opts: { useEmbedded?: boolean } = {}) {
     this.templateDirs = Array.isArray(templateDirs) ? templateDirs : [templateDirs];
+    this.useEmbedded = opts.useEmbedded ?? false;
+  }
+
+  get usesEmbedded(): boolean {
+    return this.useEmbedded;
   }
 
   /**
@@ -62,7 +68,12 @@ export class TemplateEngine {
   private loadTemplate(templatePath: string): string {
     // First try embedded files - check for the template path directly
     try {
-      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+      if (
+        this.useEmbedded &&
+        typeof Bun !== 'undefined' &&
+        'embeddedFiles' in Bun &&
+        Bun.embeddedFiles
+      ) {
         const targetPath = `packages/agent/config/agent-personas/${templatePath}`;
 
         for (const file of Bun.embeddedFiles) {
@@ -181,7 +192,12 @@ export class TemplateEngine {
 
       // Try embedded files first (Bun executable)
       let foundContent: string | null = null;
-      if (typeof Bun !== 'undefined' && 'embeddedFiles' in Bun && Bun.embeddedFiles) {
+      if (
+        this.useEmbedded &&
+        typeof Bun !== 'undefined' &&
+        'embeddedFiles' in Bun &&
+        Bun.embeddedFiles
+      ) {
         const targetPath = `packages/agent/config/agent-personas/${includePath}`;
 
         for (const file of Bun.embeddedFiles) {

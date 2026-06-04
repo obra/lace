@@ -34,10 +34,11 @@ export class ExecToolAdapter extends Tool {
   schema: ZodType;
   constructor(
     private binPath: string,
-    private descriptor: ExecToolDescriptor
+    private descriptor: ExecToolDescriptor,
+    nameOverride?: string
   ) {
     super();
-    this.name = descriptor.name;
+    this.name = nameOverride ?? descriptor.name;
     this.description = descriptor.description;
     this.schema = z.object({}).passthrough(); // lace does not validate; the binary is the source of truth
   }

@@ -1,4 +1,4 @@
-// ABOUTME: Example persona plugin — registers a single PersonaDef (security-reviewer)
+// ABOUTME: Example persona plugin — registers a security-reviewer persona from a file dir
 // ABOUTME: through the plugin API. Demonstrates config fields and template variables.
 //
 // ── PACKAGING CONTRACT ────────────────────────────────────────────────────────
@@ -7,7 +7,9 @@
 // Type-only imports are erased at build time and are always safe.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { PluginApi, PluginModule, PersonaDef } from '@lace/agent/plugins';
+import * as path from 'path';
+import { fileURLToPath } from 'node:url';
+import type { PluginApi, PluginModule } from '@lace/agent/plugins';
 
 export const meta = {
   name: 'persona-example',
@@ -15,24 +17,20 @@ export const meta = {
   version: '1.0.0',
 };
 
-// A security-reviewer persona: runs in-process (runtime: root), uses a custom
+// Personas are file-based: <entry>.md files in a sibling directory, with YAML
+// frontmatter carrying config fields. The plugin's meta.namespace namespaces
+// each file so its logical name becomes <namespace>:<entry>
+// (e.g. persona-example:security-reviewer).
+//
+// The security-reviewer persona: runs in-process (runtime: root), uses a custom
 // compaction strategy name, and embeds {{system.sessionDate}} so the rendered
-// prompt is date-stamped without requiring file-on-disk delivery.
-const securityReviewer: PersonaDef = {
-  config: {
-    runtime: { type: 'root' },
-    compaction: { strategy: 'track-based' },
-  } as PersonaDef['config'], // cast: PersonaConfig is strict; partial objects fail Zod unless cast
-  body:
-    'You are Security Reviewer. Today is {{system.sessionDate}}.\n' +
-    'Your job is to inspect code changes for security vulnerabilities: ' +
-    'injection flaws, secrets in source, insecure defaults, and privilege escalation. ' +
-    'Be concise. Flag severity (critical/high/medium/low) for every finding.',
-};
+// prompt is date-stamped without requiring additional wiring.
 
 export function register(api: PluginApi): void {
   api.assertVersion(1);
-  api.personas.register('persona-example/security-reviewer', securityReviewer);
+  api.personas.addDir(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), 'persona-example-personas')
+  );
 }
 
 export default { meta, register } satisfies PluginModule;

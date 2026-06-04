@@ -7,7 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { PromptManager } from './prompt-manager';
 import { PersonaRegistry } from './persona-registry';
-import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
+import { addPersonaDir, resetContributedDirsForTest } from '@lace/agent/plugins';
 
 // Mock logger to avoid console output during tests
 vi.mock('../../utils/logger.js', () => ({
@@ -28,6 +28,18 @@ vi.mock('child_process', async (importOriginal) => {
   };
 });
 
+/**
+ * Create a PersonaRegistry whose only user-persona dir is the given tempDir.
+ * Using '/nonexistent' for bundledPersonasPath means no bundled personas are
+ * loaded — only the files in tempDir matter.
+ */
+function makeRegistryForDir(dir: string): PersonaRegistry {
+  return new PersonaRegistry({
+    bundledPersonasPath: '/nonexistent',
+    userPersonasPaths: [dir],
+  });
+}
+
 describe('PromptManager', () => {
   let tempDir: string;
   let originalLaceDir: string | undefined;
@@ -37,6 +49,7 @@ describe('PromptManager', () => {
     // Override LACE_DIR to use our test directory
     originalLaceDir = process.env.LACE_DIR;
     process.env.LACE_DIR = tempDir;
+    resetContributedDirsForTest();
   });
 
   afterEach(() => {
@@ -51,6 +64,7 @@ describe('PromptManager', () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
     vi.clearAllMocks();
+    resetContributedDirsForTest();
   });
 
   describe('initialization', () => {
@@ -130,7 +144,8 @@ describe('PromptManager', () => {
         { name: 'file_read', description: 'Read file contents' },
       ];
 
-      const manager = new PromptManager({ tools, templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ tools, templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
@@ -148,7 +163,8 @@ describe('PromptManager', () => {
         '@sections/agent-personality.md\n\n{{#tools}}Tools available{{/tools}}{{^tools}}No tools available{{/tools}}'
       );
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
@@ -161,7 +177,8 @@ describe('PromptManager', () => {
         '@sections/agent-personality.md\n\n@sections/missing.md\n\nEnd of prompt'
       );
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('You are Lace, an AI coding assistant.');
@@ -170,8 +187,9 @@ describe('PromptManager', () => {
     });
 
     it('should return fallback prompt when template system fails', async () => {
-      // Don't create lace.md template
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      // Don't create lace.md template — persona won't be found, triggering fallback
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe(
@@ -185,7 +203,8 @@ describe('PromptManager', () => {
         'Valid start {{#broken}} {{/different}} Invalid syntax'
       );
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe(
@@ -201,7 +220,8 @@ describe('PromptManager', () => {
       fs.chmodSync(tempDir, 0o000);
 
       try {
-        const manager = new PromptManager({ templateDirs: [tempDir] });
+        const personaRegistry = makeRegistryForDir(tempDir);
+        const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
         const prompt = await manager.generateSystemPrompt();
 
         expect(prompt).toBe(
@@ -224,7 +244,8 @@ describe('PromptManager', () => {
         throw new Error('Git command failed');
       });
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       // Should still generate prompt with available variables
@@ -235,7 +256,8 @@ describe('PromptManager', () => {
     it('should handle empty template file', async () => {
       fs.writeFileSync(path.join(tempDir, 'lace.md'), '');
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('');
@@ -244,7 +266,8 @@ describe('PromptManager', () => {
     it('should handle template with only whitespace', async () => {
       fs.writeFileSync(path.join(tempDir, 'lace.md'), '   \n\t\r\n   ');
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('   \n\t\r\n   ');
@@ -283,7 +306,8 @@ describe('PromptManager', () => {
         { name: 'web_search', description: 'Search the web' },
       ];
 
-      const manager = new PromptManager({ tools, templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ tools, templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       // Should contain all expected sections
@@ -302,7 +326,8 @@ describe('PromptManager', () => {
     it('should work with minimal template', async () => {
       fs.writeFileSync(path.join(tempDir, 'lace.md'), 'Hello {{name}}!');
 
-      const manager = new PromptManager({ templateDirs: [tempDir] });
+      const personaRegistry = makeRegistryForDir(tempDir);
+      const manager = new PromptManager({ templateDirs: [tempDir], personaRegistry });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('Hello !'); // No name provided, mustache renders empty
@@ -310,64 +335,60 @@ describe('PromptManager', () => {
   });
 
   describe('plugin persona body rendering', () => {
-    beforeEach(() => {
-      resetRegistriesForTest();
-    });
-
-    afterEach(() => {
-      resetRegistriesForTest();
-    });
-
     it('renders the body of a plugin-contributed persona through variable substitution', async () => {
-      // Register a plugin persona with a recognisable body marker and a mustache variable.
-      registries.personas.register(
-        'render-test',
-        {
-          config: { runtime: { type: 'root' } } as never,
-          body: 'You are RenderTest, body marker XYZZY. OS is {{system.os}}.',
-        },
-        'vendor'
-      );
+      // Write the persona file into a temp dir and register it via addPersonaDir.
+      const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pm-plugin-test-'));
+      try {
+        fs.writeFileSync(
+          path.join(pluginDir, 'render-test.md'),
+          'You are RenderTest, body marker XYZZY. OS is {{system.os}}.'
+        );
+        addPersonaDir('vendor', pluginDir);
 
-      // Build a PersonaRegistry that has no bundled/user-disk personas so the
-      // plugin is the only source of truth for 'render-test'.
-      const personaReg = new PersonaRegistry({
-        bundledPersonasPath: '/nonexistent',
-        userPersonasPaths: [],
-      });
+        // Build a PersonaRegistry with no bundled/user-disk personas so the
+        // plugin is the only source of truth for 'vendor:render-test'.
+        const personaRegistry = new PersonaRegistry({
+          bundledPersonasPath: '/nonexistent',
+          userPersonasPaths: [],
+        });
 
-      const manager = new PromptManager({ personaRegistry: personaReg, templateDirs: [tempDir] });
-      const prompt = await manager.generateSystemPrompt('render-test');
+        const manager = new PromptManager({ personaRegistry, templateDirs: [tempDir] });
+        const prompt = await manager.generateSystemPrompt('vendor:render-test');
 
-      // The body marker must be present — proving the plugin body was rendered.
-      expect(prompt).toContain('XYZZY');
-      // Mustache substitution must also have fired (system.os is non-empty).
-      expect(prompt).toContain('OS is');
-      expect(prompt).not.toContain('{{system.os}}');
+        // The body marker must be present — proving the plugin body was rendered.
+        expect(prompt).toContain('XYZZY');
+        // Mustache substitution must also have fired (system.os is non-empty).
+        expect(prompt).toContain('OS is');
+        expect(prompt).not.toContain('{{system.os}}');
+      } finally {
+        fs.rmSync(pluginDir, { recursive: true, force: true });
+      }
     });
 
     it('does NOT fall back to the generic fallback string for a plugin persona', async () => {
-      registries.personas.register(
-        'render-test-nofallback',
-        {
-          config: { runtime: { type: 'root' } } as never,
-          body: 'Plugin persona unique marker QWERTY.',
-        },
-        'vendor'
-      );
+      const pluginDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pm-plugin-test-'));
+      try {
+        fs.writeFileSync(
+          path.join(pluginDir, 'render-test-nofallback.md'),
+          'Plugin persona unique marker QWERTY.'
+        );
+        addPersonaDir('vendor', pluginDir);
 
-      const personaReg = new PersonaRegistry({
-        bundledPersonasPath: '/nonexistent',
-        userPersonasPaths: [],
-      });
+        const personaRegistry = new PersonaRegistry({
+          bundledPersonasPath: '/nonexistent',
+          userPersonasPaths: [],
+        });
 
-      const manager = new PromptManager({ personaRegistry: personaReg, templateDirs: [tempDir] });
-      const prompt = await manager.generateSystemPrompt('render-test-nofallback');
+        const manager = new PromptManager({ personaRegistry, templateDirs: [tempDir] });
+        const prompt = await manager.generateSystemPrompt('vendor:render-test-nofallback');
 
-      expect(prompt).toContain('QWERTY');
-      expect(prompt).not.toBe(
-        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
-      );
+        expect(prompt).toContain('QWERTY');
+        expect(prompt).not.toBe(
+          'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+        );
+      } finally {
+        fs.rmSync(pluginDir, { recursive: true, force: true });
+      }
     });
   });
 
@@ -388,8 +409,15 @@ describe('PromptManager', () => {
 
       fs.writeFileSync(path.join(defaultTemplateDir, 'lace.md'), 'Default template: {{system.os}}');
 
-      // User template should take precedence
-      const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
+      // User template should take precedence (userPersonasPaths: first wins)
+      const personaRegistry = new PersonaRegistry({
+        bundledPersonasPath: defaultTemplateDir,
+        userPersonasPaths: [userTemplateDir],
+      });
+      const manager = new PromptManager({
+        templateDirs: [userTemplateDir, defaultTemplateDir],
+        personaRegistry,
+      });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('Custom user template:');
@@ -409,7 +437,14 @@ describe('PromptManager', () => {
         'Default fallback template: {{system.os}}'
       );
 
-      const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
+      const personaRegistry = new PersonaRegistry({
+        bundledPersonasPath: defaultTemplateDir,
+        userPersonasPaths: [userTemplateDir],
+      });
+      const manager = new PromptManager({
+        templateDirs: [userTemplateDir, defaultTemplateDir],
+        personaRegistry,
+      });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('Default fallback template:');
@@ -426,28 +461,42 @@ describe('PromptManager', () => {
       fs.mkdirSync(path.join(userTemplateDir, 'sections'), { recursive: true });
       fs.mkdirSync(path.join(defaultTemplateDir, 'sections'), { recursive: true });
 
-      // User has custom personality, default has environment
+      // User has custom personality section
       fs.writeFileSync(
         path.join(userTemplateDir, 'sections', 'agent-personality.md'),
         'Custom AI Assistant'
       );
 
+      // Default has environment section
       fs.writeFileSync(
         path.join(defaultTemplateDir, 'sections', 'environment.md'),
         'Environment: {{system.os}}'
       );
 
-      // System template uses both includes
+      // User template includes both sections; environment resolves from default dir
+      // Note: source-scoped rendering means includes resolve from the owning dir.
+      // So we put lace.md and both sections in userTemplateDir for this test.
+      fs.writeFileSync(
+        path.join(userTemplateDir, 'sections', 'environment.md'),
+        'Environment: {{system.os}}'
+      );
       fs.writeFileSync(
         path.join(userTemplateDir, 'lace.md'),
         '@sections/agent-personality.md\n\n@sections/environment.md'
       );
 
-      const manager = new PromptManager({ templateDirs: [userTemplateDir, defaultTemplateDir] });
+      const personaRegistry = new PersonaRegistry({
+        bundledPersonasPath: defaultTemplateDir,
+        userPersonasPaths: [userTemplateDir],
+      });
+      const manager = new PromptManager({
+        templateDirs: [userTemplateDir, defaultTemplateDir],
+        personaRegistry,
+      });
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toContain('Custom AI Assistant'); // From user directory
-      expect(prompt).toContain('Environment:'); // From default directory
+      expect(prompt).toContain('Environment:'); // Also in user directory
     });
   });
 });

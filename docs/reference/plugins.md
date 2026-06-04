@@ -6,9 +6,9 @@ walkthrough, see [Writing Plugins](../writing-plugins.md).
 ## Model
 
 Lace is a generic agent kernel. Everything product-specific — extra tools, a
-compaction strategy, container runtimes, personas — is contributed by
-**plugins** loaded at process startup. There is **one loader** feeding **four
-typed registries**.
+compaction strategy, container runtimes, personas, skills — is contributed by
+**plugins** loaded at process startup. There is **one loader** feeding **three
+typed registries** and two file-contribution APIs.
 
 - **Boot-time, not runtime.** Plugins are loaded once, when the agent process
   starts, from the `LACE_PLUGINS` environment variable. There is no runtime
@@ -93,10 +93,11 @@ interface PluginApi {
   readonly meta: PluginMeta;
   readonly kernelVersion: string; // e.g. "1.0.0"
   assertVersion(major: number): void; // throws PluginVersionError on major mismatch
-  tools: PluginRegistrar<Tool>;
+  tools: PluginRegistrar<Tool> & { registerExecDir(dir: string): void };
   compaction: PluginRegistrar<CompactionStrategy>;
   runtimes: PluginRegistrar<ContainerRuntime>;
-  personas: PluginRegistrar<PersonaDef>;
+  personas: { addDir(dir: string): void };
+  skills: { addDir(dir: string): void };
 }
 
 interface PluginRegistrar<T> {
@@ -104,9 +105,18 @@ interface PluginRegistrar<T> {
 }
 ```
 
-Each `register(name, value)` records the entry under `name` with the plugin's
+For the typed registries (`tools`, `compaction`, `runtimes`), each
+`register(name, value)` records the entry under `name` with the plugin's
 `meta.name` as owner. You do not pass the owner yourself — the registrar injects
 it.
+
+`api.personas.addDir(dir)` and `api.skills.addDir(dir)` register a directory of
+files for the persona and skill systems respectively (see
+[Personas and Skills via directories](#personas-and-skills-via-directories)).
+
+`api.tools.registerExecDir(dir)` discovers and registers one-shot-exec tool
+binaries from a directory (see
+[Exec tools via directory](#exec-tools-via-directory)).
 
 ### Versioning
 
@@ -117,15 +127,15 @@ incompatible kernel fails loudly at load rather than misbehaving later.
 
 ## Registries
 
-Four registries, one per extension kind. Each is a `Registry<T>` — a
-select-one-by-name table.
+Three typed registries, each a `Registry<T>` — a select-one-by-name table.
+Personas and skills are **not** registries; they are contributed via directories
+(see [Personas and Skills via directories](#personas-and-skills-via-directories)).
 
-| `api` field  | Value type           | Import the type from                                                                           | Consumed at                                                                                               |
-| ------------ | -------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `tools`      | `Tool`               | `@lace/agent/tools/tool`                                                                       | `ToolExecutor.registerAllAvailableTools()` draws every registered tool into each session executor.        |
-| `compaction` | `CompactionStrategy` | `@lace/agent/compaction/types`                                                                 | `resolveCompactionStrategy(name)` selects a strategy by name (persona-configured, default `track-based`). |
-| `runtimes`   | `ContainerRuntime`   | `@lace/agent/containers/types`                                                                 | `createDefaultContainerManager(platform, name)` selects a runtime by name.                                |
-| `personas`   | `PersonaDef`         | `@lace/agent/plugins` (`PersonaDef`) / `@lace/agent/config/persona-registry` (`ParsedPersona`) | `PersonaRegistry` resolves a persona by name (user-disk overrides plugin overrides bundled).              |
+| `api` field  | Value type           | Import the type from           | Consumed at                                                                                               |
+| ------------ | -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `tools`      | `Tool`               | `@lace/agent/tools/tool`       | `ToolExecutor.registerAllAvailableTools()` draws every registered tool into each session executor.        |
+| `compaction` | `CompactionStrategy` | `@lace/agent/compaction/types` | `resolveCompactionStrategy(name)` selects a strategy by name (persona-configured, default `track-based`). |
+| `runtimes`   | `ContainerRuntime`   | `@lace/agent/containers/types` | `createDefaultContainerManager(platform, name)` selects a runtime by name.                                |
 
 ### Ownership and duplicates
 
@@ -135,7 +145,7 @@ select-one-by-name table.
 uniform for built-ins (owner `'builtin'`) and plugins, so a plugin can never
 silently shadow a built-in or another plugin.
 
-→ **Namespace your names** as `<namespace>/<entry>` (e.g. `acme/deploy`). Two
+→ **Namespace your names** as `<namespace>:<entry>` (e.g. `acme:deploy`). Two
 vendors can then both ship a `deploy` tool without colliding, and an accidental
 clash is caught at boot.
 
@@ -152,10 +162,102 @@ class Registry<T> {
 ```
 
 The exported `registries` object exposes one of these per kind —
-`registries.tools`, `registries.compaction`, `registries.runtimes`,
-`registries.personas` — each with the full surface above. In a test you can
-assert ownership across all four (e.g.
-`registries.compaction.owner('acme/strat')`).
+`registries.tools`, `registries.compaction`, `registries.runtimes` — each with
+the full surface above. In a test you can assert ownership (e.g.
+`registries.compaction.owner('acme:strat')`).
+
+## Personas and Skills via directories
+
+Personas and skills are **file-based**, not registry-based. A plugin contributes
+them by pointing the kernel at a directory of files; the kernel discovers and
+names them at boot.
+
+### `api.personas.addDir(dir)`
+
+Registers a directory of flat `<entry>.md` persona files. Each `.md` file
+becomes a persona named `<namespace>:<entry>`, where `namespace` is
+`meta.namespace` from the plugin's `meta`. For example, a plugin with
+`namespace: 'acme'` and a file `personas/researcher.md` produces a persona
+named `acme:researcher`.
+
+Precedence order: user-disk personas override plugin personas override bundled
+personas. A user who drops `~/.lace/agent-personas/researcher.md` silences the
+bundled `researcher` persona; the namespaced `acme:researcher` is separate and
+can only be silenced by a user file with that exact name.
+
+Personas discovered via `addDir` are synchronously scanned at boot; the
+directory is read once and cached (no hot-reload).
+
+### `api.skills.addDir(dir)`
+
+Registers a directory of skill directories. Each sub-directory that contains a
+`SKILL.md` becomes a skill named by that sub-directory's name (which must match
+the `name` field in its `SKILL.md` frontmatter). Skills are **not** namespaced —
+the name is bare (e.g. `researcher`, not `acme:researcher`). All skill sources
+(plugins, user-disk, bundled) share a single flat namespace; collisions are
+resolved first-wins and emit a `warn`. Choose collision-safe skill names.
+
+(Contrast: tools and personas ARE `<namespace>:<entry>`-namespaced; skills are not.)
+
+### Per-persona tools and skills (`<persona>/tools/` and `<persona>/skills/`)
+
+A persona file at `<dir>/<entry>.md` may have sibling directories:
+
+```
+personas/
+  researcher.md          ← the persona
+  researcher/
+    tools/               ← exec tools active only when this persona is active
+      my-binary
+    skills/              ← skills injected only when this persona is active
+      my-skill/          ← one sub-directory per skill
+        SKILL.md
+```
+
+When the `acme:researcher` persona is active, lace additionally loads exec tools
+from `<dir>/researcher/tools/` and skills from `<dir>/researcher/skills/`.
+Per-persona exec tools are registered with **bare** descriptor names (not
+namespaced) and can override a same-named global plugin or core tool — but they
+**cannot** override a reserved kernel built-in.
+
+### ESM note
+
+Because `@lace/agent` is a `type: module` package, `__dirname` is undefined in
+plugin code. Derive paths from `import.meta.url`:
+
+```ts
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export function register(api: PluginApi): void {
+  api.personas.addDir(path.join(__dirname, 'personas'));
+  api.skills.addDir(path.join(__dirname, 'skills'));
+}
+```
+
+## Exec tools via directory
+
+### `api.tools.registerExecDir(dir)`
+
+Synchronously discovers and registers one-shot-exec tool binaries from a
+directory. Every executable file (`chmod +x`) is run with `lace-tool-schema` (5
+s budget per binary, 30 s total, max 64 binaries). Files that fail to respond or
+print an invalid descriptor are **skipped with a warning** — one bad binary
+never breaks discovery of the rest.
+
+Binaries in a plugin-registered exec dir are named
+`<namespace>:<descriptor-name>`, where `namespace` is the plugin's
+`meta.namespace` and `descriptor-name` is the `name` field returned by the
+binary's `lace-tool-schema` subcommand. The final registered name is
+`acme:<descriptor-name>`.
+
+For the exec protocol (`lace-tool-schema` / `lace-tool-invoke`) and runtime
+guarantees, see [External Tools](../external-tools.md).
+
+Core exec tools live in `config/agent-exec-tools/` inside the lace package and
+are registered at boot (owner `'core-exec'`, bare names, no namespace prefix).
 
 ## Capability manifest
 
@@ -201,6 +303,11 @@ A plugin ships as a **separate package** from `@lace/agent`.
   duplicated.
 - **Do not import kernel runtime singletons as values** (`registries`, `logger`,
   the loader). Use `api`.
+- **`__dirname` is undefined in plugin code.** `@lace/agent` is
+  `"type": "module"`, so plugins are loaded as ESM. Use
+  `path.dirname(fileURLToPath(import.meta.url))` to derive paths relative to
+  your plugin file (see the ESM note in
+  [Personas and Skills via directories](#personas-and-skills-via-directories)).
 
 Set `LACE_PLUGINS` to your package specifier in the environment the lace process
 (and therefore every subagent) runs in.
@@ -217,7 +324,7 @@ type LoadPluginsResult, type LoadPluginsOptions
 createPluginApi, makeRegistries, registries, resetRegistriesForTest,
 KERNEL_PLUGIN_VERSION, PluginVersionError,
 type PluginApi, type PluginMeta, type PluginRegistries,
-type PluginRegistrar, type PersonaDef, type PluginModule
+type PluginRegistrar, type PluginModule
 // registry
 Registry, RegistryError
 // manifest
@@ -421,11 +528,16 @@ supporting types (`ContainerConfig`, `ContainerInfo`, `ContainerState`,
 `ExecOptions`, `ExecResult`, `ExecStreamOptions`) are all in
 `@lace/agent/containers/types`.
 
-### PersonaDef (`@lace/agent/plugins`)
+### Persona files (`api.personas.addDir`)
 
-`PersonaDef = ParsedPersona = { config: PersonaConfig; body: string }` — the
-same shape a persona `.md` file parses to. `PersonaConfig` (from
-`@lace/agent/config/persona-registry`) is:
+Plugin personas are contributed as `.md` files in a directory, not as
+programmatic `PersonaDef` objects. See
+[Personas and Skills via directories](#personas-and-skills-via-directories) for
+the full contract. The file format (YAML frontmatter + template body) is
+described in [Agent Personas](../agent-personas.md).
+
+`PersonaConfig` (from `@lace/agent/config/persona-registry`) documents the
+frontmatter fields:
 
 ```ts
 interface PersonaConfig {
@@ -441,28 +553,6 @@ interface PersonaConfig {
 }
 ```
 
-Example `config` with a compaction breakpoint:
-
-```ts
-config: {
-  tools: ['file_read', 'ripgrep', 'bash'],          // allowlist
-  maxTurns: 40,
-  compaction: { strategy: 'track-based', breakpoints: [{ at: 0.8, action: 'notify' }] },
-} as PersonaDef['config']
-```
-
-> **Typing note.** `PersonaConfig` is a Zod **`.strict()`** type, so a partial
-> object literal does not satisfy it directly in TypeScript (even a complete one
-> trips the strictness in many cases). Either build it via
-> `personaConfigSchema.parse(...)`, or — as the examples do for brevity — write
-> the literal and cast with `as PersonaDef['config']`.
-
-`body` is the system-prompt template. Plugin persona bodies are rendered via
-`engine.renderString(body, context)` (string render), **not** the file-based
-`engine.render(name + '.md')` used for disk/bundled personas — so `@path`
-partial includes in a plugin body resolve against `.` (cwd), not the template
-search dirs. Avoid `@path` includes in plugin persona bodies; mustache variables
-(`{{system.os}}`, `{{system.sessionDate}}`, …) work normally.
-
-Precedence: user-disk overrides plugin overrides bundled. Plugin personas are
-**not** run through MCP-path resolution — supply absolute/ready config.
+Precedence: user-disk overrides plugin overrides bundled. MCP paths in
+plugin-contributed personas must be absolute (no mcpBaseDir resolution is
+applied to plugin dirs).

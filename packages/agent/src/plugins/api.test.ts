@@ -18,9 +18,14 @@ describe('createPluginApi', () => {
 
   it('registrar.register stamps the plugin as owner in the underlying registry', () => {
     const api = createPluginApi(META, registries);
-    api.personas.register('p', { config: { runtime: { type: 'root' } }, body: 'x' } as never);
-    expect(registries.personas.has('p')).toBe(true);
-    expect(registries.personas.owner('p')).toBe('demo');
+    const stubTool = {
+      name: 'demo:stub',
+      description: 'stub',
+      schema: { type: 'object' },
+    } as never;
+    api.tools.register('demo:stub', stubTool);
+    expect(registries.tools.has('demo:stub')).toBe(true);
+    expect(registries.tools.owner('demo:stub')).toBe('demo');
   });
 
   it('assertVersion passes the current major, throws on mismatch', () => {

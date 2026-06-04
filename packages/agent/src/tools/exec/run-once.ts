@@ -1,5 +1,5 @@
 // ABOUTME: Spawn a one-shot tool process in isolation — minimal env, cwd, process-group kill
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 export interface RunExecOptions {
   stdin: string;
   cwd: string;
@@ -15,7 +15,7 @@ export interface RunExecResult {
   timedOut: boolean;
 }
 
-function minimalEnv(extra?: Record<string, string>): Record<string, string> {
+export function minimalEnv(extra?: Record<string, string>): Record<string, string> {
   const base: Record<string, string> = { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp' };
   for (const k of ['TZ', 'LANG', 'LC_ALL']) {
     const v = process.env[k];
@@ -77,4 +77,29 @@ export function runExecToolProcess(
     child.stdin.on('error', () => {}); // swallow EPIPE when the child exits before reading stdin
     child.stdin.end(opts.stdin);
   });
+}
+
+export interface SchemaProbeResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+}
+
+// NOTE: spawnSync's timeout kills only the direct child, NOT the process group
+// (unlike the async runExecToolProcess which uses detached + process.kill(-pid)).
+// Acceptable for trusted one-shot schema probes.
+export function runExecToolSchemaSync(
+  bin: string,
+  cwd: string,
+  timeoutMs: number
+): SchemaProbeResult {
+  const r = spawnSync(bin, ['lace-tool-schema'], {
+    cwd,
+    env: minimalEnv(),
+    input: '',
+    timeout: timeoutMs,
+    encoding: 'utf-8',
+    killSignal: 'SIGKILL',
+  });
+  return { stdout: r.stdout ?? '', stderr: r.stderr ?? '', exitCode: r.status };
 }

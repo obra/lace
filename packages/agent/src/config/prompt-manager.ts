@@ -1,9 +1,8 @@
-// ABOUTME: Orchestrates template engine and variable providers for system prompt generation
-// ABOUTME: Handles template loading, variable provision, and rendering with fallbacks
+// ABOUTME: Orchestrates variable providers for system prompt generation
+// ABOUTME: Handles variable provision and delegates rendering to the persona registry
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { TemplateEngine } from './template-engine';
 import {
   VariableProviderManager,
   SystemVariableProvider,
@@ -27,7 +26,6 @@ interface PromptManagerOptions {
 }
 
 export class PromptManager {
-  private templateEngine: TemplateEngine;
   private variableManager: VariableProviderManager;
   private templateDirs: string[];
   private personaRegistry: PersonaRegistry;
@@ -37,7 +35,6 @@ export class PromptManager {
     // Set up template directories with user overlay support
     this.templateDirs = options.templateDirs || this.getTemplateDirsWithOverlay();
 
-    this.templateEngine = new TemplateEngine(this.templateDirs);
     this.variableManager = new VariableProviderManager();
 
     // Add default variable providers
@@ -71,7 +68,7 @@ export class PromptManager {
       this.personaRegistry.validatePersona(persona);
 
       const context = await this.variableManager.getTemplateContext();
-      const prompt = this.personaRegistry.render(persona, this.templateEngine, context);
+      const prompt = this.personaRegistry.renderPersona(persona, context);
 
       logger.debug('System prompt generated successfully', {
         persona,

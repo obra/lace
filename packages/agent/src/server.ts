@@ -57,13 +57,15 @@ export async function createToolExecutorForMode(
   jobManager?: JobManager,
   skillRegistry?: SkillRegistry,
   toolScope?: AgentToolScope,
-  personaRegistry?: PersonaRegistry
+  personaRegistry?: PersonaRegistry,
+  activePersona?: string
 ): Promise<{
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
 }> {
+  const registry = personaRegistry ?? defaultPersonaRegistry;
   const executor = new ToolExecutor();
-  executor.registerAllAvailableTools(skillRegistry, { personaRegistry });
+  executor.registerAllAvailableTools(skillRegistry, { personaRegistry: registry });
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
@@ -73,6 +75,12 @@ export async function createToolExecutorForMode(
 
   if (jobManager) {
     executor.setJobManager(jobManager);
+  }
+
+  // Inject the active persona's <persona>/tools/ exec tools BEFORE materialising
+  // toolsForProvider, so the advertised list matches the runtime executor.
+  if (activePersona) {
+    executor.injectPersonaTools(registry.personaToolsDir(activePersona));
   }
 
   const allTools = executor.getAllTools();

@@ -1,10 +1,10 @@
 // ABOUTME: E2E tests for the workspace-stats one-shot-exec tool example.
-// ABOUTME: Uses the REAL pipeline: discoverExecTools + ExecToolAdapter.execute (no mocks).
+// ABOUTME: Uses the REAL pipeline: discoverExecToolsSync + ExecToolAdapter.execute (no mocks).
 import { describe, it, expect } from 'vitest';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs/promises';
-import { discoverExecTools } from '@lace/agent/tools/exec/discover';
+import { discoverExecToolsSync } from '@lace/agent/tools/exec/discover';
 import { ExecToolAdapter } from '@lace/agent/tools/exec/exec-tool-adapter';
 import type { ToolContext } from '@lace/agent/tools/types';
 
@@ -20,8 +20,8 @@ function makeCtx(persona: string): ToolContext {
 }
 
 describe('workspace-stats e2e', () => {
-  it('discoverExecTools finds the workspace-stats adapter with correct metadata', async () => {
-    const adapters = await discoverExecTools(EXAMPLES_DIR);
+  it('discoverExecToolsSync finds the workspace-stats adapter with correct metadata', async () => {
+    const adapters = discoverExecToolsSync(EXAMPLES_DIR);
     const adapter = adapters.find((a) => a.name === 'workspace/stats');
     expect(adapter).toBeInstanceOf(ExecToolAdapter);
     expect(adapter!.name).toBe('workspace/stats');
@@ -40,7 +40,7 @@ describe('workspace-stats e2e', () => {
       await fs.writeFile(path.join(tmpDir, 'beta.ts'), 'const y = 2;');
       await fs.writeFile(path.join(tmpDir, 'readme.md'), '# hello');
 
-      const adapters = await discoverExecTools(EXAMPLES_DIR);
+      const adapters = discoverExecToolsSync(EXAMPLES_DIR);
       const adapter = adapters.find((a) => a.name === 'workspace/stats')!;
       expect(adapter).toBeDefined();
 
@@ -68,7 +68,7 @@ describe('workspace-stats e2e', () => {
       await fs.mkdir(subDir);
       await fs.writeFile(path.join(subDir, 'deep-file.txt'), 'content');
 
-      const adapters = await discoverExecTools(EXAMPLES_DIR);
+      const adapters = discoverExecToolsSync(EXAMPLES_DIR);
       const adapter = adapters.find((a) => a.name === 'workspace/stats')!;
 
       // researcher persona → basenames only
@@ -93,7 +93,7 @@ describe('workspace-stats e2e', () => {
   });
 
   it('returns failed result with stderr when bad input supplied (top_n out of range)', async () => {
-    const adapters = await discoverExecTools(EXAMPLES_DIR);
+    const adapters = discoverExecToolsSync(EXAMPLES_DIR);
     const adapter = adapters.find((a) => a.name === 'workspace/stats')!;
 
     const result = await adapter.execute({ top_n: 99 }, makeCtx('researcher'));

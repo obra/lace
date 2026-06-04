@@ -42,27 +42,35 @@ describe('whole plugin system — reference plugin reaches all four registries',
   it('tools: the plugin tool is drawn into a session executor alongside built-ins', () => {
     const ex = new ToolExecutor();
     ex.registerAllAvailableTools();
-    expect(ex.getTool('reference/greet')).toBeDefined();
+    expect(ex.getTool('reference:greet')).toBeDefined();
     expect(ex.getTool('bash')).toBeDefined(); // built-in still present
   });
 
   it('compaction: the plugin strategy resolves by name; built-in track-based still present', () => {
-    expect(resolveCompactionStrategy('reference/quiet').name).toBe('reference/quiet');
+    expect(resolveCompactionStrategy('reference:quiet').name).toBe('reference:quiet');
     expect(resolveCompactionStrategy('track-based').name).toBe('track-based');
   });
 
   it('runtimes: the plugin runtime is selectable by name', () => {
-    expect(createDefaultContainerManager('linux', 'reference/mem')).not.toBeNull();
+    expect(createDefaultContainerManager('linux', 'reference:mem')).not.toBeNull();
   });
 
   it('personas: the plugin persona resolves through PersonaRegistry (disk-absent paths)', () => {
     const pr = new PersonaRegistry({ bundledPersonasPath: '/nonexistent', userPersonasPaths: [] });
-    expect(pr.parsePersona('reference/scout').body).toContain('Scout');
+    expect(pr.parsePersona('reference:scout').body).toContain('Scout');
   });
 
   it('manifest + owner: plugin owns its entries; credential capability granted; builtin owned by builtin', () => {
-    expect(registries.tools.owner('reference/greet')).toBe('reference');
+    expect(registries.tools.owner('reference:greet')).toBe('reference');
     expect(registries.tools.owner('bash')).toBe('builtin');
     expect(pluginMayUseCapability('reference', 'credentials')).toBe(true);
+  });
+
+  it('exec tools: plugin-contributed exec tool is registered and surfaced by ToolExecutor', () => {
+    expect(registries.tools.has('reference:echo-tool')).toBe(true);
+    expect(registries.tools.owner('reference:echo-tool')).toBe('reference');
+    const ex = new ToolExecutor();
+    ex.registerAllAvailableTools();
+    expect(ex.getTool('reference:echo-tool')).toBeDefined();
   });
 });
