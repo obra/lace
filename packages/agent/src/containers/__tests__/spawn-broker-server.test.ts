@@ -12,7 +12,6 @@ import { BaseContainerRuntime } from '../runtime';
 import type {
   ContainerConfig,
   ContainerInfo,
-  ContainerState,
   ExecResult,
   ExecStreamHandle,
   ExecStreamOptions,

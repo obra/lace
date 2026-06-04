@@ -6,23 +6,8 @@ import { Tool } from './tool';
 import { ProjectEnvironmentManager } from '@lace/agent/projects/environment-variables';
 import { mkdirSync } from 'fs';
 import { join } from 'path';
-import { BashTool } from './implementations/bash';
-import { RecallTool } from './implementations/recall';
-import { FileReadTool } from './implementations/file_read';
-import { FileWriteTool } from './implementations/file_write';
-import { FileEditTool } from './implementations/file_edit';
-import { RipgrepSearchTool } from './implementations/ripgrep_search';
-import { FileFindTool } from './implementations/file_find';
-import { UrlFetchTool } from './implementations/url_fetch';
 import { DelegateTool } from './implementations/delegate';
-import { JobOutputTool } from './implementations/job_output';
-import { JobsListTool } from './implementations/jobs_list';
-import { JobKillTool } from './implementations/job_kill';
-import { JobNotifyTool } from './implementations/job_notify';
-import { TodoReadTool } from './implementations/todo_read';
-import { TodoWriteTool } from './implementations/todo_write';
 import { UseSkillTool } from './implementations/use-skill-tool';
-import { ManageRemindersTool } from './implementations/manage_reminders';
 import { MCPServerManager } from '../mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
 import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
@@ -30,6 +15,8 @@ import { MCPToolAdapter } from '../mcp/tool-adapter';
 import { logger } from '@lace/agent/utils/logger';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
+import { registries } from '@lace/agent/plugins';
+import { registerBuiltinTools, PER_SESSION_BUILTIN_NAMES } from './builtins';
 
 export interface RegisterToolsOptions {
   /** PersonaRegistry to wire into DelegateTool. Defaults to the global singleton. */
@@ -64,6 +51,7 @@ export const LACE_BUILTIN_TOOL_NAMES = [
   'todo_read',
   'todo_write',
   'manage_reminders',
+  'compact_session',
   'use_skill',
 ] as const;
 
@@ -107,7 +95,7 @@ export class ToolExecutor {
   }
 
   getAllTools(): Tool[] {
-    // PRI-1804 #2 (revised after adversarial review): use BYTE-STABLE
+    // Revised after adversarial review: use BYTE-STABLE
     // comparison, not localeCompare. localeCompare without an explicit
     // locale arg uses the host's default locale; on machines with Turkish
     // or other non-English locales, sort order shifts and the tools-array
@@ -288,31 +276,30 @@ export class ToolExecutor {
     skillRegistry?: SkillRegistry,
     options: RegisterToolsOptions = {}
   ): void {
-    const tools: Tool[] = [
-      new BashTool(),
-      new RecallTool(),
-      new FileReadTool(), // Schema-based file read tool
-      new FileWriteTool(),
-      new FileEditTool(),
-      new RipgrepSearchTool(),
-      new FileFindTool(),
-      new UrlFetchTool(),
-      new DelegateTool({ personaRegistry: options.personaRegistry }),
-      new JobOutputTool(),
-      new JobsListTool(),
-      new JobKillTool(),
-      new JobNotifyTool(),
-      new TodoReadTool(),
-      new TodoWriteTool(),
-      new ManageRemindersTool(),
-    ];
+    // Ensure built-ins are registered. Idempotent: safe to call at boot (from main.ts)
+    // and here (per-session). After resetRegistriesForTest(), re-registers automatically.
+    registerBuiltinTools();
+
+    // Draw all registry tools (stateless built-ins + any loaded plugins).
+    // registries.tools is populated by registerBuiltinTools() above and by
+    // loadPlugins() at boot; root + subagents see identical registries.
+    for (const name of registries.tools.names()) {
+      this.registerTool(name, registries.tools.resolve(name));
+    }
+
+    // Per-session option-taking built-ins. Fail loudly if a plugin claimed their reserved names.
+    for (const reserved of PER_SESSION_BUILTIN_NAMES) {
+      if (registries.tools.has(reserved)) {
+        throw new Error(`plugin registered reserved built-in tool name "${reserved}"`);
+      }
+    }
+
+    this.registerTool('delegate', new DelegateTool({ personaRegistry: options.personaRegistry }));
 
     // Add skill tool if registry is provided
     if (skillRegistry) {
-      tools.push(new UseSkillTool(skillRegistry));
+      this.registerTool('use_skill', new UseSkillTool(skillRegistry));
     }
-
-    this.registerTools(tools);
   }
 
   /**

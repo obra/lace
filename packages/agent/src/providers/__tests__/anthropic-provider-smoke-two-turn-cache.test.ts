@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1802 smoke probe — sends two consecutive requests through the
+// ABOUTME: Smoke probe — sends two consecutive requests through the
 // AnthropicProvider (turn 1, then turn 2 with several added tool round-trips)
 // and asserts the structural property that makes the stable-anchor pattern
 // pay off: turn 2's tail breakpoint stays within Anthropic's 20-block
@@ -78,7 +78,7 @@ function flattenBlocks(body: RequestBody): Array<{
   return out;
 }
 
-describe('PRI-1802 smoke: two-turn structural cache property', () => {
+describe('smoke: two-turn structural cache property', () => {
   let server: Server;
   let baseURL: string;
   const captured: Array<{ body: string }> = [];
@@ -187,13 +187,13 @@ describe('PRI-1802 smoke: two-turn structural cache property', () => {
     const body2 = JSON.parse(captured[1].body) as RequestBody;
 
     // Dump for inspection
-    const outDir = join(tmpdir(), 'pri-1802-smoke');
+    const outDir = join(tmpdir(), 'cache-smoke');
     mkdirSync(outDir, { recursive: true });
     const ts = Date.now();
     writeFileSync(join(outDir, `turn1-${ts}.json`), JSON.stringify(body1, null, 2));
     writeFileSync(join(outDir, `turn2-${ts}.json`), JSON.stringify(body2, null, 2));
 
-    console.log(`[PRI-1802 smoke] dumps written to ${outDir} with timestamp ${ts}`);
+    console.log(`[smoke] dumps written to ${outDir} with timestamp ${ts}`);
 
     // ── Sanity: each turn has system + last-tool + 2 message breakpoints
     const total = (b: RequestBody) => (JSON.stringify(b).match(/"cache_control"/g) ?? []).length;

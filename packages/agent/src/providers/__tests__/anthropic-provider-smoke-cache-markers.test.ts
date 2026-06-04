@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1799 smoke probe — captures the actual HTTP body the
+// ABOUTME: Smoke probe — captures the actual HTTP body the
 // AnthropicProvider sends, asserts three 1h cache_control breakpoints in the
 // wire payload (system + last tool + last message block), and writes the
 // captured body to a file so it can be eyeballed.
@@ -50,7 +50,7 @@ class FetchUrlTool extends Tool {
   }
 }
 
-describe('PRI-1799 smoke: real outgoing request body has three 1h cache_control markers', () => {
+describe('smoke: real outgoing request body has three 1h cache_control markers', () => {
   let server: Server;
   let baseURL: string;
   const captured: CapturedRequest[] = [];
@@ -142,7 +142,7 @@ describe('PRI-1799 smoke: real outgoing request body has three 1h cache_control 
     mkdirSync(outDir, { recursive: true });
     const outFile = join(outDir, `request-${Date.now()}.json`);
     writeFileSync(outFile, JSON.stringify(body, null, 2));
-    console.log(`[PRI-1799 smoke] captured request body written to ${outFile}`);
+    console.log(`[smoke] captured request body written to ${outFile}`);
 
     // ── 1. system block has cache_control with 1h ttl ───────────────────
     expect(Array.isArray(body.system)).toBe(true);
@@ -172,9 +172,9 @@ describe('PRI-1799 smoke: real outgoing request body has three 1h cache_control 
     expect(lastBlock.text).toBe('Now summarise it.');
 
     // ── Count: exactly three cache_control markers in the whole body ────
-    // (PRI-1806 #3) This conversation has 7 cacheable blocks — fewer than
+    // This conversation has 7 cacheable blocks — fewer than
     // ANCHOR_OFFSET_RAW_BLOCKS (10), so no stable anchor is attached and
-    // the total is system + last-tool + tail = 3. See the PRI-1802 smoke
+    // the total is system + last-tool + tail = 3. See the 1802 smoke
     // for the long-conversation 4-marker case.
     const allMarkers = JSON.stringify(body).match(/"cache_control"/g) ?? [];
     expect(allMarkers).toHaveLength(3);

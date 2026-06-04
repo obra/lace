@@ -51,7 +51,7 @@ describe('buildSubagentInitConfig (kata #37 Layer A)', () => {
   // running with `dangerouslySkipPermissions` (e.g. an automated runner that never
   // attaches a permission handler) would spawn children that still tried to ask
   // for permission — and the request would be cancelled within ~15ms by the
-  // sen-core supervisor's missing handler, silently dropping the subagent's
+  // the embedder supervisor's missing handler, silently dropping the subagent's
   // tool calls. The fix propagates the parent's effective approvalMode.
 
   it('propagates dangerouslySkipPermissions from the parent effective config', () => {

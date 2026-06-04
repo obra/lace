@@ -110,7 +110,7 @@ export function createQueueJobNotification(
 
     const sessionDir = state.activeSession.dir;
     const kind = jobTypeToKind(type);
-    // Filter regexes (PRI-1692 Phase 2) match against the raw tail preview,
+    // Filter regexes match against the raw tail preview,
     // not the surrounding wrapper. Only populated for 'progress' — terminal
     // kinds ignore filter by design.
     const preview = type === 'progress' ? lastLines.join('\n') : undefined;

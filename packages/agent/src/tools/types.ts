@@ -44,6 +44,12 @@ export interface ToolContext {
   activeSessionId?: string;
   activeSessionDir?: string;
 
+  /** Authoritative persona for the active session, resolved SERVER-SIDE. Never from
+   *  tool arguments — the keystone invariant. */
+  persona?: string;
+  /** Per-call timeout for out-of-process tools (one-shot-exec). */
+  timeoutMs?: number;
+
   // Reminder scheduling (provided by the session runner for manage_reminders).
   reminderScheduler?: ReminderScheduler;
 
@@ -54,11 +60,16 @@ export interface ToolContext {
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 
-  // Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+  // Idle TTL reaper for per_invocation containers.
   // When a delegate invocation starts (fresh or resume), the tool calls
   // cancelReap so the container survives for the new invocation window.
   // The subagent-job exit handler schedules a new reap after each child exits.
   perInvocationReaper?: PerInvocationReaper;
+
+  // Per-turn compaction request cell. The runner creates this object at the
+  // start of each turn and passes the same reference into every tool
+  // execution context. compact_session mutates it; the post-turn block reads it.
+  compactionRequest?: { requested: boolean; guidance?: string };
 }
 
 export interface ToolAnnotations {

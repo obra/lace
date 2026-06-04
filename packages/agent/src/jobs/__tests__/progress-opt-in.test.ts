@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1707 — progressIntervalMs is opt-in. The progress timer is
+// ABOUTME: progressIntervalMs is opt-in. The progress timer is
 // only armed when (a) the operator passes an explicit progressIntervalMs on
 // job creation, OR (b) a subscriber registers with `on` containing 'progress'.
 // When the last progress subscriber leaves an unconfigured job, the timer
@@ -33,7 +33,7 @@ function makeSetupProgressTimer(): ReturnType<typeof vi.fn> {
   });
 }
 
-describe('progress timer opt-in (PRI-1707)', () => {
+describe('progress timer opt-in', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -205,7 +205,7 @@ describe('progress timer opt-in (PRI-1707)', () => {
     expect(job.progressTimer).toBeUndefined();
   });
 
-  // PRI-1707 post-review hardening: the operator-configured branch needs its
+  // Post-review hardening: the operator-configured branch needs its
   // own teardown coverage, because the subscriber-driven branch happens to
   // pass the same assertions for a different reason. Catches future
   // refactors that conflate "operator-configured" with "unconfigured."

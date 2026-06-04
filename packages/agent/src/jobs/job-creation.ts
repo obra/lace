@@ -30,7 +30,7 @@ export type CreateSubagentJobOptions = {
   parentJobId?: string;
   turnContext?: { turnId: string; turnSeq: number };
   resumeSessionId?: string;
-  // Host-preallocated session id for the fresh-spawn case (PRI-1796).
+  // Host-preallocated session id for the fresh-spawn case.
   // Mutually exclusive with resumeSessionId.
   newSubagentSessionId?: string;
   progressIntervalMs?: number;
@@ -40,9 +40,9 @@ export type CreateSubagentJobOptions = {
   // Direct RPC-created subagent jobs do not resolve persona container
   // placement. The delegate tool's JobManager path owns container execution
   // identity minting because it has persona and placement inputs.
-  // Host scratch-directory path reserved for this invocation (PRI-1796).
+  // Host scratch-directory path reserved for this invocation.
   scratchDirHostPath?: string;
-  // Container-sharing mode for this delegate job (PRI-1796).
+  // Container-sharing mode for this delegate job.
   containerSharing?: 'per_invocation' | 'persistent';
 };
 
@@ -178,7 +178,7 @@ async function finalizeJobCreation(
       : undefined
   );
 
-  // Progress timer is opt-in (PRI-1707): arm only when the caller passed
+  // Progress timer is opt-in: arm only when the caller passed
   // an explicit progressIntervalMs. Subscriber-driven arming is handled
   // inside JobManager.subscribe().
   if (job.progressIntervalMs !== undefined) {

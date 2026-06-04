@@ -10,7 +10,6 @@ import {
   personaRegistry as defaultPersonaRegistry,
   type PersonaRegistry,
 } from './config/persona-registry';
-import { createDefaultContainerManager } from './containers/manager-factory';
 import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -96,8 +95,9 @@ export async function createToolExecutorForMode(
 
 export function createAgentServerState(): AgentServerState {
   // JobManager is created as a placeholder here and properly initialized
-  // in registerAgentRpcMethods once we have the peer and other dependencies
-  const containerManager = createDefaultContainerManager();
+  // in registerAgentRpcMethods once we have the peer and other dependencies.
+  // containerManager and perInvocationReaper are resolved in boot() AFTER
+  // built-ins + plugins register into the runtimes registry.
   return {
     initialized: false,
     activeSession: null,
@@ -113,19 +113,20 @@ export function createAgentServerState(): AgentServerState {
     toolExecutorCache: new Map(),
     personaRegistry: defaultPersonaRegistry,
     containerMounts: {},
-    containerManager,
+    // Resolved in boot() AFTER built-ins + plugins register (the plane is a runtime plugin).
+    containerManager: null,
     peer: null,
     runtimeSecretResolver: new EnvironmentRuntimeSecretResolver(),
-    // Reaper accepts null containerManager (no-op on unsupported platforms).
-    perInvocationReaper: new PerInvocationReaper(containerManager),
+    // Replaced in boot() with the real manager.
+    perInvocationReaper: new PerInvocationReaper(null),
   };
 }
 
 /**
  * Read-only accessor for the embedder-supplied containerMounts registry.
  * Returns the registry as set by the most recent initialize call (defaults to {}).
- * Persona-container materialization (K-49e) consults this to resolve
- * `runtime.mounts[name]` into a host path + readonly flag.
+ * Persona-container materialization consults persona `runtime.mounts` names
+ * through this registry to resolve host paths, container paths, and readonly flags.
  */
 export function getContainerMounts(
   state: AgentServerState
@@ -351,24 +352,27 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
-  // PRI-1919: surface gateway-routed persona container network lifecycle as
+  // Surface gateway-routed persona container network lifecycle as
   // session updates so the embedder registers/drops the source-IP → identity
   // mapping in lock-step with the container (race-free; no docker-inspect poll).
-  state.containerManager?.setNetworkLifecycleObserver({
-    onAttached: ({ containerName, containerId, sourceIp, networkName, browserCdpSocketPath }) => {
-      void emitSessionUpdate({
-        type: 'container_network_attached',
-        containerName,
-        containerId,
-        sourceIp,
-        networkName,
-        ...(browserCdpSocketPath !== undefined ? { browserCdpSocketPath } : {}),
-      });
-    },
-    onDetached: ({ containerName, containerId }) => {
-      void emitSessionUpdate({ type: 'container_network_detached', containerName, containerId });
-    },
-  });
+  if (state.containerManager) {
+    state.containerManager.setNetworkLifecycleObserver({
+      onAttached: ({ containerName, containerId, sourceIp, networkName }) => {
+        void emitSessionUpdate({
+          type: 'container_network_attached',
+          containerName,
+          containerId,
+          sourceIp,
+          networkName,
+        });
+      },
+      onDetached: ({ containerName, containerId }) => {
+        void emitSessionUpdate({ type: 'container_network_detached', containerName, containerId });
+      },
+    });
+  } else {
+    logger.warn('containers: no manager at RPC wiring — network-lifecycle observer NOT installed');
+  }
 
   // Reference to the prompt handler logic, assigned when session/prompt is registered.
   // This allows queueJobNotification to trigger turns internally when notifications
@@ -460,7 +464,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runShellProcess: (job) => void runShellJobProcess(job),
     runSubagentProcess: (job) => void runSubagentJobProcess(job),
     setupProgressTimer: (job) => setupProgressTimer(job),
-    // PRI-1867 M4: ask the embedder for per-spawn env additions via the
+    // Ask the embedder for per-spawn env additions via the
     // host-bound `host/spawn/env` JSON-RPC method. Errors (missing handler,
     // bad response shape, transport error) are absorbed by JobManager and
     // never block the spawn — see job-manager.ts for the recovery path.

@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1707 — coverage for the opt-in branch in
+// ABOUTME: Coverage for the opt-in branch in
 // createShellJob / createSubagentJob (the function-call path used by the
 // RPC server, distinct from JobManager.createJob used by the delegate
 // tool). Both paths must gate setupProgressTimer on an explicit
@@ -27,7 +27,7 @@ function makeDeps(overrides: Partial<JobCreationDeps> = {}): JobCreationDeps {
   };
 }
 
-describe('createShellJob — opt-in progress (PRI-1707)', () => {
+describe('createShellJob — opt-in progress', () => {
   it('does NOT call setupProgressTimer when progressIntervalMs is unset', async () => {
     const setupProgressTimer = vi.fn();
     const deps = makeDeps({ setupProgressTimer });
@@ -49,7 +49,7 @@ describe('createShellJob — opt-in progress (PRI-1707)', () => {
   });
 });
 
-describe('createSubagentJob — opt-in progress (PRI-1707)', () => {
+describe('createSubagentJob — opt-in progress', () => {
   it('does NOT call setupProgressTimer when progressIntervalMs is unset', async () => {
     const setupProgressTimer = vi.fn();
     const deps = makeDeps({ setupProgressTimer });

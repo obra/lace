@@ -24,6 +24,14 @@ export interface InjectNotificationOptions {
   identifiers?: Record<string, string>;
   attributes?: Record<string, string | number | null | undefined>;
   body: string;
+  /**
+   * Producer-defined demux key. When supplied, written onto the
+   * `context_injected` event's `data.track` so track-based compaction and
+   * analytics can attribute the notification to the correct conversation track.
+   * Optional — omit for notifications that are not tied to a specific track
+   * (e.g. internal breakpoints, system notifications).
+   */
+  track?: string;
   /** Optional — omit for cross-process writes (e.g. subagent → parent). */
   idleWake?: IdleWakeHooks;
 }
@@ -55,6 +63,7 @@ export function injectNotification(opts: InjectNotificationOptions): void {
     data: {
       content: [{ type: 'text', text }],
       priority: 'immediate',
+      ...(opts.track !== undefined ? { track: opts.track } : {}),
     },
   });
   // We intentionally do not rewrite state.json: appendDurableEvent's nextState

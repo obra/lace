@@ -29,7 +29,7 @@ const perInvocationRuntime: PersonaContainerRuntime = {
   containerSharing: 'per_invocation',
   image: 'devcontainer:latest',
   workingDirectory: '/work',
-  mounts: {},
+  mounts: [],
 };
 
 // Records every create() config so the test can assert the selector fields

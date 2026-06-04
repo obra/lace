@@ -237,7 +237,7 @@ describe('AnthropicProvider cache-diagnosis-2026-04-07 beta', () => {
       expect(response.cacheMissReason).toEqual(cacheMissReason);
     });
 
-    it('emits an INFO log with cache miss details (including model + response-id pair for PRI-1796 pivots)', async () => {
+    it('emits an INFO log with cache miss details (including model + response-id pair for debugging)', async () => {
       const cacheMissReason = {
         type: 'system_changed' as const,
         cache_missed_input_tokens: 12345,

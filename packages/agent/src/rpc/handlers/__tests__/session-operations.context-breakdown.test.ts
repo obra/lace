@@ -1,4 +1,4 @@
-// ABOUTME: Regression test for PRI-1799 context-breakdown systemPrompt token accounting.
+// ABOUTME: Regression test for context-breakdown systemPrompt token accounting.
 // ABOUTME: After Phase 2 of cache-control hardening, rebuilt messages never contain
 // ABOUTME: role:'system' entries — the system prompt lives in the returned systemPrompt
 // ABOUTME: string. This test verifies that computeContextBreakdownForActiveSession correctly
@@ -27,7 +27,7 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   return { client, server };
 }
 
-describe('computeContextBreakdownForActiveSession (PRI-1799 regression)', () => {
+describe('computeContextBreakdownForActiveSession (regression)', () => {
   let originalLaceDir: string | undefined;
   let originalTestProvider: string | undefined;
   let tempDir: string;
@@ -74,7 +74,7 @@ describe('computeContextBreakdownForActiveSession (PRI-1799 regression)', () => 
         percentUsed: number;
       };
 
-      // The system prompt token count must be > 0 — the PRI-1799 regression set it to 0.
+      // The system prompt token count must be > 0 — the regression set it to 0.
       expect(breakdown.categories.systemPrompt.tokens).toBeGreaterThan(0);
 
       // System prompt tokens must contribute to the total (regression check).

@@ -126,8 +126,12 @@ describe('protocol shapes (representative examples)', () => {
           clientInfo: { name: 'test-client', version: '0.0.0' },
           capabilities: { streaming: true },
           containerMounts: {
-            scratch: { hostPath: '/var/lace/scratch', readonly: false },
-            knowledge: { hostPath: '/var/lace/knowledge', readonly: true },
+            scratch: { hostPath: '/var/lace/scratch', containerPath: '/work', readonly: false },
+            knowledge: {
+              hostPath: '/var/lace/knowledge',
+              containerPath: '/knowledge',
+              readonly: true,
+            },
           },
         },
       })
@@ -174,7 +178,11 @@ describe('protocol shapes (representative examples)', () => {
           clientInfo: { name: 'test-client', version: '0.0.0' },
           capabilities: { streaming: true },
           containerMounts: {
-            Scratch: { hostPath: '/var/lace/scratch', readonly: false },
+            Scratch: {
+              hostPath: '/var/lace/scratch',
+              containerPath: '/work',
+              readonly: false,
+            },
           },
         },
       })
@@ -191,7 +199,41 @@ describe('protocol shapes (representative examples)', () => {
           clientInfo: { name: 'test-client', version: '0.0.0' },
           capabilities: { streaming: true },
           containerMounts: {
-            scratch: { hostPath: '/var/lace/scratch' },
+            scratch: { hostPath: '/var/lace/scratch', containerPath: '/work' },
+          },
+        },
+      })
+    ).toThrow();
+
+    // missing containerPath on a mount entry is rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-missing-container-path',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            scratch: { hostPath: '/var/lace/scratch', readonly: false },
+          },
+        },
+      })
+    ).toThrow();
+
+    // empty containerPath on a mount entry is rejected.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-empty-container-path',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          containerMounts: {
+            scratch: { hostPath: '/var/lace/scratch', containerPath: '', readonly: false },
           },
         },
       })
@@ -566,7 +608,7 @@ describe('protocol shapes (representative examples)', () => {
     ).toThrow();
   });
 
-  it('parses container network attached/detached session updates (PRI-1919)', () => {
+  it('parses container network attached/detached session updates', () => {
     expect(() =>
       EntProtocolNotificationSchema.parse({
         jsonrpc: '2.0',
@@ -612,26 +654,6 @@ describe('protocol shapes (representative examples)', () => {
         },
       })
     ).toThrow();
-  });
-
-  it('carries browserCdpSocketPath on container_network_attached (PRI-2002)', () => {
-    const parsed = EntProtocolNotificationSchema.parse({
-      jsonrpc: '2.0',
-      method: 'session/update',
-      params: {
-        sessionId: 'sess_00000000-0000-0000-0000-000000000001',
-        streamSeq: 5,
-        type: 'container_network_attached',
-        containerName: 'sen-persistent-box',
-        containerId: 'sen-persistent-box',
-        sourceIp: '172.31.250.3',
-        networkName: 'ada-sen_quarantine',
-        browserCdpSocketPath: '/sen-browser-cdp/sen-persistent-box.sock',
-      },
-    });
-
-    const params = parsed.params as { browserCdpSocketPath?: string };
-    expect(params.browserCdpSocketPath).toBe('/sen-browser-cdp/sen-persistent-box.sock');
   });
 
   it('parses representative responses', () => {
@@ -745,7 +767,7 @@ describe('protocol shapes (representative examples)', () => {
     ).not.toThrow();
   });
 
-  it('accepts host/spawn/env request and response shapes (PRI-1867)', () => {
+  it('accepts host/spawn/env request and response shapes', () => {
     expect(() =>
       schema('HostSpawnEnvRequestSchema').parse({
         jsonrpc: '2.0',

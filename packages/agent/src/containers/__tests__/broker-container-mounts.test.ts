@@ -10,10 +10,26 @@ describe('buildBrokerContainerMounts', () => {
   it('builds the four base mounts from the instance host root', () => {
     const mounts = buildBrokerContainerMounts({ instanceHostPath: ROOT });
     expect(mounts).toEqual({
-      scratch: { hostPath: '/mnt/data/ada-sen/state/scratch', readonly: false },
-      knowledge: { hostPath: '/mnt/data/ada-sen/user/knowledge', readonly: true },
-      identity: { hostPath: '/mnt/data/ada-sen/user/identity', readonly: true },
-      home: { hostPath: '/mnt/data/ada-sen/user/home', readonly: false },
+      scratch: {
+        hostPath: '/mnt/data/ada-sen/state/scratch',
+        containerPath: '/work',
+        readonly: false,
+      },
+      knowledge: {
+        hostPath: '/mnt/data/ada-sen/user/knowledge',
+        containerPath: '/knowledge',
+        readonly: true,
+      },
+      identity: {
+        hostPath: '/mnt/data/ada-sen/user/identity',
+        containerPath: '/sen/identity',
+        readonly: true,
+      },
+      home: {
+        hostPath: '/mnt/data/ada-sen/user/home',
+        containerPath: '/home/sen',
+        readonly: false,
+      },
     });
   });
 
@@ -25,16 +41,19 @@ describe('buildBrokerContainerMounts', () => {
     // A3b: sen-cred source is the socket's directory (post-relocation = state/sockets/).
     expect(mounts['sen-cred']).toEqual({
       hostPath: '/mnt/data/ada-sen/state/sockets',
+      containerPath: '/run',
       readonly: true,
     });
     // sen-ca + sen-browser-cdp fall back to the instance-root layout when no
     // explicit host path is supplied.
     expect(mounts['sen-ca']).toEqual({
       hostPath: '/mnt/data/ada-sen/state/credential-helper',
+      containerPath: '/etc/sen-credential-proxy-ca',
       readonly: true,
     });
     expect(mounts['sen-browser-cdp']).toEqual({
       hostPath: '/mnt/data/ada-sen/state/browser-cdp',
+      containerPath: '/sen-browser-cdp',
       readonly: false,
     });
   });

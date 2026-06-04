@@ -37,13 +37,13 @@ export type JobManagerDeps = {
   runSubagentProcess: (job: JobState) => void;
   setupProgressTimer?: (job: JobState) => void;
   /**
-   * Optional: ask the embedder (e.g. sen-core) for per-spawn env vars to merge
+   * Optional: ask the embedder for per-spawn env vars to merge
    * into the delegate container's executionEnv. Called once per delegate job,
    * after lace has computed the base executionEnv. Returns extra env vars; the
    * caller merges them with conflict resolution and shape validation applied.
    * If the embedder doesn't implement `host/spawn/env`, the implementation
    * should resolve to {} (or reject — JobManager treats either as no-op + warn
-   * and never blocks the spawn). See PRI-1867 M4.
+   * and never blocks the spawn).
    */
   fetchEmbedderSpawnEnv?: (request: {
     jobId: string;
@@ -63,20 +63,20 @@ export type CreateJobOptions = {
   parentJobId?: string;
   turnContext?: { turnId: string; turnSeq: number };
   resumeSessionId?: string; // for delegate resume
-  // Host-preallocated session id for the fresh-spawn case (PRI-1796).
+  // Host-preallocated session id for the fresh-spawn case.
   // Mutually exclusive with resumeSessionId.
   newSubagentSessionId?: string;
   connectionId?: string;
   modelId?: string;
   progressIntervalMs?: number;
   runtimeBinding?: RuntimeExecutionBinding;
-  // Host scratch-directory path reserved for this invocation (PRI-1796).
+  // Host scratch-directory path reserved for this invocation.
   scratchDirHostPath?: string;
-  // Container-sharing mode for this delegate job (PRI-1796).
+  // Container-sharing mode for this delegate job.
   containerSharing?: 'per_invocation' | 'persistent';
   // Persona-bundle support for delegate jobs
   persona?: string;
-  // Per-invocation container spec name for the idle-TTL reaper (PRI-1796).
+  // Per-invocation container spec name for the idle-TTL reaper.
   // Computed by delegate.ts and stored here so maybeScheduleReapAfter can
   // use it without reconstructing the projected container binding.
   containerSpecName?: string;
@@ -126,9 +126,9 @@ type JobsCache = {
  * A subscription registered via `job_notify`. Tracks which lifecycle kinds
  * the parent wants to be woken on for a given jobId.
  *
- * Phase 1 of PRI-1692: subscriptions exist for the four
- * `JobNotificationType` kinds. `filter` is accepted but no-op on terminal
- * states (Phase 2 will use it for progress / per-line subscriptions).
+ * Subscriptions exist for the four `JobNotificationType` kinds. `filter` is
+ * accepted but no-op on terminal states (used for progress / per-line
+ * subscriptions).
  */
 export type JobSubscription = {
   subscriptionId: string;
@@ -137,7 +137,7 @@ export type JobSubscription = {
   filter?: string;
   // Compiled form of `filter` (multi-line, so `^X` matches a line inside a
   // multi-line preview). Built once at subscribe time; null when no filter
-  // is set. Phase 2 of PRI-1692.
+  // is set.
   filterRegex?: RegExp;
 };
 
@@ -148,12 +148,11 @@ export type SubscribeOptions = {
 };
 
 /**
- * Pending per-subscription progress batch (PRI-1692 Phase 2). When a
- * subscription receives its first `progress` fanout, a 200ms timer is
- * armed; further progress within the window replaces `inject` (latest
- * call wins, carrying the latest preview). The timer fires the buffered
- * inject() to write the durable event, or a terminal-state fanout
- * flushes it early.
+ * Pending per-subscription progress batch. When a subscription receives its
+ * first `progress` fanout, a 200ms timer is armed; further progress within
+ * the window replaces `inject` (latest call wins, carrying the latest
+ * preview). The timer fires the buffered inject() to write the durable event,
+ * or a terminal-state fanout flushes it early.
  */
 type ProgressBatch = {
   inject: () => void;
@@ -217,7 +216,11 @@ function buildContainerExecutionContext(input: {
   }
 
   const token = randomBytes(32).toString('base64url');
-  const containerId = resolveContainerId(input.runtimeBinding.toolRuntime.spec);
+  const spec = input.runtimeBinding.toolRuntime.spec;
+  const hasPlaneSelectors = Boolean(
+    spec.persona || spec.parentSession || spec.childSession || spec.jobId
+  );
+  const containerId = !spec.containerId && hasPlaneSelectors ? undefined : resolveContainerId(spec);
   return {
     executionEnv: { [input.identity.tokenEnvName]: token },
     metadata: {
@@ -379,7 +382,7 @@ export class JobManager {
   addJob(job: JobState): void {
     this.jobs.set(job.jobId, job);
     // Honor any pre-existing progress subscriptions registered against this
-    // jobId before the job was added (PRI-1707). subscribe() accepts
+    // jobId before the job was added. subscribe() accepts
     // unknown jobIds, so a caller can legitimately register progress
     // interest before the job lands in the map; without this hook the
     // timer would never arm.
@@ -538,10 +541,10 @@ export class JobManager {
       this.subscriptionsByJob.set(opts.jobId, byJob);
     }
     byJob.add(sub.subscriptionId);
-    // PRI-1707: the progress timer is opt-in. A new subscription that
-    // includes 'progress' is the demand signal that arms it; jobs without
-    // an operator-configured cadence and without progress subscribers
-    // stay silent.
+    // The progress timer is opt-in. A new subscription that includes
+    // 'progress' is the demand signal that arms it; jobs without an
+    // operator-configured cadence and without progress subscribers stay
+    // silent.
     if (sub.on.includes('progress')) {
       this.startProgressTimerIfNeeded(opts.jobId);
     }
@@ -562,9 +565,9 @@ export class JobManager {
       byJob.delete(subscriptionId);
       if (byJob.size === 0) this.subscriptionsByJob.delete(sub.jobId);
     }
-    // PRI-1707: if this was the last progress subscriber for the job, the
-    // timer is no longer needed. Operator-configured cadences (explicit
-    // progressIntervalMs) outlive subscriber churn and are left alone here.
+    // If this was the last progress subscriber for the job, the timer is no
+    // longer needed. Operator-configured cadences (explicit progressIntervalMs)
+    // outlive subscriber churn and are left alone here.
     if (sub.on.includes('progress')) {
       this.stopProgressTimerIfUnused(sub.jobId);
     }
@@ -677,7 +680,7 @@ export class JobManager {
   /**
    * Returns true iff at least one subscription for `jobId` has 'progress'
    * in its `on` set. The presence of a progress subscriber is the demand
-   * signal that keeps the per-job progress timer armed (PRI-1707).
+   * signal that keeps the per-job progress timer armed.
    */
   private hasProgressSubscriber(jobId: string): boolean {
     const subIds = this.subscriptionsByJob.get(jobId);
@@ -831,11 +834,11 @@ export class JobManager {
           })
         : undefined;
 
-    // PRI-1867 M4: ask the embedder for per-spawn env additions (e.g. sen-core's
-    // placeholder tokens for sen-credential-proxy). Only applies to delegate
-    // jobs that actually got a containerExecutionContext (i.e. containerized
-    // spawn with an identity config). Failure of the host RPC is non-fatal —
-    // the spawn proceeds with the base executionEnv.
+    // Ask the embedder for per-spawn env additions (e.g. placeholder tokens
+    // for a credential proxy). Only applies to delegate jobs that actually got
+    // a containerExecutionContext (i.e. containerized spawn with an identity
+    // config). Failure of the host RPC is non-fatal — the spawn proceeds with
+    // the base executionEnv.
     let finalExecutionEnv = containerExecutionContext?.executionEnv;
     if (
       type === 'delegate' &&
@@ -951,8 +954,8 @@ export class JobManager {
     });
 
     // 7. Set up progress timer ONLY when the operator explicitly opted in
-    // via `progressIntervalMs` (PRI-1707). Otherwise the timer stays
-    // dormant until a subscriber registers with `on` containing 'progress'.
+    // via `progressIntervalMs`. Otherwise the timer stays dormant until a
+    // subscriber registers with `on` containing 'progress'.
     if (options.progressIntervalMs !== undefined) {
       this.deps.setupProgressTimer?.(job);
     }

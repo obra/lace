@@ -41,4 +41,4 @@ bun.lockb
 CHANGELOG.md
 
 # Byte-identical test fixtures - tests assert exact match against these
-tests/scenarios/pri-1674-baseline/
+tests/scenarios/persona-path-migration-baseline/

@@ -100,15 +100,15 @@ export type JobState = {
   permissionAbortController?: AbortController;
   childPeer?: JsonRpcPeer;
   subagentSessionId?: string;
-  // True when the host pre-allocated subagentSessionId before session/new (PRI-1796).
+  // True when the host pre-allocated subagentSessionId before session/new.
   // Distinguishes from the resume case, where subagentSessionId is set because a
   // prior job already ran with that session.
   subagentSessionPreallocated?: boolean;
-  // Host scratch-directory path reserved for this invocation (PRI-1796).
+  // Host scratch-directory path reserved for this invocation.
   scratchDirHostPath?: string;
-  // Container-sharing mode for this delegate job (PRI-1796).
+  // Container-sharing mode for this delegate job.
   containerSharing?: 'per_invocation' | 'persistent';
-  // Per-invocation container spec name used by the reaper (PRI-1796).
+  // Per-invocation container spec name used by the reaper.
   // Computed once at delegate time; read by maybeScheduleReapAfter so it
   // can schedule cleanup after a projected-container subagent exits.
   containerSpecName?: string;
@@ -182,9 +182,9 @@ export type AgentServerState = {
   // Set by the initialize handler when the client supplies skillDirs.
   skillDirs?: string[];
   // Embedder-supplied named-mount registry. Consulted at persona-container
-  // materialization to resolve persona `runtime.mounts[name]` into a host
-  // path + readonly flag. Always present; defaults to {} when initialize
-  // omits the param.
+  // materialization to resolve persona `runtime.mounts` names into host paths,
+  // container paths, and readonly flags. Always present; defaults to {} when
+  // initialize omits the param.
   containerMounts: Record<string, MountRegistryEntry>;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
   // Persona-container materialization (K-49e). null when the host platform
@@ -204,7 +204,7 @@ export type AgentServerState = {
   // runExclusive mutex (avoids cross-process events.jsonl write races).
   peer: JsonRpcPeer | null;
   runtimeSecretResolver?: RuntimeSecretResolver;
-  // Idle TTL reaper for per_invocation containers (PRI-1796 Chunk E).
+  // Idle TTL reaper for per_invocation containers.
   // Schedules destroy calls after a subagent exits; canceled on resume.
   // Always present after boot — cost is a Map with zero entries until used.
   perInvocationReaper: PerInvocationReaper;
@@ -213,5 +213,6 @@ export type AgentServerState = {
 // Single entry in the embedder-supplied containerMounts registry.
 export type MountRegistryEntry = {
   hostPath: string;
+  containerPath: string;
   readonly: boolean;
 };

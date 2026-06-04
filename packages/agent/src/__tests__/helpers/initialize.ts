@@ -5,7 +5,7 @@ export type InitializeOverrides = {
 
 export type InitializeExtras = {
   userPersonasPaths?: string[];
-  containerMounts?: Record<string, { hostPath: string; readonly: boolean }>;
+  containerMounts?: Record<string, { hostPath: string; containerPath: string; readonly: boolean }>;
 };
 
 export function defaultInitializeParams(

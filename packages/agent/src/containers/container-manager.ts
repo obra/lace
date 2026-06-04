@@ -13,7 +13,6 @@ import type {
   ExecStreamOptions,
 } from './types';
 import { ContainerError, ContainerNotFoundError } from './types';
-import { browserCdpSocketPath } from './spec';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
 
 // See ABOUTME above: every container id is namespaced under this prefix so
@@ -22,8 +21,8 @@ const CONTAINER_ID_PREFIX = 'lace-';
 
 export function resolveContainerId(spec: Pick<ContainerSpec, 'name' | 'containerId'>): string {
   // Persistent container runtime opts out of the `lace-` namespace by supplying a verbatim
-  // containerId (e.g. `sen-box-shell`). Using a non-`lace-` id is intentional: it
-  // makes boxes invisible to the startup reaper, which only lists `lace-*`.
+  // containerId. Using a non-`lace-` id is intentional: it makes boxes invisible
+  // to the startup reaper, which only lists `lace-*`.
   if (spec.containerId && spec.containerId.length > 0) {
     return spec.containerId;
   }
@@ -115,8 +114,8 @@ function formatMount(mount: ContainerMount): string {
 }
 
 /**
- * Observes container network lifecycle for gateway-routed (PRI-1919 transparent
- * egress) personas. The embedder wires this to emit `container_network_attached`
+ * Observes container network lifecycle for gateway-routed (transparent egress)
+ * personas. The embedder wires this to emit `container_network_attached`
  * / `container_network_detached` session updates so it can register/drop the
  * source-IP → identity mapping in lock-step with the container's lifetime.
  */
@@ -126,10 +125,6 @@ export interface ContainerNetworkLifecycleObserver {
     containerId: string;
     sourceIp: string;
     networkName: string;
-    // PRI-2002: per-job CDP unix-socket path on the shared host CDP dir, so the
-    // credential helper can reach this container's quarantined browser Chrome.
-    // Present only for browserCdpSocket-enabled specs.
-    browserCdpSocketPath?: string;
   }): void;
   onDetached(info: { containerName: string; containerId: string }): void;
 }
@@ -143,8 +138,8 @@ export class ContainerManager {
   constructor(private readonly runtime: ContainerRuntime) {}
 
   /**
-   * Register the network lifecycle observer (PRI-1919). Late-bound because the
-   * manager is constructed before the session-update emitter exists.
+   * Register the network lifecycle observer. Late-bound because the manager is
+   * constructed before the session-update emitter exists.
    */
   setNetworkLifecycleObserver(observer: ContainerNetworkLifecycleObserver): void {
     this.networkObserver = observer;
@@ -158,10 +153,6 @@ export class ContainerManager {
    */
   private async notifyNetworkAttached(spec: ContainerSpec, containerId: string): Promise<void> {
     if (!this.networkObserver) return;
-    // browserCdpSocketPath (below) piggybacks on this attach event, so a
-    // `browserCdpSocket: true` persona MUST also be gateway-routed — otherwise the
-    // env is injected but the path is never emitted (a silent half-wired state).
-    // True for every persona that exists today (the browser-driver is quarantined).
     if (!spec.gatewayRoute || !spec.network) return;
     if (typeof this.runtime.inspectNetworkIp !== 'function') return;
     try {
@@ -172,10 +163,6 @@ export class ContainerManager {
         containerId,
         sourceIp,
         networkName: spec.network,
-        // PRI-2002: same path as the injected SEN_BROWSER_CDP_SOCKET env, so the
-        // credential helper reaches the same socket the in-container relay opens.
-        // Only for browserCdpSocket-enabled specs; undefined otherwise.
-        ...(spec.browserCdpSocket ? { browserCdpSocketPath: browserCdpSocketPath(spec.name) } : {}),
       });
     } catch (error) {
       logger.warn('ContainerManager.notifyNetworkAttached failed', {
@@ -247,10 +234,13 @@ export class ContainerManager {
       persona: spec.persona,
       parentSessionId: spec.parentSessionId,
       childSessionId: spec.childSessionId,
+      parentSession: spec.parentSession,
+      childSession: spec.childSession,
+      jobId: spec.jobId,
     };
 
     // Box specs may have a daemon-side container that survived this process —
-    // the docker --restart policy keeps `sen-box-shell` alive across agent restarts.
+    // the docker --restart policy keeps persistent boxes alive across agent restarts.
     // Consult the daemon directly so we adopt instead of recreating.
     const inspectContainerId = knownContainerId ?? containerId;
     const adoptable = spec.containerId

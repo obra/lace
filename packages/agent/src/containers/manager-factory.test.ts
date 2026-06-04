@@ -6,10 +6,9 @@ import type { ContainerManager } from './container-manager';
 import type { ContainerRuntime } from './types';
 
 const ENV_KEY = 'LACE_CONTAINER_RUNTIME';
-
-// Constructing AppleContainerRuntime kicks off a floating `container system
-// start` probe that rejects on non-macOS hosts (CLI absent) and surfaces as an
-// unhandled rejection. The darwin-default branch can only be exercised on macOS.
+// Constructing AppleContainerRuntime on Linux kicks off an async `container
+// system start` that rejects (no Apple runtime) → unhandled rejection. Guard the
+// Apple-constructing case to darwin; the docker/linux selection paths still run.
 const isDarwin = process.platform === 'darwin';
 
 function getRuntime(manager: ContainerManager | null): ContainerRuntime | null {
@@ -43,11 +42,14 @@ describe('createDefaultContainerManager', () => {
     expect(getRuntime(manager)?.constructor.name).toBe('DockerContainerRuntime');
   });
 
-  it('fails clearly for an invalid LACE_CONTAINER_RUNTIME value', () => {
+  it('fails clearly for an unregistered LACE_CONTAINER_RUNTIME value', () => {
+    // Previously: parseContainerRuntimeSelection hard-rejected names outside {auto,apple,docker}.
+    // Now: any name is accepted and resolved against the plugin registry; an unknown name throws
+    // with a registry-miss message so embedders get a clear error.
     process.env[ENV_KEY] = 'podman';
 
     expect(() => createDefaultContainerManager('darwin')).toThrow(
-      /LACE_CONTAINER_RUNTIME must be one of: auto, apple, docker/
+      /LACE_CONTAINER_RUNTIME="podman" but no runtime registered under that name/
     );
   });
 

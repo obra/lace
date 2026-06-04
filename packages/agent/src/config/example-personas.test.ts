@@ -22,13 +22,14 @@ describe('Example Personas', () => {
     expect(personaRegistry.hasPersona('helper-agent')).toBe(true);
   });
 
-  it('all personas have valid file paths', () => {
-    const personas = ['lace', 'coding-agent', 'helper-agent'];
+  it('all personas have valid display paths', () => {
+    const available = personaRegistry.listAvailablePersonas();
+    const byName = new Map(available.map((p) => [p.name, p]));
 
-    for (const persona of personas) {
-      const path = personaRegistry.getPersonaPath(persona);
-      expect(path).toBeTruthy();
-      expect(path).toContain(`${persona}.md`);
+    for (const name of ['lace', 'coding-agent', 'helper-agent']) {
+      const info = byName.get(name);
+      expect(info).toBeTruthy();
+      expect(info!.path).toContain(`${name}.md`);
     }
   });
 

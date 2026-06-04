@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
@@ -21,7 +22,6 @@ import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-s
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
-import { ensureScratchGcReminder } from './scratch-gc-reminder';
 
 const delegateSchema = z
   .object({
@@ -171,7 +171,7 @@ Parameters:
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
         // R6 security invariant: per_invocation personas must not share
-        // mount-registry names with persistent personas (PRI-1796 Chunk F).
+        // mount-registry names with persistent personas.
         // Readonly mounts are excluded — they carry no write path so they are
         // not an adversarial-write threat.
         assertNoMountConflict(persona, parsed, this.personaRegistry, context.containerMounts ?? {});
@@ -186,7 +186,7 @@ Parameters:
             // host. Idempotent: the resume path finds an existing dir; the
             // fresh path creates a new one. mode 0o700 applies only to
             // newly created dirs — existing dirs keep their mode.
-            const scratchBase = process.env.LACE_WORK_DIR ?? '/var/sen/instance/work';
+            const scratchBase = process.env.LACE_WORK_DIR ?? path.join(os.tmpdir(), 'lace-work');
             scratchDirHostPath = path.join(scratchBase, childSessionId!);
             fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
 
@@ -195,22 +195,16 @@ Parameters:
               personaName: persona,
               childSessionId: childSessionId!,
             });
-
-            // Schedule GC reminder (best-effort — the helper wraps in try/catch).
-            if (context.reminderScheduler && context.activeSessionId) {
-              await ensureScratchGcReminder(context.reminderScheduler, context.activeSessionId);
-            }
           }
 
           // Project the persona container into a host-side RuntimeExecutionBinding.
           // The session runner threads the embedder-supplied named-mount registry
           // into ToolContext; when absent (e.g. unit-test fixtures), fall back to
-          // {} so personas with `mounts: {}` still resolve and personas that do
+          // {} so personas with `mounts: []` still resolve and personas that do
           // declare mounts fail with a clear "unknown mount" error.
           //
           // The persona-declared image string (tag or digest) flows through
-          // verbatim — no pre-resolution. The projected runtime captures the
-          // daemon's `.Image` field post-create for audit (see projected-container.ts).
+          // verbatim — no lace-side pre-resolution or docker inspect.
           projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
             parentSessionId: context.activeSessionId ?? 'delegate',
             personaName: persona,
@@ -236,7 +230,7 @@ Parameters:
       }
     }
 
-    // Cancel any pending idle-TTL reap for this per_invocation container (PRI-1796 Chunk E).
+    // Cancel any pending idle-TTL reap for this per_invocation container.
     // Fresh delegates call cancelReap idempotently (no timer exists — safe no-op).
     // Resume delegates cancel the timer that was set when the prior invocation's
     // subagent exited, preserving the container for this new invocation window.

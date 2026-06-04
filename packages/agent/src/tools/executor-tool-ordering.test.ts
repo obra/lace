@@ -1,5 +1,5 @@
 // ABOUTME: Tests for getAllTools() deterministic byte-stable ordering.
-// Ensures sort order is independent of host locale (PRI-1804 #2 follow-up
+// Ensures sort order is independent of host locale (follow-up
 // after adversarial review of the original cache-control hardening).
 
 import { describe, it, expect } from 'vitest';
@@ -24,7 +24,7 @@ class MockTool extends Tool {
   }
 }
 
-describe('ToolExecutor.getAllTools — byte-stable ordering (PRI-1804 #2)', () => {
+describe('ToolExecutor.getAllTools — byte-stable ordering', () => {
   it('sorts native tools using byte-stable comparison, not localeCompare', () => {
     const executor = new ToolExecutor();
     // Names chosen to expose locale-dependent collation differences.

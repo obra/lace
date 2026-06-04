@@ -38,7 +38,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   childSessionId?: string;
   scratchDirHostPath?: string;
 }): RuntimeExecutionBinding {
-  const spec = buildPersonaContainerSpec({
+  const containerSpec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
     personaName: input.personaName,
     childSessionId: input.childSessionId,
@@ -46,8 +46,11 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     runtime: input.runtime,
     containerMounts: input.containerMounts,
   });
+  const runtimeSpec = containerSpecToRuntimeSpec({ spec: containerSpec });
 
-  const runtimeSpec = containerSpecToRuntimeSpec({ spec });
+  // Delegate builds this binding before JobManager.createJob allocates the
+  // final Lace job id. Do not synthesize one here; PlaneRuntime uses its
+  // fallback identity until a later lifecycle can thread the real job id.
   runtimeSpec.env = { ...runtimeSpec.env, ...(input.executionEnv ?? {}) };
 
   const binding: RuntimeExecutionBinding = {
@@ -61,7 +64,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
     },
     // Tag the binding with the lifecycle so post-exit handlers (Chunk E) can
     // branch on per_invocation vs persistent without inspecting toolRuntime
-    // internals (PRI-1796).
+    // internals.
     containerSharing: input.runtime.containerSharing,
   };
 

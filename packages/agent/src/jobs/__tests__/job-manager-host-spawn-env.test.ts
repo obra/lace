@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1867 M4 — coverage for the host/spawn/env outbound RPC hook
+// ABOUTME: Coverage for the host/spawn/env outbound RPC hook
 // in JobManager.createJob. Verifies that the embedder-supplied env is
 // merged into the delegate spawn's executionEnv with strict validation
 // (POSIX-shape names) and conflict resolution (lace-managed names win).
@@ -50,7 +50,7 @@ function delegateOptions() {
   };
 }
 
-describe('JobManager.createJob — host/spawn/env merge (PRI-1867 M4)', () => {
+describe('JobManager.createJob — host/spawn/env merge', () => {
   it('merges embedder-supplied env vars into the spawn executionEnv', async () => {
     const fetchEmbedderSpawnEnv = vi.fn().mockResolvedValue({
       HTTPBIN_BEARER_TEST: 'sen-placeholder-abc123',

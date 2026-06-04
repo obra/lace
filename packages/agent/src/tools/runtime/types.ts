@@ -44,11 +44,7 @@ export type ToolRuntimeDescriptor =
         name: string;
         containerId?: string;
         // Persona-declared image reference. Passed verbatim to docker create —
-        // may be a tag, a RepoDigest, or anything else docker accepts. The
-        // post-create `.Image` capture (see projected-container.ts) is the
-        // immutable identity used for audit/tracking. Pre-resolution was
-        // dropped because locally-built images (sen-box:dev, sen-browser:dev)
-        // have no registry digest to pin to.
+        // may be a tag, a RepoDigest, or anything else docker accepts.
         image: string;
         workingDirectory: string;
         mounts: RuntimeMountDescriptor[];
@@ -56,18 +52,17 @@ export type ToolRuntimeDescriptor =
         secretEnv?: Record<string, RuntimeSecretReference>;
         ports?: RuntimePortDescriptor[];
         restartPolicy?: 'unless-stopped';
-        // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-        // PRI-1790: sen-browser declares `net.ipv6.conf.lo.disable_ipv6=0`
-        // so superpowers-chrome's port-availability check can bind to `::1`.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these; the plane
+        // rebuilds persona docker authority from selectors/persona config.
         sysctls?: Record<string, string>;
-        // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-        // PRI-1919: persona containers need NET_ADMIN for transparent egress gateway.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these.
         capAdd?: string[];
-        // Docker network name forwarded to `docker create --network <name>`.
-        // PRI-1919: persona containers join the quarantine network.
+        // Generic projected-container docker authority fields. Persona
+        // projected specs built by lace intentionally omit these.
         network?: string;
-        // IPv4 address of the egress gateway. When set, a privileged one-shot
-        // sidecar sets the persona's default route after start. PRI-1919.
+        // IPv4 address of the egress gateway broker.
         gatewayRoute?: string;
         // PRI-2002: when true, the persona is a quarantined browser-driver whose
         // Chrome CDP is exposed over a unix socket on the shared sen-browser-cdp
@@ -76,15 +71,18 @@ export type ToolRuntimeDescriptor =
         // reach it. Mount scope IS the access-control boundary: only personas
         // with this flag get the socket dir + env.
         browserCdpSocket?: boolean;
-        // PRI-2012 spawn-broker SELECTOR fields. Carried verbatim across the
-        // ContainerSpec→RuntimeSpec→ContainerSpec round-trip so the
-        // SpawnBrokerContainerRuntime client can format the wire spawn request
-        // `{persona, parentSessionId, childSessionId}`. SELECTOR ONLY — never an
-        // authority source: the broker rebuilds the FULL container spec from its
-        // own catalog using only `persona`. The docker/apple runtimes ignore them.
+        // Shared selector field. It is a selector only, never an authority
+        // source: the selected privileged runtime re-validates it.
         persona?: string;
+        // Spawn-broker selector fields. Carried verbatim across the
+        // ContainerSpec -> RuntimeSpec -> ContainerSpec round-trip.
         parentSessionId?: string;
         childSessionId?: string;
+        // PlaneRuntime selector fields. create() emits
+        // `spawn <persona> <parent> <child> <jobId>`.
+        parentSession?: string;
+        childSession?: string;
+        jobId?: string;
       };
       cwd: string;
       helper?: RuntimeHelperDescriptor;
@@ -96,7 +94,7 @@ export interface RuntimeExecutionBinding {
   toolRuntime: ToolRuntimeDescriptor;
   // Present on persona container bindings; absent on host/bounded-host bindings.
   // Lets post-exit handlers (Chunk E) branch on lifecycle without inspecting
-  // toolRuntime internals (PRI-1796).
+  // toolRuntime internals.
   containerSharing?: 'per_invocation' | 'persistent';
 }
 

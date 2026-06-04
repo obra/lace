@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { ContainerManager } from '@lace/agent/containers/container-manager';
 import { DockerContainerRuntime } from '@lace/agent/containers/docker-container';
-import { buildPersonaContainerSpec } from '@lace/agent/jobs/persona-container-spec';
+import type { ContainerSpec } from '@lace/agent/containers/spec';
+import { buildProjectedRuntimeSpec } from '@lace/agent/jobs/persona-container-spec';
 import { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 
@@ -42,7 +43,7 @@ function hasImage(image: string): boolean {
 const DOCKER_AVAILABLE = hasDockerAvailable();
 
 // Use node:24-bookworm for per_invocation tests (has sh + bash, readily available).
-// For persistent tests, prefer sen-box:dev if available; fall back to node:24-bookworm.
+// For persistent tests, prefer a locally available embedder image if present; fall back to node:24-bookworm.
 const TEST_PER_INVOCATION_IMAGE = process.env.LACE_TEST_PER_INVOCATION_IMAGE ?? 'node:24-bookworm';
 const TEST_PERSISTENT_IMAGE =
   process.env.LACE_TEST_PERSISTENT_IMAGE ??
@@ -57,7 +58,7 @@ function newSessionId(): string {
   return `sess_${uuidv4().replace(/-/g, '').slice(0, 24)}`;
 }
 
-/** Compute the spec name that buildPersonaContainerSpec will use for per_invocation. */
+/** Compute the spec name that buildProjectedRuntimeSpec will use for per_invocation. */
 function perInvocationSpecName(
   parentSessionId: string,
   personaName: string,
@@ -137,11 +138,29 @@ function forceRemoveContainer(name: string): void {
   }
 }
 
+function containerSpecFromProjectedSpec(
+  spec: ReturnType<typeof buildProjectedRuntimeSpec>,
+  containerId?: string
+): ContainerSpec {
+  return {
+    name: spec.name,
+    ...(containerId ? { containerId } : {}),
+    image: spec.image,
+    workingDirectory: spec.workingDirectory,
+    mounts: spec.mounts.map((mount) => ({
+      source: mount.hostPath,
+      target: mount.containerPath,
+      readonly: mount.readonly,
+    })),
+    env: spec.env,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // test suite
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integration', () => {
+describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () => {
   let runtime: DockerContainerRuntime;
   let containerManager: ContainerManager;
 
@@ -195,13 +214,13 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
       containerSharing: 'per_invocation',
       image: TEST_PER_INVOCATION_IMAGE,
       workingDirectory: '/work',
-      mounts: {},
+      mounts: [],
       env: {},
     };
 
     await mkdir(scratchDirHostPath, { recursive: true });
 
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId,
       personaName,
       runtime: perInvocationRuntime,
@@ -214,7 +233,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
     const dockerName = `lace-${specName}`;
     createdContainerNames.push(dockerName);
 
-    await containerManager.materialize(spec);
+    await containerManager.materialize(containerSpecFromProjectedSpec(spec));
 
     return { specName, dockerName };
   }
@@ -229,11 +248,11 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
       containerSharing: 'persistent',
       image: TEST_PERSISTENT_IMAGE,
       workingDirectory: '/tmp',
-      mounts: {},
+      mounts: [],
       env: {},
     };
 
-    const spec = buildPersonaContainerSpec({
+    const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess_parentforpersistent',
       personaName,
       runtime: persistentRuntime,
@@ -241,11 +260,10 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
     });
 
     const specName = spec.name;
-    // Persistent containers use spec.containerId = `sen-<persona>` (no lace- prefix).
-    const dockerName = `sen-${personaName}`;
+    const dockerName = `box-${personaName}`;
     createdContainerNames.push(dockerName);
 
-    await containerManager.materialize(spec);
+    await containerManager.materialize(containerSpecFromProjectedSpec(spec, dockerName));
 
     return { specName, dockerName };
   }
@@ -392,9 +410,9 @@ describe.skipIf(!DOCKER_AVAILABLE)('PRI-1796 persona container sharing integrati
   // -------------------------------------------------------------------------
 
   it('concurrent persistent delegates use the same projected container', async () => {
-    // Use a unique persona name to avoid colliding with a real sen-box-shell on the host
+    // Use a unique persona name to avoid colliding with any real persistent persona container on the host
     const personaName = `test-pri1796-${uuidv4().slice(0, 8)}`;
-    const expectedDockerName = `sen-${personaName}`;
+    const expectedDockerName = `box-${personaName}`;
 
     // Materialize the same persistent persona twice concurrently.
     // Both should adopt / share one container.

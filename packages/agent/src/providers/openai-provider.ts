@@ -439,7 +439,7 @@ export class OpenAIProvider extends AIProvider {
     // the Chat Completions path and this Responses-API path produce identical
     // system prompts (same \n\n separator, same content-block handling).
     // The old inline join used '\n' and stringified content arrays naively,
-    // producing '[object Object]' for block-style content (PRI-1804 #3).
+    // producing '[object Object]' for block-style content.
     const systemText = this.getEffectiveSystemPrompt(messages);
     // instructions is optional in the SDK; map '' → undefined to omit the field.
     const instructions = systemText || undefined;

@@ -42,7 +42,7 @@ export class UseSkillTool extends Tool {
     const { skill: skillName } = args;
 
     // Cache may be stale if a skill was authored after registry construction
-    // (e.g. via sen-core's create_skill tool). Refresh once on miss before
+    // (e.g. via the embedder's create_skill tool). Refresh once on miss before
     // declaring the skill not found.
     let content = this.registry.getSkillContent(skillName);
     if (!content) {

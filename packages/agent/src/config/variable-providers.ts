@@ -43,7 +43,7 @@ export class CommandRunner {
 export class SystemVariableProvider implements VariableProvider {
   getVariables(): Record<string, unknown> {
     try {
-      // PRI-1804 #1: emit date only (YYYY-MM-DD) rather than a precise
+      // Emit date only (YYYY-MM-DD) rather than a precise
       // ISO-8601 timestamp. The precise timestamp made the rendered system
       // prompt byte-different on every new session, so the system+tools
       // cache never read across sessions. Date-only is stable within a UTC

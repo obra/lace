@@ -1,6 +1,5 @@
 // ABOUTME: Asserts that countTokens ships the SAME cache_control shape as the
-// live request path (_createRequestPayload). PRI-1806 #2 introduced this
-// parity; this test guards against regression.
+// live request path (_createRequestPayload). This parity test guards against regression.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnthropicProvider } from '../anthropic-provider';
@@ -44,7 +43,7 @@ class TestTool extends Tool {
   }
 }
 
-describe('countTokens shape parity with _createRequestPayload (PRI-1806 #2)', () => {
+describe('countTokens shape parity with _createRequestPayload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCountTokens.mockResolvedValue({ input_tokens: 100 });

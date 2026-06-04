@@ -11,7 +11,7 @@
  *
  * The 2026-05-17 production smoke retry reproduced the original failure:
  *
- *   Model not found in catalog: haiku for instance sen-anthropic (provider anthropic)
+ *   Model not found in catalog: haiku for instance my-anthropic (provider anthropic)
  *
  * Working hypothesis (from the kata reopen comment): the catalog that actually reaches
  * the resolver in production — the result of `getCatalogForInstance` for an Anthropic
@@ -51,7 +51,7 @@ describe('ProviderRegistry alias resolution — production catalog paths', () =>
 
   let previousDisableDynamic: string | undefined;
 
-  // Build a cached "dynamic catalog" for sen-anthropic that contains sonnet & opus but
+  // Build a cached "dynamic catalog" for the test provider instance that contains sonnet & opus but
   // NO haiku entries. Pre-populate it on disk so getCatalogForInstance reads it from
   // cache without any network call. This mirrors the production state where the
   // catalog visible to the resolver lacks alias-matching entries.
@@ -229,7 +229,7 @@ describe('ProviderRegistry alias resolution — production catalog paths', () =>
 
       // Note: getModelFromCatalog calls getCatalogProvider(providerId), not
       // getCatalogForInstance. The Anthropic branch in getCatalogProvider also
-      // discovers the sen-anthropic instance (it scans loaded instances for one
+      // discovers the configured Anthropic instance (it scans loaded instances for one
       // with catalogProviderId === 'anthropic') and uses the same on-disk cache
       // path, so the cache we wrote above is the catalog this method will see.
       const registry = ProviderRegistry.getInstance();

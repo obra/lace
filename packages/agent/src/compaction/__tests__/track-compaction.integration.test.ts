@@ -74,7 +74,7 @@ describe('compact() against Ada fixture', () => {
       expect(estPrefixTokens).toBeLessThan(200_000);
 
       // The Ada fixture predates track-stamping — all events land in 'untracked'
-      // which renders under "## System events", not Slack/Jobs sections.
+      // which renders under "## System events", not Jobs/Other sections.
       expect(prefix).toContain('## System events');
 
       // The untracked salience extractor should produce User:/Assistant: lines

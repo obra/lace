@@ -389,7 +389,7 @@ export function registerMcpHandlers(
         : [];
 
       // Find and replace or add the server config. Tag as 'user'-owned so
-      // it survives subsequent embedder session/resume calls (see PRI-1754).
+      // it survives subsequent embedder session/resume calls.
       const updatedServers: StoredMcpServer[] = existingMcpServers.filter(
         (s: { name: string }) => s.name !== serverId
       );

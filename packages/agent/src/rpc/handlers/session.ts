@@ -181,7 +181,7 @@ async function activateStoredSession(
     // Cold session-open path: ask loadSession to scan for and synthesize
     // turn_end events for any orphan turn_starts left by a prior process
     // (SIGKILL, OOM, container restart). All other loadSession call sites
-    // are mid-flight refreshes that must NOT repair. See PRI-1818.
+    // are mid-flight refreshes that must NOT repair.
     loaded = loadSession(params.sessionId, { repairOrphanTurnStarts: true });
   } catch (error) {
     if (error instanceof Error && error.message === 'Session not found') {
@@ -208,8 +208,8 @@ async function activateStoredSession(
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,
-    // PRI-1912: resolve relative host-placement command/args against mcpBaseDir
-    // before applying embedder servers (same as session/new).
+    // Resolve relative host-placement command/args against mcpBaseDir before
+    // applying embedder servers (same as session/new).
     resolveMcpServerPaths(params.mcpServers, state.personaRegistry.getMcpBaseDir()),
     activeRuntimeBinding
   );
@@ -315,9 +315,9 @@ export function registerSessionHandlers(
 
     const parsed = params as {
       cwd: string;
-      // Host-preallocated session id (PRI-1796). When present and valid, used
-      // instead of minting a fresh id. Must be a valid sess_<uuid> format and
-      // must not collide with an existing session on disk.
+      // Host-preallocated session id. When present and valid, used instead of
+      // minting a fresh id. Must be a valid sess_<uuid> format and must not
+      // collide with an existing session on disk.
       sessionId?: unknown;
       mcpServers?: Array<{
         name: string;
@@ -422,8 +422,8 @@ export function registerSessionHandlers(
           // present = exactly these tools (no implicit builtins); omitted =
           // inherit all; `[]` = zero tools. Personas that need a builtin must
           // list it explicitly. (This replaced the earlier additive union;
-          // see PRI-1900 — the migration re-audited every persona that
-          // declares tools: so none silently lose a builtin they rely on.)
+          // the migration re-audited every persona that declares tools: so none
+          // silently lose a builtin they rely on.)
           personaDefaults.toolScope = [...personaConfig.tools];
         }
         if (personaConfig.mcpServers) {
@@ -466,9 +466,9 @@ export function registerSessionHandlers(
       parsed.mcpServers !== undefined
         ? mergeMcpServers(
             personaDefaults.mcpServers,
-            // PRI-1912: resolve relative host-placement command/args in the
-            // embedder's request servers against mcpBaseDir (persona defaults are
-            // already resolved by parsePersona). Resolve BEFORE merge so the
+            // Resolve relative host-placement command/args in the embedder's
+            // request servers against mcpBaseDir (persona defaults are already
+            // resolved by parsePersona). Resolve BEFORE merge so the
             // stdio→toolRuntime placement default does not skip them.
             resolveMcpServerPaths(parsed.mcpServers, state.personaRegistry.getMcpBaseDir())
           )

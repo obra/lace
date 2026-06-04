@@ -68,17 +68,10 @@ export class PromptManager {
     try {
       logger.debug('Generating system prompt using template system', { persona });
 
-      // Validate persona exists
       this.personaRegistry.validatePersona(persona);
 
-      // Get persona template path
-      const personaPath = this.personaRegistry.getPersonaPath(persona);
-      if (!personaPath) {
-        throw new Error(`Persona '${persona}' not found`);
-      }
-
       const context = await this.variableManager.getTemplateContext();
-      const prompt = this.templateEngine.render(`${persona}.md`, context);
+      const prompt = this.personaRegistry.render(persona, this.templateEngine, context);
 
       logger.debug('System prompt generated successfully', {
         persona,

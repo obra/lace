@@ -36,11 +36,11 @@ runtime:
   image: sen-browser:dev
   workingDirectory: /work
   mounts:
-    knowledge: /knowledge
-    identity: /sen/identity
-    sen-cred: /run
-    sen-ca: /etc/sen-credential-proxy-ca
-    sen-browser-cdp: /sen-browser-cdp
+    - knowledge
+    - identity
+    - sen-cred
+    - sen-ca
+    - sen-browser-cdp
   env:
     DISPLAY: ":1"
     NODE_EXTRA_CA_CERTS: /etc/sen-credential-proxy-ca/sen-credential-proxy-ca.pem
@@ -82,12 +82,12 @@ runtime:
   image: sen-persistent-box:dev
   workingDirectory: /home/sen
   mounts:
-    home: /home/sen
-    scratch: /work
-    knowledge: /knowledge
-    identity: /sen/identity
-    sen-cred: /run
-    sen-ca: /etc/sen-credential-proxy-ca
+    - home
+    - scratch
+    - knowledge
+    - identity
+    - sen-cred
+    - sen-ca
   network: quarantine
   gatewayRoute: 172.31.250.2
   sysctls:
@@ -115,10 +115,10 @@ runtime:
   image: sen-ephemeral-shell:dev
   workingDirectory: /work
   mounts:
-    knowledge: /knowledge
-    identity: /sen/identity
-    sen-cred: /run
-    sen-ca: /etc/sen-credential-proxy-ca
+    - knowledge
+    - identity
+    - sen-cred
+    - sen-ca
   network: quarantine
   gatewayRoute: 172.31.250.2
   sysctls:

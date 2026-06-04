@@ -151,7 +151,7 @@ function dropOrphanedToolBlocks(messages: ProviderMessage[]): void {
 
   // Pass B: drop assistant tool_uses whose matching tool_result is missing in
   // the immediately-following user message. This is the case that bricked Ada
-  // in PRI-1820: a tool_use survived into messages[1298] without its result and
+  // a tool_use survived into messages[1298] without its result and
   // every subsequent Anthropic call 400'd on the same toolu id.
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]!;

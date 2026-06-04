@@ -8,7 +8,7 @@ import { logger } from '@lace/agent/utils/logger';
  * Why a deliberately narrow whitelist?
  *
  * Many HTTP 400 responses are legitimate hard failures the agent SHOULD surface
- * by throwing (e.g. PRI-1796: malformed `tool_use`/`tool_result` pairing).
+ * by throwing (e.g. malformed `tool_use`/`tool_result` pairing).
  * Silently swallowing them as "context window exceeded" would hide real bugs
  * and corrupt telemetry.
  *

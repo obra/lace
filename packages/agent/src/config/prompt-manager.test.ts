@@ -6,6 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { PromptManager } from './prompt-manager';
+import { PersonaRegistry } from './persona-registry';
+import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
 
 // Mock logger to avoid console output during tests
 vi.mock('../../utils/logger.js', () => ({
@@ -304,6 +306,68 @@ describe('PromptManager', () => {
       const prompt = await manager.generateSystemPrompt();
 
       expect(prompt).toBe('Hello !'); // No name provided, mustache renders empty
+    });
+  });
+
+  describe('plugin persona body rendering', () => {
+    beforeEach(() => {
+      resetRegistriesForTest();
+    });
+
+    afterEach(() => {
+      resetRegistriesForTest();
+    });
+
+    it('renders the body of a plugin-contributed persona through variable substitution', async () => {
+      // Register a plugin persona with a recognisable body marker and a mustache variable.
+      registries.personas.register(
+        'render-test',
+        {
+          config: { runtime: { type: 'root' } } as never,
+          body: 'You are RenderTest, body marker XYZZY. OS is {{system.os}}.',
+        },
+        'vendor'
+      );
+
+      // Build a PersonaRegistry that has no bundled/user-disk personas so the
+      // plugin is the only source of truth for 'render-test'.
+      const personaReg = new PersonaRegistry({
+        bundledPersonasPath: '/nonexistent',
+        userPersonasPaths: [],
+      });
+
+      const manager = new PromptManager({ personaRegistry: personaReg, templateDirs: [tempDir] });
+      const prompt = await manager.generateSystemPrompt('render-test');
+
+      // The body marker must be present — proving the plugin body was rendered.
+      expect(prompt).toContain('XYZZY');
+      // Mustache substitution must also have fired (system.os is non-empty).
+      expect(prompt).toContain('OS is');
+      expect(prompt).not.toContain('{{system.os}}');
+    });
+
+    it('does NOT fall back to the generic fallback string for a plugin persona', async () => {
+      registries.personas.register(
+        'render-test-nofallback',
+        {
+          config: { runtime: { type: 'root' } } as never,
+          body: 'Plugin persona unique marker QWERTY.',
+        },
+        'vendor'
+      );
+
+      const personaReg = new PersonaRegistry({
+        bundledPersonasPath: '/nonexistent',
+        userPersonasPaths: [],
+      });
+
+      const manager = new PromptManager({ personaRegistry: personaReg, templateDirs: [tempDir] });
+      const prompt = await manager.generateSystemPrompt('render-test-nofallback');
+
+      expect(prompt).toContain('QWERTY');
+      expect(prompt).not.toBe(
+        'You are Lace, an AI coding assistant. Use the available tools to help with programming tasks.'
+      );
     });
   });
 

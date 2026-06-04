@@ -8,11 +8,7 @@ export interface PortMapping {
   container: number;
 }
 
-export interface ContainerConfig {
-  // Container identification (optional - will be generated if not provided)
-  id?: string;
-  name?: string;
-
+export interface DockerCreateConfig {
   // Image to run. Required: every container must know its image at create time.
   image: string;
 
@@ -28,37 +24,27 @@ export interface ContainerConfig {
   // may ignore (see AppleContainerRuntime).
   ports?: PortMapping[];
 
-  // Resource limits (optional for now)
-  memory?: number; // bytes
-  cpuShares?: number;
-
   // Docker --restart policy. Only 'unless-stopped' is supported in v1; used by
   // persistent container runtimes so the daemon resurrects them after host reboot.
   // Absent ⇒ no restart flag emitted (default no-restart behavior).
   restartPolicy?: 'unless-stopped';
 
   // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-  // Absent or empty ⇒ no --sysctl flag emitted. PRI-1790: sen-browser needs
+  // Absent or empty ⇒ no --sysctl flag emitted. The browser persona may need
   // `net.ipv6.conf.lo.disable_ipv6=0` so chrome's port-availability check
   // can bind to `::1`.
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // Absent or empty ⇒ no --cap-add flags emitted. PRI-1919: persona containers
-  // need NET_ADMIN to replace the default route via the transparent egress gateway.
+  // Absent or empty ⇒ no --cap-add flags emitted. Used by direct docker
+  // container specs that need extra kernel authority.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // Absent ⇒ no --network flag emitted (docker default). PRI-1919: persona
-  // containers join the quarantine network for transparent egress.
+  // Absent ⇒ no --network flag emitted (docker default).
   network?: string;
 
-  // IPv4 address of the egress gateway. When set, a privileged one-shot
-  // sidecar container is launched into the persona's network namespace after
-  // `docker start` to replace the default route:
-  //   ip route replace default via <gatewayRoute>
-  // The persona container itself does NOT need NET_ADMIN — the sidecar holds
-  // the privilege and exits immediately. PRI-1919 transparent egress gateway.
+  // IPv4 address of the egress gateway broker.
   gatewayRoute?: string;
 
   // Docker object labels stamped at create (`docker create --label key=value`).
@@ -76,6 +62,30 @@ export interface ContainerConfig {
   parentSessionId?: string;
   childSessionId?: string;
 }
+
+type AssertNoForbiddenDockerCreateConfigKeys<T extends never> = T;
+type _DockerCreateConfigHasNoResourceLimitFields = AssertNoForbiddenDockerCreateConfigKeys<
+  Extract<keyof DockerCreateConfig, 'memory' | 'cpuShares'>
+>;
+
+export interface PlaneSpawnRequest {
+  // Container identity fields may be supplied by ContainerManager for fallback naming.
+  id?: string;
+  name?: string;
+
+  // Selector fields for plane spawn: `spawn <persona> <parent> <child> <jobId>`.
+  persona: string;
+  parentSession?: string;
+  childSession?: string;
+  jobId?: string;
+}
+
+export type ContainerConfig = DockerCreateConfig &
+  Partial<PlaneSpawnRequest> & {
+    // Container identification (optional - will be generated if not provided)
+    id?: string;
+    name?: string;
+  };
 
 export interface ContainerMount {
   source: string; // Host path
@@ -167,14 +177,10 @@ export interface ContainerRuntime {
    * Resolve the container's IPv4 address on the named docker network, or
    * undefined when unavailable (network absent, container gone, daemon error,
    * or the runtime has no network concept — e.g. AppleContainerRuntime).
-   * Optional: only runtimes backing the PRI-1919 transparent egress gateway
-   * implement it; ContainerManager treats its absence as "no source IP".
+   * Optional: only runtimes backing the transparent egress gateway implement it;
+   * ContainerManager treats its absence as "no source IP".
    */
   inspectNetworkIp?(containerId: string, networkName: string): Promise<string | undefined>;
-
-  // Path translation
-  translateToContainer(hostPath: string, containerId: string): string;
-  translateToHost(containerPath: string, containerId: string): string;
 }
 
 export class ContainerError extends Error {

@@ -10,7 +10,9 @@ import {
   writeSessionState,
 } from '@lace/agent/storage/session-store';
 import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
-import { compact } from '@lace/agent/compaction/track-compaction';
+import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import {
@@ -19,7 +21,6 @@ import {
   type CreateToolExecutorFn,
 } from '@lace/agent/server-types';
 import { composeAndWriteSystemPromptSet } from '@lace/agent/rpc/handlers/session';
-import { createProviderForTurn } from './provider-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 
 export type SlashCommandResult = {
@@ -153,15 +154,18 @@ export async function handleSlashCommand(
 
         const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
-        const provider = await createProviderForTurn({
+        const name = compactionStrategyNameForSession(sessionDir);
+        // args is the free-text tail after /compact — thread as guidance.
+        const guidance = args.trim() || undefined;
+        const compactionCtx = buildCompactionContext({
+          threadId: sessionId,
+          sessionDir,
           connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
+          guidance,
         });
-        const result = await compact(events, {
-          threadId: sessionId,
-          provider,
-          modelId: effectiveConfig.modelId,
-        }).finally(() => provider.cleanup());
+        const raw = await resolveCompactionStrategy(name).compact(events, compactionCtx);
+        const result = validatePreserved(raw);
 
         if ('noop' in result) {
           return finishTurn('Context is already minimal. Nothing to compact.');

@@ -37,9 +37,10 @@ import {
   buildProviderMessagesFromDurableEvents,
   estimateProviderTokens,
 } from '../../message-building/message-builder';
-import { compact } from '@lace/agent/compaction/track-compaction';
+import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
-import { createProviderForTurn } from '../../providers/turn-factory';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
 import {
@@ -215,6 +216,7 @@ export async function injectIntoActiveSession(
     content: unknown[];
     priority: 'immediate' | 'normal' | 'deferred';
     idempotencyKey?: unknown;
+    track?: unknown;
   }
 ): Promise<{ durableHandoffStatus: DurableHandoffStatus } | undefined> {
   return await runExclusive(() => {
@@ -248,6 +250,8 @@ export async function injectIntoActiveSession(
       }
     }
 
+    const track =
+      typeof parsed.track === 'string' && parsed.track.length > 0 ? parsed.track : undefined;
     let sessionState: SessionState = readSessionState(state.activeSession.dir);
     const { nextState } = appendDurableEvent(state.activeSession.dir, sessionState, {
       type: 'context_injected',
@@ -255,6 +259,7 @@ export async function injectIntoActiveSession(
         content: Array.isArray(parsed.content) ? parsed.content : [],
         priority: parsed.priority,
         ...(idempotencyKey ? { idempotencyKey } : {}),
+        ...(track !== undefined ? { track } : {}),
       },
     });
     sessionState = nextState;
@@ -460,10 +465,7 @@ export function registerSessionOperationHandlers(
   peer.onRequest('ent/session/compact', async (params: unknown) => {
     assertSessionReady(state);
 
-    const parsed = params as { strategy?: string } | undefined;
-    if (parsed?.strategy && parsed.strategy !== 'track-based') {
-      throwInvalidParams('strategy must be track-based (legacy strategies removed)');
-    }
+    const parsed = params as { strategy?: string; guidance?: string } | undefined;
 
     return await runExclusive(async () => {
       const sessionDir = state.activeSession!.dir;
@@ -475,52 +477,58 @@ export function registerSessionOperationHandlers(
 
       const sessionStateForConfig = readSessionState(sessionDir);
       const effectiveConfig = getEffectiveConfig(state.config, sessionStateForConfig.config);
-      const provider = await createProviderForTurn({
+
+      const rawEvents = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
+      // DurableEvent[] and TypedDurableEvent[] differ in their typing of `data`
+      // (Record<string, unknown> vs DurableEventData union). Runtime shape is
+      // identical. Same cast pattern is used in slash-commands.ts.
+      const events = rawEvents.events as unknown as TypedDurableEvent[];
+
+      const name = parsed?.strategy ?? compactionStrategyNameForSession(sessionDir);
+      // Validate the strategy name early so an unknown name produces -32602 (InvalidParams)
+      // rather than propagating a RegistryError as an internal error.
+      let strategy;
+      try {
+        strategy = resolveCompactionStrategy(name);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw { code: -32602, message: msg, data: { category: 'protocol' } };
+      }
+      const compactionCtx = buildCompactionContext({
+        threadId: state.activeSession!.meta.sessionId,
+        sessionDir,
         connectionId: effectiveConfig.connectionId,
         modelId: effectiveConfig.modelId,
+        guidance: parsed?.guidance,
       });
+      const raw = await strategy.compact(events, compactionCtx);
+      const result = validatePreserved(raw);
 
-      try {
-        const rawEvents = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
-        // DurableEvent[] and TypedDurableEvent[] differ in their typing of `data`
-        // (Record<string, unknown> vs DurableEventData union). Runtime shape is
-        // identical. Same cast pattern is used in slash-commands.ts.
-        const events = rawEvents.events as unknown as TypedDurableEvent[];
-
-        const result = await compact(events, {
-          threadId: state.activeSession!.meta.sessionId,
-          provider,
-          modelId: effectiveConfig.modelId,
-        });
-
-        if ('noop' in result) {
-          return {
-            previousTokens,
-            currentTokens: previousTokens,
-            messagesCompacted: 0,
-          };
-        }
-
-        let sessionState = readSessionState(sessionDir);
-        const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-          type: 'context_compacted',
-          data: result.compactionEvent.data as Record<string, unknown>,
-        });
-        sessionState = nextState;
-        writeSessionState(sessionDir, sessionState);
-        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-
-        const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
-        const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
-
+      if ('noop' in result) {
         return {
           previousTokens,
-          currentTokens,
-          messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
+          currentTokens: previousTokens,
+          messagesCompacted: 0,
         };
-      } finally {
-        provider.cleanup();
       }
+
+      let sessionState = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+        type: 'context_compacted',
+        data: result.compactionEvent.data as Record<string, unknown>,
+      });
+      sessionState = nextState;
+      writeSessionState(sessionDir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
+      const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
+
+      return {
+        previousTokens,
+        currentTokens,
+        messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
+      };
     });
   });
 
@@ -630,6 +638,7 @@ export function registerSessionOperationHandlers(
       content: unknown[];
       priority: 'immediate' | 'normal' | 'deferred';
       idempotencyKey?: unknown;
+      track?: unknown;
     };
     const priority =
       parsed?.priority === 'immediate' ||
@@ -641,6 +650,7 @@ export function registerSessionOperationHandlers(
       content: Array.isArray(parsed?.content) ? parsed.content : [],
       priority,
       idempotencyKey: parsed?.idempotencyKey,
+      track: parsed?.track,
     });
   });
 

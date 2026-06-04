@@ -2,6 +2,33 @@ import { z } from 'zod';
 import { buildRuntimeId } from './identity';
 import type { RuntimeExecutionBinding } from './types';
 
+const CONTAINER_PLANE_SELECTOR_FIELDS = ['parentSession', 'childSession', 'jobId'] as const;
+const CONTAINER_BROKER_SELECTOR_FIELDS = ['parentSessionId', 'childSessionId'] as const;
+const CONTAINER_AUTHORITY_FIELDS = [
+  'containerId',
+  'ports',
+  'restartPolicy',
+  'sysctls',
+  'capAdd',
+  'network',
+  'gatewayRoute',
+  'browserCdpSocket',
+] as const;
+
+function hasDefinedField(value: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, field) && value[field] !== undefined;
+}
+
+function hasPlaneSelector(value: Record<string, unknown>): boolean {
+  const hasBrokerSelector = CONTAINER_BROKER_SELECTOR_FIELDS.some((field) =>
+    hasDefinedField(value, field)
+  );
+  return (
+    CONTAINER_PLANE_SELECTOR_FIELDS.some((field) => hasDefinedField(value, field)) ||
+    (hasDefinedField(value, 'persona') && !hasBrokerSelector)
+  );
+}
+
 const RuntimeSecretReferenceSchema = z
   .object({
     namespace: z.enum(['session', 'project', 'host-service']),
@@ -46,33 +73,46 @@ const ContainerRuntimeDescriptorSchema = z
           .array(z.object({ host: z.number().int(), container: z.number().int() }).strict())
           .optional(),
         restartPolicy: z.literal('unless-stopped').optional(),
-        // PRI-1790: forwarded verbatim to `docker create --sysctl key=value`.
+        // Forwarded verbatim to `docker create --sysctl key=value`.
         // Validated as opaque key/value pairs at this layer — the persona
         // schema enforces the dot-separated key shape upstream.
         sysctls: z.record(z.string(), z.string()).optional(),
-        // PRI-1919: forwarded to `docker create --cap-add <cap>` per entry.
+        // Forwarded to `docker create --cap-add <cap>` per entry.
         capAdd: z.array(z.string().min(1)).optional(),
-        // PRI-1919: forwarded to `docker create --network <name>`.
+        // Forwarded to `docker create --network <name>`.
         network: z.string().min(1).optional(),
-        // PRI-1919: IPv4 address of the egress gateway for the post-start
-        // netns-init sidecar. Validated as a non-empty string (loose IPv4).
+        // IPv4 address of the egress gateway broker. Validated as a
+        // non-empty string at this layer.
         gatewayRoute: z.string().min(1).optional(),
         // PRI-2002: when true, lace injects SEN_BROWSER_CDP_SOCKET + emits
         // browserCdpSocketPath for this quarantined browser-driver persona.
         browserCdpSocket: z.boolean().optional(),
-        // PRI-2012 B7 SELECTOR fields. The SpawnBrokerContainerRuntime client reads
-        // these at create() to format the wire spawn request. SELECTOR ONLY — never
-        // an authority source: the broker validates `persona` against its closed enum
-        // and rebuilds the FULL container spec from its own catalog using only
-        // persona. They MUST be allowed through this .strict() runtime-binding
-        // validator (they're on ContainerSpec/RuntimeSpec + the spec assembly); a
-        // strict reject here blocks EVERY container persona spawn (the B7-missed wire
-        // boundary — type was updated, this validator wasn't).
+        // Shared selector field. The privileged runtime re-validates it.
         persona: z.string().min(1).optional(),
+        // Spawn-broker selector fields. They MUST be allowed through this
+        // .strict() runtime-binding validator or broker round-trips fail.
         parentSessionId: z.string().min(1).optional(),
         childSessionId: z.string().min(1).optional(),
+        // Root A SELECTOR fields — carried for PlaneRuntime's create()->spawn.
+        // MUST be in this .strict() schema or a plane binding fails validation
+        // (bug-#7 class). SELECTOR ONLY; the plane re-validates persona.
+        parentSession: z.string().min(1).optional(),
+        childSession: z.string().min(1).optional(),
+        jobId: z.string().min(1).optional(),
       })
-      .strict(),
+      .strict()
+      .superRefine((spec, ctx) => {
+        const hasSelector = hasPlaneSelector(spec);
+        const hasAuthority = CONTAINER_AUTHORITY_FIELDS.some((field) =>
+          hasDefinedField(spec, field)
+        );
+        if (!hasSelector || !hasAuthority) return;
+
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Container selector fields cannot be combined with docker authority fields',
+        });
+      }),
     helper: z
       .object({
         mode: z.enum(['copy', 'mount', 'image']),
@@ -95,7 +135,7 @@ const RuntimeExecutionBindingSchema = z
       ContainerRuntimeDescriptorSchema,
     ]),
     // Present on persona container bindings; absent on host/bounded-host bindings.
-    // Lets post-exit handlers branch on lifecycle without inspecting toolRuntime (PRI-1796).
+    // Lets post-exit handlers branch on lifecycle without inspecting toolRuntime.
     containerSharing: z.enum(['per_invocation', 'persistent']).optional(),
   })
   .strict();

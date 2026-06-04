@@ -5,13 +5,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tmpdir } from 'node:os';
 import { DelegateTool } from '../delegate';
-import { _resetEnsuredThisSessionForTest } from '../scratch-gc-reminder';
 import { isSessionId } from '@lace/ent-protocol';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
-import type { ReminderScheduler } from '@lace/agent/reminders';
 
 describe('DelegateTool', () => {
   const runtimeBinding: RuntimeExecutionBinding = {
@@ -28,7 +26,6 @@ describe('DelegateTool', () => {
     scratchBase = fs.mkdtempSync(path.join(tmpdir(), 'lace-d3-test-'));
     originalLaceWorkDir = process.env.LACE_WORK_DIR;
     process.env.LACE_WORK_DIR = scratchBase;
-    _resetEnsuredThisSessionForTest();
   });
 
   afterEach(() => {
@@ -191,7 +188,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -239,7 +236,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'sen-box:dev',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -290,7 +287,7 @@ describe('DelegateTool', () => {
             containerSharing: 'persistent',
             image: 'example/sen-box@sha256:' + 'a'.repeat(64),
             workingDirectory: '/home/agent',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -321,8 +318,12 @@ describe('DelegateTool', () => {
     const options = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect((options.runtimeBinding as RuntimeExecutionBinding).toolRuntime).toMatchObject({
       type: 'container',
-      spec: { name: 'box-shell', containerId: 'sen-box-shell', restartPolicy: 'unless-stopped' },
+      spec: { name: 'box-shell', persona: 'box-shell' },
     });
+    const containerRuntime = (options.runtimeBinding as RuntimeExecutionBinding)
+      .toolRuntime as Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>;
+    expect(containerRuntime.spec.containerId).toBe('sen-box-shell');
+    expect(containerRuntime.spec.restartPolicy).toBe('unless-stopped');
   });
 
   it('uses containerMounts from context when building projected binding', async () => {
@@ -336,7 +337,7 @@ describe('DelegateTool', () => {
             containerSharing: 'persistent',
             image: 'example/subagent@sha256:' + 'a'.repeat(64),
             workingDirectory: '/work',
-            mounts: { data: '/work' },
+            mounts: ['data'],
             env: {},
           },
         },
@@ -364,7 +365,9 @@ describe('DelegateTool', () => {
         signal: new AbortController().signal,
         jobManager,
         runtimeBinding,
-        containerMounts: { data: { hostPath: '/host/data', readonly: false } },
+        containerMounts: {
+          data: { hostPath: '/host/data', containerPath: '/work', readonly: false },
+        },
       }
     );
 
@@ -473,7 +476,7 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796 per_invocation response shape tests
+  // per_invocation response shape tests
   // ---------------------------------------------------------------------------
 
   it('background per_invocation response includes subagentSessionId and scratchDir', async () => {
@@ -485,7 +488,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -540,7 +543,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -594,7 +597,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -669,7 +672,7 @@ describe('DelegateTool', () => {
             containerSharing: 'persistent',
             image: 'example/sen-box:latest',
             workingDirectory: '/home/agent',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -713,7 +716,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -752,250 +755,7 @@ describe('DelegateTool', () => {
     expect(opts.newSubagentSessionId).toBeUndefined();
   });
 
-  // ---------------------------------------------------------------------------
-  // GC-1: After per_invocation delegate, GC reminder is scheduled
-  // ---------------------------------------------------------------------------
-  it('GC-1: per_invocation delegate schedules scratch GC reminder', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: {},
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
-
-    const mockJob = {
-      jobId: 'job_gc1',
-      type: 'delegate' as const,
-      status: 'running' as const,
-      completion: new Promise<void>(() => {}),
-    } as unknown as JobState;
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_gc1', job: mockJob });
-    const jobManager = {
-      createJob,
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    // Create a temp dir for the reminder store
-    const reminderDir = fs.mkdtempSync(path.join(tmpdir(), 'lace-reminders-'));
-    try {
-      const { ReminderScheduler } = await import('@lace/agent/reminders');
-      const reminderScheduler = new ReminderScheduler({
-        sessionDir: reminderDir,
-        now: () => Date.now(),
-        notifier: vi.fn(),
-      });
-
-      await tool.execute(
-        { prompt: 'gc1 work', background: true, persona: 'inv-persona' },
-        {
-          signal: new AbortController().signal,
-          jobManager,
-          runtimeBinding,
-          activeSessionId: 'sess_gc1',
-          reminderScheduler,
-        }
-      );
-
-      const reminders = reminderScheduler.store.list();
-      const gcReminder = reminders.find((r) => r.prompt.startsWith('<scratch-gc>'));
-      expect(gcReminder).toBeDefined();
-      expect(gcReminder?.recurs).toEqual({ kind: 'cron', expr: '0 6 * * *' });
-    } finally {
-      fs.rmSync(reminderDir, { recursive: true, force: true });
-    }
-  });
-
-  // ---------------------------------------------------------------------------
-  // GC-2: Two per_invocation delegates in the same session = exactly one reminder
-  // ---------------------------------------------------------------------------
-  it('GC-2: two per_invocation delegates in same session schedule exactly one GC reminder', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: {},
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
-
-    const mkMockJob = (id: string): JobState =>
-      ({
-        jobId: id,
-        type: 'delegate' as const,
-        status: 'running' as const,
-        completion: new Promise<void>(() => {}),
-      }) as unknown as JobState;
-
-    const createJob = vi
-      .fn()
-      .mockResolvedValueOnce({ jobId: 'job_gc2a', job: mkMockJob('job_gc2a') })
-      .mockResolvedValueOnce({ jobId: 'job_gc2b', job: mkMockJob('job_gc2b') });
-    const jobManager = {
-      createJob,
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    const reminderDir = fs.mkdtempSync(path.join(tmpdir(), 'lace-reminders-gc2-'));
-    try {
-      const { ReminderScheduler } = await import('@lace/agent/reminders');
-      const reminderScheduler = new ReminderScheduler({
-        sessionDir: reminderDir,
-        now: () => Date.now(),
-        notifier: vi.fn(),
-      });
-
-      const ctx = {
-        signal: new AbortController().signal,
-        jobManager,
-        runtimeBinding,
-        activeSessionId: 'sess_gc2',
-        reminderScheduler,
-      };
-
-      await tool.execute({ prompt: 'first', background: true, persona: 'inv-persona' }, ctx);
-      await tool.execute({ prompt: 'second', background: true, persona: 'inv-persona' }, ctx);
-
-      const gcReminders = reminderScheduler.store
-        .list()
-        .filter((r) => r.prompt.startsWith('<scratch-gc>'));
-      expect(gcReminders).toHaveLength(1);
-    } finally {
-      fs.rmSync(reminderDir, { recursive: true, force: true });
-    }
-  });
-
-  // ---------------------------------------------------------------------------
-  // GC-3: Scheduler throws — delegate still succeeds
-  // ---------------------------------------------------------------------------
-  it('GC-3: scheduler failure does not block delegate', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: {},
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
-
-    const mockJob = {
-      jobId: 'job_gc3',
-      type: 'delegate' as const,
-      status: 'running' as const,
-      completion: new Promise<void>(() => {}),
-    } as unknown as JobState;
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_gc3', job: mockJob });
-    const jobManager = {
-      createJob,
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    // Fake scheduler that throws on schedule()
-    const fakeScheduler = {
-      store: { list: vi.fn().mockReturnValue([]) },
-      schedule: vi.fn().mockRejectedValue(new Error('scheduler unavailable')),
-    } as unknown as ReminderScheduler;
-
-    const result = await tool.execute(
-      { prompt: 'gc3 work', background: true, persona: 'inv-persona' },
-      {
-        signal: new AbortController().signal,
-        jobManager,
-        runtimeBinding,
-        activeSessionId: 'sess_gc3',
-        reminderScheduler: fakeScheduler,
-      }
-    );
-
-    // Delegate must still succeed
-    expect(result.status).toBe('completed');
-    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
-    expect(body.jobId).toBe('job_gc3');
-    expect(body.status).toBe('started');
-  });
-
-  // ---------------------------------------------------------------------------
-  // GC-4: Persistent persona — GC reminder NOT scheduled
-  // ---------------------------------------------------------------------------
-  it('GC-4: persistent persona does not schedule GC reminder', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'persistent',
-            image: 'example/sen-box:latest',
-            workingDirectory: '/home/agent',
-            mounts: {},
-            env: {},
-          },
-        },
-        body: 'persistent persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
-
-    const mockJob = {
-      jobId: 'job_gc4',
-      type: 'delegate' as const,
-      status: 'running' as const,
-      completion: new Promise<void>(() => {}),
-    } as unknown as JobState;
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_gc4', job: mockJob });
-    const jobManager = {
-      createJob,
-      listJobs: vi.fn().mockReturnValue([]),
-    } as unknown as JobManager;
-
-    const fakeScheduler = {
-      store: { list: vi.fn().mockReturnValue([]) },
-      schedule: vi.fn(),
-    } as unknown as ReminderScheduler;
-
-    await tool.execute(
-      { prompt: 'gc4 work', background: true, persona: 'box-shell' },
-      {
-        signal: new AbortController().signal,
-        jobManager,
-        runtimeBinding,
-        activeSessionId: 'sess_gc4',
-        reminderScheduler: fakeScheduler,
-      }
-    );
-
-    expect(fakeScheduler.schedule).not.toHaveBeenCalled();
-  });
-
-  // PRI-1796 Chunk E: reaper cancel wiring
+  // reaper cancel wiring
   describe('per_invocation reaper cancel wiring', () => {
     function makePerInvocationPersonaRegistry(): PersonaRegistry {
       return {
@@ -1006,7 +766,7 @@ describe('DelegateTool', () => {
               containerSharing: 'per_invocation',
               image: 'example/subagent:latest',
               workingDirectory: '/workspace',
-              mounts: {},
+              mounts: [],
               env: {},
             },
           },
@@ -1142,7 +902,7 @@ describe('DelegateTool', () => {
               containerSharing: 'persistent',
               image: 'example/sen-box:latest',
               workingDirectory: '/home/agent',
-              mounts: {},
+              mounts: [],
               env: {},
             },
           },
@@ -1183,7 +943,7 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796: minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
+  // minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
   // ---------------------------------------------------------------------------
   it('mints childSessionId in SessionIdSchema format (hyphenated UUID)', async () => {
     const personaRegistry = {
@@ -1194,7 +954,7 @@ describe('DelegateTool', () => {
             containerSharing: 'per_invocation',
             image: 'example/subagent:latest',
             workingDirectory: '/workspace',
-            mounts: {},
+            mounts: [],
             env: {},
           },
         },
@@ -1235,7 +995,7 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // PRI-1796 Chunk F: PersonaSharingViolationError propagation
+  // PersonaSharingViolationError propagation
   // ---------------------------------------------------------------------------
   it('delegate fails with PersonaSharingViolationError when per_invocation persona conflicts with persistent', async () => {
     // box-shell: persistent with mounts.home
@@ -1250,7 +1010,7 @@ describe('DelegateTool', () => {
                 containerSharing: 'persistent',
                 image: 'img:latest',
                 workingDirectory: '/home',
-                mounts: { home: '/home' },
+                mounts: ['home'],
                 env: {},
               },
             },
@@ -1265,7 +1025,7 @@ describe('DelegateTool', () => {
               containerSharing: 'per_invocation',
               image: 'img:latest',
               workingDirectory: '/shared',
-              mounts: { home: '/shared' },
+              mounts: ['home'],
               env: {},
             },
           },

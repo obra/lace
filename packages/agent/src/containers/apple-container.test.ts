@@ -9,8 +9,9 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { v4 as uuidv4 } from 'uuid';
 
-// AppleContainerRuntime shells out to the macOS-only `container` CLI; on any
-// other platform the CLI is absent and these integration tests cannot run.
+// The Apple `container` runtime only exists on macOS; on Linux (CI, embedder
+// hosts) `container system start` fails. Guard the whole suite to darwin —
+// mirrors apple-container.integration.test.ts's APPLE_CONTAINER_AVAILABLE gate.
 const isDarwin = process.platform === 'darwin';
 
 describe.skipIf(!isDarwin)('AppleContainerRuntime', () => {
@@ -74,25 +75,6 @@ describe.skipIf(!isDarwin)('AppleContainerRuntime', () => {
       // Container ID should start with the provided ID but have a unique suffix
       expect(containerId).toMatch(/^test-container-123-[a-f0-9]{8}$/);
     });
-
-    it('should register mounts correctly', () => {
-      const config: ContainerConfig = {
-        id: 'mount-test',
-        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
-        workingDirectory: testDir,
-        mounts: [
-          { source: testDir, target: '/workspace', readonly: false },
-          { source: '/tmp', target: '/tmp', readonly: true },
-        ],
-      };
-
-      const containerId = runtime.create(config);
-      createdContainers.push(containerId);
-
-      // Test path translation
-      const containerPath = runtime.translateToContainer(join(testDir, 'file.txt'), containerId);
-      expect(containerPath).toBe('/workspace/file.txt');
-    });
   });
 
   describe('lifecycle', () => {
@@ -138,48 +120,6 @@ describe.skipIf(!isDarwin)('AppleContainerRuntime', () => {
           command: ['echo', 'test'],
         })
       ).rejects.toThrow(ContainerError);
-    });
-  });
-
-  describe('path translation', () => {
-    it('should correctly translate paths between host and container', () => {
-      const projectDir = join(testDir, 'project');
-      const dataDir = join(testDir, 'data');
-      mkdirSync(projectDir, { recursive: true });
-      mkdirSync(dataDir, { recursive: true });
-
-      const config: ContainerConfig = {
-        id: 'path-test',
-        image: 'mcr.microsoft.com/devcontainers/base:ubuntu',
-        workingDirectory: '/workspace',
-        mounts: [
-          { source: projectDir, target: '/workspace', readonly: false },
-          { source: dataDir, target: '/data', readonly: true },
-        ],
-      };
-
-      const containerId = runtime.create(config);
-      createdContainers.push(containerId);
-
-      // Host to container
-      expect(runtime.translateToContainer(join(projectDir, 'src/index.ts'), containerId)).toBe(
-        '/workspace/src/index.ts'
-      );
-      expect(runtime.translateToContainer(join(dataDir, 'config.json'), containerId)).toBe(
-        '/data/config.json'
-      );
-
-      // Container to host
-      expect(runtime.translateToHost('/workspace/src/index.ts', containerId)).toBe(
-        join(projectDir, 'src/index.ts')
-      );
-      expect(runtime.translateToHost('/data/config.json', containerId)).toBe(
-        join(dataDir, 'config.json')
-      );
-
-      // Unmounted paths
-      expect(runtime.translateToContainer('/other/path', containerId)).toBe('/other/path');
-      expect(runtime.translateToHost('/unmounted/path', containerId)).toBe('/unmounted/path');
     });
   });
 

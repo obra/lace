@@ -1,4 +1,4 @@
-// ABOUTME: Captures baseline persona renders for the PRI-1674 @path migration scenario test.
+// ABOUTME: Captures baseline persona renders for the @path migration scenario test.
 // ABOUTME: Renders each bundled persona with a fixed empty context and writes the bytes to disk.
 
 import * as fs from 'fs';

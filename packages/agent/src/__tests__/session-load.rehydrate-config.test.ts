@@ -145,7 +145,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(loadState.config.modelId).toBe('model_test');
     // session/load applies the embedder's mcpServers authoritatively: entries
     // present in the loaded state but absent from the incoming list are
-    // removed (see PRI-1754). 'initial' came from session/new and is
+    // removed. 'initial' came from session/new and is
     // embedder-owned, so it gets replaced by 'loaded'.
     expect(loadState.activeSession?.state.config?.mcpServers).toEqual([
       {
@@ -1388,7 +1388,7 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     }
   );
 
-  it('removes embedder-owned mcp servers absent from the resume mcpServers list (PRI-1754)', async () => {
+  it('removes embedder-owned mcp servers absent from the resume mcpServers list', async () => {
     // Reproduces the production bug: a session was created when the embedder's
     // mcpServers list still included an entry (here, "scheduler"). After the
     // embedder later removes that entry, session/resume should drop it from

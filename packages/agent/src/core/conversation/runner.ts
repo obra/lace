@@ -45,15 +45,21 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
-import { computePressure, shouldFireCompaction } from './compaction-trigger';
-import { compact } from '@lace/agent/compaction/track-compaction';
+import { computePressure, evaluateBreakpoints } from './compaction-trigger';
+import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import {
+  compactionStrategyNameForSession,
+  compactionBreakpointsForSession,
+} from '@lace/agent/compaction/select';
+import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
+import { injectNotification } from '@lace/agent/notifications/inject-notification';
 
 /**
  * Non-enumerable sentinel applied to errors thrown out of `executeToolCall`.
  * Lets `mapErrorToStopReason` distinguish a tool throw from a provider throw
  * without inspecting the loop's lexical state. The field is non-enumerable so
- * it doesn't pollute JSON serialization of the error. See PRI-1818.
+ * it doesn't pollute JSON serialization of the error.
  */
 const PHASE_TOOL = 'tool';
 const PHASE_KEY = '__lacePhase';
@@ -229,6 +235,8 @@ const FUTURE_TENSE_INTENT_PATTERN =
  */
 const MAX_PAUSE_RESUMES = 10;
 
+const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
+
 function hasFutureTenseIntent(text: string): boolean {
   if (!text) return false;
   return FUTURE_TENSE_INTENT_PATTERN.test(text);
@@ -253,7 +261,7 @@ function extractInjectedText(content: unknown): string {
  * Read durable events newer than `afterEventSeq` and return any
  * priority='immediate' context_injected events plus the highest eventSeq seen.
  *
- * Existed because of PRI-1691: a sessionPrompt can be in flight while a peer
+ * A sessionPrompt can be in flight while a peer
  * calls ent/session/inject, which writes a context_injected event with
  * priority='immediate'. Without this re-read, the runner would only pick that
  * event up on the NEXT turn — functionally identical to queueing.
@@ -383,7 +391,7 @@ export class ConversationRunner {
     const provider = await this.deps.createProvider();
     const modelPricing = await this.deps.getModelPricing();
 
-    // Track token usage across the turn. PRI-1817: track all four Anthropic
+    // Track token usage across the turn. Track all four Anthropic
     // categories so events.jsonl carries the full breakdown — without
     // cache_creation/cache_read, cost reconstruction from disk under-counts
     // by ~70% on heavily-cached workloads.
@@ -424,12 +432,12 @@ export class ConversationRunner {
     // We start from the last turn_end rather than the very latest event so that
     // any context_injected events written between turns (after turn_end but
     // before run() was called) are picked up on the first iteration, not
-    // silently skipped (PRI-1744).
+    // silently skipped.
     let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
-    // PRI-1818: captured by the outer catch and rethrown after the finally
+    // Captured by the outer catch and rethrown after the finally
     // block so the turn_end write always runs. `undefined` means the loop
     // completed cleanly and there is nothing to rethrow.
     let caughtError: unknown;
@@ -463,9 +471,15 @@ export class ConversationRunner {
     let partialAssistantText = '';
     let pauseResumeCount = 0;
 
+    // Per-turn compaction request cell. compact_session mutates this during
+    // tool execution; the post-turn block reads it to decide whether to fire.
+    // A single shared object is used so the tool (which receives the same
+    // reference via ToolContext) mutates the runner's local state in place.
+    const compactionRequest: { requested: boolean; guidance?: string } = { requested: false };
+
     try {
       for (; completedTurns < maxTurns; completedTurns++) {
-        // PRI-1691: pick up any priority='immediate' context_injected events
+        // Pick up any priority='immediate' context_injected events
         // that landed since we last looked. These come from ent/session/inject
         // RPCs fired by peers while this turn is in flight; without this
         // re-read they would not be visible until the next sessionPrompt.
@@ -479,7 +493,7 @@ export class ConversationRunner {
         lastSeenEventSeq = newWatermark;
 
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
-        // stuck loops. PRI-1804 #4 (revised after adversarial review): push
+        // stuck loops. Revised after adversarial review: push
         // the reminder into providerMessages in-memory ONLY. Do NOT persist
         // it as a context_injected event — persisting caused the next
         // iteration's readImmediateInjectsSince to re-read and re-append
@@ -637,7 +651,7 @@ export class ConversationRunner {
           lastCallCacheCreationInputTokens = cacheCreationInputTokens;
           lastCallCacheReadInputTokens = cacheReadInputTokens;
 
-          // PRI-1817: real cache-aware cost. Anthropic bills cache_creation
+          // Real cache-aware cost. Anthropic bills cache_creation
           // at a premium over base input, cache_read at a steep discount.
           // Pre-cache-aware code computed `input * costPer1mIn` only, which
           // happens to coincide with reality on the cold-cache path but
@@ -918,9 +932,10 @@ export class ConversationRunner {
                 sessionId,
                 runtimeBinding,
                 writeAndAdvance,
+                compactionRequest,
               });
             } catch (toolErr) {
-              // PRI-1818: log at ERROR with toolName + toolCallId so the next
+              // Log at ERROR with toolName + toolCallId so the next
               // occurrence of message_then_no_tool_use surfaces in agent.log
               // (the 19 Ada cases had no error logged at all — the throw was
               // entirely silent). The outer catch + finally then produce the
@@ -971,7 +986,7 @@ export class ConversationRunner {
         stopReason = 'cancelled';
       }
     } catch (loopError) {
-      // PRI-1818: never let a throw skip the turn_end write. Capture the
+      // Never let a throw skip the turn_end write. Capture the
       // error, derive a fine-grained stopReason from it, and let the finally
       // block close out the durable log. The error is rethrown after the
       // finally so callers (prompt.ts, the job layer, SDK consumers) still
@@ -1010,7 +1025,7 @@ export class ConversationRunner {
       // The turn_end write itself is wrapped because the process may be in a
       // degraded state (disk full, mutex stuck, parent crashed). Losing the
       // write is bad but recoverable on next session-open by the crash-
-      // recovery scan (PRI-1818 #3); throwing here would shadow the caught
+      // recovery scan; throwing here would shadow the caught
       // error.
       try {
         await writeAndAdvance({
@@ -1040,12 +1055,13 @@ export class ConversationRunner {
         });
       }
 
-      // Track-based compaction trigger. Runs synchronously in the runner's
-      // finally block after the turn_end write. Uses the raw
-      // appendDurableEvent + writeSessionState path (no writeAndAdvance) so
-      // we don't acquire a nested runExclusive lock and deadlock.
-      // Failures are logged but never abort the turn — pressure stays high and
-      // the next clean turn re-evaluates.
+      // Compaction trigger. Runs synchronously in the runner's finally block
+      // after the turn_end write. Uses the raw appendDurableEvent +
+      // writeSessionState path (no writeAndAdvance) so we don't acquire a
+      // nested runExclusive lock and deadlock. Failures are logged but never
+      // abort the turn — pressure stays high and the next clean turn
+      // re-evaluates. The clean-stop-reason gate below (compactionRequest gate
+      // skips it) mirrors the prior shouldFireCompaction gate.
       try {
         const usage = {
           inputTokens: totalInputTokens,
@@ -1058,18 +1074,81 @@ export class ConversationRunner {
         };
         const contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
         const pressure = computePressure(usage, contextWindowSize);
-        if (shouldFireCompaction({ stopReason, pressure })) {
+
+        const isCleanStop = CLEAN_STOP_REASONS.has(stopReason);
+
+        // Evaluate persona breakpoints (only on clean stops; compactionRequest
+        // bypasses the clean-stop gate entirely so the agent can explicitly
+        // request compaction at any stop reason).
+        let breakpointCompactCrossed = false;
+        if (isCleanStop) {
+          const breakpoints = compactionBreakpointsForSession(sessionDir);
+          const currentHighestFiredAt = readSessionState(sessionDir).highestFiredBreakpointAt ?? 0;
+          const ev = evaluateBreakpoints({
+            pressure,
+            breakpoints,
+            highestFiredAt: currentHighestFiredAt,
+          });
+
+          if (ev.reset) {
+            // Pressure has dropped below all breakpoints: reset once-per-crossing state
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              writeSessionState(sessionDir, { ...sessionState, highestFiredBreakpointAt: 0 });
+            });
+          } else if (ev.fire?.action === 'notify') {
+            // Notify action: inject a notification and persist the crossed level
+            const pressurePct = Math.round(pressure * 100);
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              injectNotification({
+                sessionDir,
+                kind: 'compaction-pressure',
+                attributes: { pressure: pressurePct },
+                body: `Context window is ${pressurePct}% full. Consider wrapping up your current task or calling compact_session to compress the conversation history.`,
+              });
+              writeSessionState(sessionDir, {
+                ...sessionState,
+                highestFiredBreakpointAt: ev.nextHighestFiredAt,
+              });
+            });
+          } else if (ev.fire?.action === 'compact') {
+            breakpointCompactCrossed = true;
+            // Persist the new highestFiredBreakpointAt — the compact path below
+            // will read and write state under its own runExclusive.
+            await this.deps.runExclusive(() => {
+              const sessionState = readSessionState(sessionDir);
+              writeSessionState(sessionDir, {
+                ...sessionState,
+                highestFiredBreakpointAt: ev.nextHighestFiredAt,
+              });
+            });
+          }
+        }
+
+        if (compactionRequest.requested || breakpointCompactCrossed) {
           const allEvents = readDurableEvents(sessionDir, {
             limit: Number.MAX_SAFE_INTEGER,
           }).events;
-          const result = await compact(
+          const strategy = resolveCompactionStrategy(
+            this.config.persona ? compactionStrategyNameForSession(sessionDir) : 'track-based'
+          );
+          const compactionCtx = buildCompactionContext({
+            threadId: sessionId,
+            sessionDir,
+            connectionId: this.config.connectionId,
+            modelId: modelId ?? undefined,
+            guidance: compactionRequest.guidance,
+          });
+          const raw = await strategy.compact(
             // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
             // is the typed union. The shapes are identical on disk — this cast is
             // safe because the event-log writer and event-types agree on the wire
             // format.
             allEvents as unknown as TypedDurableEvent[],
-            { threadId: sessionId, provider, modelId: modelId ?? undefined }
+            compactionCtx
           );
+          const result = validatePreserved(raw);
           if (!('noop' in result)) {
             await this.deps.runExclusive(() => {
               const sessionState = readSessionState(sessionDir);
@@ -1084,7 +1163,7 @@ export class ConversationRunner {
           }
         }
       } catch (compactionErr) {
-        logger.error('runner: track-based compaction failed', {
+        logger.error('runner: compaction failed', {
           err: compactionErr instanceof Error ? compactionErr.message : String(compactionErr),
           turnId,
           stopReason,
@@ -1142,6 +1221,7 @@ export class ConversationRunner {
     sessionId: string;
     runtimeBinding: RuntimeExecutionBinding;
     writeAndAdvance: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
+    compactionRequest: { requested: boolean; guidance?: string };
   }): Promise<{
     streamTurnSeq: number;
     coreResult: CoreToolResult;
@@ -1168,6 +1248,7 @@ export class ConversationRunner {
       sessionId,
       runtimeBinding,
       writeAndAdvance,
+      compactionRequest,
     } = params;
     const { toolExecutor } = params;
     let { streamTurnSeq } = params;
@@ -1328,7 +1409,7 @@ export class ConversationRunner {
       }
 
       const { command, description, progressIntervalMs } = parsedBashInput.data;
-      // Forward operator-configured progressIntervalMs (PRI-1707) — without
+      // Forward operator-configured progressIntervalMs — without
       // this, the bash tool's schema-documented progressIntervalMs is
       // silently dropped here and the job's progress timer never arms.
       const { jobId } = await this.deps.startShellJob({
@@ -1512,6 +1593,7 @@ export class ConversationRunner {
       abortController,
       turnId,
       runtimeBinding,
+      compactionRequest,
     });
 
     const protocolResult = protocolToolResultFromCore(coreResult);
@@ -1588,6 +1670,7 @@ export class ConversationRunner {
     abortController: AbortController;
     turnId: string;
     runtimeBinding: RuntimeExecutionBinding;
+    compactionRequest: { requested: boolean; guidance?: string };
   }): Promise<CoreToolResult> {
     const {
       toolName,
@@ -1602,6 +1685,7 @@ export class ConversationRunner {
       abortController,
       turnId,
       runtimeBinding,
+      compactionRequest,
     } = params;
 
     // Note: bash with background=true is handled before permission check and never reaches here.
@@ -1650,6 +1734,7 @@ export class ConversationRunner {
         turnSeq: toolTurnSeq,
         ...(this.deps.reminderScheduler ? { reminderScheduler: this.deps.reminderScheduler } : {}),
         ...(this.deps.activeSessionId ? { activeSessionId: this.deps.activeSessionId } : {}),
+        ...(this.config.persona ? { persona: this.config.persona } : {}),
         activeSessionDir: this.config.sessionDir,
         ...(this.deps.containerMounts ? { containerMounts: this.deps.containerMounts } : {}),
         ...(this.deps.containerExecutionIdentity
@@ -1658,6 +1743,7 @@ export class ConversationRunner {
         ...(this.deps.perInvocationReaper
           ? { perInvocationReaper: this.deps.perInvocationReaper }
           : {}),
+        compactionRequest,
       }
     );
   }

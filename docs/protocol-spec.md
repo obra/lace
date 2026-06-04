@@ -1406,6 +1406,12 @@ capabilities (tools, slash commands, subagents, hooks, MCP servers, etc.).
 This is intentionally generic ("extensions"), so different agent runtimes can
 map their own packaging systems (e.g., plugins) onto the same protocol surface.
 
+> **Note:** lace's own plugin system (the `LACE_PLUGINS` loader, see
+> [Plugin System Reference](reference/plugins.md)) is **boot-time and not runtime
+> toggleable** — it does not implement `ent/extensions/enable`/`disable`. These
+> verbs are a generic protocol surface for runtimes that do offer runtime
+> extension control; do not assume they drive the `LACE_PLUGINS` loader.
+
 ```typescript
 // Request
 {

@@ -175,7 +175,7 @@ describe('OpenAIProvider', () => {
       ]);
     });
 
-    it('should use setSystemPrompt as system message and ignore role:system messages in input (PRI-1804 invariant)', async () => {
+    it('should use setSystemPrompt as system message and ignore role:system messages in input', async () => {
       // setSystemPrompt('Test system prompt') was called in beforeEach.
       // role:system messages in the input are ignored by getEffectiveSystemPrompt;
       // only the value set via setSystemPrompt() is used.

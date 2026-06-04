@@ -30,43 +30,44 @@ export interface ContainerSpec {
   // after a broker restart.
   labels?: Record<string, string>;
 
-  // PRI-2012 spawn-broker SELECTOR fields. The SpawnBrokerContainerRuntime client
-  // uses these to format the wire spawn request `{persona, parentSessionId,
-  // childSessionId, jobId}`. They are a SELECTOR ONLY — never an authority source:
-  // the broker validates `persona` against its closed enum and rebuilds the FULL
-  // ContainerConfig from its OWN catalog using only `persona` as input, so these
-  // fields grant NO privilege broker-side. The docker/apple runtimes ignore them
-  // (they build the container locally). `persona` is a string here (not PersonaName)
-  // to avoid an import cycle; the broker enforces the enum at the wire boundary.
+  // Shared selector field. It is a selector only, never an authority source:
+  // the privileged runtime validates it and rebuilds the full container spec.
   persona?: string;
+
+  // Spawn-broker selector fields. The SpawnBrokerContainerRuntime client uses
+  // these to format its `{persona,parentSessionId,childSessionId,jobId}` wire
+  // request. Docker/apple runtimes ignore them.
   parentSessionId?: string;
   childSessionId?: string;
+
+  // PlaneRuntime selector fields. Its create() emits the closed
+  // `spawn <persona> <parent> <child> <jobId>` command. Docker/apple runtimes
+  // ignore them.
+  parentSession?: string;
+  childSession?: string;
+  jobId?: string;
   ports?: PortMapping[];
   // Verbatim container id used by the daemon. When set, ContainerManager
   // bypasses the `lace-` prefix and uses this id directly. Used by the box
-  // runtime so the daemon-side container id (e.g. `sen-box-shell`) is stable
-  // across agent restarts and avoids the startup reaper's `lace-` scan.
+  // runtime so the daemon-side container id is stable across agent restarts
+  // and avoids the startup reaper's `lace-` scan.
   containerId?: string;
   // Forwarded to ContainerConfig.restartPolicy. Used by boxes so the daemon
   // auto-restarts them after host reboot.
   restartPolicy?: 'unless-stopped';
   // Linux kernel sysctls forwarded to `docker create --sysctl key=value`.
-  // Personas declare these in `runtime.sysctls`; PRI-1790 added support so
-  // sen-browser can enable `net.ipv6.conf.lo.disable_ipv6=0` for the chrome
-  // launcher's port-availability check.
+  // Personas declare these in `runtime.sysctls`; the browser persona may need
+  // `net.ipv6.conf.lo.disable_ipv6=0` for the chrome launcher's port-availability check.
   sysctls?: Record<string, string>;
 
   // Linux capabilities forwarded to `docker create --cap-add <cap>` per entry.
-  // PRI-1919: persona containers need NET_ADMIN to replace the default route
-  // via the transparent egress gateway.
+  // Used by direct docker container specs that need extra kernel authority.
   capAdd?: string[];
 
   // Docker network name forwarded to `docker create --network <name>`.
-  // PRI-1919: persona containers join the quarantine network.
   network?: string;
 
-  // IPv4 address of the egress gateway. When set, a privileged one-shot sidecar
-  // sets the persona's default route after `docker start`. PRI-1919.
+  // IPv4 address of the egress gateway broker.
   gatewayRoute?: string;
 
   // PRI-2002: when true, this is a quarantined browser-driver spec. The

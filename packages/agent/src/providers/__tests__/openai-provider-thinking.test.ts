@@ -155,7 +155,7 @@ describe('OpenAIProvider thinking events', () => {
   });
 
   describe('system prompt handling (Responses API path)', () => {
-    it('uses _systemPrompt (set via setSystemPrompt) and ignores role:system messages in input (PRI-1804 invariant)', async () => {
+    it('uses _systemPrompt (set via setSystemPrompt) and ignores role:system messages in input', async () => {
       // The system prompt is set once at session start via setSystemPrompt() (done in
       // beforeEach). role:system messages in the input are ignored — the invariant
       // ensures the system prompt is byte-stable for the session, keeping the

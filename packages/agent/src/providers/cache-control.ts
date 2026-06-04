@@ -11,19 +11,19 @@ import type Anthropic from '@anthropic-ai/sdk';
 export const MAX_CACHE_BREAKPOINTS = 4;
 
 // Anthropic's cache lookup window is ~20 raw content blocks per breakpoint.
-// PRI-1805: the offset is in **raw** blocks, not cacheable-only — thinking
+// The offset is in **raw** blocks, not cacheable-only — thinking
 // blocks count toward the lookback budget even though we never stamp them.
 // Placing the anchor 10 raw blocks behind the tail keeps both markers
 // reachable from the next request's breakpoints for turn growth Δ ≤ 10
 // blocks via the tail path AND extends reachability to Δ ≤ 30 via the
-// anchor path. See PRI-1805 description for the derivation.
+// anchor path.
 export const ANCHOR_OFFSET_RAW_BLOCKS = 10;
 
 // Whitelist of block types that accept `cache_control` AND are sensible
-// breakpoint targets. PRI-1806 #5: only stamp types confirmed by the SDK
+// breakpoint targets. Only stamp types confirmed by the SDK
 // type definitions to carry cache_control; refuse unknown types rather than
 // silently stamping them.
-// PRI-1806 #5 follow-up: SDK 0.60 confirms server_tool_use,
+// SDK 0.60 confirms server_tool_use,
 // web_search_tool_result, and search_result accept cache_control too.
 const CACHEABLE_BLOCK_TYPES: ReadonlySet<string> = new Set([
   'text',
@@ -270,9 +270,8 @@ export function enforceBreakpointBudget(payload: {
   const total = countCacheBreakpoints(payload);
   if (total <= MAX_CACHE_BREAKPOINTS) return payload.messages;
 
-  // PRI-1806 #1 (revised after adversarial review): strip NEWEST message
-  // markers first so the stable anchor (oldest) survives. The anchor is
-  // expensive to position (PRI-1805 raw-block math) and exists specifically
+  // Strip NEWEST message markers first so the stable anchor (oldest) survives.
+  // The anchor is expensive to position (raw-block math) and exists specifically
   // to defeat Anthropic's 20-block lookback. The rolling tail is
   // regenerated on every turn and cheap to lose.
   let toDrop = total - MAX_CACHE_BREAKPOINTS;

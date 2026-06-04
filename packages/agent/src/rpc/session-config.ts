@@ -105,9 +105,9 @@ export function tagMcpServers(
  * with user entries winning on name collision so operator intent isn't
  * silently overwritten by an embedder restart.
  *
- * This is the merge used by session/load and session/resume — see PRI-1754
- * for the bug union semantics caused: a since-deleted embedder MCP server
- * stuck around in state.json and lace tried to spawn its missing command.
+ * This is the merge used by session/load and session/resume — the bug it fixed:
+ * a since-deleted embedder MCP server stuck around in state.json and lace tried
+ * to spawn its missing command.
  */
 export function applyEmbedderMcpServers(existing: unknown, incoming: unknown): StoredMcpServer[] {
   const incomingServers = defaultMcpServerPlacements(validateIncomingMcpServers(incoming));

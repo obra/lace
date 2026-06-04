@@ -23,7 +23,7 @@ describe('lace-agent subagent early-stop bug (kata #31)', () => {
     { timeout: 20_000 },
     async () => {
       // Write a user persona whose toolScope includes file_read but has a
-      // narrow scope overall. With verbatim-allowlist semantics (PRI-1900),
+      // narrow scope overall. With verbatim-allowlist semantics,
       // tools: is the complete set — personas must explicitly list every tool
       // they need, including builtins. The kata-#31 regression is that
       // subagents stop after a single turn when a toolScope is present; the

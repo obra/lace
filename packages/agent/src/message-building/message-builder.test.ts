@@ -237,7 +237,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_result recovery
   });
 });
 
-describe('buildProviderMessagesFromDurableEvents — orphan tool_use recovery (PRI-1820)', () => {
+describe('buildProviderMessagesFromDurableEvents — orphan tool_use recovery', () => {
   let tempDir: string;
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -252,7 +252,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_use recovery (P
   });
 
   it('drops an assistant tool_use whose id has no matching following user tool_result', () => {
-    // Mirrors the Ada bricking case (PRI-1820): the matching tool_result was
+    // Mirrors the Ada bricking case: the matching tool_result was
     // compacted away, leaving an assistant message carrying an orphan tool_use
     // that Anthropic 400s on with "tool_use ids were found without tool_result
     // blocks immediately after".
@@ -497,7 +497,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_use recovery (P
 
   it('reproduces the Ada bricking shape (toolu_01NK38wAMjBA3eJc76cCBfNj) and strips it', () => {
     // The exact toolu id from the Ada incident that drove 38/78 unmatched
-    // turn_starts on 2026-05-24 (PRI-1820 / PRI-1818 #5). The orphan tool_use
+    // turn_starts on 2026-05-24. The orphan tool_use
     // survived into messages[1298] after compaction; here we model the shape
     // and assert the symmetric drop fires.
     const offendingId = 'toolu_01NK38wAMjBA3eJc76cCBfNj';
@@ -538,8 +538,7 @@ describe('buildProviderMessagesFromDurableEvents — orphan tool_use recovery (P
   });
 
   it('also drops user tool_results whose tool_use is missing in the prior assistant (inverse case)', () => {
-    // The investigator noted a 1-of-39 inverse case from 2026-05-21 (PRI-1820
-    // "out of scope" — but worth verifying that the existing user-side strip
+    // The investigator noted a 1-of-39 inverse case from 2026-05-21 — but worth verifying that the existing user-side strip
     // covers it). The shape: a user message carrying a tool_result whose
     // tool_use_id has no matching tool_use in the immediately-prior assistant
     // message. The existing pass A should catch it; this test confirms.

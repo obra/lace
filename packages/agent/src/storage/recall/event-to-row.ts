@@ -26,6 +26,22 @@ export type RecallRow = {
   persona: string | null;
   kind: RecallKind;
   content: string;
+  /**
+   * Conversation-track key (e.g. `slack:T123:C456/1678`), or null when not
+   * deterministically attributable from the event alone.
+   *
+   * v1 scope: populated from `event.data.track` on `prompt` and
+   * `context_injected` events (producers stamp these). `tool_use` and
+   * `message` events carry no `track` field, so they index as null.
+   * Notably, outbound `slack/send_message` sends are NOT track-attributed
+   * here: deriving their track requires `teamId` (session install-scope)
+   * which the stateless per-event indexer does not have access to without
+   * threading new state through the index path. v1 limitation: track-filtered
+   * recall covers inbound stamped prompts/injects but not the agent's outbound
+   * prose or non-stamped tool calls. The pointer still recovers the inbound
+   * thread, which is sufficient for re-reading the conversation.
+   */
+  track: string | null;
 };
 
 export type RowContext = {
@@ -47,7 +63,30 @@ export function eventToRow(event: TypedDurableEvent, ctx: RowContext): RecallRow
     persona: ctx.persona,
     kind: kindAndContent.kind,
     content: kindAndContent.content,
+    track: extractTrack(event.type, event.data),
   };
+}
+
+/**
+ * Extract the conversation-track key from an event, or return null.
+ *
+ * v1 scope: only `prompt` and `context_injected` events carry a `track` field
+ * stamped by their producers. All other event types return null.
+ *
+ * Notably absent: `tool_use` (no track field on ToolUseEventData) and
+ * outbound `slack/send_message` sends (their track would require `teamId`
+ * from session install-scope, which the stateless indexer does not have).
+ * See RecallRow.track for the full v1 scope documentation.
+ */
+function extractTrack(
+  type: TypedDurableEvent['type'],
+  data: TypedDurableEvent['data']
+): string | null {
+  if (type === 'prompt' || type === 'context_injected') {
+    const track = (data as { track?: unknown }).track;
+    if (typeof track === 'string' && track.length > 0) return track;
+  }
+  return null;
 }
 
 function renderKindAndContent(

@@ -25,7 +25,7 @@ export interface BrokerMountEnv {
 }
 
 /**
- * Build the embedder mount registry (name → {hostPath, readonly}) the broker
+ * Build the embedder mount registry (name → {hostPath, containerPath, readonly}) the broker
  * feeds to buildPersonaContainerSpec. Mirrors sen-core `buildContainerMounts`
  * (src/instance/paths.ts layout + src/main.ts:1141-1215) — KEEP IN SYNC with
  * that layout. The broker computes host paths directly from the instance host
@@ -44,10 +44,10 @@ export function buildBrokerContainerMounts(
   const at = (...segments: string[]): string => path.join(root, ...segments);
 
   const mounts: Record<string, MountRegistryEntry> = {
-    scratch: { hostPath: at('state', 'scratch'), readonly: false },
-    knowledge: { hostPath: at('user', 'knowledge'), readonly: true },
-    identity: { hostPath: at('user', 'identity'), readonly: true },
-    home: { hostPath: at('user', 'home'), readonly: false },
+    scratch: { hostPath: at('state', 'scratch'), containerPath: '/work', readonly: false },
+    knowledge: { hostPath: at('user', 'knowledge'), containerPath: '/knowledge', readonly: true },
+    identity: { hostPath: at('user', 'identity'), containerPath: '/sen/identity', readonly: true },
+    home: { hostPath: at('user', 'home'), containerPath: '/home/sen', readonly: false },
   };
 
   const socketHostPath = env.credentialHelperSocketHostPath;
@@ -59,13 +59,18 @@ export function buildBrokerContainerMounts(
     // run/ alongside sen-browser-cdp/, which dirname() over-exposed; the relocation
     // is what fixes that. No logic change here — the broker tracks wherever the
     // socket lives; correctness depends on the deploy placing it in a narrow dir.
-    mounts['sen-cred'] = { hostPath: path.dirname(socketHostPath), readonly: true };
+    mounts['sen-cred'] = {
+      hostPath: path.dirname(socketHostPath),
+      containerPath: '/run',
+      readonly: true,
+    };
 
     mounts['sen-ca'] = {
       hostPath:
         env.credentialCaStoreHostPath && env.credentialCaStoreHostPath.length > 0
           ? env.credentialCaStoreHostPath
           : at('state', 'credential-helper'),
+      containerPath: '/etc/sen-credential-proxy-ca',
       readonly: true,
     };
 
@@ -75,6 +80,7 @@ export function buildBrokerContainerMounts(
         env.browserCdpHostPath && env.browserCdpHostPath.length > 0
           ? env.browserCdpHostPath
           : at('state', 'browser-cdp'),
+      containerPath: '/sen-browser-cdp',
       readonly: false,
     };
   }

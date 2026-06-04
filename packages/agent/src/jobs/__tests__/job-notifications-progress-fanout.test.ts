@@ -1,6 +1,6 @@
 // ABOUTME: Integration test for the createSetupProgressTimer →
 // queueJobNotification → fanoutToInject path for `progress` notifications
-// (PRI-1692 Phase 2, PRI-1744). Spins up the real createQueueJobNotification
+// Spins up the real createQueueJobNotification
 // factory used by server.ts and verifies that progress notifications route
 // through the subscription registry, that the subscriber-side filter regex is
 // applied against the preview text, and that jobs with no subscribers still
@@ -73,7 +73,7 @@ function readInjectedTexts(sessionDir: string): string[] {
   return texts;
 }
 
-describe('progress fanout integration (PRI-1692 Phase 2, PRI-1744)', () => {
+describe('progress fanout integration', () => {
   let outputDir: string;
   let laceDir: string;
   let sessionDir: string;
@@ -143,7 +143,7 @@ describe('progress fanout integration (PRI-1692 Phase 2, PRI-1744)', () => {
     expect(texts[0]).toContain('ERROR: bad thing happened');
   });
 
-  it('PRI-1707 end-to-end: opt-in arm via subscribe → real timer fires → fanout delivers a notification', () => {
+  it('end-to-end: opt-in arm via subscribe → real timer fires → fanout delivers a notification', () => {
     // Wire JobManager to the REAL createSetupProgressTimer + queueJobNotification
     // so a single subscribe(on=['progress']) round-trip arms a real interval,
     // fires it once, and routes a notification through the fanoutToInject path.

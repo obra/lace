@@ -46,6 +46,8 @@ export async function spawnSubagent(options: SpawnSubagentOptions): Promise<Suba
 }
 
 function spawnNativeSubagent(executionEnv?: Record<string, string>): SubagentProcessHandle {
+  // Subagent plugin reach depends on inheriting LACE_PLUGINS: the child re-execs the
+  // same entrypoint (process.argv[1]) and runs the loader. Do NOT switch to a clean env.
   const proc = spawn(process.execPath, [process.argv[1] ?? ''], {
     cwd: process.cwd(),
     env: { ...process.env, ...(executionEnv ?? {}) },

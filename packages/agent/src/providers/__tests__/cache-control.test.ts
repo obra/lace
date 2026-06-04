@@ -1,6 +1,5 @@
 // ABOUTME: Unit tests for the shared cache-control module — covers raw-block
-// anchor math (PRI-1805), block-type whitelist (PRI-1806 #5), and the
-// 4-marker budget cap (PRI-1806 #1).
+// anchor math, block-type whitelist, and the 4-marker budget cap.
 
 import { describe, it, expect } from 'vitest';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -87,7 +86,7 @@ describe('markLastToolForCaching', () => {
   });
 });
 
-describe('attachMessageCacheBreakpoints — raw block math (PRI-1805)', () => {
+describe('attachMessageCacheBreakpoints — raw block math', () => {
   it(`places anchor at least ${ANCHOR_OFFSET_RAW_BLOCKS} RAW blocks behind tail, counting thinking blocks`, () => {
     // Build a conversation with thinking blocks interleaved. The anchor must
     // count those toward the distance threshold even though it can't land
@@ -229,7 +228,7 @@ describe('attachMessageCacheBreakpoints — raw block math (PRI-1805)', () => {
   });
 });
 
-describe('attachMessageCacheBreakpoints — block-type whitelist (PRI-1806 #5)', () => {
+describe('attachMessageCacheBreakpoints — block-type whitelist', () => {
   it('treats unknown block types as non-cacheable (whitelist, not blacklist)', () => {
     // Fabricate a block with an unknown type. Use `as unknown as` to bypass
     // the SDK's exhaustive union.
@@ -253,7 +252,7 @@ describe('attachMessageCacheBreakpoints — block-type whitelist (PRI-1806 #5)',
     }
   });
 
-  it('treats SDK-cacheable block types beyond the original 5 as cacheable (PRI-1806 #5 follow-up)', () => {
+  it('treats SDK-cacheable block types beyond the original 5 as cacheable', () => {
     // SDK 0.60 confirms cache_control is accepted on server_tool_use,
     // web_search_tool_result, and search_result. The previous whitelist
     // excluded them, leaving cache reach on the floor for hosted-tool workloads.
@@ -330,7 +329,7 @@ describe('attachMessageCacheBreakpoints — block-type whitelist (PRI-1806 #5)',
   });
 });
 
-describe('bedrockCacheTtlFor (PRI-1803)', () => {
+describe('bedrockCacheTtlFor', () => {
   it('returns 1h for Bedrock models on the supported allowlist', () => {
     expect(bedrockCacheTtlFor('anthropic.claude-opus-4-5-20251101-v1:0')).toBe('1h');
     expect(bedrockCacheTtlFor('anthropic.claude-sonnet-4-5-20250929-v1:0')).toBe('1h');
@@ -347,7 +346,7 @@ describe('bedrockCacheTtlFor (PRI-1803)', () => {
     expect(bedrockCacheTtlFor('anthropic.claude-3-5-sonnet-20241022-v2:0')).toBe('5m');
   });
 
-  it('rejects hypothetical bad substring matches (PRI-1806 #5 follow-up)', () => {
+  it('rejects hypothetical bad substring matches', () => {
     // 'claude-opus-4-50' should NOT match the 'claude-opus-4-5' substring.
     expect(bedrockCacheTtlFor('anthropic.claude-opus-4-50-future-v1:0')).toBe('5m');
     // Reverse — 'claude-opus-4-5-something' SHOULD match.
@@ -355,7 +354,7 @@ describe('bedrockCacheTtlFor (PRI-1803)', () => {
   });
 });
 
-describe('budget enforcement (PRI-1806 #1)', () => {
+describe('budget enforcement', () => {
   it('countCacheBreakpoints adds up markers across system/tools/messages', () => {
     const payload = {
       system: [
@@ -370,11 +369,11 @@ describe('budget enforcement (PRI-1806 #1)', () => {
     expect(countCacheBreakpoints(payload)).toBe(3);
   });
 
-  it('enforceBreakpointBudget strips NEWEST message-level markers first when over cap (PRI-1802 anchor preservation)', () => {
+  it('enforceBreakpointBudget strips NEWEST message-level markers first when over cap (anchor preservation)', () => {
     // 5 markers in messages — over the cap of 4. Strip the NEWEST first
-    // so the stable anchor (oldest) survives. This is the breakpoint that
-    // PRI-1802 added specifically to defeat Anthropic's 20-block lookback
-    // window; evicting it first would defeat the whole point.
+    // so the stable anchor (oldest) survives. This is the breakpoint added
+    // specifically to defeat Anthropic's 20-block lookback window;
+    // evicting it first would defeat the whole point.
     const messages = [
       user({ ...text('first'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),
       user({ ...text('second'), cache_control: MARKER_1H } as Anthropic.TextBlockParam),

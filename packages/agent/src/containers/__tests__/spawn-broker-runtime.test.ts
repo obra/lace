@@ -176,10 +176,12 @@ describe('SpawnBrokerContainerRuntime', () => {
     expect(id).toBe(EXPECTED_NAME);
   });
 
-  it('create() caches resolvedMounts so inspect + translate work locally', async () => {
+  it('create() caches resolvedMounts so inspect works locally', async () => {
     const id = await runtime.create(configFor());
-    expect(runtime.inspect(id).state).toBe('running');
-    expect(runtime.translateToContainer('/h/scratch/file.ts', id)).toBe('/work/file.ts');
+    expect(runtime.inspect(id)).toMatchObject({
+      state: 'running',
+      mounts: [{ source: '/h/scratch', target: '/work', readonly: false }],
+    });
   });
 
   it('create() rejects a config without a persona (broker only spawns personas)', async () => {
@@ -279,8 +281,10 @@ describe('SpawnBrokerContainerRuntime', () => {
         'running'
       )
     ).resolves.toBeUndefined();
-    // now broker-owned → status works + mounts cached for translation
+    // now broker-owned → status works + mounts cached locally
     expect((await runtime.daemonInspect('persistent-box'))?.state).toBe('running');
-    expect(runtime.translateToContainer('/h/box/x', 'persistent-box')).toBe('/work/x');
+    expect(runtime.inspect('persistent-box').mounts).toEqual([
+      { source: '/h/box', target: '/work', readonly: false },
+    ]);
   });
 });

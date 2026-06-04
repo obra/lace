@@ -135,7 +135,7 @@ describe('Format Converters', () => {
     });
   });
 
-  describe('convertToAnthropicFormat — empty assistant content (PRI-1799 Task 3D)', () => {
+  describe('convertToAnthropicFormat — empty assistant content', () => {
     it('drops the (no response) placeholder; omits empty assistant turns entirely', () => {
       const messages: ProviderMessage[] = [
         { role: 'user', content: 'hi' },

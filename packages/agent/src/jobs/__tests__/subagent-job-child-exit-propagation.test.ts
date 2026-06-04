@@ -1,4 +1,4 @@
-// ABOUTME: Integration test for PRI-1774 bug #1 — runSubagentJobProcess must
+// ABOUTME: Integration test — runSubagentJobProcess must
 // ABOUTME: react to subagent child crash by transitioning the owning job to a
 // ABOUTME: terminal state (failed) and invoking finalizeJob exactly once so
 // ABOUTME: job_notify subscribers wake and jobs_list reflects the death.
@@ -80,12 +80,12 @@ function makeFakeSubagent(): FakeSubagentHandle {
   };
 }
 
-describe('runSubagentJobProcess — child_exit propagation (PRI-1774)', () => {
+describe('runSubagentJobProcess — child_exit propagation', () => {
   let sessionDir: string;
   let fakeHandle: FakeSubagentHandle;
 
   beforeEach(() => {
-    sessionDir = mkdtempSync(join(tmpdir(), 'pri-1774-job-'));
+    sessionDir = mkdtempSync(join(tmpdir(), 'subagent-exit-job-'));
     fakeHandle = makeFakeSubagent();
     spawnMock.current = () => Promise.resolve(fakeHandle);
   });

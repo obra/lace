@@ -75,6 +75,7 @@ export function registerPromptHandler(
     outputFormat?: unknown;
     maxTurns?: number;
     idempotencyKey?: unknown;
+    track?: unknown;
   }) => {
     assertInitialized(state);
     rejectHandoffSourceMetadata(params);
@@ -150,7 +151,7 @@ export function registerPromptHandler(
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
     let ownsActiveTurn = true;
 
-    // Hoisted outside the try so the catch handler (PRI-1818 #2 fallback) can
+    // Hoisted outside the try so the catch handler (fallback turn_end) can
     // reuse the same write path to synthesize a turn_end. The turnSeq counter
     // is intentionally local to this handler invocation; the runner has its
     // own counter and the storage layer dedups any duplicate turn_end on this
@@ -180,11 +181,14 @@ export function registerPromptHandler(
     let promptWritten = false;
 
     try {
+      const track =
+        typeof params.track === 'string' && params.track.length > 0 ? params.track : undefined;
       await writeAndAdvance({
         type: 'prompt',
         data: {
           content: promptContent,
           ...(idempotencyKey ? { idempotencyKey } : {}),
+          ...(track !== undefined ? { track } : {}),
         },
       });
       promptWritten = true;
@@ -290,6 +294,7 @@ export function registerPromptHandler(
         environment: effectiveConfig.environment as Record<string, string> | undefined,
         runtimeBinding: state.activeSession.state.config?.runtimeBinding,
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
+        ...(state.activeSession.meta.persona ? { persona: state.activeSession.meta.persona } : {}),
       };
 
       const sessionIdForCache = state.activeSession.meta.sessionId;
@@ -364,10 +369,10 @@ export function registerPromptHandler(
           return sessionState.sessionCostUsd ?? 0;
         },
         updateSessionUsage: ({ costDelta, inputTokens, outputTokens }) => {
-          // PRI-1817: only base input/output flow into session-level
-          // tokenUsage (existing SessionState shape doesn't carry cache
-          // categories). Per-turn cache breakdown lives in turn_end events
-          // — anything wanting cumulative cache totals reads events.jsonl.
+          // Only base input/output flow into session-level tokenUsage (existing
+          // SessionState shape doesn't carry cache categories). Per-turn cache
+          // breakdown lives in turn_end events — anything wanting cumulative
+          // cache totals reads events.jsonl.
           runExclusive(() => {
             if (!state.activeSession) return;
             const sessionState = readSessionState(state.activeSession.dir);
@@ -397,12 +402,11 @@ export function registerPromptHandler(
         startedAt,
       });
 
-      // Translate runner cache field names to the ent-protocol
-      // UsageInfoSchema names (PRI-1817). Runner uses the Anthropic SDK's
-      // category names; the wire protocol pre-dated cache pricing and uses
-      // cacheRead/cacheWrite. Strict schema rejects unknowns, so we cannot
-      // just spread `result.usage`. Used for both the session/update SSE
-      // notification and the session/prompt RPC result.
+      // Translate runner cache field names to the ent-protocol UsageInfoSchema
+      // names. Runner uses the Anthropic SDK's category names; the wire protocol
+      // pre-dated cache pricing and uses cacheRead/cacheWrite. Strict schema
+      // rejects unknowns, so we cannot just spread `result.usage`. Used for both
+      // the session/update SSE notification and the session/prompt RPC result.
       const protocolUsage = {
         inputTokens: result.usage.inputTokens,
         outputTokens: result.usage.outputTokens,
@@ -450,7 +454,7 @@ export function registerPromptHandler(
         }
       }
 
-      // RPC response uses the protocol-shaped usage (PRI-1817).
+      // RPC response uses the protocol-shaped usage.
       return {
         turnId: result.turnId,
         stopReason: result.stopReason,
@@ -462,11 +466,10 @@ export function registerPromptHandler(
         ...(idempotencyKey ? { durableHandoffStatus: 'persisted-new' as const } : {}),
       };
     } catch (err) {
-      // PRI-1818 #2: defense-in-depth fallback turn_end. The runner is
-      // supposed to always write turn_end before throwing (PRI-1818 #1),
-      // but this catch backstops any path the runner can't cover —
-      // throws between turn_start and runner.run() starting, throws from
-      // runner construction, or future bugs in #1's error classifier.
+      // Defense-in-depth fallback turn_end. The runner is supposed to always
+      // write turn_end before throwing, but this catch backstops any path the
+      // runner can't cover — throws between turn_start and runner.run() starting,
+      // throws from runner construction, or future bugs in the error classifier.
       // The storage layer dedups by turnId, so if the runner already wrote
       // its own turn_end this write is a silent no-op.
       if (turnStartWritten) {
@@ -510,6 +513,7 @@ export function registerPromptHandler(
         outputFormat?: unknown;
         maxTurns?: number;
         idempotencyKey?: unknown;
+        track?: unknown;
       }
     );
   });

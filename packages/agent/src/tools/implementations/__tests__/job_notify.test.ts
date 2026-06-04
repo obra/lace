@@ -1,4 +1,4 @@
-// ABOUTME: Tests for the job_notify tool (PRI-1692 Phase 1)
+// ABOUTME: Tests for the job_notify tool
 // Verifies that job_notify registers a subscription on the JobManager and
 // returns a structured result containing the subscription id.
 
@@ -110,7 +110,7 @@ describe('JobNotifyTool', () => {
     const tool = new JobNotifyTool();
     // The description must teach: a delegate JOB is one round; a delegate
     // SESSION is the whole conversation. This is the load-bearing mental
-    // model from PRI-1692.
+    // load-bearing mental model.
     expect(tool.description).toMatch(/job/i);
     expect(tool.description).toMatch(/session/i);
     // Should point the agent at delegate(resume=...) for continuing a
@@ -148,7 +148,7 @@ describe('JobNotifyTool', () => {
 
   it('is idempotent at the tool layer: calling twice with identical args returns the same subscriptionId', async () => {
     // Mirrors the JobManager-level idempotency contract, but exercised
-    // through the tool wrapper agents actually call (PRI-1692).
+    // through the tool wrapper agents actually call.
     const jobManager = new JobManager({
       getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: '/tmp/sess' }),
       persistEvent: vi.fn(),

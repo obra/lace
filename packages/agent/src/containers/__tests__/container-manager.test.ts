@@ -308,8 +308,8 @@ describe('ContainerManager', () => {
     });
 
     it('adopts an existing daemon-side container without creating', async () => {
-      // Simulate a running daemon-side `sen-box-shell` that this process has never
-      // seen — daemonInspect returns it.
+      // Simulate a running daemon-side persistent container that this process has
+      // never seen — daemonInspect returns it.
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce({
         id: 'sen-box-shell',
         state: 'running',
@@ -495,7 +495,7 @@ describe('ContainerManager', () => {
     });
   });
 
-  describe('network lifecycle observer (PRI-1919)', () => {
+  describe('network lifecycle observer', () => {
     const gatewaySpec: ContainerSpec = {
       ...baseSpec,
       network: 'ada-sen_quarantine',
@@ -566,32 +566,6 @@ describe('ContainerManager', () => {
         containerName: 'sess1-worker',
         containerId: 'lace-sess1-worker',
       });
-    });
-
-    it('populates browserCdpSocketPath in onAttached when browserCdpSocket is set (PRI-2002)', async () => {
-      const onAttached = vi.fn();
-      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
-
-      const cdpSpec: ContainerSpec = { ...gatewaySpec, browserCdpSocket: true };
-      const handle = await manager.materialize(cdpSpec);
-
-      expect(onAttached).toHaveBeenCalledWith({
-        containerName: 'sess1-worker',
-        containerId: handle.containerId,
-        sourceIp: '172.31.250.3',
-        networkName: 'ada-sen_quarantine',
-        browserCdpSocketPath: '/sen-browser-cdp/sess1-worker.sock',
-      });
-    });
-
-    it('leaves browserCdpSocketPath undefined in onAttached when the flag is absent (PRI-2002)', async () => {
-      const onAttached = vi.fn();
-      manager.setNetworkLifecycleObserver({ onAttached, onDetached: vi.fn() });
-
-      await manager.materialize(gatewaySpec);
-
-      const payload = onAttached.mock.calls[0][0];
-      expect(payload.browserCdpSocketPath).toBeUndefined();
     });
   });
 

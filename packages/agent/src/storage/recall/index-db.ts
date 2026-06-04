@@ -10,14 +10,25 @@ import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../transcript-paths';
 
 export type { Db };
 
-const SCHEMA = `
-CREATE VIRTUAL TABLE IF NOT EXISTS events USING fts5(
+// Bump this integer whenever the FTS5 virtual-table schema changes.
+// FTS5 does not support ALTER TABLE ADD COLUMN, so a version mismatch triggers
+// a DROP + CREATE (full index rebuild). The backfill path then repopulates the
+// index on the next startup.
+//
+// History:
+//   1 — initial schema (event_id, session_id, ts, persona, kind, content)
+//   2 — added track UNINDEXED column (Task 9, 2026-06-03)
+export const SCHEMA_VERSION = 2;
+
+const EVENTS_SCHEMA = `
+CREATE VIRTUAL TABLE events USING fts5(
   event_id UNINDEXED,
   session_id UNINDEXED,
   ts UNINDEXED,
   persona UNINDEXED,
   kind UNINDEXED,
   content,
+  track UNINDEXED,
   tokenize = 'porter unicode61'
 );
 `;
@@ -72,7 +83,7 @@ export function openRecallIndex(dbPath: string): Db {
   // BUSY, re-read the mode — most often a sibling process won the race and
   // already put it in WAL. Only re-throw if it's still not WAL.
   ensureWalMode(db);
-  db.exec(SCHEMA);
+  applySchema(db);
   // Apply 0o600 to the index file and any WAL/SHM sidecars. In-memory
   // databases (dbPath === ':memory:') have no on-disk file; skip them.
   if (dbPath !== ':memory:') {
@@ -87,6 +98,50 @@ export function openRecallIndex(dbPath: string): Db {
     }
   }
   return db;
+}
+
+/**
+ * Create or upgrade the recall schema.
+ *
+ * Strategy: maintain a `_meta` table with a `schema_version` key. On each
+ * open, compare the stored version against SCHEMA_VERSION. If they differ
+ * (or the table doesn't exist yet), drop the FTS5 `events` table and
+ * recreate it with the current schema. FTS5 virtual tables cannot have
+ * columns added via ALTER TABLE, so a rebuild is the only upgrade path.
+ *
+ * After a rebuild the index is empty; the startup backfill repopulates it
+ * on the next launch. This is the same behaviour as a fresh install: all
+ * data lives in JSONL on disk and is never lost, only re-indexed.
+ */
+function applySchema(db: Db): void {
+  // Ensure the _meta table exists (safe to run unconditionally).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS _meta (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  const metaRow = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).get() as
+    | { value: string }
+    | undefined;
+
+  const storedVersion = metaRow !== undefined ? Number(metaRow.value) : 0;
+
+  if (storedVersion === SCHEMA_VERSION) {
+    // Schema is current — nothing to do.
+    return;
+  }
+
+  // Version mismatch (or first open on a DB that never had _meta).
+  // Drop the existing FTS5 table (if any) and recreate with the current schema.
+  // FTS5 stores index data in shadow tables named events_*, so a simple
+  // DROP TABLE on the virtual table removes them all.
+  db.exec(`DROP TABLE IF EXISTS events;`);
+  db.exec(EVENTS_SCHEMA);
+  db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
+    String(SCHEMA_VERSION)
+  );
 }
 
 let _instance: Db | null = null;

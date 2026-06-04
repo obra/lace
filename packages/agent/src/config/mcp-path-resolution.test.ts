@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveMcpServerCommandArgs, resolveMcpServerPaths } from './mcp-path-resolution';
 
-describe('resolveMcpServerCommandArgs (PRI-1912)', () => {
+describe('resolveMcpServerCommandArgs', () => {
   it('resolves relative ./ and ../ command/args against baseDir for host placement', () => {
     const out = resolveMcpServerCommandArgs(
       { command: './node_modules/.bin/tsx', args: ['./src/mcp/servers/knowledge.ts', '--flag'] },
@@ -27,7 +27,7 @@ describe('resolveMcpServerCommandArgs (PRI-1912)', () => {
   });
 });
 
-describe('resolveMcpServerPaths (PRI-1912)', () => {
+describe('resolveMcpServerPaths', () => {
   it('maps over a list, resolving host-placement relatives', () => {
     const out = resolveMcpServerPaths(
       [

@@ -1,10 +1,13 @@
-// ABOUTME: Build ContainerSpec from a persona's container runtime + mount registry
+// ABOUTME: Build container specs from a persona's container runtime + mount registry
 // ABOUTME: Branches on containerSharing (per_invocation vs persistent) and resolves mounts against the registry
 
 import { browserCdpSocketPath, type ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
-import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
+import type {
+  RuntimeExecutionBinding,
+  RuntimeMountDescriptor,
+} from '@lace/agent/tools/runtime/types';
 
 // Single source of truth for the persona container runtime shape: the
 // `type: 'container'` arm of the persona schema's discriminated union.
@@ -28,29 +31,28 @@ export class PersonaContainerSpecError extends Error {
  * Shared core: resolves a persona's declared mounts against the embedder
  * registry and passes runtime.env through unchanged.
  *
- * Used by both lifecycle branches of `buildPersonaContainerSpec` (per-session
- * and persistent) so the mount/env contract stays identical regardless of
- * lifecycle.
+ * Used by both projected and daemon-shaped builders so the mount/env contract
+ * stays identical regardless of lifecycle.
  */
 function resolvePersonaMountsAndEnv(input: {
   personaName: string;
   containerSharing: 'per_invocation' | 'persistent';
-  runtimeMounts: Record<string, string>;
+  runtimeMounts: readonly string[];
   runtimeEnv: Record<string, string> | undefined;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
-}): { mounts: ContainerMount[]; env: Record<string, string> } {
+}): { mounts: RuntimeMountDescriptor[]; env: Record<string, string> } {
   const { personaName, containerSharing, runtimeMounts, runtimeEnv, containerMounts } = input;
 
-  const mounts: ContainerMount[] = [];
-  for (const [mountName, target] of Object.entries(runtimeMounts)) {
+  const mounts: RuntimeMountDescriptor[] = [];
+  for (const mountName of runtimeMounts) {
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
     // the per-invocation work directory at /work. Persistent personas may still
-    // use 'scratch' as a named mount resolved through the registry (PRI-1796).
+    // use 'scratch' as a named mount resolved through the registry.
     if (mountName === 'scratch' && containerSharing === 'per_invocation') {
       throw new PersonaContainerSpecError(
         `containerSharing: per_invocation persona '${personaName}' declares mount 'scratch' — ` +
           `reserved for lace's auto-injection of the per-invocation work directory ` +
-          `at /work. Remove it from the persona file (PRI-1796).`
+          `at /work. Remove it from the persona file.`
       );
     }
     const entry = containerMounts[mountName];
@@ -61,8 +63,8 @@ function resolvePersonaMountsAndEnv(input: {
       );
     }
     mounts.push({
-      source: entry.hostPath,
-      target,
+      hostPath: entry.hostPath,
+      containerPath: entry.containerPath,
       readonly: entry.readonly,
     });
   }
@@ -70,6 +72,23 @@ function resolvePersonaMountsAndEnv(input: {
   const env: Record<string, string> = { ...(runtimeEnv ?? {}) };
 
   return { mounts, env };
+}
+
+function toContainerMounts(mounts: RuntimeMountDescriptor[]): ContainerMount[] {
+  return mounts.map((mount) => ({
+    source: mount.hostPath,
+    target: mount.containerPath,
+    readonly: mount.readonly,
+  }));
+}
+
+function withBrowserCdpSocketEnv(
+  env: Record<string, string>,
+  browserCdpSocket: boolean | undefined,
+  containerName: string
+): Record<string, string> {
+  if (!browserCdpSocket) return env;
+  return { ...env, SEN_BROWSER_CDP_SOCKET: browserCdpSocketPath(containerName) };
 }
 
 // Extract the first 8 meaningful characters from a session id for use in
@@ -95,7 +114,7 @@ export function buildPerInvocationSpecName(input: {
   return `${sessionIdShort(input.parentSessionId)}-${input.personaName}-${sessionIdShort(input.childSessionId)}`;
 }
 
-export function buildPersonaContainerSpec(input: {
+type PersonaContainerSpecInput = {
   parentSessionId: string;
   personaName: string;
   runtime: PersonaContainerRuntime;
@@ -103,8 +122,11 @@ export function buildPersonaContainerSpec(input: {
   // Required for per_invocation; ignored for persistent.
   childSessionId?: string;
   scratchDirHostPath?: string;
-}): ContainerSpec {
-  const { parentSessionId, personaName, runtime, containerMounts } = input;
+  jobId?: string;
+};
+
+function validatePersonaContainerSpecInput(input: PersonaContainerSpecInput): void {
+  const { parentSessionId, personaName, runtime } = input;
 
   if (!SPEC_NAME_COMPONENT_RE.test(parentSessionId)) {
     throw new PersonaContainerSpecError(
@@ -117,7 +139,6 @@ export function buildPersonaContainerSpec(input: {
     );
   }
 
-  // Validate per_invocation fields before doing any mount work.
   if (runtime.containerSharing === 'per_invocation') {
     if (!input.childSessionId) {
       throw new PersonaContainerSpecError(
@@ -139,6 +160,97 @@ export function buildPersonaContainerSpec(input: {
       );
     }
   }
+}
+
+export interface ProjectedPersonaRuntimeSpec {
+  name: string;
+  image: string;
+  workingDirectory: string;
+  mounts: RuntimeMountDescriptor[];
+  env: Record<string, string>;
+  persona: string;
+  parentSession: string;
+  childSession?: string;
+  jobId?: string;
+}
+
+type AssertNoForbiddenProjectedPersonaKeys<T extends never> = T;
+type _ProjectedPersonaSpecHasNoDockerAuthorityFields = AssertNoForbiddenProjectedPersonaKeys<
+  Extract<
+    keyof ProjectedPersonaRuntimeSpec,
+    | 'containerId'
+    | 'ports'
+    | 'restartPolicy'
+    | 'sysctls'
+    | 'capAdd'
+    | 'network'
+    | 'gatewayRoute'
+    | 'browserCdpSocket'
+  >
+>;
+
+export function buildProjectedRuntimeSpec(
+  input: PersonaContainerSpecInput
+): ProjectedPersonaRuntimeSpec {
+  const { parentSessionId, personaName, runtime, containerMounts } = input;
+
+  validatePersonaContainerSpecInput(input);
+
+  const { mounts, env } = resolvePersonaMountsAndEnv({
+    personaName,
+    containerSharing: runtime.containerSharing,
+    runtimeMounts: runtime.mounts,
+    runtimeEnv: runtime.env,
+    containerMounts,
+  });
+
+  if (runtime.containerSharing === 'persistent') {
+    const name = personaName;
+    return {
+      name,
+      image: runtime.image,
+      workingDirectory: runtime.workingDirectory,
+      mounts,
+      env,
+      // Root A selector fields (persistent has no child session).
+      persona: personaName,
+      parentSession: parentSessionId,
+      ...(input.jobId ? { jobId: input.jobId } : {}),
+    };
+  }
+
+  // per_invocation: compose a name unique to this child session so concurrent
+  // delegates of the same persona from the same parent don't collide.
+  // Auto-inject the per-invocation scratch directory at /work so the subagent
+  // has an isolated writable workspace for the duration of this invocation.
+  const perInvocationMounts: RuntimeMountDescriptor[] = [
+    ...mounts,
+    { hostPath: input.scratchDirHostPath!, containerPath: '/work', readonly: false },
+  ];
+
+  const name = buildPerInvocationSpecName({
+    parentSessionId,
+    personaName,
+    childSessionId: input.childSessionId!,
+  });
+  return {
+    name,
+    image: runtime.image,
+    workingDirectory: runtime.workingDirectory,
+    mounts: perInvocationMounts,
+    env,
+    // Root A selector fields.
+    persona: personaName,
+    parentSession: parentSessionId,
+    childSession: input.childSessionId,
+    ...(input.jobId ? { jobId: input.jobId } : {}),
+  };
+}
+
+export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): ContainerSpec {
+  const { parentSessionId, personaName, runtime, containerMounts } = input;
+
+  validatePersonaContainerSpecInput(input);
 
   const { mounts, env } = resolvePersonaMountsAndEnv({
     personaName,
@@ -155,10 +267,9 @@ export function buildPersonaContainerSpec(input: {
       containerId: `sen-${personaName}`,
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
-      mounts,
+      mounts: toContainerMounts(mounts),
       env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
       restartPolicy: 'unless-stopped',
-      // PRI-2012 B7 SELECTOR fields (persistent has no childSessionId).
       persona: personaName,
       parentSessionId,
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
@@ -169,12 +280,8 @@ export function buildPersonaContainerSpec(input: {
     };
   }
 
-  // per_invocation: compose a name unique to this child session so concurrent
-  // delegates of the same persona from the same parent don't collide (PRI-1796).
-  // Auto-inject the per-invocation scratch directory at /work so the subagent
-  // has an isolated writable workspace for the duration of this invocation.
   const perInvocationMounts: ContainerMount[] = [
-    ...mounts,
+    ...toContainerMounts(mounts),
     { source: input.scratchDirHostPath!, target: '/work', readonly: false },
   ];
 
@@ -189,8 +296,6 @@ export function buildPersonaContainerSpec(input: {
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
     env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
-    // PRI-2012 B7 SELECTOR fields. childSessionId is guaranteed non-null here
-    // (validated above for per_invocation).
     persona: personaName,
     parentSessionId,
     childSessionId: input.childSessionId,
@@ -203,24 +308,9 @@ export function buildPersonaContainerSpec(input: {
   };
 }
 
-// PRI-2002: when the persona is a browser-driver, inject SEN_BROWSER_CDP_SOCKET
-// so the in-container relay knows where to listen. Keyed off the container name
-// so it matches the lifecycle browserCdpSocketPath exactly. Returns env
-// unchanged when the flag is absent — the security invariant that only a
-// browserCdpSocket persona gets this env.
-function withBrowserCdpSocketEnv(
-  env: Record<string, string>,
-  browserCdpSocket: boolean | undefined,
-  containerName: string
-): Record<string, string> {
-  if (!browserCdpSocket) return env;
-  return { ...env, SEN_BROWSER_CDP_SOCKET: browserCdpSocketPath(containerName) };
-}
-
 // Convert a daemon-shaped ContainerSpec into the projected runtime's spec
-// shape. The persona-declared image string flows through verbatim — the
-// projected runtime's identity for tracking comes from a post-create
-// `.Image` capture (see projected-container.ts), not from pre-resolution.
+// shape. The persona-declared image string flows through verbatim; identity for
+// tracking comes from the selected runtime, not from pre-resolution here.
 export function containerSpecToRuntimeSpec(input: {
   spec: ContainerSpec;
 }): Extract<RuntimeExecutionBinding['toolRuntime'], { type: 'container' }>['spec'] {
@@ -243,9 +333,11 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
     ...(spec.browserCdpSocket ? { browserCdpSocket: true } : {}),
-    // PRI-2012 B7 SELECTOR fields — verbatim across the round-trip.
     ...(spec.persona ? { persona: spec.persona } : {}),
     ...(spec.parentSessionId ? { parentSessionId: spec.parentSessionId } : {}),
     ...(spec.childSessionId ? { childSessionId: spec.childSessionId } : {}),
+    ...(spec.parentSession ? { parentSession: spec.parentSession } : {}),
+    ...(spec.childSession ? { childSession: spec.childSession } : {}),
+    ...(spec.jobId ? { jobId: spec.jobId } : {}),
   };
 }

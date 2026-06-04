@@ -110,7 +110,7 @@ describe('AnthropicProvider context-window classification', () => {
       expect(response.usage).toEqual({ promptTokens: 0, completionTokens: 0, totalTokens: 0 });
     });
 
-    it('rethrows unrelated 400 (PRI-1796 tool_use ids)', async () => {
+    it('rethrows unrelated 400 (tool_use ids)', async () => {
       mockCreate.mockRejectedValueOnce(makePri1796Error());
 
       await expect(

@@ -61,10 +61,7 @@ interface DockerPsRowJson {
 }
 
 export class DockerContainerRuntime extends BaseContainerRuntime {
-  private readonly dockerBin: string;
-  // Stores the full ContainerConfig keyed by container id so start() can
-  // access gatewayRoute and image after create() has returned.
-  private readonly configs = new Map<string, ContainerConfig>();
+  protected readonly dockerBin: string;
 
   constructor(dockerBin: string = 'docker') {
     super();
@@ -75,7 +72,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     return name.startsWith(LACE_PREFIX) ? name : `${LACE_PREFIX}${name}`;
   }
 
-  private resolveContainerName(config: ContainerConfig): string {
+  protected resolveContainerName(config: ContainerConfig): string {
     // Persistent container runtime supplies a verbatim id that intentionally lacks the `lace-`
     // prefix (so the startup reaper's `name=lace-` scan ignores it). Honor
     // config.id directly when BOTH id and name are present and id is already a
@@ -143,11 +140,8 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       args.push('--network', config.network);
     }
 
-    // A gateway-routed persona (PRI-1919) cannot use docker's embedded resolver
-    // (127.0.0.11): once netns-init points the default route at the broker, the
-    // embedded resolver's external forwarding dies. The broker is both the
-    // gateway and a DNS forwarder, so point resolv.conf at it. DNS to the
-    // gateway IP is permitted by the persona's OUTPUT isolation rule.
+    // The broker is also a DNS forwarder, so gateway-routed containers resolve
+    // names through it rather than Docker's embedded resolver.
     if (config.gatewayRoute) {
       args.push('--dns', config.gatewayRoute);
     }
@@ -237,7 +231,6 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       mounts: config.mounts,
     };
     this.containers.set(containerName, info);
-    this.configs.set(containerName, { ...config, id: containerName });
     this.registerMounts(containerName, config);
 
     return containerName;
@@ -265,88 +258,6 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
       info.state = 'failed';
       throw new ContainerError(
         `Failed to start container: ${stderr || errMessage}`,
-        containerId,
-        error instanceof Error ? error : undefined
-      );
-    }
-
-    const config = this.configs.get(containerId);
-    if (config?.gatewayRoute) {
-      await this.runNetnsInit(containerId, config.image, config.gatewayRoute, info);
-    }
-  }
-
-  /**
-   * Launch a privileged one-shot sidecar into the persona container's network
-   * namespace to (1) replace its default route with the egress gateway IP and
-   * (2) install subagent↔subagent isolation: OUTPUT rules that ACCEPT the
-   * gateway and DROP every other host on the persona's own subnet. The persona
-   * itself does NOT need NET_ADMIN — the sidecar holds the cap and exits
-   * immediately, and the persona cannot remove the rules. Hub-and-spoke:
-   * main↔persona is via `docker exec` (not L3, unaffected); persona→gateway and
-   * persona→external are allowed; persona↔persona is denied. The gateway bridge
-   * keeps docker's default icc (enabled) — enable_icc=false would also drop the
-   * persona→gateway hop. PRI-1919 transparent egress gateway.
-   */
-  private async runNetnsInit(
-    containerId: string,
-    image: string,
-    gatewayRoute: string,
-    info: ContainerInfo
-  ): Promise<void> {
-    // Flush+rebuild OUTPUT for determinism + idempotency (this also runs on
-    // adopt()). The persona has no NET_ADMIN, so OUTPUT is otherwise empty; the
-    // subnet is derived from eth0 (the persona's only interface) — iptables
-    // masks the host CIDR to the network, so `-d 172.31.250.x/24` == the /24.
-    // ACCEPT the gateway BEFORE the subnet DROP so the gateway stays reachable.
-    const netnsInitScript = [
-      'set -e',
-      `ip route replace default via ${gatewayRoute}`,
-      `SUBNET=$(ip -o -4 addr show dev eth0 | awk '{print $4}' | head -1)`,
-      'iptables -F OUTPUT',
-      `iptables -A OUTPUT -d ${gatewayRoute} -j ACCEPT`,
-      'iptables -A OUTPUT -d "$SUBNET" -j DROP',
-    ].join('; ');
-    const sidecarArgs = [
-      'run',
-      '--rm',
-      // Run as root: --cap-add NET_ADMIN only populates the BOUNDING set, which
-      // a non-root user (the persona image runs as `sen`) cannot exercise without
-      // file caps on `ip`/`iptables`. The ephemeral sidecar runs for milliseconds
-      // and exits; it never touches the persona's processes/filesystem (only its
-      // netns), so root here does NOT weaken the workload (which stays non-root,
-      // no NET_ADMIN). Mirrors Istio's privileged istio-init + unprivileged app.
-      '--user',
-      '0:0',
-      '--network',
-      `container:${containerId}`,
-      '--cap-add',
-      'NET_ADMIN',
-      '--entrypoint',
-      'sh',
-      image,
-      '-c',
-      netnsInitScript,
-    ];
-    logger.info('Running netns-init sidecar to set default route', {
-      containerId,
-      gatewayRoute,
-      image,
-    });
-    try {
-      await execFileAsync(this.dockerBin, sidecarArgs);
-      logger.info('netns-init sidecar complete', { containerId, gatewayRoute });
-    } catch (error: unknown) {
-      const stderr = (error as ExecFileError).stderr || '';
-      const errMessage = error instanceof Error ? error.message : String(error);
-      info.state = 'failed';
-      logger.error('netns-init sidecar failed — persona has no gateway route; aborting start', {
-        containerId,
-        gatewayRoute,
-        stderr: stderr || errMessage,
-      });
-      throw new ContainerError(
-        `netns-init sidecar failed (exit non-zero): ${stderr || errMessage}`,
         containerId,
         error instanceof Error ? error : undefined
       );
@@ -404,7 +315,6 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     }
 
     this.containers.delete(containerId);
-    this.configs.delete(containerId);
     this.unregisterMounts(containerId);
   }
 
@@ -685,7 +595,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
    * Resolve the container's IPv4 address on `networkName` via `docker inspect`.
    * Returns undefined when the network is absent, the container is gone, or the
    * inspect fails — callers degrade gracefully (the transparent egress gateway
-   * skips the source-IP mapping rather than blocking). PRI-1919.
+   * skips the source-IP mapping rather than blocking).
    */
   async inspectNetworkIp(containerId: string, networkName: string): Promise<string | undefined> {
     try {
@@ -709,10 +619,6 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
    * `docker create`, so subsequent `start()` and `execStream()` work against
    * an adopted container.
    *
-   * When config.gatewayRoute is set, the netns-init sidecar is run immediately
-   * to (re)assert the default route. A host reboot or docker restart wipes the
-   * network namespace, so an adopted container has no route until we set it.
-   * `ip route replace` is idempotent — safe to run even if a route survived.
    */
   async adopt(config: ContainerConfig, state: ContainerState): Promise<void> {
     const id = config.id;
@@ -723,12 +629,7 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
     info.state = state;
     info.mounts = config.mounts;
     this.containers.set(id, info);
-    this.configs.set(id, { ...config });
     this.registerMounts(id, config);
-
-    if (config.gatewayRoute) {
-      await this.runNetnsInit(id, config.image, config.gatewayRoute, info);
-    }
   }
 
   private dockerInspectToInfo(containerId: string, parsed: DockerInspectJson): ContainerInfo {

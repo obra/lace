@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1818 — ConversationRunner.run() must ALWAYS write a turn_end
+// ABOUTME: ConversationRunner.run() must ALWAYS write a turn_end
 // ABOUTME: durable event before returning, including when the loop throws.
 // ABOUTME: 78 of 163 turn_starts on Ada (48%) saw no matching turn_end before
 // ABOUTME: the fix. The classifier maps the caught error to a fine-grained
@@ -188,7 +188,7 @@ function createMockDeps(
   };
 }
 
-describe('ConversationRunner — turn_end on error (PRI-1818)', () => {
+describe('ConversationRunner — turn_end on error', () => {
   let sessionDir: string;
   let cwd: string;
 
@@ -334,7 +334,7 @@ describe('ConversationRunner — turn_end on error (PRI-1818)', () => {
       "Three smoke retries lined up. Personas have been refreshed. Let me fire all three in parallel with notify subscriptions, then return my turn — they'll wake me on completion.";
     const provider = new ToolCallProvider(adaProse, 'bash', { command: 'echo hi' });
     const toolExecutor = makeToolExecutor(async () => {
-      // Concrete cause in production is unknown — see PRI-1818 followup #5 —
+      // Concrete cause in production is unknown —
       // but any uncaught throw in the tool path now lands in this catch.
       throw new Error('synthetic tool throw mid-execute');
     });

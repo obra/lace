@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import {
   cp,
   lstat,
@@ -28,7 +27,6 @@ import type {
   ContainerSpec,
 } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
-import { logger } from '@lace/agent/utils/logger';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
 import {
   RuntimeSecretResolutionError,
@@ -56,6 +54,19 @@ type ContainerToolRuntimeDescriptor = Extract<ToolRuntimeDescriptor, { type: 'co
 
 export type ProjectedContainerToolRuntimeDescriptor = Omit<ContainerToolRuntimeDescriptor, 'type'>;
 
+const CONTAINER_PLANE_SELECTOR_FIELDS = ['parentSession', 'childSession', 'jobId'] as const;
+const CONTAINER_BROKER_SELECTOR_FIELDS = ['parentSessionId', 'childSessionId'] as const;
+const CONTAINER_AUTHORITY_FIELDS = [
+  'containerId',
+  'ports',
+  'restartPolicy',
+  'sysctls',
+  'capAdd',
+  'network',
+  'gatewayRoute',
+  'browserCdpSocket',
+] as const;
+
 interface ProjectedContainerSecretContext {
   runtimeId: string;
   sessionId?: string;
@@ -80,46 +91,6 @@ export interface ProjectedContainerManager {
 
 function isNotFoundError(error: unknown): boolean {
   return typeof error === 'object' && error !== null && (error as NodeError).code === 'ENOENT';
-}
-
-// Best-effort post-create capture of the daemon's `.Image` field. The audit
-// trail for projected container runtimes lives here: persona images may be
-// floating tags (e.g. sen-box:dev), so the only way to know what actually got
-// used is to ask docker after create. Failures degrade to a warning log;
-// never throw — runtime startup must not depend on this.
-async function captureContainerImageId(input: {
-  containerId: string;
-  runtimeId: string;
-  requestedImage: string;
-}): Promise<void> {
-  try {
-    const child = spawn('docker', ['inspect', '--format', '{{.Image}}', input.containerId]);
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString('utf8')));
-    child.stderr.on('data', (chunk: Buffer) => (stderr += chunk.toString('utf8')));
-    const exitCode: number | null = await new Promise((resolve, reject) => {
-      child.on('error', reject);
-      child.on('close', resolve);
-    });
-    const capturedImageId = stdout.trim();
-    if (exitCode !== 0 || capturedImageId.length === 0) {
-      logger.warn(
-        `Projected container image-id capture failed for ${input.containerId}: ${stderr.trim()}`,
-        { runtimeId: input.runtimeId, requestedImage: input.requestedImage }
-      );
-      return;
-    }
-    logger.info(
-      `Projected container materialized: ${input.containerId} runs ${capturedImageId} (requested ${input.requestedImage})`,
-      { runtimeId: input.runtimeId, containerId: input.containerId, capturedImageId }
-    );
-  } catch (err) {
-    logger.warn(
-      `Projected container image-id capture errored for ${input.containerId}: ${(err as Error).message}`,
-      { runtimeId: input.runtimeId, requestedImage: input.requestedImage }
-    );
-  }
 }
 
 function containerPathIsInside(root: string, path: string): boolean {
@@ -207,10 +178,44 @@ function definedEnvironment(
   return Object.keys(environment).length > 0 ? environment : undefined;
 }
 
+function hasDefinedField(value: Record<string, unknown>, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(value, field) && value[field] !== undefined;
+}
+
+function hasPlaneSelector(value: Record<string, unknown>): boolean {
+  const hasBrokerSelector = CONTAINER_BROKER_SELECTOR_FIELDS.some((field) =>
+    hasDefinedField(value, field)
+  );
+  return (
+    CONTAINER_PLANE_SELECTOR_FIELDS.some((field) => hasDefinedField(value, field)) ||
+    (hasDefinedField(value, 'persona') && !hasBrokerSelector)
+  );
+}
+
+function hasContainerSelector(value: Record<string, unknown>): boolean {
+  return (
+    hasDefinedField(value, 'persona') ||
+    CONTAINER_PLANE_SELECTOR_FIELDS.some((field) => hasDefinedField(value, field)) ||
+    CONTAINER_BROKER_SELECTOR_FIELDS.some((field) => hasDefinedField(value, field))
+  );
+}
+
+function assertNoMixedSelectorAuthority(
+  spec: ProjectedContainerToolRuntimeDescriptor['spec']
+): void {
+  const record = spec as Record<string, unknown>;
+  const hasSelector = hasPlaneSelector(record);
+  const hasAuthority = CONTAINER_AUTHORITY_FIELDS.some((field) => hasDefinedField(record, field));
+  if (!hasSelector || !hasAuthority) return;
+
+  throw new Error('Container selector fields cannot be combined with docker authority fields');
+}
+
 async function containerSpecFromDescriptor(
   descriptor: ProjectedContainerToolRuntimeDescriptor,
   secretContext: ProjectedContainerSecretContext
 ): Promise<{ spec: ContainerSpec; hooks?: ContainerLifecycleHooks }> {
+  assertNoMixedSelectorAuthority(descriptor.spec);
   const secretEntries = Object.entries(descriptor.spec.secretEnv ?? {});
   const resolvedSecrets =
     secretEntries.length === 0
@@ -227,10 +232,6 @@ async function containerSpecFromDescriptor(
   }
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
-    // Pass the persona-declared image reference through verbatim. Pre-resolution
-    // to a digest was dropped because locally-built images (sen-box:dev,
-    // sen-browser:dev) have no registry digest. The post-create `.Image`
-    // capture below is the immutable runtime identity for audit purposes.
     image: descriptor.spec.image,
     workingDirectory: descriptor.spec.workingDirectory,
     mounts,
@@ -240,31 +241,43 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.containerId) {
     spec.containerId = descriptor.spec.containerId;
   }
-  if (descriptor.spec.ports) {
-    spec.ports = descriptor.spec.ports;
+  const hasPlaneSelectors = hasPlaneSelector(descriptor.spec as Record<string, unknown>);
+  if (!hasPlaneSelectors) {
+    if (descriptor.spec.ports) {
+      spec.ports = descriptor.spec.ports;
+    }
+    if (descriptor.spec.restartPolicy) {
+      spec.restartPolicy = descriptor.spec.restartPolicy;
+    }
+    if (descriptor.spec.sysctls) {
+      spec.sysctls = descriptor.spec.sysctls;
+    }
+    if (descriptor.spec.capAdd) {
+      spec.capAdd = descriptor.spec.capAdd;
+    }
+    if (descriptor.spec.network) {
+      spec.network = descriptor.spec.network;
+    }
+    if (descriptor.spec.gatewayRoute) {
+      spec.gatewayRoute = descriptor.spec.gatewayRoute;
+    }
+    if (descriptor.spec.browserCdpSocket) {
+      spec.browserCdpSocket = true;
+    }
   }
-  if (descriptor.spec.restartPolicy) {
-    spec.restartPolicy = descriptor.spec.restartPolicy;
-  }
-  if (descriptor.spec.sysctls) {
-    spec.sysctls = descriptor.spec.sysctls;
-  }
-  if (descriptor.spec.capAdd) {
-    spec.capAdd = descriptor.spec.capAdd;
-  }
-  if (descriptor.spec.network) {
-    spec.network = descriptor.spec.network;
-  }
-  if (descriptor.spec.gatewayRoute) {
-    spec.gatewayRoute = descriptor.spec.gatewayRoute;
-  }
-  if (descriptor.spec.browserCdpSocket) {
-    spec.browserCdpSocket = descriptor.spec.browserCdpSocket;
-  }
-  // PRI-2012 B7 SELECTOR fields — rebuild them onto the ContainerSpec so
-  // materializeOnce copies them to the ContainerConfig the broker client reads.
+  // Selector fields — carried through to the ContainerSpec so the selected
+  // runtime can read its own dialect.
   if (descriptor.spec.persona) {
     spec.persona = descriptor.spec.persona;
+  }
+  if (descriptor.spec.parentSession) {
+    spec.parentSession = descriptor.spec.parentSession;
+  }
+  if (descriptor.spec.childSession) {
+    spec.childSession = descriptor.spec.childSession;
+  }
+  if (descriptor.spec.jobId) {
+    spec.jobId = descriptor.spec.jobId;
   }
   if (descriptor.spec.parentSessionId) {
     spec.parentSessionId = descriptor.spec.parentSessionId;
@@ -675,16 +688,16 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       throw new Error('runtime process command is empty');
     }
 
+    const selectorBacked = hasContainerSelector(this.descriptor.spec as Record<string, unknown>);
+    const baseEnvironment = selectorBacked ? this.descriptor.spec.env : undefined;
+
     return {
       command,
       workingDirectory: normalizeContainerPath(
         opts.cwd ?? this.descriptor.cwd,
         this.descriptor.cwd
       ),
-      environment: definedEnvironment(
-        opts.envMode === 'replace' ? undefined : this.descriptor.spec.env,
-        opts.env
-      ),
+      environment: definedEnvironment(baseEnvironment, opts.env),
       environmentMode: opts.envMode ?? 'inherit',
     };
   }
@@ -700,18 +713,11 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
         this.descriptor,
         this.secretContext
       );
-      const handle = materialization.hooks
-        ? await this.containerManager.materialize(materialization.spec, materialization.hooks)
-        : await this.containerManager.materialize(materialization.spec);
-      // Audit-only: capture the daemon's `.Image` field for the running
-      // container so logs record what actually got pulled/used (the persona
-      // image ref may be a floating tag). Best-effort — failure logs a warning
-      // but doesn't abort runtime startup.
-      void captureContainerImageId({
-        containerId: handle.containerId,
-        runtimeId: this.secretContext.runtimeId,
-        requestedImage: this.descriptor.spec.image,
-      });
+      if (materialization.hooks) {
+        await this.containerManager.materialize(materialization.spec, materialization.hooks);
+      } else {
+        await this.containerManager.materialize(materialization.spec);
+      }
     })();
     this.materialized = materialized;
 

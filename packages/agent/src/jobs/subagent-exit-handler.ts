@@ -1,4 +1,4 @@
-// ABOUTME: Subagent child-exit persistence — PRI-1774
+// ABOUTME: Subagent child-exit persistence
 // ABOUTME: When a spawned subagent process exits non-zero (or by signal) before
 // ABOUTME: the parent's in-flight RPC completes, the buffered stderr never
 // ABOUTME: lands on disk. This helper writes a [SUBAGENT CHILD EXITED] block

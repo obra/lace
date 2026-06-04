@@ -93,6 +93,37 @@ describe('injectNotification', () => {
     expect(triggerInternalTurn).not.toHaveBeenCalled();
   });
 
+  it('sets track on the context_injected event when provided', () => {
+    const { laceDir, sessionDir } = tempSessionDir();
+    process.env.LACE_DIR = laceDir;
+    injectNotification({
+      sessionDir,
+      kind: 'reminder',
+      identifiers: { id: 'reminder_track_test' },
+      body: 'fired',
+      track: 'slack:TTEAM:CCHAN/1234567890.000100',
+    });
+    const { events } = readDurableEvents(sessionDir, {});
+    expect(events).toHaveLength(1);
+    expect((events[0].data as { track?: string }).track).toBe(
+      'slack:TTEAM:CCHAN/1234567890.000100'
+    );
+  });
+
+  it('leaves track undefined on the context_injected event when not provided', () => {
+    const { laceDir, sessionDir } = tempSessionDir();
+    process.env.LACE_DIR = laceDir;
+    injectNotification({
+      sessionDir,
+      kind: 'reminder',
+      identifiers: { id: 'reminder_notrack' },
+      body: 'fired',
+    });
+    const { events } = readDurableEvents(sessionDir, {});
+    expect(events).toHaveLength(1);
+    expect((events[0].data as { track?: string }).track).toBeUndefined();
+  });
+
   it('does NOT trigger idle-wake when target is not the active session', () => {
     const { laceDir, sessionDir } = tempSessionDir();
     process.env.LACE_DIR = laceDir;

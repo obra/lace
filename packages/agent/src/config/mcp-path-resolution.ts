@@ -1,4 +1,4 @@
-// ABOUTME: PRI-1912 — resolve relative MCP command/args against an embedder base
+// ABOUTME: Resolve relative MCP command/args against an embedder base
 // ABOUTME: dir. Host-placement servers run from the embedder package root (where
 // ABOUTME: the server scripts live), not lace's cwd; toolRuntime servers run
 // ABOUTME: container-side and are left untouched. Shared by PersonaRegistry

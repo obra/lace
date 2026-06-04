@@ -36,7 +36,7 @@ export interface ModelPricing {
  * read) or null if unavailable. For test provider, returns mock pricing for
  * testing budget enforcement.
  *
- * PRI-1817: the state-owned `providerCatalog` is lazily loaded on first
+ * The state-owned `providerCatalog` is lazily loaded on first
  * read. Callers that need pricing (today: the conversation runner) hit this
  * function on every turn — if the catalog isn't loaded yet we'd return null
  * and the persisted `costUsd` field would silently be 0 forever. Force the

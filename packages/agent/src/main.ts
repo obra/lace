@@ -12,7 +12,15 @@ import { PassThrough, Writable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
-import { createContainerManagerForPlatform, runStartupReaper } from './containers/startup-reaper';
+import { runStartupReaper } from './containers/startup-reaper';
+import { loadPlugins, PluginLoadError } from './plugins';
+import { registerBuiltinTools } from './tools/builtins';
+import { registerBuiltinCompaction } from './compaction/strategy';
+import {
+  registerBuiltinRuntimes,
+  createDefaultContainerManager,
+} from './containers/manager-factory';
+import { PerInvocationReaper } from './jobs/per-invocation-reaper';
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
@@ -38,20 +46,15 @@ const protocolLog = openLogStream('ent-protocol.log');
 const agentLogPath = path.join(process.env.LACE_SESSION_DIR || laceDir, 'agent.log');
 logger.configure('debug', agentLogPath, true);
 
+// Pipe stdin into a PassThrough tee. A PassThrough buffers while nothing
+// consumes it and only flows once a `data` listener (or pipe) attaches.
+// We intentionally DO NOT attach any consumer here — the protocol-log `data`
+// listener is attached inside boot() AFTER the plugin-load await, so frames
+// that arrive during the (possibly slow) import buffer in the tee and are
+// delivered in order once the peer wires. This resolves the existing H15 race.
 const stdinTee = new PassThrough();
 process.stdin.pipe(stdinTee);
 const readable = stdinTee;
-readable.on('data', (chunk) => {
-  const lines = chunk
-    .toString()
-    .split(/\n/)
-    .filter((l: string) => l.trim().length > 0);
-  if (protocolLog) {
-    for (const line of lines) {
-      protocolLog.write(`${new Date().toISOString()} IN ${line}\n`);
-    }
-  }
-});
 
 const writable = new Writable({
   write(chunk, _enc, cb) {
@@ -68,34 +71,8 @@ const writable = new Writable({
   },
 });
 
-// Best-effort orphan reap is kicked off in the background. It runs its own
-// try/catch and never throws. Boot does not wait for it because the stdin
-// tee at line 34 is in flowing mode the moment the protocol-logging data
-// listener attaches — blocking startup here drops in-flight bytes from
-// early callers before the JSON-RPC peer is wired up.
-void runStartupReaper(createContainerManagerForPlatform());
-
-const transport = createNdjsonStdioTransport({ readable, writable });
-const peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
-state.peer = peer;
-registerAgentRpcMethods(peer, state);
-
-// Catch the FTS index up to anything that landed in JSONL before write-through
-// indexing shipped, or while the process was down. Deferred to the next event
-// loop tick so the JSON-RPC peer above is fully wired up before we touch the
-// FTS index — running backfill synchronously here would block bytes that the
-// stdin tee has already started flowing (the data listener on line 44 puts
-// stdin in flowing mode immediately), causing early JSON-RPC frames to be
-// consumed only by the protocol-log listener and never delivered to the peer
-// (H15). Failures must never break startup; the JSONL files are source of truth.
-setImmediate(() => {
-  try {
-    const stats = backfillIndex(getRecallIndex(), laceDir);
-    logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
-  } catch (err) {
-    logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-});
+// Promoted to module scope so shutdown() can guard with ?.
+let peer: JsonRpcPeer | undefined;
 
 let shuttingDown = false;
 const shutdown = async () => {
@@ -107,7 +84,7 @@ const shutdown = async () => {
   } catch {
     // Best-effort; never block process exit on reminder bookkeeping.
   }
-  peer.close();
+  peer?.close();
   await state.mcpServerManager.shutdown();
   try {
     closeRecallIndex();
@@ -120,3 +97,66 @@ const shutdown = async () => {
 process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
 process.stdin.on('end', () => void shutdown());
+
+async function boot(): Promise<void> {
+  // Register built-ins BEFORE plugins so a plugin dup of a built-in name is fatal.
+  registerBuiltinTools();
+  registerBuiltinCompaction();
+  registerBuiltinRuntimes();
+
+  try {
+    const res = await loadPlugins(process.env.LACE_PLUGINS);
+    if (res.loaded.length) {
+      logger.info(`plugins: loaded ${res.loaded.map((p) => p.name).join(', ')}`);
+    }
+  } catch (err) {
+    logger.error(
+      `plugins: fatal load failure: ${err instanceof PluginLoadError ? err.message : String(err)}`
+    );
+    // Fatal before any frame — LaceSupervisor respawns; a persistent misconfig is a
+    // respawn loop = config error.
+    process.exit(1);
+  }
+
+  // Runtimes registry is now populated — build the manager + reaper.
+  const manager = createDefaultContainerManager();
+  state.containerManager = manager;
+  state.perInvocationReaper = new PerInvocationReaper(manager);
+  // Best-effort orphan reap; runs its own try/catch and never throws.
+  void runStartupReaper(manager);
+
+  // Safe to attach the stdin consumer NOW — frames that arrived during the plugin
+  // await were buffered in the tee and will be delivered in order once the peer wires.
+  readable.on('data', (chunk) => {
+    const lines = chunk
+      .toString()
+      .split(/\n/)
+      .filter((l: string) => l.trim().length > 0);
+    if (protocolLog) {
+      for (const line of lines) {
+        protocolLog.write(`${new Date().toISOString()} IN ${line}\n`);
+      }
+    }
+  });
+
+  const transport = createNdjsonStdioTransport({ readable, writable });
+  peer = new JsonRpcPeer(transport, { idPrefix: 'a_' });
+  state.peer = peer;
+  // manager is set above, so the network-lifecycle observer will be installed.
+  registerAgentRpcMethods(peer, state);
+
+  // Catch the FTS index up to anything that landed in JSONL before write-through
+  // indexing shipped, or while the process was down. Deferred to the next event
+  // loop tick so the JSON-RPC peer above is fully wired up before we touch the
+  // FTS index. Failures must never break startup; the JSONL files are source of truth.
+  setImmediate(() => {
+    try {
+      const stats = backfillIndex(getRecallIndex(), laceDir);
+      logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
+    } catch (err) {
+      logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+}
+
+void boot();

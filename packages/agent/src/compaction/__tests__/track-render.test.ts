@@ -2,16 +2,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { renderCompactionPrefix } from '../track-render';
-import type { TrackBlock } from '../track-compaction';
+import type { TrackBlock } from '../toolkit';
 
 describe('renderCompactionPrefix', () => {
   it('emits the header and the per-section blocks in fixed order', () => {
     const blocks: TrackBlock[] = [
-      {
-        trackId: 'slack:T:C1:1.0',
-        body: '### slack:T:C1:1.0\n- They said: hi',
-        estimatedTokens: 10,
-      },
       { trackId: 'job:job_a', body: '- job:job_a ✓ completed: IP check', estimatedTokens: 8 },
     ];
     const out = renderCompactionPrefix({
@@ -19,12 +14,32 @@ describe('renderCompactionPrefix', () => {
       scheduler: { alarmsPending: 2, remindersPending: 1 },
     });
     expect(out).toContain('[Earlier conversation, compacted by track]');
-    expect(out).toContain('## Slack threads');
-    expect(out).toContain('### slack:T:C1:1.0');
     expect(out).toContain('## Subagent jobs');
     expect(out).toContain('- job:job_a ✓ completed: IP check');
     expect(out).toContain('## Scheduler');
     expect(out).toMatch(/2 alarms pending, 1 reminder pending/);
+  });
+
+  it('unknown plugin-prefixed track blocks fall through to ## Other (generic rendering)', () => {
+    // The kernel default has no domain-specific sections. A plugin-tracked block
+    // rendered by the kernel lands in ## Other, not a domain-specific section.
+    const blocks: TrackBlock[] = [
+      {
+        trackId: 'ext:T:C1:1.0',
+        body: 'User: hello from plugin track',
+        estimatedTokens: 10,
+      },
+      { trackId: 'job:job_a', body: '- job:job_a ✓ completed: IP check', estimatedTokens: 8 },
+    ];
+    const out = renderCompactionPrefix({
+      blocks,
+      scheduler: { alarmsPending: 0, remindersPending: 0 },
+    });
+    expect(out).toContain('[Earlier conversation, compacted by track]');
+    // Generic: plugin block appears in ## Other, not a plugin-specific section
+    expect(out).toContain('## Other');
+    expect(out).toContain('User: hello from plugin track');
+    expect(out).toContain('## Subagent jobs');
   });
 
   it('skips empty sections', () => {
@@ -32,9 +47,9 @@ describe('renderCompactionPrefix', () => {
       blocks: [{ trackId: 'job:a', body: '- job:a ✓ completed: x', estimatedTokens: 5 }],
       scheduler: { alarmsPending: 0, remindersPending: 0 },
     });
-    expect(out).not.toContain('## Slack threads');
     expect(out).toContain('## Subagent jobs');
     expect(out).not.toContain('## Scheduler');
+    expect(out).not.toContain('## Other');
   });
 
   it('emits system events section only if any present', () => {
@@ -71,7 +86,6 @@ describe('renderCompactionPrefix', () => {
     expect(out).toContain('### webhook:foo');
     expect(out).toContain('event received');
     // Should not appear under any known-prefix section
-    expect(out).not.toContain('## Slack threads');
     expect(out).not.toContain('## Subagent jobs');
     expect(out).not.toContain('## System events');
   });

@@ -83,6 +83,16 @@ describe('RecallTool schema', () => {
     );
   });
 
+  it('accepts a valid track string', () => {
+    expect(() =>
+      tool.schema.parse({ action: 'search', query: 'x', track: 'slack:T123:C456/1.0' })
+    ).not.toThrow();
+  });
+
+  it('rejects empty track string', () => {
+    expect(() => tool.schema.parse({ action: 'search', query: 'x', track: '' })).toThrow(/track/i);
+  });
+
   it('rejects empty since', () => {
     expect(() => tool.schema.parse({ action: 'search', query: 'x', since: '' })).toThrow(/since/i);
   });
@@ -453,6 +463,7 @@ describe('RecallTool search', () => {
         persona: 'ada',
         kind: 'user_message',
         content: `needle ${i}`,
+        track: null,
       });
     }
 
@@ -488,6 +499,52 @@ describe('RecallTool search', () => {
       expect(typeof parsed.hint).toBe('string');
       expect(parsed.hint as string).toMatch(/FTS5 syntax error/);
     }
+  });
+
+  it('filters by track — returns only events whose indexed track matches', async () => {
+    // Seed rows directly into FTS with specific track values to test filtering.
+    // (appendDurableEvent does not yet stamp track; we use insertRow directly.)
+    const { getRecallIndex } = await import('@lace/agent/storage/recall/index-db');
+    const { insertRow } = await import('@lace/agent/storage/recall/index-writer');
+    const sessionId = `sess_${randomUUID()}`;
+    const db = getRecallIndex();
+    const track = 'slack:T123:C456/1678';
+
+    insertRow(db, {
+      event_id: `${sessionId}:1`,
+      session_id: sessionId,
+      ts: '2026-06-01T00:00:01Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'on-track needle content',
+      track,
+    });
+    insertRow(db, {
+      event_id: `${sessionId}:2`,
+      session_id: sessionId,
+      ts: '2026-06-01T00:00:02Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'off-track needle content',
+      track: 'slack:T999:C999/9999',
+    });
+    insertRow(db, {
+      event_id: `${sessionId}:3`,
+      session_id: sessionId,
+      ts: '2026-06-01T00:00:03Z',
+      persona: 'ada',
+      kind: 'user_message',
+      content: 'null-track needle content',
+      track: null,
+    });
+
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'needle', track },
+      makeCtx()
+    );
+    const hits = parseResult(result).hits as Array<{ event_id: string }>;
+    expect(hits).toHaveLength(1);
+    expect(hits[0].event_id).toBe(`${sessionId}:1`);
   });
 
   it('respects AND semantics across multiple filters', async () => {
@@ -834,6 +891,7 @@ describe('RecallTool read', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'phantom',
+      track: null,
     });
     insertRow(db, {
       event_id: `${sessionId}:2`,
@@ -842,6 +900,7 @@ describe('RecallTool read', () => {
       persona: 'ada',
       kind: 'user_message',
       content: 'phantom2',
+      track: null,
     });
 
     const result = await new RecallTool().execute(

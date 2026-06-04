@@ -848,7 +848,7 @@ describe('storage/event-log', () => {
     });
   });
 
-  describe('turn_end dedup invariant (PRI-1818 #2)', () => {
+  describe('turn_end dedup invariant', () => {
     it('silently skips a second turn_end for the same turnId, leaving only the first', () => {
       const { laceDir, sessionDir } = makeTestSessionDirs();
       process.env.LACE_DIR = laceDir;

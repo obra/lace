@@ -38,7 +38,7 @@ describe('Variable Providers', () => {
       expect(typeof (variables.system as Record<string, unknown>).arch).toBe('string');
       expect(typeof (variables.system as Record<string, unknown>).sessionDate).toBe('string');
 
-      // PRI-1804 #1: sessionDate is YYYY-MM-DD (stable within a UTC day so
+      // sessionDate is YYYY-MM-DD (stable within a UTC day so
       // the system prompt cache stays warm across sessions).
       const date = (variables.system as Record<string, unknown>).sessionDate as string;
       expect(date).toMatch(/^\d{4}-\d{2}-\d{2}$/);

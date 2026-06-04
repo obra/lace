@@ -15,7 +15,7 @@ import type { ProviderMessage } from '@lace/agent/providers/base-provider';
  * For string content: joined with newline (or replaces it if existing is empty).
  * For array content: appended as a new text ContentBlock.
  *
- * IMPORTANT (PRI-1796 follow-up): when the last message carries toolResults,
+ * IMPORTANT: when the last message carries toolResults,
  * merging text here puts text alongside tool_result on the user turn. The
  * wire format converter (`convertToAnthropicFormat`) MUST emit tool_result
  * BEFORE the text — Anthropic's API otherwise 400s with a misleading

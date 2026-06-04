@@ -328,7 +328,7 @@ describe('DockerContainerRuntime', () => {
       await runtime.remove(id);
 
       expect(findCallWithSubcommand('rm')).toEqual(['rm', '-f', id]);
-      expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
+      expect(() => runtime.inspect(id)).toThrow(ContainerNotFoundError);
     });
 
     it('remove cleans local state even if docker reports no-such-container', async () => {
@@ -349,7 +349,7 @@ describe('DockerContainerRuntime', () => {
       ]);
 
       await runtime.remove(id);
-      expect(() => runtime.translateToContainer('/anything', id)).toThrow(ContainerNotFoundError);
+      expect(() => runtime.inspect(id)).toThrow(ContainerNotFoundError);
     });
 
     it('start throws ContainerNotFoundError on unknown container id', async () => {
@@ -688,7 +688,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('inspectNetworkIp (PRI-1919)', () => {
+  describe('inspectNetworkIp', () => {
     it('returns the IPAddress for the named network', async () => {
       setExecFileResponses([
         {
@@ -811,7 +811,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('sysctls (PRI-1790)', () => {
+  describe('sysctls', () => {
     it('emits --sysctl key=value for each entry in config.sysctls', async () => {
       await runtime.create({
         name: 'svc',
@@ -912,7 +912,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('capAdd + network (PRI-1919)', () => {
+  describe('capAdd + network', () => {
     it('emits --cap-add NET_ADMIN and --network quarantine when runtime sets them', async () => {
       await runtime.create({
         name: 'svc',
@@ -1002,8 +1002,8 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('gatewayRoute netns-init (PRI-1919)', () => {
-    it('runs netns-init sidecar with the gatewayRoute after start', async () => {
+  describe('gatewayRoute start/adopt behavior', () => {
+    it('does not run an extra docker command after start when gatewayRoute is set', async () => {
       const id = await runtime.create({
         name: 'persona',
         image: 'sen-box:dev',
@@ -1014,42 +1014,11 @@ describe('DockerContainerRuntime', () => {
       mockExecFile.mockClear();
       await runtime.start(id);
 
-      // The first call should be `docker start <id>`
-      const startArgs = mockExecFile.mock.calls[0]?.[1] as string[];
-      expect(startArgs).toEqual(['start', id]);
-
-      // The second call should be the netns-init sidecar
-      const sidecarArgs = mockExecFile.mock.calls[1]?.[1] as string[];
-      expect(sidecarArgs).toBeDefined();
-      expect(sidecarArgs[0]).toBe('run');
-      expect(sidecarArgs).toContain('--rm');
-      // Sidecar runs as root so the NET_ADMIN cap is in the EFFECTIVE set (the
-      // persona image runs as non-root, which can't exercise a bounding-only cap).
-      expect(sidecarArgs).toContain('--user');
-      expect(sidecarArgs[sidecarArgs.indexOf('--user') + 1]).toBe('0:0');
-      expect(sidecarArgs).toContain('--network');
-      expect(sidecarArgs[sidecarArgs.indexOf('--network') + 1]).toBe(`container:${id}`);
-      expect(sidecarArgs).toContain('--cap-add');
-      expect(sidecarArgs[sidecarArgs.indexOf('--cap-add') + 1]).toBe('NET_ADMIN');
-      expect(sidecarArgs).toContain('--entrypoint');
-      expect(sidecarArgs[sidecarArgs.indexOf('--entrypoint') + 1]).toBe('sh');
-      // image must be present
-      expect(sidecarArgs).toContain('sen-box:dev');
-      const imageIdx = sidecarArgs.indexOf('sen-box:dev');
-      // trailing args: -c "<set default route + install subagent↔subagent
-      // isolation OUTPUT rules>". Gateway is ACCEPTed before the subnet DROP.
-      expect(sidecarArgs.slice(imageIdx + 1)).toEqual([
-        '-c',
-        'set -e; ' +
-          'ip route replace default via 172.31.250.1; ' +
-          "SUBNET=$(ip -o -4 addr show dev eth0 | awk '{print $4}' | head -1); " +
-          'iptables -F OUTPUT; ' +
-          'iptables -A OUTPUT -d 172.31.250.1 -j ACCEPT; ' +
-          'iptables -A OUTPUT -d "$SUBNET" -j DROP',
-      ]);
+      expect(mockExecFile.mock.calls).toHaveLength(1);
+      expect(mockExecFile.mock.calls[0]?.[1]).toEqual(['start', id]);
     });
 
-    it('does NOT run netns-init when gatewayRoute is absent', async () => {
+    it('runs only docker start when gatewayRoute is absent', async () => {
       const id = await runtime.create({
         name: 'persona',
         image: 'sen-box:dev',
@@ -1059,34 +1028,8 @@ describe('DockerContainerRuntime', () => {
       mockExecFile.mockClear();
       await runtime.start(id);
 
-      // Only `docker start` should have been called — no sidecar run
       expect(mockExecFile.mock.calls).toHaveLength(1);
       expect((mockExecFile.mock.calls[0]?.[1] as string[])[0]).toBe('start');
-    });
-
-    it('throws ContainerError and marks container failed when sidecar exits non-zero', async () => {
-      const id = await runtime.create({
-        name: 'persona',
-        image: 'sen-box:dev',
-        workingDirectory: '/w',
-        mounts: [],
-        gatewayRoute: '172.31.250.1',
-      });
-
-      setExecFileResponses([
-        // docker start succeeds
-        { match: (args) => args[0] === 'start', stdout: '', stderr: '' },
-        // sidecar fails
-        {
-          match: (args) => args[0] === 'run',
-          error: Object.assign(new Error('ip: command not found'), {
-            code: 1,
-            stderr: 'ip: command not found',
-          }),
-        },
-      ]);
-
-      await expect(runtime.start(id)).rejects.toBeInstanceOf(ContainerError);
     });
   });
 
@@ -1165,10 +1108,6 @@ describe('DockerContainerRuntime', () => {
       const info = runtime.inspect('sen-box-shell');
       expect(info.id).toBe('sen-box-shell');
       expect(info.state).toBe('running');
-      // Mount registration is in place.
-      expect(runtime.translateToContainer('/host/work/index.ts', 'sen-box-shell')).toBe(
-        '/work/index.ts'
-      );
     });
 
     it('throws when config.id is missing', async () => {
@@ -1177,9 +1116,7 @@ describe('DockerContainerRuntime', () => {
       ).rejects.toThrow(/config.id/);
     });
 
-    it('runs netns-init sidecar when config.gatewayRoute is set', async () => {
-      // The adopted container is already running (resurrected by docker restart policy),
-      // so adopt() must (re)assert the route immediately — the netns is wiped on restart.
+    it('does not run an extra docker command when config.gatewayRoute is set', async () => {
       await runtime.adopt(
         {
           id: 'sen-box-shell',
@@ -1191,35 +1128,10 @@ describe('DockerContainerRuntime', () => {
         'running'
       );
 
-      // adopt() should have issued exactly one docker run (the netns-init sidecar).
-      expect(mockExecFile.mock.calls).toHaveLength(1);
-      const sidecarArgs = mockExecFile.mock.calls[0]?.[1] as string[];
-      expect(sidecarArgs[0]).toBe('run');
-      expect(sidecarArgs).toContain('--rm');
-      // Sidecar runs as root so the NET_ADMIN cap is in the EFFECTIVE set (the
-      // persona image runs as non-root, which can't exercise a bounding-only cap).
-      expect(sidecarArgs).toContain('--user');
-      expect(sidecarArgs[sidecarArgs.indexOf('--user') + 1]).toBe('0:0');
-      expect(sidecarArgs).toContain('--network');
-      expect(sidecarArgs[sidecarArgs.indexOf('--network') + 1]).toBe('container:sen-box-shell');
-      expect(sidecarArgs).toContain('--cap-add');
-      expect(sidecarArgs[sidecarArgs.indexOf('--cap-add') + 1]).toBe('NET_ADMIN');
-      expect(sidecarArgs).toContain('--entrypoint');
-      expect(sidecarArgs[sidecarArgs.indexOf('--entrypoint') + 1]).toBe('sh');
-      expect(sidecarArgs).toContain('sen-box:dev');
-      const imageIdx = sidecarArgs.indexOf('sen-box:dev');
-      expect(sidecarArgs.slice(imageIdx + 1)).toEqual([
-        '-c',
-        'set -e; ' +
-          'ip route replace default via 172.31.250.1; ' +
-          "SUBNET=$(ip -o -4 addr show dev eth0 | awk '{print $4}' | head -1); " +
-          'iptables -F OUTPUT; ' +
-          'iptables -A OUTPUT -d 172.31.250.1 -j ACCEPT; ' +
-          'iptables -A OUTPUT -d "$SUBNET" -j DROP',
-      ]);
+      expect(mockExecFile.mock.calls).toHaveLength(0);
     });
 
-    it('does not run netns-init when gatewayRoute is absent on adopt', async () => {
+    it('does not run a docker command when gatewayRoute is absent on adopt', async () => {
       await runtime.adopt(
         {
           id: 'sen-box-shell',
@@ -1230,49 +1142,7 @@ describe('DockerContainerRuntime', () => {
         'running'
       );
 
-      // No docker calls should have been made — no sidecar, no start.
       expect(mockExecFile.mock.calls).toHaveLength(0);
-    });
-
-    it('throws ContainerError and marks container failed when netns-init sidecar fails on adopt', async () => {
-      setExecFileResponses([
-        {
-          error: Object.assign(new Error('ip: command not found'), {
-            code: 1,
-            stderr: 'ip: command not found',
-          }),
-        },
-      ]);
-
-      await expect(
-        runtime.adopt(
-          {
-            id: 'sen-box-shell',
-            image: 'sen-box:dev',
-            workingDirectory: '/work',
-            mounts: [],
-            gatewayRoute: '172.31.250.1',
-          },
-          'running'
-        )
-      ).rejects.toBeInstanceOf(ContainerError);
-    });
-  });
-
-  describe('translateToContainer / translateToHost', () => {
-    it('translates host paths to container paths via registered mounts', async () => {
-      const id = await runtime.create({
-        name: 'paths',
-        image: 'alpine:latest',
-        workingDirectory: '/workspace',
-        mounts: [{ source: '/host/proj', target: '/workspace' }],
-      });
-      expect(runtime.translateToContainer('/host/proj/src/index.ts', id)).toBe(
-        '/workspace/src/index.ts'
-      );
-      expect(runtime.translateToHost('/workspace/src/index.ts', id)).toBe(
-        '/host/proj/src/index.ts'
-      );
     });
   });
 });

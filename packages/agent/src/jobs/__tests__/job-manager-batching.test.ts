@@ -1,7 +1,7 @@
-// ABOUTME: Tests for JobManager 200ms progress-batching window (PRI-1692 Phase 2)
+// ABOUTME: Tests for JobManager 200ms progress-batching window
 // Verifies that bursty progress fanouts coalesce into a single inject call per
 // subscription, that a terminal-state fanout flushes any pending batch
-// immediately, and that unsubscribe cancels pending timers. After PRI-1744 the
+// immediately, and that unsubscribe cancels pending timers. The
 // notification is delivered via an `inject` callback (one per matching sub),
 // not pushed onto an in-memory queue.
 
@@ -29,7 +29,7 @@ function recordedInject(calls: string[], tag: string): () => void {
   };
 }
 
-describe('JobManager 200ms progress batching (PRI-1692 Phase 2)', () => {
+describe('JobManager 200ms progress batching', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

@@ -1,4 +1,4 @@
-// ABOUTME: Tests for the prompt.ts fallback turn_end catch handler (PRI-1818 #2).
+// ABOUTME: Tests for the prompt.ts fallback turn_end catch handler.
 // ABOUTME: Verifies the defense-in-depth path that synthesizes a turn_end when
 // ABOUTME: the conversation runner throws, and that storage-layer dedup keeps
 // ABOUTME: us to one turn_end per turnId even when runner+fallback both write.
@@ -34,7 +34,7 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   return { client, server };
 }
 
-describe('prompt.ts fallback turn_end (PRI-1818 #2)', () => {
+describe('prompt.ts fallback turn_end', () => {
   let originalLaceDir: string | undefined;
   let originalTestProvider: string | undefined;
   let tempDir: string;
@@ -64,7 +64,7 @@ describe('prompt.ts fallback turn_end (PRI-1818 #2)', () => {
   it('writes fallback turn_end when runner.run throws without writing one itself', async () => {
     // Force the runner to throw immediately, simulating an error before its
     // own turn_end-write path can fire (e.g. provider construction failure,
-    // or a future bug in PRI-1818 #1's classifier).
+    // or a future bug in the runner's turn_end classifier).
     const runSpy = vi
       .spyOn(ConversationRunner.prototype, 'run')
       .mockRejectedValue(new Error('synthetic runner failure'));
@@ -107,7 +107,7 @@ describe('prompt.ts fallback turn_end (PRI-1818 #2)', () => {
   });
 
   it('does NOT overwrite an earlier runner turn_end when the runner threw after writing one', async () => {
-    // Simulate the realistic post-PRI-1818-#1 path: runner writes its own
+    // Simulate the realistic post-fix path: runner writes its own
     // turn_end (with a precise stopReason) and THEN throws. The fallback
     // must hit the storage dedup and leave the runner's turn_end intact.
     const runSpy = vi.spyOn(ConversationRunner.prototype, 'run').mockImplementation(async function (

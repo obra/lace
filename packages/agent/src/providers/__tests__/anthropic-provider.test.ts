@@ -158,7 +158,7 @@ describe('AnthropicProvider', () => {
       const callArgs = mockCreateResponse.mock
         .calls[0][0] as Anthropic.Messages.MessageCreateParams;
       // role:system is filtered out of messages[] by convertToAnthropicFormat;
-      // PRI-1799: last message is converted to a content-block array so we
+      // last message is converted to a content-block array so we
       // can attach a 1h cache_control breakpoint to its final block.
       expect(callArgs.messages).toEqual([
         { role: 'user', content: 'User message' },
@@ -174,7 +174,7 @@ describe('AnthropicProvider', () => {
         },
       ]);
       // System prompt is sourced from setSystemPrompt(), not from role:system messages
-      // (PRI-1804 invariant: system prompt is set once at session start and never
+      // (invariant: system prompt is set once at session start and never
       // changes; role:system entries in input are ignored).
       expect(Array.isArray(callArgs.system)).toBe(true);
       const systemBlocks = callArgs.system as Array<{
@@ -186,7 +186,7 @@ describe('AnthropicProvider', () => {
       expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
 
-    it('uses _systemPrompt (set via setSystemPrompt) and ignores any role:system messages in input (PRI-1804 invariant)', async () => {
+    it('uses _systemPrompt (set via setSystemPrompt) and ignores any role:system messages in input', async () => {
       mockCreateResponse.mockResolvedValue({
         content: [{ type: 'text', text: 'r' }],
         usage: { input_tokens: 1, output_tokens: 1 },
@@ -463,10 +463,10 @@ describe('AnthropicProvider', () => {
     });
   });
 
-  // PRI-1817: surface cache_creation_input_tokens and cache_read_input_tokens
+  // Surface cache_creation_input_tokens and cache_read_input_tokens
   // from the SDK response into ProviderResponse.usage so the runner can
   // accumulate them and compute real cost.
-  describe('cache token mapping (PRI-1817)', () => {
+  describe('cache token mapping', () => {
     it('maps cache_creation/cache_read fields from non-streaming response', async () => {
       mockCreateResponse.mockResolvedValue({
         content: [{ type: 'text', text: 'ok' }],

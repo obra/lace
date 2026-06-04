@@ -4,6 +4,7 @@ export * from './rpc/peer';
 export * from './ids';
 export * from './errors';
 export * from './schemas';
+export * from './slack-track';
 
 // Re-export application types that don't conflict with schema types
 // Note: types/shared.ts has application-level types, schemas/shared.ts has wire protocol types

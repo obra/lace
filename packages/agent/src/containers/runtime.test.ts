@@ -119,107 +119,6 @@ describe('BaseContainerRuntime', () => {
     });
   });
 
-  describe('translateToContainer', () => {
-    it('should translate host path to container path based on mounts', () => {
-      const config: ContainerConfig = {
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [
-          { source: '/Users/test/project', target: '/workspace', readonly: false },
-          { source: '/Users/test/data', target: '/data', readonly: true },
-        ],
-      };
-      const containerId = runtime.create(config);
-
-      const containerPath = runtime.translateToContainer(
-        '/Users/test/project/src/file.ts',
-        containerId
-      );
-      expect(containerPath).toBe('/workspace/src/file.ts');
-    });
-
-    it('should handle exact mount point paths', () => {
-      const config: ContainerConfig = {
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [{ source: '/Users/test/project', target: '/workspace', readonly: false }],
-      };
-      const containerId = runtime.create(config);
-
-      const containerPath = runtime.translateToContainer('/Users/test/project', containerId);
-      expect(containerPath).toBe('/workspace/');
-    });
-
-    it('should return original path when no mount matches', () => {
-      const config: ContainerConfig = {
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [{ source: '/Users/test/project', target: '/workspace', readonly: false }],
-      };
-      const containerId = runtime.create(config);
-
-      const containerPath = runtime.translateToContainer('/Users/other/path', containerId);
-      expect(containerPath).toBe('/Users/other/path');
-    });
-
-    it('should throw ContainerNotFoundError for non-existent container', () => {
-      expect(() => runtime.translateToContainer('/path', 'non-existent')).toThrow(
-        ContainerNotFoundError
-      );
-    });
-  });
-
-  describe('translateToHost', () => {
-    it('should translate container path to host path based on mounts', () => {
-      const config: ContainerConfig = {
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [{ source: '/Users/test/project', target: '/workspace', readonly: false }],
-      };
-      const containerId = runtime.create(config);
-
-      const hostPath = runtime.translateToHost('/workspace/src/file.ts', containerId);
-      expect(hostPath).toBe('/Users/test/project/src/file.ts');
-    });
-
-    it('should handle multiple mount points correctly', () => {
-      const config: ContainerConfig = {
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [
-          { source: '/Users/test/project', target: '/workspace', readonly: false },
-          { source: '/Users/test/data', target: '/data', readonly: true },
-        ],
-      };
-      const containerId = runtime.create(config);
-
-      expect(runtime.translateToHost('/workspace/file1.ts', containerId)).toBe(
-        '/Users/test/project/file1.ts'
-      );
-      expect(runtime.translateToHost('/data/file2.json', containerId)).toBe(
-        '/Users/test/data/file2.json'
-      );
-    });
-
-    it('should return original path when no mount matches', () => {
-      const config: ContainerConfig = {
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [],
-      };
-      const containerId = runtime.create(config);
-
-      const hostPath = runtime.translateToHost('/unknown/path', containerId);
-      expect(hostPath).toBe('/unknown/path');
-    });
-  });
-
   describe('state management', () => {
     it('should update container state correctly', async () => {
       const containerId = await runtime.create({
@@ -242,25 +141,6 @@ describe('BaseContainerRuntime', () => {
       info = await runtime.inspect(containerId);
       expect(info.state).toBe('stopped');
       expect(info.stoppedAt).toBeInstanceOf(Date);
-    });
-
-    it('should clean up mounts when container is removed', async () => {
-      const containerId = runtime.create({
-        id: 'test-container',
-        image: 'test:latest',
-        workingDirectory: '/app',
-        mounts: [{ source: '/Users/test', target: '/workspace', readonly: false }],
-      });
-
-      // Verify mount exists
-      expect(() => runtime.translateToContainer('/Users/test/file', containerId)).not.toThrow();
-
-      await runtime.remove(containerId);
-
-      // Verify mount is cleaned up
-      expect(() => runtime.translateToContainer('/Users/test/file', containerId)).toThrow(
-        ContainerNotFoundError
-      );
     });
   });
 });

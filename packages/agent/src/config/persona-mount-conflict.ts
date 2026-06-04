@@ -1,5 +1,5 @@
 // ABOUTME: R6 invariant — per_invocation personas must not share mount-registry
-// ABOUTME: names with persistent personas. PRI-1796.
+// ABOUTME: names with persistent personas.
 
 import type { PersonaRegistry, ParsedPersona } from './persona-registry';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
@@ -48,7 +48,7 @@ function findConflictsForPersona(
   if (runtime.type !== 'container' || runtime.containerSharing !== 'per_invocation') {
     return [];
   }
-  const declared = Object.keys(runtime.mounts);
+  const declared = runtime.mounts;
   const conflicts: Conflict[] = [];
   for (const mountName of declared) {
     if (RESERVED_MOUNT_NAMES.has(mountName)) continue;
@@ -83,7 +83,7 @@ function buildPersistentByNameMap(registry: PersonaRegistry): Map<string, Set<st
     }
     const runtime = parsed.config.runtime;
     if (runtime.type !== 'container' || runtime.containerSharing !== 'persistent') continue;
-    for (const mountName of Object.keys(runtime.mounts)) {
+    for (const mountName of runtime.mounts) {
       if (RESERVED_MOUNT_NAMES.has(mountName)) continue;
       const set = persistentByName.get(mountName) ?? new Set<string>();
       set.add(info.name);
