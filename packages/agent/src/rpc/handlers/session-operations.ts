@@ -102,10 +102,24 @@ async function computeContextBreakdownForActiveSession(
     }
   }
 
-  const { executor: coreExecutor } = await createToolExecutorForMode('execute');
+  const activePersona = state.activeSession?.meta.persona ?? 'lace';
+  const { executor: coreExecutor } = await createToolExecutorForMode(
+    'execute',
+    undefined, // mcpServerManager
+    undefined, // jobManager
+    undefined, // skillRegistry
+    undefined, // toolScope
+    undefined, // personaRegistry
+    activePersona
+  );
   const { executor: allExecutor } = await createToolExecutorForMode(
     'execute',
-    state.mcpServerManager
+    state.mcpServerManager,
+    undefined, // jobManager
+    undefined, // skillRegistry
+    undefined, // toolScope
+    undefined, // personaRegistry
+    activePersona
   );
 
   const coreTools = coreExecutor.getAllTools();

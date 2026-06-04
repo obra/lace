@@ -299,6 +299,10 @@ export function registerPromptHandler(
 
       const sessionIdForCache = state.activeSession.meta.sessionId;
       const sessionToolScope = state.activeSession.state.config?.toolScope;
+      // Capture the session's active persona at executor-build time so
+      // fork and /clear always use the persona of the session being built,
+      // not whatever state.activeSession holds at call time.
+      const sessionActivePersona = state.activeSession.meta.persona ?? 'lace';
       // Forwards personaRegistry through explicitly so the data flow from
       // state.personaRegistry → DelegateTool is auditable (no closure capture
       // hiding the wiring). Per-session toolScope is captured because it is
@@ -321,7 +325,8 @@ export function registerPromptHandler(
               jobManager,
               skillReg,
               sessionToolScope,
-              personaReg
+              personaReg,
+              sessionActivePersona
             ),
           sessionToolScope
         )) as RunnerDependencies['createToolExecutor'];

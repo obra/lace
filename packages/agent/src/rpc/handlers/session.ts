@@ -268,7 +268,8 @@ export async function composeAndWriteSystemPromptSet(params: {
     undefined, // jobManager
     skillRegistry,
     undefined, // toolScope
-    state.personaRegistry
+    state.personaRegistry,
+    persona
   );
   const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
 

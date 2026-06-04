@@ -32,7 +32,8 @@ export function registerToolHandlers(
       undefined, // jobManager
       skillRegistry,
       undefined, // toolScope
-      state.personaRegistry
+      state.personaRegistry,
+      state.activeSession?.meta.persona ?? 'lace'
     );
 
     const seenToolNames = new Set<string>();

@@ -38,7 +38,8 @@ export type CreateToolExecutorFn = (
   jobManager?: JobManager,
   skillRegistry?: SkillRegistry,
   toolScope?: AgentToolScope,
-  personaRegistry?: PersonaRegistry
+  personaRegistry?: PersonaRegistry,
+  activePersona?: string
 ) => Promise<{
   executor: ToolExecutor;
   toolsForProvider: Tool[];
