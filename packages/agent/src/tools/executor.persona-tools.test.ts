@@ -3,9 +3,13 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resetRegistriesForTest } from '@lace/agent/plugins';
+import { z } from 'zod';
+import { resetRegistriesForTest, registries } from '@lace/agent/plugins';
+import { Tool } from './tool';
+import type { ToolResult, ToolContext } from './types';
 import { ToolExecutor } from './executor';
 import { registerBuiltinTools } from './builtins';
+import { ExecToolAdapter } from './exec/exec-tool-adapter';
 
 function personaToolsDir(name: string): string {
   const root = mkdtempSync(join(tmpdir(), 'pt-'));
@@ -44,5 +48,34 @@ describe('injectPersonaTools', () => {
     const ex = new ToolExecutor();
     ex.registerAllAvailableTools();
     expect(() => ex.injectPersonaTools(null)).not.toThrow();
+  });
+
+  it('per-persona tool overrides a same-named non-reserved global tool', () => {
+    // Register a stub plugin/global tool under a non-reserved name.
+    // beforeEach has already run resetRegistriesForTest + registerBuiltinTools, so
+    // registries.tools contains only builtins — 'plugin-thing' is free to register.
+    class StubGlobalTool extends Tool {
+      name = 'plugin-thing';
+      description = 'a non-reserved plugin tool';
+      schema = z.object({});
+      protected async executeValidated(_args: unknown, _ctx: ToolContext): Promise<ToolResult> {
+        return this.createResult('stub');
+      }
+    }
+    registries.tools.register('plugin-thing', new StubGlobalTool(), 'test-plugin');
+
+    const ex = new ToolExecutor();
+    ex.registerAllAvailableTools();
+    const globalTool = ex.getTool('plugin-thing');
+    expect(globalTool).toBeInstanceOf(StubGlobalTool);
+
+    // Build a persona tools dir with a tool whose schema name matches the global.
+    const td = personaToolsDir('plugin-thing');
+    ex.injectPersonaTools(td);
+
+    // The global tool must have been overridden by the per-persona ExecToolAdapter.
+    const afterInject = ex.getTool('plugin-thing');
+    expect(afterInject).toBeInstanceOf(ExecToolAdapter);
+    expect(afterInject).not.toBe(globalTool);
   });
 });

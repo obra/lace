@@ -10,6 +10,8 @@ import {
 } from './api';
 import { recordManifest, type CapabilityManifest } from './manifest';
 
+const NAMESPACE_RE = /^[a-z][a-z0-9-]*$/;
+
 export class PluginLoadError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -64,6 +66,11 @@ export async function loadPlugins(
       namespace: specifier,
       version: '0.0.0',
     };
+    if (!NAMESPACE_RE.test(meta.namespace)) {
+      throw new PluginLoadError(
+        `plugin "${specifier}" has invalid namespace "${meta.namespace}" (must match ${NAMESPACE_RE.source})`
+      );
+    }
     if (mod.manifest) recordManifest(meta.name, mod.manifest);
     const api = createPluginApi(meta, registries);
     try {

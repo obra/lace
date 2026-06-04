@@ -71,4 +71,19 @@ describe('loadPlugins', () => {
       loadPlugins(`${FIX}/version-skew-plugin`, { registries: makeRegistries() })
     ).rejects.toThrow(/major/i);
   });
+
+  describe('namespace validation', () => {
+    it('fatal: namespace containing / is rejected with a clear error', async () => {
+      // Simulates a plugin whose meta.namespace is an import specifier like "@scope/pkg"
+      await expect(
+        loadPlugins(`${FIX}/bad-namespace-plugin`, { registries: makeRegistries() })
+      ).rejects.toThrow(/has invalid namespace "@scope\/pkg" \(must match \^/);
+    });
+
+    it('clean namespace loads fine', async () => {
+      const r = makeRegistries();
+      const res = await loadPlugins(`${FIX}/good-plugin`, { registries: r });
+      expect(res.loaded[0].name).toBe('good');
+    });
+  });
 });
