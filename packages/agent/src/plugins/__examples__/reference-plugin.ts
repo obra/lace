@@ -25,6 +25,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as path from 'path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { Tool } from '@lace/agent/tools/tool'; // concrete base class; stays external at build
 import type { ToolResult, ToolContext } from '@lace/agent/tools/types';
@@ -84,7 +85,9 @@ export function register(api: PluginApi): void {
   api.tools.register('reference:greet', new GreetTool());
   api.compaction.register('reference:quiet', quietStrategy);
   api.runtimes.register('reference:mem', memRuntime);
-  api.personas.addDir(path.join(__dirname, 'reference-personas'));
+  api.personas.addDir(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), 'reference-personas')
+  );
 }
 
 // Satisfy PluginModule for type-safe authoring.

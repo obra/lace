@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as path from 'path';
+import { fileURLToPath } from 'node:url';
 import type { PluginApi, PluginModule } from '@lace/agent/plugins';
 
 export const meta = {
@@ -28,7 +29,9 @@ export const meta = {
 
 export function register(api: PluginApi): void {
   api.assertVersion(1);
-  api.personas.addDir(path.join(__dirname, 'incident-responder-personas'));
+  api.personas.addDir(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), 'incident-responder-personas')
+  );
 }
 
 export default { meta, register } satisfies PluginModule;
