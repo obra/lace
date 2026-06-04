@@ -30,7 +30,7 @@ and exit 0:
 
 ```json
 {
-  "name": "acme/widget",
+  "name": "widget",
   "description": "Does a thing with widgets",
   "inputSchema": {
     "type": "object",
@@ -41,7 +41,15 @@ and exit 0:
 }
 ```
 
-- `name` (required) — namespaced, globally unique (same rule as plugin tools).
+- `name` (required) — the entry name for this tool. The final registered name
+  depends on how the binary is loaded:
+  - **Plugin global exec dir** (`api.tools.registerExecDir`): the kernel prepends
+    `<namespace>:` automatically, so `"name": "widget"` in a plugin with
+    `namespace: 'acme'` becomes `acme:widget`.
+  - **Per-persona exec dir** (`<persona>/tools/`): the descriptor name is used as-is
+    (no namespace prefix). The name must be globally unique among tools visible to
+    that persona but can shadow a same-named plugin/core global.
+  - **Core exec tools**: the descriptor name is used as-is (no prefix).
 - `description` (required) — shown to the model.
 - `inputSchema` (required) — a JSON Schema **object** (`type: "object"`);
   `properties`/`required` optional. This is advertised to the model verbatim.
@@ -110,24 +118,33 @@ When lace invokes your tool (`run-once.ts` / `exec-tool-adapter.ts`):
 
 ### Discovery and registration
 
-`discoverExecTools(dir)` (from `@lace/agent/tools/exec/discover`) scans a single
-directory, runs each **executable** file (mode `+x`) with `lace-tool-schema` (5
-s budget), and returns an `ExecToolAdapter[]`. Files that aren't executable,
-exit non-zero, or print an invalid descriptor are **skipped with a warning,
-never fatal** — one bad binary can't break discovery.
+`discoverExecToolsSync(dir, namePrefix?)` (from `@lace/agent/tools/exec/discover`)
+synchronously scans a single directory, runs each **executable** file (mode
+`+x`) with `lace-tool-schema` (5 s budget per binary, 30 s total budget, max 64
+binaries), and returns an `ExecToolAdapter[]`. Files that aren't executable, exit
+non-zero, or print an invalid descriptor are **skipped with a warning, never
+fatal** — one bad binary can't break discovery of the rest.
+
+Discovery runs **synchronously at boot** through three wiring points:
+
+1. **Core exec tools** — `config/agent-exec-tools/` inside the lace package;
+   registered at startup by `registerCoreExecTools` (owner `'core-exec'`, bare
+   names, no namespace prefix).
+2. **Plugin global exec tools** — call `api.tools.registerExecDir(dir)` in your
+   plugin's `register()` function. Tools are named
+   `<meta.namespace>:<descriptor-name>`.
+3. **Per-persona exec tools** — sibling directory `<personaDir>/<entry>/tools/`
+   next to a persona `.md` file; loaded when that persona becomes active (bare
+   descriptor names, can override plugin/core globals but not kernel built-ins).
 
 ```ts
-import { discoverExecTools } from '@lace/agent/tools/exec/discover';
-const adapters = await discoverExecTools('/opt/acme/lace-tools');
+import { discoverExecToolsSync } from '@lace/agent/tools/exec/discover';
+const adapters = discoverExecToolsSync('/opt/acme/lace-tools');
 // register each adapter into a ToolExecutor / the tools registry
 ```
 
-> **Status (be aware):** discovery is **not yet wired into boot or session
-> startup** — there is no environment variable or config field that auto-scans a
-> directory today. The protocol, the adapter, and `discoverExecTools` are real
-> and tested; an embedder currently calls `discoverExecTools(dir)` itself and
-> registers the results. Auto-wiring (an env-var-scanned tools dir) is a future
-> step.
+For the typical plugin use case, call `api.tools.registerExecDir(dir)` in
+`register()` rather than calling `discoverExecToolsSync` directly.
 
 ### Minimal example (bash)
 
@@ -136,7 +153,7 @@ const adapters = await discoverExecTools('/opt/acme/lace-tools');
 set -euo pipefail
 case "${1:-}" in
   lace-tool-schema)
-    printf '%s' '{"name":"acme/upcase","description":"Uppercase a string","inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}'
+    printf '%s' '{"name":"upcase","description":"Uppercase a string","inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}'
     ;;
   lace-tool-invoke)
     req="$(cat)"                                  # JSON on stdin
@@ -149,7 +166,9 @@ esac
 ```
 
 Make it executable (`chmod +x`) and put it in a directory you pass to
-`discoverExecTools`.
+`api.tools.registerExecDir` (plugin global) or in a
+`<personaDir>/<entry>/tools/` sibling (per-persona). When loaded via a plugin
+with `namespace: 'acme'`, this binary's final tool name will be `acme:upcase`.
 
 > **Writing it in Node?** An exec tool is a standalone executable, so Node
 > decides CommonJS-vs-ESM from _its_ context: the nearest `package.json`
@@ -169,8 +188,8 @@ tools, and exposes each as `<serverId>/<toolName>` to the model.
 ### Declaring a server
 
 MCP servers are configured per-persona via the `mcpServers` map in the persona's
-config (frontmatter for a disk persona; `config.mcpServers` for a
-[plugin persona](reference/plugins.md#personadef-lace-agentplugins)):
+config (frontmatter for a disk persona, including plugin-contributed `.md`
+personas):
 
 ```yaml
 mcpServers:
