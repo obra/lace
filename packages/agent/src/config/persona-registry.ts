@@ -320,7 +320,7 @@ class FileDirSource implements PersonaSource {
     this.namespace = opts.namespace;
     this.mcpBaseDir = opts.mcpBaseDir;
     this.getSharedCache = opts.getSharedCache;
-    this.engine = new TemplateEngine([opts.dir], { useEmbedded: false });
+    this.engine = new TemplateEngine([this.dir], { useEmbedded: false });
   }
 
   private logicalName(entry: string): string {
@@ -408,10 +408,10 @@ class FileDirSource implements PersonaSource {
 
 /**
  * Persona source backed by the bundled (embedded) persona files.
- * Owns an embedded-on TemplateEngine so that @path includes in bundled
- * templates resolve from Bun's embedded file set in production builds.
- * In development (useEmbedded:false would miss them), the engine also has
- * the bundledPersonasPath on its FS search dirs.
+ * Owns a TemplateEngine with `useEmbedded:true` so Bun embedded files are
+ * checked first in production standalone builds. The bundledPersonasPath is
+ * also on the FS search dirs as a fallback, which covers the development case
+ * where files live on disk and have not been embedded.
  */
 class BundledSource implements PersonaSource {
   readonly kind = 'bundled' as const;

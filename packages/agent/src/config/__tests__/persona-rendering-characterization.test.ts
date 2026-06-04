@@ -9,7 +9,7 @@ import * as path from 'path';
 import { PersonaRegistry, PersonaNotFoundError } from '../persona-registry';
 import { TemplateEngine } from '../template-engine';
 import { VariableProviderManager, SystemVariableProvider } from '../variable-providers';
-import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
+import { addPersonaDir, resetContributedDirsForTest } from '@lace/agent/plugins';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,20 +31,26 @@ describe('PersonaRegistry rendering characterization', () => {
   let tempDir: string;
   let bundledDir: string;
   let userDir: string;
+  let pluginDir: string;
   let registry: PersonaRegistry;
   let engine: TemplateEngine;
   let varManager: VariableProviderManager;
 
   beforeEach(() => {
-    resetRegistriesForTest();
+    resetContributedDirsForTest();
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-render-char-'));
     bundledDir = path.join(tempDir, 'bundled');
     userDir = path.join(tempDir, 'user');
+    pluginDir = path.join(tempDir, 'plugin');
     fs.mkdirSync(bundledDir, { recursive: true });
     fs.mkdirSync(userDir, { recursive: true });
+    fs.mkdirSync(pluginDir, { recursive: true });
 
     fs.writeFileSync(path.join(bundledDir, 'bundled-agent.md'), BUNDLED_BODY);
     fs.writeFileSync(path.join(userDir, 'user-agent.md'), USER_BODY);
+    fs.writeFileSync(path.join(pluginDir, 'plugin-agent.md'), PLUGIN_BODY);
+
+    addPersonaDir('test-vendor', pluginDir);
 
     registry = new PersonaRegistry({
       bundledPersonasPath: bundledDir,
@@ -60,7 +66,7 @@ describe('PersonaRegistry rendering characterization', () => {
 
   afterEach(() => {
     fs.rmSync(tempDir, { recursive: true, force: true });
-    resetRegistriesForTest();
+    resetContributedDirsForTest();
   });
 
   // ── 1. User persona ───────────────────────────────────────────────────────
@@ -96,18 +102,11 @@ describe('PersonaRegistry rendering characterization', () => {
 
   // ── 3. Plugin persona ─────────────────────────────────────────────────────
 
-  it('renders a plugin persona — body is rendered via renderString, variables substituted', async () => {
-    registries.personas.register(
-      'plugin-agent',
-      { config: { runtime: { type: 'root' } } as never, body: PLUGIN_BODY },
-      'test-vendor'
-    );
-
+  it('renders a plugin persona — body rendered via renderPersona, variables substituted', async () => {
     const context = await makeMinimalContext(varManager);
-    // Drive rendering the same way prompt-manager does today for plugin personas:
-    // parsePersona returns the body, then engine.renderString(body, context) is called.
-    const parsed = registry.parsePersona('plugin-agent');
-    const result = engine.renderString(parsed.body, context);
+    // Plugin persona is now file-dir based: test-vendor:plugin-agent resolves
+    // from the plugin dir set up in beforeEach via addPersonaDir.
+    const result = registry.renderPersona('test-vendor:plugin-agent', context);
 
     expect(result).toContain('You are a plugin-defined test agent.');
     expect(result).not.toContain('{{system.os}}');
@@ -118,28 +117,23 @@ describe('PersonaRegistry rendering characterization', () => {
 
   // ── 4. User wins over plugin with same name ───────────────────────────────
 
-  it('user-disk persona shadows same-named plugin persona during render', async () => {
-    registries.personas.register(
-      'user-agent',
-      { config: { runtime: { type: 'root' } } as never, body: PLUGIN_BODY },
-      'test-vendor'
-    );
-
+  it('user-disk persona is found by engine render without plugin interference', async () => {
+    // Plugin personas are namespaced (test-vendor:plugin-agent), so there is no
+    // name collision with plain user-disk personas. Verify engine.render picks the
+    // user-disk file as expected.
     const context = await makeMinimalContext(varManager);
-    // user-agent on disk should win, and render via engine.render (not renderString).
     const result = engine.render('user-agent.md', context);
     expect(result).toContain('You are a user-defined test agent.');
     expect(result).not.toContain('plugin-defined');
   });
 
-  // ── registry.render() dispatch tests ─────────────────────────────────────
-  // These exercise the new PersonaRegistry.render() method — the actual
-  // dispatch path introduced by the refactor. The old tests above exercise
-  // engine.render/renderString directly and do NOT cover registry dispatch.
+  // ── registry.renderPersona() dispatch tests ───────────────────────────────
+  // These exercise PersonaRegistry.renderPersona() — the source-scoped dispatch
+  // path. Engine.render/renderString tests above do NOT cover registry dispatch.
 
-  it('registry.render — user persona: substitutes {{system.os}}', async () => {
+  it('registry.renderPersona — user persona: substitutes {{system.os}}', async () => {
     const context = await makeMinimalContext(varManager);
-    const result = registry.render('user-agent', engine, context);
+    const result = registry.renderPersona('user-agent', context);
 
     expect(result).toContain('You are a user-defined test agent.');
     // The mustache variable must have been expanded — literal tag is gone.
@@ -150,15 +144,9 @@ describe('PersonaRegistry rendering characterization', () => {
     expect(match![1].trim().length).toBeGreaterThan(0);
   });
 
-  it('registry.render — plugin persona: renderString path, substitutes {{system.os}}', async () => {
-    registries.personas.register(
-      'plugin-agent',
-      { config: { runtime: { type: 'root' } } as never, body: PLUGIN_BODY },
-      'test-vendor'
-    );
-
+  it('registry.renderPersona — plugin persona: substitutes {{system.os}}', async () => {
     const context = await makeMinimalContext(varManager);
-    const result = registry.render('plugin-agent', engine, context);
+    const result = registry.renderPersona('test-vendor:plugin-agent', context);
 
     expect(result).toContain('You are a plugin-defined test agent.');
     expect(result).not.toContain('{{system.os}}');
@@ -167,24 +155,26 @@ describe('PersonaRegistry rendering characterization', () => {
     expect(match![1].trim().length).toBeGreaterThan(0);
   });
 
-  it('registry.render — user beats plugin for same name (precedence via dispatch)', async () => {
-    // Register a plugin persona with the same name as the user-disk persona.
-    registries.personas.register(
-      'user-agent',
-      { config: { runtime: { type: 'root' } } as never, body: PLUGIN_BODY },
-      'test-vendor'
-    );
+  it('registry.renderPersona — user persona wins when user dir and bundled dir both have entry', async () => {
+    // Write a bundled entry with the same name as the user persona. User dir source
+    // has higher precedence, so registry.renderPersona must return the user body.
+    fs.writeFileSync(path.join(bundledDir, 'user-agent.md'), BUNDLED_BODY);
+
+    // Rebuild registry so it scans the updated bundled dir.
+    const reg2 = new PersonaRegistry({
+      bundledPersonasPath: bundledDir,
+      userPersonasPaths: [userDir],
+    });
 
     const context = await makeMinimalContext(varManager);
-    // registry.render must pick the user-disk source first.
-    const result = registry.render('user-agent', engine, context);
+    const result = reg2.renderPersona('user-agent', context);
 
     expect(result).toContain('You are a user-defined test agent.');
-    expect(result).not.toContain('plugin-defined');
+    expect(result).not.toContain('bundled');
   });
 
-  it('registry.render — throws PersonaNotFoundError for unknown name', async () => {
+  it('registry.renderPersona — throws PersonaNotFoundError for unknown name', async () => {
     const context = await makeMinimalContext(varManager);
-    expect(() => registry.render('does-not-exist', engine, context)).toThrow(PersonaNotFoundError);
+    expect(() => registry.renderPersona('does-not-exist', context)).toThrow(PersonaNotFoundError);
   });
 });
