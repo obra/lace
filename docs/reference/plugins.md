@@ -307,13 +307,26 @@ type CompactResult =
     }
   | { noop: true };
 interface CompactionContext {
-  threadId;
-  sessionDir;
-  provider?;
-  agent?;
-  modelId?;
+  threadId: string;
+  sessionDir?: string;
+  // One-shot LLM query, bound by the call site to the session connection
+  // (converts {prompt}->messages; defaults `model` to the session modelId).
+  // Absent when no connection/model is available; deterministic strategies ignore it.
+  query?: (opts: {
+    messages?: ProviderMessage[]; prompt?: string; model?: string; signal?: AbortSignal;
+  }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
+  // Free-text steering from the compact caller (compact_session / ent.session.compact
+  // `guidance`, or /compact's command tail). Absent when auto-fired; built-ins ignore it.
+  guidance?: string;
 }
 ```
+
+**Compaction is triggered three ways**, all routing through the persona-selected
+strategy and `validatePreserved`: automatically in the runner's post-turn hook at
+the persona's `compaction.breakpoints` (`{ at, action: 'notify' | 'compact' }`);
+by the agent calling the built-in **`compact_session`** tool (optional `guidance`;
+it schedules a post-turn compaction and asks the model to end its turn); or via the
+`ent/session/compact` RPC / the `/compact` command.
 
 Return `{ noop: true }` when there is nothing to compact — do **not** return a
 `compactionEvent` with an empty `preserved`. `ContextCompactedEventData` (from
@@ -340,8 +353,16 @@ result). When building test fixtures, a minimal `turn_end` data payload is
 `{ stopReason: 'end_turn', usage: { costUsd: 0 } }`; a `prompt`/`message`
 payload carries `{ content: string | ContentBlock[] }`.
 
-**The toolkit:** `@lace/agent/compaction/toolkit` exports
-`mergePreservedAdjacent(entries: PreservedEntry[])` — apply it to your preserved
+**The toolkit:** `@lace/agent/compaction/toolkit` exports the
+domain-neutral compaction primitives (promoted out of the kernel `track-based`
+strategy in the Slack de-leak): `splitAtTailBoundary` (events -> earlier/tail at a
+turn boundary), `demuxByTrack(events, attributeFn)` (group earlier events by a
+caller-supplied per-event track key — the de-interleave seam a custom strategy
+injects its own attributor into), `buildPreservedTail` / `buildPreservedWithPrefix`
+(build the verbatim-tail + prefix preserved stream), the generic non-Slack salience
+helpers `jobSalience` / `untrackedSalience` / `systemSalience` with
+`renderGenericSections`, and
+`mergePreservedAdjacent(entries: PreservedEntry[])` — apply the last to your preserved
 list so message replay stays legal (drops empties, merges consecutive same-role
 entries, ensures a leading user-role entry; returns `[]` when nothing remains →
 return `{ noop: true }`). A `PreservedEntry` is

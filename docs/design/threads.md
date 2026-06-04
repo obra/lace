@@ -99,6 +99,14 @@ events (id, thread_id, type, data, created_at)
 
 #### Compaction System (`src/threads/compaction/`)
 
+> **OUTDATED (2026-06).** Predates the event-sourced rewrite and the plugin system.
+> Compaction is no longer a `src/threads/` `ThreadManager` registry; it is a
+> `LACE_PLUGINS` registry: `api.compaction.register(name, strategy)`, where a
+> strategy is `compact(events, ctx): Promise<CompactResult>`, selected per-persona
+> by name (default `track-based`). `registerCompactionStrategy` /
+> `TrimToolResultsStrategy` below no longer exist. See `docs/reference/plugins.md`
+> and `docs/superpowers/specs/2026-06-03-pluggable-compaction-design.md`.
+
 Event-based strategy for managing context window limits:
 
 - `CompactionStrategy` interface for extensibility
@@ -166,6 +174,9 @@ parent_thread_id
 ```
 
 ## Compaction Strategy
+
+> **OUTDATED** — see the note under "Compaction System" above. Compaction is now a
+> plugin registry (`api.compaction`); the strategy types below are historical.
 
 ### Event-Based Compaction
 

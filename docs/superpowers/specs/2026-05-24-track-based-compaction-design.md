@@ -4,6 +4,15 @@ Date: 2026-05-24 Author: Jesse + Bot Supersedes:
 `2026-05-25-typed-capsule-compaction-strategy-design.md` (v1–v6, paused after 6
 non-converging rev rounds — see `project_compaction_design_in_hell.md` memory).
 
+> **Status (2026-06-03): shipped, then partially superseded by *pluggable
+> compaction*** (`2026-06-03-pluggable-compaction-design.md`). The track-demux +
+> tail-preserve skeleton became the kernel default and the exported
+> `@lace/agent/compaction/toolkit`. The **Slack-specific** salience/rendering
+> described below was **de-leaked out of the lace kernel** into the sen-core
+> `sen-multiconv` plugin — the lace kernel default is now domain-neutral (no Slack
+> references). Read this for the track/demux rationale; read Spec A for the current
+> seam, breakpoints, `compact_session`, and the one-shot `query` primitive.
+
 ## Why
 
 Sen's lace session is a single-persona, single-memory-thread agent whose inbound
