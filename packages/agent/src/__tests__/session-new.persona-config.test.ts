@@ -16,6 +16,7 @@ import { loadSession } from '../storage/session-store';
 import { defaultInitializeParams } from './helpers/initialize';
 import type { JobManager } from '../jobs/job-manager';
 import type { JobState } from '../server-types';
+import { resetRegistriesForTest } from '../plugins';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -581,6 +582,78 @@ mcp-only persona`
 
       const loaded = loadSession(created.sessionId);
       expect(loaded.state.config?.personaName).toBe('custom');
+    });
+  });
+
+  describe('session/new fails at open when persona selects an unregistered compaction strategy', () => {
+    afterEach(() => {
+      // Reset the compaction registry so unregistered-strategy tests don't
+      // contaminate other tests that expect track-based to be available.
+      resetRegistriesForTest();
+    });
+
+    it('rejects session/new when persona compaction.strategy is unregistered', async () => {
+      writeFileSync(
+        join(userPersonasDir, 'bad-compaction.md'),
+        `---
+compaction:
+  strategy: sen-multiconv
+---
+Persona with unregistered compaction strategy.`
+      );
+
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+      );
+
+      await expect(
+        client.request('session/new', { cwd: tempDir, persona: 'bad-compaction' })
+      ).rejects.toMatchObject({
+        message: expect.stringMatching(/sen-multiconv|LACE_PLUGINS/),
+      });
+    });
+
+    it('allows session/new when persona has no compaction block (uses default track-based)', async () => {
+      writeFileSync(join(userPersonasDir, 'no-compaction.md'), 'Persona with no compaction.');
+
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+      );
+
+      await expect(
+        client.request('session/new', { cwd: tempDir, persona: 'no-compaction' })
+      ).resolves.toMatchObject({ sessionId: expect.stringContaining('sess_') });
+    });
+
+    it('allows session/new when persona compaction.strategy is track-based (always registered)', async () => {
+      writeFileSync(
+        join(userPersonasDir, 'track-compaction.md'),
+        `---
+compaction:
+  strategy: track-based
+---
+Persona with track-based compaction strategy.`
+      );
+
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] })
+      );
+
+      await expect(
+        client.request('session/new', { cwd: tempDir, persona: 'track-compaction' })
+      ).resolves.toMatchObject({ sessionId: expect.stringContaining('sess_') });
     });
   });
 
