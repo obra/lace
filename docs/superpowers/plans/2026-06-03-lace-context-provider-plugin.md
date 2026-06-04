@@ -1,7 +1,8 @@
 # Lace Context-Provider Plugin Implementation Plan
 
 Let plugins contribute **variable/context providers** — the objects that feed
-data into the system-prompt template — through the existing `LACE_PLUGINS` system.
+data into the system-prompt template — through the existing `LACE_PLUGINS`
+system.
 
 Today `PromptManager` hardcodes its set of `VariableProvider`s
 (System/Git/Project/Context + optional Tool/Skill) in its constructor
@@ -13,13 +14,14 @@ already there.
 
 ## Design of record
 
-- A 6th `Registry<VariableProvider>` named `contextProviders`, mirroring the other
-  five registries (registrar, owner-tracking, reset).
-- `PromptManager` drains the registry into its `VariableProviderManager` **after**
-  the built-in providers, so a plugin's variables merge last (last-write-wins in
-  `Object.assign`, matching today's add-order semantics).
+- A 6th `Registry<VariableProvider>` named `contextProviders`, mirroring the
+  other five registries (registrar, owner-tracking, reset).
+- `PromptManager` drains the registry into its `VariableProviderManager`
+  **after** the built-in providers, so a plugin's variables merge last
+  (last-write-wins in `Object.assign`, matching today's add-order semantics).
 - The `VariableProvider` interface must become **exported** so plugins can type
-  against it. It is currently module-private (`config/variable-providers.ts:11`).
+  against it. It is currently module-private
+  (`config/variable-providers.ts:11`).
 - No new behavior beyond "plugin providers also run." Built-in providers and
   ordering are unchanged.
 
@@ -49,12 +51,16 @@ you invoke), not a factory. Plugins construct their provider and register it.
    - `import type { VariableProvider } from '@lace/agent/config/variable-providers';`
    - Add `contextProviders: Registry<VariableProvider>;` to `PluginRegistries`.
    - Add `contextProviders: PluginRegistrar<VariableProvider>;` to `PluginApi`.
-   - `makeRegistries()`: `contextProviders: new Registry<VariableProvider>('contextProviders'),`.
-   - `createPluginApi()`: `contextProviders: registrar(registries.contextProviders, meta.name),`.
+   - `makeRegistries()`:
+     `contextProviders: new Registry<VariableProvider>('contextProviders'),`.
+   - `createPluginApi()`:
+     `contextProviders: registrar(registries.contextProviders, meta.name),`.
    - `resetRegistriesForTest()`: `registries.contextProviders.clear();`.
 
 **Tests (TDD):**
-- `makeRegistries().contextProviders` is a `Registry` of kind `'contextProviders'`.
+
+- `makeRegistries().contextProviders` is a `Registry` of kind
+  `'contextProviders'`.
 - `createPluginApi(...).contextProviders.register('x', provider)` records owner
   `meta.name`.
 - `resetRegistriesForTest()` clears it.
@@ -65,6 +71,7 @@ you invoke), not a factory. Plugins construct their provider and register it.
 
 After the existing built-in `addProvider(...)` calls (the block ending at
 `prompt-manager.ts:57`, after the optional Skill provider), append:
+
 ```ts
 import { registries as pluginRegistries } from '@lace/agent/plugins';
 // ...
@@ -73,7 +80,9 @@ import { registries as pluginRegistries } from '@lace/agent/plugins';
 // other registries: populated by loadPlugins() in boot() before any prompt is
 // generated, so the registry is full by the time PromptManager is constructed.
 for (const name of pluginRegistries.contextProviders.names()) {
-  this.variableManager.addProvider(pluginRegistries.contextProviders.resolve(name));
+  this.variableManager.addProvider(
+    pluginRegistries.contextProviders.resolve(name)
+  );
 }
 ```
 
@@ -85,14 +94,15 @@ wiring is required (unlike providers/tools/runtimes, context providers have no
 built-in registration step — the built-ins stay as direct `addProvider` calls).
 
 **Tests (TDD):**
+
 - With a context provider registered in `registries.contextProviders`, a
   `PromptManager` built afterward includes that provider — assert its variable
-  appears in `variableManager.getTemplateContext()` (or in a generated prompt that
-  references it).
-- Ordering: a plugin provider returning `{ system: {...} }` overrides the built-in
-  `SystemVariableProvider` key (last-write-wins), confirming plugin-after-builtin
-  order. (If overriding built-ins is undesirable, document it — but the merge
-  semantics are pre-existing; do not change them here.)
+  appears in `variableManager.getTemplateContext()` (or in a generated prompt
+  that references it).
+- Ordering: a plugin provider returning `{ system: {...} }` overrides the
+  built-in `SystemVariableProvider` key (last-write-wins), confirming
+  plugin-after-builtin order. (If overriding built-ins is undesirable, document
+  it — but the merge semantics are pre-existing; do not change them here.)
 
 ---
 
@@ -103,6 +113,7 @@ built-in registration step — the built-ins stay as direct `addProvider` calls)
 **File:** `plugins/__examples__/reference-plugin.ts`.
 
 Add a `// ── 6) Context provider ──` section:
+
 ```ts
 import type { VariableProvider } from '@lace/agent/config/variable-providers';
 
@@ -119,10 +130,11 @@ api.contextProviders.register('reference/vars', refVars);
 
 Extend the existing whole-system test to assert the context-provider consumption
 site:
+
 - `registries.contextProviders.has('reference/vars')` with owner `'reference'`.
 - A `PromptManager` constructed after loading the reference plugin produces a
-  template context containing `reference.marker === 'XYZZY'` (proving the drain in
-  A2 reaches the prompt pipeline end-to-end).
+  template context containing `reference.marker === 'XYZZY'` (proving the drain
+  in A2 reaches the prompt pipeline end-to-end).
 
 ---
 
@@ -136,14 +148,17 @@ site:
 
 # Self-review / coverage
 
-- [ ] `contextProviders` registry mirrors the other five (registrar, owner, reset).
+- [ ] `contextProviders` registry mirrors the other five (registrar, owner,
+      reset).
 - [ ] `VariableProvider` exported; plugins can type against it.
-- [ ] Built-in providers and their order unchanged; plugin providers appended after.
-- [ ] No new boot wiring needed; comment explains why the registry is already full.
+- [ ] Built-in providers and their order unchanged; plugin providers appended
+      after.
+- [ ] No new boot wiring needed; comment explains why the registry is already
+      full.
 - [ ] Reference plugin + integration test cover the seam end-to-end.
 
 # Execution handoff
 
-Use `superpowers:subagent-driven-development`. A1→A2→B1→B2 sequential. All phases
-are mechanical given this spec; cheap model suffices except A2 (the
+Use `superpowers:subagent-driven-development`. A1→A2→B1→B2 sequential. All
+phases are mechanical given this spec; cheap model suffices except A2 (the
 construction-timing reasoning) which warrants a standard model.

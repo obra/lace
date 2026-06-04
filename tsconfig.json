@@ -15,6 +15,10 @@
       "~/*": ["./*"]
     }
   },
-  "include": ["src/**/*", "types/**/*", "tests/scenarios/persona-path-migration-baseline/capture.ts"],
+  "include": [
+    "src/**/*",
+    "types/**/*",
+    "tests/scenarios/persona-path-migration-baseline/capture.ts"
+  ],
   "exclude": ["node_modules", "dist", "packages", "knip.config.ts", "production-build.test.ts"]
 }

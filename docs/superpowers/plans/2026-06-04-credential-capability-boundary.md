@@ -1,120 +1,476 @@
 # Credential capability boundary (#6) Implementation Plan — rev 4
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:test-driven-development + superpowers:executing-plans (or subagent-driven-development). Steps use checkbox (`- [ ]`). **Two repos:** the bulk is **sen-core-v2** (helper, per-container sockets, the Rust shim/plane provisioning, proxy/token cleanup); **lace** (TypeScript, `packages/agent`) does a focused **decoupling** (delete the token minter + the `browserCdpSocket` carrier + generalize hardcoded mount names). **Chase by symbol, not line number** — #3 + the plugin system landed; lines have shifted. (The `pri2012-shim-lace`→`main` merge has RESOLVED; the tree is on `main`, no conflict markers.)
+> **For agentic workers:** REQUIRED SUB-SKILL:
+> superpowers:test-driven-development + superpowers:executing-plans (or
+> subagent-driven-development). Steps use checkbox (`- [ ]`). **Two repos:** the
+> bulk is **sen-core-v2** (helper, per-container sockets, the Rust shim/plane
+> provisioning, proxy/token cleanup); **lace** (TypeScript, `packages/agent`)
+> does a focused **decoupling** (delete the token minter + the
+> `browserCdpSocket` carrier + generalize hardcoded mount names). **Chase by
+> symbol, not line number** — #3 + the plugin system landed; lines have shifted.
+> (The `pri2012-shim-lace`→`main` merge has RESOLVED; the tree is on `main`, no
+> conflict markers.)
 
-> **rev 4 (2026-06-04):** a third confirmatory 3-opus panel returned **SHIP-WITH-FIXES on all three lenses — no more architectural blockers** (the rev-3 security model is sound: per-container sockets off the instance root genuinely exclude main-sen; "identity = which socket" has no residual forgery surface). rev 4 folds in the buildability/lifecycle fixes:
-> - **Sockets go on a HOST-PATH-BACKED dir, not the named volume.** `docker -v` resolves source paths on the **host** fs; a named volume's data lives at `/var/lib/docker/volumes/...` which the shim can't address. So the per-container sockets need a host-path-backed private dir bind-mounted at the **same host path** into helper(RW)/arbiter(RO)/shim(RO), **outside** the instance root (so main-sen still can't see it). Only the **new** per-container socket needs this; the existing admin/approval/CA sockets stay on the named volume (they use `connect()`/read, never an onward bind-mount).
-> - **persistent-box must re-provision on adopt.** The spawn flow early-returns on adopt (`dispatch.rs:124`), bypassing provisioning. persistent-box always adopts after its first spawn → after a helper restart its socket dies and is never re-listened. Fix: call `provision_capability_socket` **idempotently on the adopt path** too.
-> - **"Identity = which socket" needs a real per-socket-listener subsystem**, not a map swap. The helper today has 4 static role-keyed `net.createServer`s; the model needs **one dynamic server per persona** (listen on the provisioned path, server→identity, unlisten+unlink on release, identity resolved from *which server accepted*). Called out as its own step.
-> - **The shim INJECTS the single-file socket bind directly** (like it already injects `/work` for per_invocation, `dispatch.rs:158`), NOT via the baked mount registry (which has no per-container placeholder). The persona's declared `sen-cred` mount is the **gate signal**; the shim detects it and substitutes the per-container single-file bind.
-> - **Provision-failure unwind:** a successful provision + failed `docker create` leaks a bound socket + map entry → `release_capability_socket` must fire on the create-failure path (mirror the existing mount-before-register unwind).
-> - **Decoupling enumeration was incomplete + framing was glib.** Add `config/persona-registry.ts` (the `browserCdpSocket` schema field) and `rpc/handlers/initialize.ts` (the `tokenEnvName` protocol intake) to the strip set. The `browserCdpSocket` carrier is **already dead in the live plane path** (`projected-container.ts:244` only carries it when `!hasPlaneSelectors`; the plane re-injects the env via `spawn.rs:144` + `PersonaSpec.browser_cdp_socket`) — so stripping it is safe and the **browser persona survives through the plane**, NOT via "a generic mount" (a mount can't carry the computed per-container socket-file env — fix that sentence).
-> - **Gate the token-METADATA removal on #4, not just the env.** `containerExecutionMetadata.tokenFingerprint` is forwarded to sen-core and feeds the **live** proxy registration (`lace-runtime-registration.ts`) — the source-IP identity path #4 replaces. Deleting it pre-#4 bricks proxy identity.
-> - **Re-scope mount-name generalization:** `broker-container-mounts.ts` is spawn-broker-adjacent and is **deleted by Part C Step 1** (the spawn-broker family) — don't double-count; the genuinely-generic literals to scrub are in `containers/spec.ts` + `tools/runtime/*`.
-> - **Feasibility nits:** add `proxy/src/protocol.rs` (the Rust `CallerIdentity.browser_cdp_url` field) to Part D's deletion list; `sen-credential-private` is mounted by helper/arbiter/**shim**, NOT the proxy; `executionEnv` is a **generic** mechanism (host subagents, projected bindings) — remove only the token *content*, keep the field.
+> **rev 4 (2026-06-04):** a third confirmatory 3-opus panel returned
+> **SHIP-WITH-FIXES on all three lenses — no more architectural blockers** (the
+> rev-3 security model is sound: per-container sockets off the instance root
+> genuinely exclude main-sen; "identity = which socket" has no residual forgery
+> surface). rev 4 folds in the buildability/lifecycle fixes:
+>
+> - **Sockets go on a HOST-PATH-BACKED dir, not the named volume.** `docker -v`
+>   resolves source paths on the **host** fs; a named volume's data lives at
+>   `/var/lib/docker/volumes/...` which the shim can't address. So the
+>   per-container sockets need a host-path-backed private dir bind-mounted at
+>   the **same host path** into helper(RW)/arbiter(RO)/shim(RO), **outside** the
+>   instance root (so main-sen still can't see it). Only the **new**
+>   per-container socket needs this; the existing admin/approval/CA sockets stay
+>   on the named volume (they use `connect()`/read, never an onward bind-mount).
+> - **persistent-box must re-provision on adopt.** The spawn flow early-returns
+>   on adopt (`dispatch.rs:124`), bypassing provisioning. persistent-box always
+>   adopts after its first spawn → after a helper restart its socket dies and is
+>   never re-listened. Fix: call `provision_capability_socket` **idempotently on
+>   the adopt path** too.
+> - **"Identity = which socket" needs a real per-socket-listener subsystem**,
+>   not a map swap. The helper today has 4 static role-keyed
+>   `net.createServer`s; the model needs **one dynamic server per persona**
+>   (listen on the provisioned path, server→identity, unlisten+unlink on
+>   release, identity resolved from _which server accepted_). Called out as its
+>   own step.
+> - **The shim INJECTS the single-file socket bind directly** (like it already
+>   injects `/work` for per_invocation, `dispatch.rs:158`), NOT via the baked
+>   mount registry (which has no per-container placeholder). The persona's
+>   declared `sen-cred` mount is the **gate signal**; the shim detects it and
+>   substitutes the per-container single-file bind.
+> - **Provision-failure unwind:** a successful provision + failed
+>   `docker create` leaks a bound socket + map entry →
+>   `release_capability_socket` must fire on the create-failure path (mirror the
+>   existing mount-before-register unwind).
+> - **Decoupling enumeration was incomplete + framing was glib.** Add
+>   `config/persona-registry.ts` (the `browserCdpSocket` schema field) and
+>   `rpc/handlers/initialize.ts` (the `tokenEnvName` protocol intake) to the
+>   strip set. The `browserCdpSocket` carrier is **already dead in the live
+>   plane path** (`projected-container.ts:244` only carries it when
+>   `!hasPlaneSelectors`; the plane re-injects the env via `spawn.rs:144` +
+>   `PersonaSpec.browser_cdp_socket`) — so stripping it is safe and the
+>   **browser persona survives through the plane**, NOT via "a generic mount" (a
+>   mount can't carry the computed per-container socket-file env — fix that
+>   sentence).
+> - **Gate the token-METADATA removal on #4, not just the env.**
+>   `containerExecutionMetadata.tokenFingerprint` is forwarded to sen-core and
+>   feeds the **live** proxy registration (`lace-runtime-registration.ts`) — the
+>   source-IP identity path #4 replaces. Deleting it pre-#4 bricks proxy
+>   identity.
+> - **Re-scope mount-name generalization:** `broker-container-mounts.ts` is
+>   spawn-broker-adjacent and is **deleted by Part C Step 1** (the spawn-broker
+>   family) — don't double-count; the genuinely-generic literals to scrub are in
+>   `containers/spec.ts` + `tools/runtime/*`.
+> - **Feasibility nits:** add `proxy/src/protocol.rs` (the Rust
+>   `CallerIdentity.browser_cdp_url` field) to Part D's deletion list;
+>   `sen-credential-private` is mounted by helper/arbiter/**shim**, NOT the
+>   proxy; `executionEnv` is a **generic** mechanism (host subagents, projected
+>   bindings) — remove only the token _content_, keep the field.
 
-> **Sequencing — #6 is LAST: #3 → #4 → #6.** #3 (the plane) IS merged. **#4 (proxy source-IP attribution + token-free proxy) is NOT** (verified: `resolve_source_ip`, the empty-identity fallback, token injection, shared `quarantine` net all still present) — Part C **and the Part B metadata removal** are blocked on it.
+> **Sequencing — #6 is LAST: #3 → #4 → #6.** #3 (the plane) IS merged. **#4
+> (proxy source-IP attribution + token-free proxy) is NOT** (verified:
+> `resolve_source_ip`, the empty-identity fallback, token injection, shared
+> `quarantine` net all still present) — Part C **and the Part B metadata
+> removal** are blocked on it.
 
-**Goal:** Delete `SEN_AGENT_TOKEN` end-to-end and make lace **genuinely credential-agnostic**. Replace the world-writable, token-authed credential socket with a **per-persona-container socket on a host-path-backed private dir, plane-provisioned and bound to registry-truth identity** — identity is *which socket your container has*, not a stealable secret, and not reachable from main-sen. The credential tool stays an **in-image CLI**; the gate is the persona's declared `sen-cred` mount. The helper runs in its **own container**. Browser CDP stays **loopback-only** (already true via PRI-2002); kill any network form. lace loses the token minter, the `browserCdpSocket` carrier, and hardcoded credential mount names.
+**Goal:** Delete `SEN_AGENT_TOKEN` end-to-end and make lace **genuinely
+credential-agnostic**. Replace the world-writable, token-authed credential
+socket with a **per-persona-container socket on a host-path-backed private dir,
+plane-provisioned and bound to registry-truth identity** — identity is _which
+socket your container has_, not a stealable secret, and not reachable from
+main-sen. The credential tool stays an **in-image CLI**; the gate is the
+persona's declared `sen-cred` mount. The helper runs in its **own container**.
+Browser CDP stays **loopback-only** (already true via PRI-2002); kill any
+network form. lace loses the token minter, the `browserCdpSocket` carrier, and
+hardcoded credential mount names.
 
-**Architecture:** Authentication is **structural** — credentials are reachable only from inside a persona container whose socket the **trusted plane** created (on a dir main-sen can't see) and bound to the persona's **registry-truth** identity. No bearer secret. lace ships nothing credential-specific; sen owns the in-image CLI, the helper, and the protocol.
+**Architecture:** Authentication is **structural** — credentials are reachable
+only from inside a persona container whose socket the **trusted plane** created
+(on a dir main-sen can't see) and bound to the persona's **registry-truth**
+identity. No bearer secret. lace ships nothing credential-specific; sen owns the
+in-image CLI, the helper, and the protocol.
 
 ---
 
 ## Repo state / posture / trust
-- **lace** (TS): `/home/jesse/git/prime-radiant/sen2/lace`, `packages/agent/src`, on `main` (merge resolved). Chase by symbol.
-- **sen-core-v2**: `/home/jesse/git/prime-radiant/sen2/sen-core-v2` — `src/credential-injection/` (helper, browser, registry, the `lace-runtime-registration.ts` bridge), `src/cli/request-credential.ts` (the in-image CLI source), `sen-docker/` (Rust shim/plane), `proxy/` + `docker/credential-proxy/` + `docker/credential-helper/` + `docker/persona-containers/`, `docker-compose.yml`.
-- Posture: **not in production, Ada is the only runner, we own the box, code is trusted as code.** Fix-by-rebuild; **no backward-compat for removed pre-v1 surfaces** (token, in-process helper gates, network `browser_cdp_url`, the shared 0666 socket, spawn-broker — DELETED). Box-coordinated; lands under `--recreate`.
-- **Trust split:** the **plane (shim)** is trusted (holds docker.sock = total container control) and is the **sole identity-asserter**. **main-sen is semi-trusted** — orchestrates spawns but never holds secrets, never asserts credential identity, and now **cannot reach a credential socket** (host-path-backed private dir, unmounted in main-sen).
+
+- **lace** (TS): `/home/jesse/git/prime-radiant/sen2/lace`,
+  `packages/agent/src`, on `main` (merge resolved). Chase by symbol.
+- **sen-core-v2**: `/home/jesse/git/prime-radiant/sen2/sen-core-v2` —
+  `src/credential-injection/` (helper, browser, registry, the
+  `lace-runtime-registration.ts` bridge), `src/cli/request-credential.ts` (the
+  in-image CLI source), `sen-docker/` (Rust shim/plane), `proxy/` +
+  `docker/credential-proxy/` + `docker/credential-helper/` +
+  `docker/persona-containers/`, `docker-compose.yml`.
+- Posture: **not in production, Ada is the only runner, we own the box, code is
+  trusted as code.** Fix-by-rebuild; **no backward-compat for removed pre-v1
+  surfaces** (token, in-process helper gates, network `browser_cdp_url`, the
+  shared 0666 socket, spawn-broker — DELETED). Box-coordinated; lands under
+  `--recreate`.
+- **Trust split:** the **plane (shim)** is trusted (holds docker.sock = total
+  container control) and is the **sole identity-asserter**. **main-sen is
+  semi-trusted** — orchestrates spawns but never holds secrets, never asserts
+  credential identity, and now **cannot reach a credential socket**
+  (host-path-backed private dir, unmounted in main-sen).
 
 ## The boundary model (read first)
-- **Today (verified):** a single `0o666` subagent socket (`helper-server.ts:220`) under the instance root, mounted dir→`/run` into persona containers (`src/main.ts:~1204`), authenticated **solely** by `SEN_AGENT_TOKEN` — minted in lace (`job-manager.ts:218`), the **Rust shim** (`dispatch.rs:167` `TokenMinter::mint` → `spawn.rs:139` env), a **synthetic** mint (`runtime-registry.ts:114`), and the **spawn-broker** (`spawn-broker-identity.ts`). Identity = `registry.resolve({token})` keyed on `tokenFingerprint`. Helper defaults **in-process in main-sen**. No peer-cred. The credential *tool* is the in-image CLI `sen-request-credential` (`src/cli/request-credential.ts`), invoked via bash in the persona container.
-- **After #6:** credentials are reachable **only from inside a persona container**. The **plane provisions one credential socket per persona container on a host-path-backed private dir**, binds it to that persona's **registry-truth `(persona, session, job)`**, and **directly injects** the **single socket file** at `/run/sen-cred.sock`. **Identity = which socket.** No token. Helper in its **own container**. Browser CDP loopback-only via the existing unix-socket relay. lace carries no credential-specific code.
-- **Why it's sound (panel-verified):** (1) the socket dir is **unmounted in main-sen** → the shared-container lace processes can't reach any persona's socket; (2) each persona has only its own single socket file mounted → no cross-container reach; (3) identity is bound by the **plane** (registry-truth, the persona is a closed 3-value enum), never caller-asserted → no forgery; (4) no token to steal; (5) vault memory isolated in the helper container.
+
+- **Today (verified):** a single `0o666` subagent socket
+  (`helper-server.ts:220`) under the instance root, mounted dir→`/run` into
+  persona containers (`src/main.ts:~1204`), authenticated **solely** by
+  `SEN_AGENT_TOKEN` — minted in lace (`job-manager.ts:218`), the **Rust shim**
+  (`dispatch.rs:167` `TokenMinter::mint` → `spawn.rs:139` env), a **synthetic**
+  mint (`runtime-registry.ts:114`), and the **spawn-broker**
+  (`spawn-broker-identity.ts`). Identity = `registry.resolve({token})` keyed on
+  `tokenFingerprint`. Helper defaults **in-process in main-sen**. No peer-cred.
+  The credential _tool_ is the in-image CLI `sen-request-credential`
+  (`src/cli/request-credential.ts`), invoked via bash in the persona container.
+- **After #6:** credentials are reachable **only from inside a persona
+  container**. The **plane provisions one credential socket per persona
+  container on a host-path-backed private dir**, binds it to that persona's
+  **registry-truth `(persona, session, job)`**, and **directly injects** the
+  **single socket file** at `/run/sen-cred.sock`. **Identity = which socket.**
+  No token. Helper in its **own container**. Browser CDP loopback-only via the
+  existing unix-socket relay. lace carries no credential-specific code.
+- **Why it's sound (panel-verified):** (1) the socket dir is **unmounted in
+  main-sen** → the shared-container lace processes can't reach any persona's
+  socket; (2) each persona has only its own single socket file mounted → no
+  cross-container reach; (3) identity is bound by the **plane** (registry-truth,
+  the persona is a closed 3-value enum), never caller-asserted → no forgery; (4)
+  no token to steal; (5) vault memory isolated in the helper container.
 
 ## Decisions (Jesse, 2026-06-04)
-1. Identity = **per-persona-container socket on a host-path-backed private dir, plane-provisioned, bound to registry-truth identity**. Credentials used **only** inside persona containers (the in-image CLI). **No SO_PEERCRED, no dedicated uid** (useless under shared uid 1000; the separate helper container is the vault-memory boundary).
-2. #6 **builds on #4**; #3→#4→#6; the token dies completely across **all** minters (incl. spawn-broker).
-3. The credential tool **stays an in-image CLI**; the gate is the persona's declared `sen-cred` mount (plane-enforced). **Drop the plugin + lace-manifest framing.**
-4. #6 does the **FULL lace decoupling**: delete the token minter + the `browserCdpSocket` carrier + generalize hardcoded mount names → lace genuinely credential-agnostic.
-5. CDP/D1 = **verify the existing PRI-2002 unix-socket loopback relay is the only path + delete any network `browser_cdp_url`** (complete site list). No plane-exec rewrite.
+
+1. Identity = **per-persona-container socket on a host-path-backed private dir,
+   plane-provisioned, bound to registry-truth identity**. Credentials used
+   **only** inside persona containers (the in-image CLI). **No SO_PEERCRED, no
+   dedicated uid** (useless under shared uid 1000; the separate helper container
+   is the vault-memory boundary).
+2. #6 **builds on #4**; #3→#4→#6; the token dies completely across **all**
+   minters (incl. spawn-broker).
+3. The credential tool **stays an in-image CLI**; the gate is the persona's
+   declared `sen-cred` mount (plane-enforced). **Drop the plugin + lace-manifest
+   framing.**
+4. #6 does the **FULL lace decoupling**: delete the token minter + the
+   `browserCdpSocket` carrier + generalize hardcoded mount names → lace
+   genuinely credential-agnostic.
+5. CDP/D1 = **verify the existing PRI-2002 unix-socket loopback relay is the
+   only path + delete any network `browser_cdp_url`** (complete site list). No
+   plane-exec rewrite.
 
 ---
 
 ## Part A — Per-persona-container credential socket (host-path-backed dir), plane-provisioned
 
-**Files (sen-core-v2):** `docker-compose.yml` (the host-path-backed private dir); `sen-docker/src/{dispatch.rs, helper.rs, mounts.rs}` (shim: provision + direct single-file inject + register + unwind); `src/credential-injection/{helper-server.ts, helper-lifecycle.ts, runtime-registry.ts, socket-paths.ts, proxy-helper-protocol.ts}`.
+**Files (sen-core-v2):** `docker-compose.yml` (the host-path-backed private
+dir); `sen-docker/src/{dispatch.rs, helper.rs, mounts.rs}` (shim: provision +
+direct single-file inject + register + unwind);
+`src/credential-injection/{helper-server.ts, helper-lifecycle.ts, runtime-registry.ts, socket-paths.ts, proxy-helper-protocol.ts}`.
 
-- [ ] **Step 1: helper container is the only mode.** Delete the in-process helper *gates* (`isCredentialHelperEnabled` `helper-lifecycle.ts:354`, `isCredentialBrokerActive` `:377`, in-process wiring). The dedicated helper container + its `sen` (uid 1000, gosu) `docker/credential-helper/entrypoint.sh` → `dist/credential-injection/cli/helper-entrypoint.js` (source `src/credential-injection/cli/helper-entrypoint.ts` — **both exist; keep both**) already work. Do **not** claim a distinct uid (uid 1000 is deliberate). Test: in-process path gone (grep gate).
-- [ ] **Step 2: host-path-backed private socket dir.** Add a host dir (e.g. `${SEN_CREDENTIAL_SOCKETS_HOST}`), a **sibling of** `${SEN_INSTANCE_ROOT_HOST}` (NOT under it), bind-mounted at the **same host path** into `sen-credential-helper` (RW) and `sen-docker`/shim (RO) — mirror how compose already bind-mounts `state/scratch` at the same host path (`docker-compose.yml`). main-sen / snapshotter / personas do **not** mount it. (The existing admin/approval/CA sockets stay on the named `sen-credential-private` volume — they only `connect()`/read and are never bind-mounted onward, so they don't need this.) Test: the dir is absent from main-sen's mounts; helper and shim see it at the identical host path.
-- [ ] **Step 3: per-persona dynamic socket server (the real subsystem, not a map swap).** Today the helper makes 4 static role-keyed `net.createServer`s (`helper-server.ts:203-206`) and dispatches by a static role; identity comes from `resolve({token})`. Replace the single subagent server with **per-persona dynamic servers**: on provision, `net.createServer()` + `listen()` on the provisioned path, store `server → identity`; in `handleConnection`/`handleLine` resolve identity from **which server accepted** (NOT a token); on release, `close()` + `unlink()` + drop the entry. Extend the socket-bookkeeping (`ownedSocketPaths`/client tracking) per-socket; leak-free teardown. Delete the `0o666` chmod (`:220`), `resolve_source_ip` (`:433`), and the synthetic mint (`runtime-registry.ts:114`) — coordinate the proxy half with #4 (Part C). Test: two personas → two servers → two identities; a connection resolves to the server's identity; release closes+unlinks; no leaked servers.
-- [ ] **Step 4: provision handshake + direct single-file inject.** The shim, at spawn, for a persona that **declares the `sen-cred` mount** (the gate):
-  - **computes** the per-container socket host path on the Step-2 dir (keyed on the container name — stable for persistent-box, distinct per per_invocation; **not** the `{child_session}` registry placeholder, which is undefined for child-less persistent-box).
-  - calls a new helper **admin** op **`provision_capability_socket`** (over the existing shim→helper admin channel, `helper.rs:38-69`; admin dispatch `helper-server.ts:~693`, beside `adminRegisterRuntime` `:1231`; the shim already calls `register_runtime` at `dispatch.rs:187` before `build_create_argv` `:197`) passing **the computed path** + **registry-truth-derived** `{persona, session, job}` (persona is the closed enum `validate.rs:9`; the rest derived from the vetted persona spec).
+- [ ] **Step 1: helper container is the only mode.** Delete the in-process
+      helper _gates_ (`isCredentialHelperEnabled` `helper-lifecycle.ts:354`,
+      `isCredentialBrokerActive` `:377`, in-process wiring). The dedicated
+      helper container + its `sen` (uid 1000, gosu)
+      `docker/credential-helper/entrypoint.sh` →
+      `dist/credential-injection/cli/helper-entrypoint.js` (source
+      `src/credential-injection/cli/helper-entrypoint.ts` — **both exist; keep
+      both**) already work. Do **not** claim a distinct uid (uid 1000 is
+      deliberate). Test: in-process path gone (grep gate).
+- [ ] **Step 2: host-path-backed private socket dir.** Add a host dir (e.g.
+      `${SEN_CREDENTIAL_SOCKETS_HOST}`), a **sibling of**
+      `${SEN_INSTANCE_ROOT_HOST}` (NOT under it), bind-mounted at the **same
+      host path** into `sen-credential-helper` (RW) and `sen-docker`/shim (RO) —
+      mirror how compose already bind-mounts `state/scratch` at the same host
+      path (`docker-compose.yml`). main-sen / snapshotter / personas do **not**
+      mount it. (The existing admin/approval/CA sockets stay on the named
+      `sen-credential-private` volume — they only `connect()`/read and are never
+      bind-mounted onward, so they don't need this.) Test: the dir is absent
+      from main-sen's mounts; helper and shim see it at the identical host path.
+- [ ] **Step 3: per-persona dynamic socket server (the real subsystem, not a map
+      swap).** Today the helper makes 4 static role-keyed `net.createServer`s
+      (`helper-server.ts:203-206`) and dispatches by a static role; identity
+      comes from `resolve({token})`. Replace the single subagent server with
+      **per-persona dynamic servers**: on provision, `net.createServer()` +
+      `listen()` on the provisioned path, store `server → identity`; in
+      `handleConnection`/`handleLine` resolve identity from **which server
+      accepted** (NOT a token); on release, `close()` + `unlink()` + drop the
+      entry. Extend the socket-bookkeeping (`ownedSocketPaths`/client tracking)
+      per-socket; leak-free teardown. Delete the `0o666` chmod (`:220`),
+      `resolve_source_ip` (`:433`), and the synthetic mint
+      (`runtime-registry.ts:114`) — coordinate the proxy half with #4 (Part C).
+      Test: two personas → two servers → two identities; a connection resolves
+      to the server's identity; release closes+unlinks; no leaked servers.
+- [ ] **Step 4: provision handshake + direct single-file inject.** The shim, at
+      spawn, for a persona that **declares the `sen-cred` mount** (the gate):
+  - **computes** the per-container socket host path on the Step-2 dir (keyed on
+    the container name — stable for persistent-box, distinct per per_invocation;
+    **not** the `{child_session}` registry placeholder, which is undefined for
+    child-less persistent-box).
+  - calls a new helper **admin** op **`provision_capability_socket`** (over the
+    existing shim→helper admin channel, `helper.rs:38-69`; admin dispatch
+    `helper-server.ts:~693`, beside `adminRegisterRuntime` `:1231`; the shim
+    already calls `register_runtime` at `dispatch.rs:187` before
+    `build_create_argv` `:197`) passing **the computed path** +
+    **registry-truth-derived** `{persona, session, job}` (persona is the closed
+    enum `validate.rs:9`; the rest derived from the vetted persona spec).
   - the helper binds+listens on that path (Step 3) and maps it to the identity.
-  - the shim **directly injects** the single-file bind `-v <computed-path>:/run/sen-cred.sock` (the way it already injects `/work` for per_invocation at `dispatch.rs:158` — **not** via the baked registry; `sen-cred` in the persona's declared mounts is the gate signal the shim detects, then substitutes the per-container bind). **Single file, not the dir** — never expose sibling sockets.
-  - Test: a persona container has only its own `/run/sen-cred.sock`; two personas → different host sockets → different identities; main-sen cannot reach any persona's socket (assert absent from main-sen mounts); the in-image CLI connects successfully.
-- [ ] **Step 5: re-provision on ADOPT (persistent-box).** The spawn flow early-returns on adopt (`dispatch.rs:124`), so persistent-box (always adopts after first spawn) would never re-provision. Call `provision_capability_socket` **idempotently on the adopt path** too (re-bind/re-listen if the helper isn't already listening on the path — e.g. after a helper restart; no-op if it is). Test: adopt re-establishes a missing listener; a present listener is untouched.
-- [ ] **Step 6: teardown + failure unwind.** On teardown the shim calls **`release_capability_socket`** (close + unlink + drop the map entry). **Also call it on any post-provision spawn failure** (failed `docker create`/start/netns) so a bound socket + map entry don't leak — mirror the existing mount-before-register unwind discipline (`dispatch.rs:135-138/166`, `cleanup_new_container:237`). Test: a failed create after provision leaves no bound socket / map entry.
-- [ ] **Step 7: no caller-asserted identity.** The CLI/agent never sends `persona`/`session`/`job`; the helper derives them from the socket binding. Remove any subagent-wire identity field. Test: a request with a `persona` field is ignored.
+  - the shim **directly injects** the single-file bind
+    `-v <computed-path>:/run/sen-cred.sock` (the way it already injects `/work`
+    for per_invocation at `dispatch.rs:158` — **not** via the baked registry;
+    `sen-cred` in the persona's declared mounts is the gate signal the shim
+    detects, then substitutes the per-container bind). **Single file, not the
+    dir** — never expose sibling sockets.
+  - Test: a persona container has only its own `/run/sen-cred.sock`; two
+    personas → different host sockets → different identities; main-sen cannot
+    reach any persona's socket (assert absent from main-sen mounts); the
+    in-image CLI connects successfully.
+- [ ] **Step 5: re-provision on ADOPT (persistent-box).** The spawn flow
+      early-returns on adopt (`dispatch.rs:124`), so persistent-box (always
+      adopts after first spawn) would never re-provision. Call
+      `provision_capability_socket` **idempotently on the adopt path** too
+      (re-bind/re-listen if the helper isn't already listening on the path —
+      e.g. after a helper restart; no-op if it is). Test: adopt re-establishes a
+      missing listener; a present listener is untouched.
+- [ ] **Step 6: teardown + failure unwind.** On teardown the shim calls
+      **`release_capability_socket`** (close + unlink + drop the map entry).
+      **Also call it on any post-provision spawn failure** (failed
+      `docker create`/start/netns) so a bound socket + map entry don't leak —
+      mirror the existing mount-before-register unwind discipline
+      (`dispatch.rs:135-138/166`, `cleanup_new_container:237`). Test: a failed
+      create after provision leaves no bound socket / map entry.
+- [ ] **Step 7: no caller-asserted identity.** The CLI/agent never sends
+      `persona`/`session`/`job`; the helper derives them from the socket
+      binding. Remove any subagent-wire identity field. Test: a request with a
+      `persona` field is ignored.
 
 ## Part B — Full lace decoupling (credential tool stays an in-image CLI)
 
-**Files (lace):** `jobs/job-manager.ts` + `core/server-types.ts` + `jobs/container-execution-metadata.ts` + `jobs/subagent-job.ts` + `rpc/handlers/initialize.ts` + `tools/types.ts` + `core/conversation/types.ts` + `jobs/job-creation.ts` (token metadata); `tools/runtime/{types.ts,validation.ts}` + `tools/runtime/projected-container.ts` + `jobs/persona-container-spec.ts` + `containers/spec.ts` + `config/persona-registry.ts` (the `browserCdpSocket` carrier). **Chase ALL by symbol.**
+**Files (lace):** `jobs/job-manager.ts` + `core/server-types.ts` +
+`jobs/container-execution-metadata.ts` + `jobs/subagent-job.ts` +
+`rpc/handlers/initialize.ts` + `tools/types.ts` + `core/conversation/types.ts` +
+`jobs/job-creation.ts` (token metadata);
+`tools/runtime/{types.ts,validation.ts}` +
+`tools/runtime/projected-container.ts` + `jobs/persona-container-spec.ts` +
+`containers/spec.ts` + `config/persona-registry.ts` (the `browserCdpSocket`
+carrier). **Chase ALL by symbol.**
 
-- [ ] **Step 1: delete lace's token minter + metadata plumbing — GATE THE METADATA ON #4.** Remove the mint itself now (`job-manager.ts:218` token, `:225` `executionEnv:{[tokenEnvName]:token}`, `:228` `tokenFingerprint`, the `mergeEmbedderSpawnEnv` `SEN_AGENT_TOKEN` special-case `:196-199`). **Keep `executionEnv` the mechanism** (it's generic — host subagents `subagent-spawn.ts`, projected bindings `persona-projected-binding.ts`); remove only the token content. The **metadata removal** (`ContainerExecutionIdentityConfig.tokenEnvName`/`tokenFingerprint` `server-types.ts:~68`, `container-execution-metadata.ts`, the `initialize.ts` intake `~:59-74`, `tools/types.ts`, `core/conversation/types.ts`, `job-creation.ts`, `subagent-job.ts:~372` consumers) **is gated on #4** — `containerExecutionMetadata.tokenFingerprint` is forwarded to sen-core and feeds the **live** proxy registration (`lace-runtime-registration.ts`), which #4 migrates to source-IP. Deleting it pre-#4 bricks proxy identity. Test (post-#4): no lace reference to the token env name or `tokenFingerprint` (grep gate); a spawned container has no `SEN_AGENT_TOKEN`.
-- [ ] **Step 2: strip the `browserCdpSocket` carrier from lace's GENERIC layer.** It's a behavior-bearing flag, but **already dead in the live plane path** (`projected-container.ts:244` carries it only when `!hasPlaneSelectors`; the plane re-injects `SEN_BROWSER_CDP_SOCKET` via `spawn.rs:144` gated on `PersonaSpec.browser_cdp_socket` `persona.rs:41`). Remove it from: `config/persona-registry.ts:~68` (the schema field — **don't miss this**), `tools/runtime/types.ts:~73`, `validation.ts:~89`, `projected-container.ts:~264`, `persona-container-spec.ts:~90`, `containers/spec.ts:~17`. **The browser persona survives THROUGH THE PLANE** (`PersonaSpec.browser_cdp_socket` + `spawn.rs` env injection) — NOT via "a generic mount" (a mount can't carry the computed per-container socket-file env). Also delete the stale `notifyNetworkAttached emits browserCdpSocketPath` comments (`spec.ts`/`tools/runtime/types.ts` — it only emits `sourceIp`). Test: no `browserCdpSocket`/`SEN_BROWSER_CDP_SOCKET` symbol in lace (grep gate); the browser persona still gets CDP via the plane.
-- [ ] **Step 3: scrub the generic credential mount-name literals.** The genuinely-generic literals are in `containers/spec.ts` + `tools/runtime/*` (the `/sen-browser-cdp` path constant + comments). (`containers/broker-container-mounts.ts` — the broker mirror that hardcodes `sen-cred`/`sen-ca`/`sen-browser-cdp` host paths — is **deleted wholesale by Part C Step 1's spawn-broker removal**; do NOT treat it as separate work here.) The registry mount model (`persona-container-spec.ts:37-75`) already resolves arbitrary embedder-supplied mount names, so no new lace API is needed. Test: lace has no `sen-cred`/`sen-ca`/`sen-browser-cdp` literals outside deleted files (grep gate).
-- [ ] **Step 4: the gate is the persona's `sen-cred` mount (plane-enforced); drop the lace manifest path.** A persona's credential-ness = it **declares the `sen-cred` mount** (resolved at `mounts.rs:47`, `dispatch.rs:103`); the plane provisions a socket (Part A) **only** for such personas — that IS the gate (registry-truth, plane-side). `PersonaSpec` needs no capability field (the mount declaration suffices; YAGNI to add one). **Drop** the lace `pluginMayUseCapability` enforcement from #6 — it's dead code (`manifest.ts:17`, no prod callers) and not the boundary; the credential tool is an in-image CLI, not a plugin, and lace has **zero** in-process credential callers (grep-verified). The in-image CLI (`src/cli/request-credential.ts`) is unchanged except it stops sending a token (Part C Step 2). Test: a persona without the `sen-cred` mount gets no socket and the CLI fails closed.
+- [ ] **Step 1: delete lace's token minter + metadata plumbing — GATE THE
+      METADATA ON #4.** Remove the mint itself now (`job-manager.ts:218` token,
+      `:225` `executionEnv:{[tokenEnvName]:token}`, `:228` `tokenFingerprint`,
+      the `mergeEmbedderSpawnEnv` `SEN_AGENT_TOKEN` special-case `:196-199`).
+      **Keep `executionEnv` the mechanism** (it's generic — host subagents
+      `subagent-spawn.ts`, projected bindings `persona-projected-binding.ts`);
+      remove only the token content. The **metadata removal**
+      (`ContainerExecutionIdentityConfig.tokenEnvName`/`tokenFingerprint`
+      `server-types.ts:~68`, `container-execution-metadata.ts`, the
+      `initialize.ts` intake `~:59-74`, `tools/types.ts`,
+      `core/conversation/types.ts`, `job-creation.ts`, `subagent-job.ts:~372`
+      consumers) **is gated on #4** —
+      `containerExecutionMetadata.tokenFingerprint` is forwarded to sen-core and
+      feeds the **live** proxy registration (`lace-runtime-registration.ts`),
+      which #4 migrates to source-IP. Deleting it pre-#4 bricks proxy identity.
+      Test (post-#4): no lace reference to the token env name or
+      `tokenFingerprint` (grep gate); a spawned container has no
+      `SEN_AGENT_TOKEN`.
+- [ ] **Step 2: strip the `browserCdpSocket` carrier from lace's GENERIC
+      layer.** It's a behavior-bearing flag, but **already dead in the live
+      plane path** (`projected-container.ts:244` carries it only when
+      `!hasPlaneSelectors`; the plane re-injects `SEN_BROWSER_CDP_SOCKET` via
+      `spawn.rs:144` gated on `PersonaSpec.browser_cdp_socket` `persona.rs:41`).
+      Remove it from: `config/persona-registry.ts:~68` (the schema field —
+      **don't miss this**), `tools/runtime/types.ts:~73`, `validation.ts:~89`,
+      `projected-container.ts:~264`, `persona-container-spec.ts:~90`,
+      `containers/spec.ts:~17`. **The browser persona survives THROUGH THE
+      PLANE** (`PersonaSpec.browser_cdp_socket` + `spawn.rs` env injection) —
+      NOT via "a generic mount" (a mount can't carry the computed per-container
+      socket-file env). Also delete the stale
+      `notifyNetworkAttached emits browserCdpSocketPath` comments
+      (`spec.ts`/`tools/runtime/types.ts` — it only emits `sourceIp`). Test: no
+      `browserCdpSocket`/`SEN_BROWSER_CDP_SOCKET` symbol in lace (grep gate);
+      the browser persona still gets CDP via the plane.
+- [ ] **Step 3: scrub the generic credential mount-name literals.** The
+      genuinely-generic literals are in `containers/spec.ts` + `tools/runtime/*`
+      (the `/sen-browser-cdp` path constant + comments).
+      (`containers/broker-container-mounts.ts` — the broker mirror that
+      hardcodes `sen-cred`/`sen-ca`/`sen-browser-cdp` host paths — is **deleted
+      wholesale by Part C Step 1's spawn-broker removal**; do NOT treat it as
+      separate work here.) The registry mount model
+      (`persona-container-spec.ts:37-75`) already resolves arbitrary
+      embedder-supplied mount names, so no new lace API is needed. Test: lace
+      has no `sen-cred`/`sen-ca`/`sen-browser-cdp` literals outside deleted
+      files (grep gate).
+- [ ] **Step 4: the gate is the persona's `sen-cred` mount (plane-enforced);
+      drop the lace manifest path.** A persona's credential-ness = it **declares
+      the `sen-cred` mount** (resolved at `mounts.rs:47`, `dispatch.rs:103`);
+      the plane provisions a socket (Part A) **only** for such personas — that
+      IS the gate (registry-truth, plane-side). `PersonaSpec` needs no
+      capability field (the mount declaration suffices; YAGNI to add one).
+      **Drop** the lace `pluginMayUseCapability` enforcement from #6 — it's dead
+      code (`manifest.ts:17`, no prod callers) and not the boundary; the
+      credential tool is an in-image CLI, not a plugin, and lace has **zero**
+      in-process credential callers (grep-verified). The in-image CLI
+      (`src/cli/request-credential.ts`) is unchanged except it stops sending a
+      token (Part C Step 2). Test: a persona without the `sen-cred` mount gets
+      no socket and the CLI fails closed.
 
 ## Part C — End-to-end `SEN_AGENT_TOKEN` death (BLOCKED on #4)
 
-> **HARD BLOCK — verify in code before starting Part C; ALL are currently RED (panel-confirmed):** (a) the proxy resolves identity by source-IP with **no** `resolve_source_ip`/synthetic token in `transparent.rs`; (b) the empty-identity fallback at `transparent.rs:406-420` is **deleted** (deny); (c) `spawn.rs:139` no longer injects `SEN_AGENT_TOKEN`; (d) per-agent networks live (no shared `--network <quarantine>` `spawn.rs:119`). These are **#4's** deliverables, all unbuilt today. If any is missing, **STOP** — deleting the token now bricks egress credential injection.
+> **HARD BLOCK — verify in code before starting Part C; ALL are currently RED
+> (panel-confirmed):** (a) the proxy resolves identity by source-IP with **no**
+> `resolve_source_ip`/synthetic token in `transparent.rs`; (b) the
+> empty-identity fallback at `transparent.rs:406-420` is **deleted** (deny); (c)
+> `spawn.rs:139` no longer injects `SEN_AGENT_TOKEN`; (d) per-agent networks
+> live (no shared `--network <quarantine>` `spawn.rs:119`). These are **#4's**
+> deliverables, all unbuilt today. If any is missing, **STOP** — deleting the
+> token now bricks egress credential injection.
 
 - [ ] **Step 1: delete ALL minters** (panel-verified enumeration):
   - lace `job-manager.ts:218` — done in Part B Step 1.
-  - **Rust shim (LIVE path):** `dispatch.rs:167` `self.minter.mint()` + the **`TokenMinter`** trait (`dispatch.rs:22`); `spawn.rs:139` env, `SpawnIdentity.token`/`token_fingerprint` (`:22-23`), and the `sen.broker.token-fingerprint` label (`LABEL_FINGERPRINT` `:14`, push `:135` — **safe to delete**; ownership/reaping key on `sen.broker.persona` only, `ownership.rs`/`dispatch.rs:394`).
+  - **Rust shim (LIVE path):** `dispatch.rs:167` `self.minter.mint()` + the
+    **`TokenMinter`** trait (`dispatch.rs:22`); `spawn.rs:139` env,
+    `SpawnIdentity.token`/`token_fingerprint` (`:22-23`), and the
+    `sen.broker.token-fingerprint` label (`LABEL_FINGERPRINT` `:14`, push `:135`
+    — **safe to delete**; ownership/reaping key on `sen.broker.persona` only,
+    `ownership.rs`/`dispatch.rs:394`).
   - **Helper synthetic mint:** `runtime-registry.ts:114`.
-  - **spawn-broker (ALIVE, not dead):** `manager-factory.ts:86` selects `SpawnBrokerContainerRuntime` (precedence) whenever `SEN_SPAWN_BROKER_SOCKET` is set; `spawn-broker-server.ts:219 mintToken()` + the 8-file `containers/spawn-broker-*.ts` family (+ `broker-container-mounts.ts`). Superseded by the shim — **delete the whole family + the `manager-factory.ts` selection** (else its minter survives). Test: no token mint site remains (grep gate).
-- [ ] **Step 2: delete the token-accept paths** (with #4 live): `extract_bearer`/`authenticate_request` (`auth.rs:27/42`), `validate_token` (proxy op `helper-server.ts:~473` + `helper_client.rs:21`), `resolve_source_ip` (`helper-server.ts:433`), the `resolve({token})` subagent dispatch (replaced by Part A), and `execution_token` on the CLI wire (`request-credential.ts:~393`, 8 sites). `request_credential` (`request_pipeline.rs:~527`) takes #4's resolved `CallerIdentity`. **#4 owns making BOTH proxy listeners token-free** — the explicit CONNECT forward-proxy listener (`server.rs:58`) is the *primary* auth surface, not residual; #6 asserts it. Test: no token mint/accept code in either repo (grep gate).
+  - **spawn-broker (ALIVE, not dead):** `manager-factory.ts:86` selects
+    `SpawnBrokerContainerRuntime` (precedence) whenever
+    `SEN_SPAWN_BROKER_SOCKET` is set; `spawn-broker-server.ts:219 mintToken()` +
+    the 8-file `containers/spawn-broker-*.ts` family (+
+    `broker-container-mounts.ts`). Superseded by the shim — **delete the whole
+    family + the `manager-factory.ts` selection** (else its minter survives).
+    Test: no token mint site remains (grep gate).
+- [ ] **Step 2: delete the token-accept paths** (with #4 live):
+      `extract_bearer`/`authenticate_request` (`auth.rs:27/42`),
+      `validate_token` (proxy op `helper-server.ts:~473` +
+      `helper_client.rs:21`), `resolve_source_ip` (`helper-server.ts:433`), the
+      `resolve({token})` subagent dispatch (replaced by Part A), and
+      `execution_token` on the CLI wire (`request-credential.ts:~393`, 8 sites).
+      `request_credential` (`request_pipeline.rs:~527`) takes #4's resolved
+      `CallerIdentity`. **#4 owns making BOTH proxy listeners token-free** — the
+      explicit CONNECT forward-proxy listener (`server.rs:58`) is the _primary_
+      auth surface, not residual; #6 asserts it. Test: no token mint/accept code
+      in either repo (grep gate).
 
-**Cutover order (state it, gate on it):** #4 merged+verified → **Part A** serving identity by socket (token path kept dead-but-present until box-verified) → **Part B Step 1 (incl. the #4-gated metadata) + Part C Step 1** delete minters → **Part C Step 2** delete the dead accept code. (lace's `job-manager.ts` minter isn't the live path under the shim, so deleting the *mint* is safe early; the **metadata** and the shim minter + subagent accept are the #4-gated/Part-A-gated ones.) A partial #6 (delete-minters/metadata without #4) **bricks egress auth** — do not reorder.
+**Cutover order (state it, gate on it):** #4 merged+verified → **Part A**
+serving identity by socket (token path kept dead-but-present until box-verified)
+→ **Part B Step 1 (incl. the #4-gated metadata) + Part C Step 1** delete minters
+→ **Part C Step 2** delete the dead accept code. (lace's `job-manager.ts` minter
+isn't the live path under the shim, so deleting the _mint_ is safe early; the
+**metadata** and the shim minter + subagent accept are the #4-gated/Part-A-gated
+ones.) A partial #6 (delete-minters/metadata without #4) **bricks egress auth**
+— do not reorder.
 
 ## Part D — Browser CDP: confirm loopback-only, delete any network form
 
-**Files (sen-core-v2):** `docker/persona-containers/browser/entrypoint.sh`; `src/credential-injection/browser/chromium-cdp-transport.ts`; `proxy-helper-protocol.ts`, `runtime-registry.ts`, `helper-server.ts`, `helper-lifecycle.ts`, `lace-runtime-registration.ts`, `remote-runtime-registrar.ts`, `types.ts`; **`proxy/src/protocol.rs`** (the Rust carrier).
+**Files (sen-core-v2):** `docker/persona-containers/browser/entrypoint.sh`;
+`src/credential-injection/browser/chromium-cdp-transport.ts`;
+`proxy-helper-protocol.ts`, `runtime-registry.ts`, `helper-server.ts`,
+`helper-lifecycle.ts`, `lace-runtime-registration.ts`,
+`remote-runtime-registrar.ts`, `types.ts`; **`proxy/src/protocol.rs`** (the Rust
+carrier).
 
-- [ ] **Step 1: confirm loopback-only.** PRI-2002 runs `socat UNIX-LISTEN:$SEN_BROWSER_CDP_SOCKET,fork,mode=0666 → TCP:127.0.0.1:9222` (`docker/persona-containers/browser/entrypoint.sh:62`); `:9222` has **no EXPOSE / no publish** (only 6080 noVNC); `ChromiumCdpTransport` already supports `unix:` (`chromium-cdp-transport.ts:103`). Test (box): `:9222` unreachable from the agent/helper network; the unix socket works. (KEEP the relay — it's the secure path; the CDP socket continues to reach the container via the plane's `PersonaSpec.browser_cdp_socket` env injection.)
-- [ ] **Step 2: delete the NETWORK `browser_cdp_url` form** (the unix-socket path stays). Remove `browser_cdp_url`/`browserCdpUrl` from **ALL** sites: `proxy-helper-protocol.ts:~105`, `runtime-registry.ts:~94`, `helper-server.ts:~168/1255`, `helper-lifecycle.ts:~499`/`~212` (`createBrowserForOperation`), `lace-runtime-registration.ts:~82-141`, `remote-runtime-registrar.ts:~71-72`, `types.ts:~63`, `chromium-cdp-transport.ts`, **and `proxy/src/protocol.rs:~120-124` (the Rust `CallerIdentity.browser_cdp_url` struct field — missed by earlier revs)**. (`spawn-broker-identity.ts`'s `browser_cdp_url` carrier dies with the spawn-broker deletion, Part C Step 1.) Test: no network CDP URL remains in either repo (grep gate); `type_replace` still drives CDP over the unix socket.
+- [ ] **Step 1: confirm loopback-only.** PRI-2002 runs
+      `socat UNIX-LISTEN:$SEN_BROWSER_CDP_SOCKET,fork,mode=0666 → TCP:127.0.0.1:9222`
+      (`docker/persona-containers/browser/entrypoint.sh:62`); `:9222` has **no
+      EXPOSE / no publish** (only 6080 noVNC); `ChromiumCdpTransport` already
+      supports `unix:` (`chromium-cdp-transport.ts:103`). Test (box): `:9222`
+      unreachable from the agent/helper network; the unix socket works. (KEEP
+      the relay — it's the secure path; the CDP socket continues to reach the
+      container via the plane's `PersonaSpec.browser_cdp_socket` env injection.)
+- [ ] **Step 2: delete the NETWORK `browser_cdp_url` form** (the unix-socket
+      path stays). Remove `browser_cdp_url`/`browserCdpUrl` from **ALL** sites:
+      `proxy-helper-protocol.ts:~105`, `runtime-registry.ts:~94`,
+      `helper-server.ts:~168/1255`, `helper-lifecycle.ts:~499`/`~212`
+      (`createBrowserForOperation`), `lace-runtime-registration.ts:~82-141`,
+      `remote-runtime-registrar.ts:~71-72`, `types.ts:~63`,
+      `chromium-cdp-transport.ts`, **and `proxy/src/protocol.rs:~120-124` (the
+      Rust `CallerIdentity.browser_cdp_url` struct field — missed by earlier
+      revs)**. (`spawn-broker-identity.ts`'s `browser_cdp_url` carrier dies with
+      the spawn-broker deletion, Part C Step 1.) Test: no network CDP URL
+      remains in either repo (grep gate); `type_replace` still drives CDP over
+      the unix socket.
 
 ---
 
 ## Cross-cutting
-- **Fail-closed everywhere:** no socket / no identity association / relay failure → **deny**, no fallback. Do NOT reintroduce the empty-identity literal (#4 deletes it).
-- **Helper-restart rehydration (the #5 lesson):** the socket→identity map is **in-memory** (`runtime-registry.ts:73`, `clear()` `:156`). On helper-container restart, live persona sockets go dead. For **per_invocation** agents: re-spawn re-provisions (new container, new socket). For **persistent-box**: the **adopt-path re-provision** (Part A Step 5) re-establishes the listener on its next spawn. **v1 (Ada-only): accept the gap between a helper restart and the next spawn as documented debt.** **Pre-prod fix:** persist the socket→identity map in the helper's private dir + rehydrate on boot. Named, not hidden.
-- **Reuse-safety (the #4 lesson):** `release_capability_socket` must **succeed (drop association + unlink) before** a socket path is reused; the shim teardown gates reprovision on release success. **Required tests:** (1) a torn-down per_invocation agent's path, reused, does NOT resolve to the old identity; (2) the **persistent-box stable-name path** is released on `docker rm` (mirror #4's recycled-subnet test).
-- **Admin/proxy/approval sockets unchanged** (`0o600`, on the named `sen-credential-private` volume); only the subagent socket becomes per-container on the host-path-backed dir. `validateSocketNotInsideSubagentDir` (`helper-lifecycle.ts:467`) extends to the per-container socket dir.
-- **Vault/store/audit untouched** (`vault.ts OnePasswordCliVault`, `credential-setting.ts`, `audit-log.ts`, policy YAML).
+
+- **Fail-closed everywhere:** no socket / no identity association / relay
+  failure → **deny**, no fallback. Do NOT reintroduce the empty-identity literal
+  (#4 deletes it).
+- **Helper-restart rehydration (the #5 lesson):** the socket→identity map is
+  **in-memory** (`runtime-registry.ts:73`, `clear()` `:156`). On
+  helper-container restart, live persona sockets go dead. For **per_invocation**
+  agents: re-spawn re-provisions (new container, new socket). For
+  **persistent-box**: the **adopt-path re-provision** (Part A Step 5)
+  re-establishes the listener on its next spawn. **v1 (Ada-only): accept the gap
+  between a helper restart and the next spawn as documented debt.** **Pre-prod
+  fix:** persist the socket→identity map in the helper's private dir + rehydrate
+  on boot. Named, not hidden.
+- **Reuse-safety (the #4 lesson):** `release_capability_socket` must **succeed
+  (drop association + unlink) before** a socket path is reused; the shim
+  teardown gates reprovision on release success. **Required tests:** (1) a
+  torn-down per_invocation agent's path, reused, does NOT resolve to the old
+  identity; (2) the **persistent-box stable-name path** is released on
+  `docker rm` (mirror #4's recycled-subnet test).
+- **Admin/proxy/approval sockets unchanged** (`0o600`, on the named
+  `sen-credential-private` volume); only the subagent socket becomes
+  per-container on the host-path-backed dir.
+  `validateSocketNotInsideSubagentDir` (`helper-lifecycle.ts:467`) extends to
+  the per-container socket dir.
+- **Vault/store/audit untouched** (`vault.ts OnePasswordCliVault`,
+  `credential-setting.ts`, `audit-log.ts`, policy YAML).
 
 ## Sequencing within #6
-1. **Part A** (helper-container-only + per-container socket on the host-path dir + dynamic per-persona servers + plane provisioning + adopt-reprovision + unwind) — the new boundary.
-2. **Part B** — Step 1's *mint* deletion is safe early; the *metadata* deletion is **#4-gated**. Steps 2-4 (browserCdp carrier, generic literals, gate) are independent decoupling and can proceed in parallel.
+
+1. **Part A** (helper-container-only + per-container socket on the host-path
+   dir + dynamic per-persona servers + plane provisioning + adopt-reprovision +
+   unwind) — the new boundary.
+2. **Part B** — Step 1's _mint_ deletion is safe early; the _metadata_ deletion
+   is **#4-gated**. Steps 2-4 (browserCdp carrier, generic literals, gate) are
+   independent decoupling and can proceed in parallel.
 3. **Part C** — ONLY after #4 is merged+verified; follow the cutover order.
 4. **Part D** — independent; separable sub-deliverable.
 
 ## Open items / decisions to surface
-- Helper-restart rehydration — v1 documented debt (adopt-reprovision covers persistent-box on next spawn) vs persist now (recommend documented debt for Ada-only).
-- The exact host path / env name for the host-path-backed socket dir (`SEN_CREDENTIAL_SOCKETS_HOST`?) — pick + wire in compose.
-- Whether to add an explicit `credentials` field to `PersonaSpec` later vs keep "declares the `sen-cred` mount" as the gate (YAGNI now).
+
+- Helper-restart rehydration — v1 documented debt (adopt-reprovision covers
+  persistent-box on next spawn) vs persist now (recommend documented debt for
+  Ada-only).
+- The exact host path / env name for the host-path-backed socket dir
+  (`SEN_CREDENTIAL_SOCKETS_HOST`?) — pick + wire in compose.
+- Whether to add an explicit `credentials` field to `PersonaSpec` later vs keep
+  "declares the `sen-cred` mount" as the gate (YAGNI now).
 
 ## Known limitations (name them)
-- main-sen is semi-trusted (orchestrates spawns) but never holds secrets, never asserts identity, and **cannot reach a credential socket** (host-path-backed dir). If the **plane** is compromised, all bets are off — but it already holds docker.sock; no new exposure.
-- Between a helper restart and the next (re-)spawn, live agents' credential calls fail-closed (v1 debt; persist pre-prod).
+
+- main-sen is semi-trusted (orchestrates spawns) but never holds secrets, never
+  asserts identity, and **cannot reach a credential socket** (host-path-backed
+  dir). If the **plane** is compromised, all bets are off — but it already holds
+  docker.sock; no new exposure.
+- Between a helper restart and the next (re-)spawn, live agents' credential
+  calls fail-closed (v1 debt; persist pre-prod).
 
 ## Self-review (rev 4)
-- **No architectural blockers remain** (3rd panel: SHIP-WITH-FIXES on all lenses). The security model is sound: per-container sockets off the instance root exclude main-sen; identity-by-socket has no forgery surface; the rev-2 reachability hole is closed by the host-path-backed dir.
-- Buildability fixed: host-path-backed dir (named-volume `-v` was impossible), shim directly injects the single-file bind, dynamic per-persona socket servers spelled out, provision-failure unwind, persistent-box adopt-reprovision.
-- Decoupling is **real and complete**: strip set includes `persona-registry.ts` + `initialize.ts`; the `browserCdpSocket` carrier is already dead in the live path (browser persona survives via the plane); metadata removal **gated on #4** (it feeds live proxy registration); mount-name work re-scoped (broker mirror dies with spawn-broker).
-- Token death enumerates **all** minters incl. the **alive** spawn-broker; cutover gated; **#4-unbuilt** is an unmissable block.
-- Part D's `browser_cdp_url` list is complete incl. `proxy/src/protocol.rs`; the unix-socket relay (secure path) stays.
-- Restart-rehydration + reuse-safety (incl. persistent-name) named with tests; vault/audit untouched.
+
+- **No architectural blockers remain** (3rd panel: SHIP-WITH-FIXES on all
+  lenses). The security model is sound: per-container sockets off the instance
+  root exclude main-sen; identity-by-socket has no forgery surface; the rev-2
+  reachability hole is closed by the host-path-backed dir.
+- Buildability fixed: host-path-backed dir (named-volume `-v` was impossible),
+  shim directly injects the single-file bind, dynamic per-persona socket servers
+  spelled out, provision-failure unwind, persistent-box adopt-reprovision.
+- Decoupling is **real and complete**: strip set includes
+  `persona-registry.ts` + `initialize.ts`; the `browserCdpSocket` carrier is
+  already dead in the live path (browser persona survives via the plane);
+  metadata removal **gated on #4** (it feeds live proxy registration);
+  mount-name work re-scoped (broker mirror dies with spawn-broker).
+- Token death enumerates **all** minters incl. the **alive** spawn-broker;
+  cutover gated; **#4-unbuilt** is an unmissable block.
+- Part D's `browser_cdp_url` list is complete incl. `proxy/src/protocol.rs`; the
+  unix-socket relay (secure path) stays.
+- Restart-rehydration + reuse-safety (incl. persistent-name) named with tests;
+  vault/audit untouched.
