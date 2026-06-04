@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // ABOUTME: Reference exec-tool fixture — used by the whole-system integration test.
 // Implements the two-command protocol: lace-tool-schema and lace-tool-invoke.
+/* global process */
 
 const cmd = process.argv[2];
 
