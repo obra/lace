@@ -77,6 +77,30 @@ class ExecFilePlaneRunner implements PlaneRunner {
   }
 }
 
+// HOME and PATH are owned by the plane container, not the caller: HOME is injected
+// by the shim at create time (from the persona's working directory) and PATH comes
+// from the image. The shim's exec env allowlist deliberately denies caller-provided
+// HOME/PATH (keeping `docker exec -e` inert), so the plane runtime strips them from
+// the inherit-mode overlay rather than forward them and trip the allowlist. Only the
+// `-e` overlay is filtered; `env -i` replace-mode (commandWithExecEnvironment) is left
+// to the caller, which explicitly owns the full env in that mode.
+const CONTAINER_PROVIDED_ENV = new Set(['HOME', 'PATH']);
+
+function withoutContainerProvidedEnv<T extends { environment?: Record<string, string> }>(
+  options: T
+): T {
+  if (!options.environment) {
+    return options;
+  }
+  const environment: Record<string, string> = {};
+  for (const [key, value] of Object.entries(options.environment)) {
+    if (!CONTAINER_PROVIDED_ENV.has(key)) {
+      environment[key] = value;
+    }
+  }
+  return { ...options, environment };
+}
+
 export class PlaneRuntime implements ContainerRuntime {
   private readonly runner: PlaneRunner;
   private readonly containers = new Map<string, ContainerInfo>();
@@ -179,7 +203,7 @@ export class PlaneRuntime implements ContainerRuntime {
     if (options.workingDirectory) {
       args.push('-w', options.workingDirectory);
     }
-    appendEnvironmentOverlayArgs(args, options);
+    appendEnvironmentOverlayArgs(args, withoutContainerProvidedEnv(options));
     args.push(containerId, ...commandWithExecEnvironment(options));
 
     try {
@@ -214,7 +238,7 @@ export class PlaneRuntime implements ContainerRuntime {
     if (options.workingDirectory) {
       args.push('-w', options.workingDirectory);
     }
-    appendEnvironmentOverlayArgs(args, options);
+    appendEnvironmentOverlayArgs(args, withoutContainerProvidedEnv(options));
     args.push(containerId, ...commandWithExecEnvironment(options));
 
     logger.debug('Streaming exec in plane container', {

@@ -244,6 +244,30 @@ describe('PlaneRuntime', () => {
     );
   });
 
+  it('exec does not forward HOME or PATH (the plane container provides them)', async () => {
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'sen-x-exec\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'out', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+
+    // HOME and PATH are owned by the plane container — HOME is injected at create
+    // from the persona's working directory, PATH comes from the image. The shim's
+    // exec env allowlist denies caller-provided HOME/PATH, so the plane runtime must
+    // strip them from the inherit-mode overlay rather than forward them.
+    await rt.exec(id, {
+      command: ['sh', '-c', 'true'],
+      workingDirectory: '/work',
+      environment: { HOME: '/home/sen', PATH: '/usr/bin', A: '1' },
+    });
+
+    expect(run).toHaveBeenLastCalledWith(
+      ['exec', '-w', '/work', '-e', 'A=1', id, 'sh', '-c', 'true'],
+      { timeout: 30000 }
+    );
+  });
+
   it('exec forwards timeout to the plane runner', async () => {
     const run = vi
       .fn()
