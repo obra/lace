@@ -172,15 +172,6 @@ export interface ContainerRuntime {
    * runtime has no caches to populate.
    */
   adopt(config: ContainerConfig, state: ContainerState): Promise<void>;
-
-  /**
-   * Resolve the container's IPv4 address on the named docker network, or
-   * undefined when unavailable (network absent, container gone, daemon error,
-   * or the runtime has no network concept — e.g. AppleContainerRuntime).
-   * Optional: only runtimes backing the transparent egress gateway implement it;
-   * ContainerManager treats its absence as "no source IP".
-   */
-  inspectNetworkIp?(containerId: string, networkName: string): Promise<string | undefined>;
 }
 
 export class ContainerError extends Error {

@@ -2052,31 +2052,6 @@ const SessionUpdateJobStartedSchema = z
   })
   .strict();
 
-// A gateway-routed persona container finished materializing and has
-// an assigned quarantine-network IP. Fires after the container is running (and
-// the netns-init sidecar has run), so the embedder can register the
-// source-IP → identity mapping for the transparent egress gateway without
-// racing against container creation.
-const SessionUpdateContainerNetworkAttachedSchema = z
-  .object({
-    type: z.literal('container_network_attached'),
-    containerName: NonEmptyStringSchema,
-    containerId: NonEmptyStringSchema,
-    sourceIp: NonEmptyStringSchema,
-    networkName: NonEmptyStringSchema,
-  })
-  .strict();
-
-// A gateway-routed persona container was torn down. The embedder
-// drops its source-IP → identity mapping so it does not outlive the container.
-const SessionUpdateContainerNetworkDetachedSchema = z
-  .object({
-    type: z.literal('container_network_detached'),
-    containerName: NonEmptyStringSchema,
-    containerId: NonEmptyStringSchema,
-  })
-  .strict();
-
 const SessionUpdateJobFinishedSchema = z
   .object({
     type: z.literal('job_finished'),
@@ -2326,8 +2301,6 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdatePlanSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateToolUseSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobStartedSchema),
-  SessionUpdateBaseParamsSchema.merge(SessionUpdateContainerNetworkAttachedSchema),
-  SessionUpdateBaseParamsSchema.merge(SessionUpdateContainerNetworkDetachedSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobFinishedSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobUpdateSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnStartSchema),

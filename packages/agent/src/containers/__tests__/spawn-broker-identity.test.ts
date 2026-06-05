@@ -143,7 +143,7 @@ describe('SpawnBrokerIdentity', () => {
     expect(helper.requests).toHaveLength(1);
   });
 
-  it('enrichOnAttach re-sends the stored identity with source_ip', async () => {
+  it('enrichOnAttach re-sends the stored identity', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
     const token = identity.mintToken();
     await identity.registerAtSpawn({
@@ -156,12 +156,12 @@ describe('SpawnBrokerIdentity', () => {
       containerSharing: 'persistent',
     });
 
-    await identity.enrichOnAttach({ containerName: 'sen-coworker-abc', sourceIp: '10.0.0.5' });
+    await identity.enrichOnAttach({ containerName: 'sen-coworker-abc' });
 
     expect(helper.requests).toHaveLength(2);
     const enrich = helper.requests[1];
     expect(enrich.op).toBe('register_runtime');
-    expect(enrich.source_ip).toBe('10.0.0.5');
+    expect(enrich.source_ip).toBeUndefined();
     expect(enrich.token_fingerprint).toBe(fingerprintContainerExecutionToken(token));
     expect(enrich.persona).toBe('sen-coworker');
     expect(enrich.session_id).toBe('sess_parent');
@@ -181,7 +181,6 @@ describe('SpawnBrokerIdentity', () => {
 
     await identity.enrichOnAttach({
       containerName: 'sen-browser-xyz',
-      sourceIp: '10.0.0.6',
       browserCdpSocketPath: '/run/sen/cdp/sen-browser-xyz.sock',
     });
 
@@ -239,9 +238,7 @@ describe('SpawnBrokerIdentity', () => {
 
   it('enrichOnAttach throws for an unknown container (no stored identity to re-assert)', async () => {
     const identity = new SpawnBrokerIdentity({ helperSocketPath: helper.socketPath });
-    await expect(
-      identity.enrichOnAttach({ containerName: 'never-registered', sourceIp: '10.0.0.9' })
-    ).rejects.toThrow();
+    await expect(identity.enrichOnAttach({ containerName: 'never-registered' })).rejects.toThrow();
   });
 
   it('registerAtSpawn rejects when the helper replies {ok:false} (register-before-egress must fail closed)', async () => {

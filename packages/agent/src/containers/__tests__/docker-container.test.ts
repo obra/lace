@@ -688,47 +688,6 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('inspectNetworkIp', () => {
-    it('returns the IPAddress for the named network', async () => {
-      setExecFileResponses([
-        {
-          stdout: JSON.stringify({
-            'ada-sen_quarantine': { IPAddress: '172.31.250.3' },
-            bridge: { IPAddress: '172.17.0.5' },
-          }),
-        },
-      ]);
-      const ip = await runtime.inspectNetworkIp('sen-persistent-box', 'ada-sen_quarantine');
-      expect(ip).toBe('172.31.250.3');
-      const args = findCallWithSubcommand('inspect');
-      expect(args).toEqual([
-        'inspect',
-        'sen-persistent-box',
-        '--format',
-        '{{json .NetworkSettings.Networks}}',
-      ]);
-    });
-
-    it('returns undefined when the network is absent', async () => {
-      setExecFileResponses([{ stdout: JSON.stringify({ bridge: { IPAddress: '172.17.0.5' } }) }]);
-      const ip = await runtime.inspectNetworkIp('sen-persistent-box', 'ada-sen_quarantine');
-      expect(ip).toBeUndefined();
-    });
-
-    it('returns undefined when docker inspect fails (degrade gracefully)', async () => {
-      setExecFileResponses([
-        {
-          error: Object.assign(new Error('inspect failed'), {
-            code: 1,
-            stderr: 'Error: No such object',
-          }),
-        },
-      ]);
-      const ip = await runtime.inspectNetworkIp('missing', 'ada-sen_quarantine');
-      expect(ip).toBeUndefined();
-    });
-  });
-
   describe('list', () => {
     it('passes --filter name=lace- to docker ps and parses NDJSON', async () => {
       const lines = [

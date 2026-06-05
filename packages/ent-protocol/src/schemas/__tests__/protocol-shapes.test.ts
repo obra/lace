@@ -609,54 +609,6 @@ describe('protocol shapes (representative examples)', () => {
     ).toThrow();
   });
 
-  it('parses container network attached/detached session updates', () => {
-    expect(() =>
-      EntProtocolNotificationSchema.parse({
-        jsonrpc: '2.0',
-        method: 'session/update',
-        params: {
-          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
-          streamSeq: 5,
-          type: 'container_network_attached',
-          containerName: 'sen-persistent-box',
-          containerId: 'sen-persistent-box',
-          sourceIp: '172.31.250.3',
-          networkName: 'ada-sen_quarantine',
-        },
-      })
-    ).not.toThrow();
-
-    expect(() =>
-      EntProtocolNotificationSchema.parse({
-        jsonrpc: '2.0',
-        method: 'session/update',
-        params: {
-          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
-          streamSeq: 6,
-          type: 'container_network_detached',
-          containerName: 'sen-persistent-box',
-          containerId: 'sen-persistent-box',
-        },
-      })
-    ).not.toThrow();
-
-    // sourceIp is required on the attached arm — omitting it must fail.
-    expect(() =>
-      EntProtocolNotificationSchema.parse({
-        jsonrpc: '2.0',
-        method: 'session/update',
-        params: {
-          sessionId: 'sess_00000000-0000-0000-0000-000000000001',
-          streamSeq: 7,
-          type: 'container_network_attached',
-          containerName: 'sen-persistent-box',
-          containerId: 'sen-persistent-box',
-          networkName: 'ada-sen_quarantine',
-        },
-      })
-    ).toThrow();
-  });
-
   it('parses representative responses', () => {
     expect(() =>
       InitializeResponseSchema.parse({

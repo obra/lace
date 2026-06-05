@@ -72,9 +72,6 @@ class EchoRuntime extends BaseContainerRuntime {
       },
     };
   }
-  async inspectNetworkIp(): Promise<string | undefined> {
-    return '172.31.250.9';
-  }
 }
 
 class FakeCatalog implements PersonaCatalog {

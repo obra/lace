@@ -95,10 +95,6 @@ class MockRuntime extends BaseContainerRuntime {
     if (this.inspectResults.has(containerId)) return this.inspectResults.get(containerId) ?? null;
     return this.containers.get(containerId) ?? { id: containerId, state: 'running' };
   }
-  failInspectNetworkIp = false;
-  async inspectNetworkIp(): Promise<string | undefined> {
-    return '172.31.250.7';
-  }
 }
 
 // ── fake catalog (returns a fixed spawn for a known persona) ──────────────────

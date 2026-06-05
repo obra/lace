@@ -273,42 +273,18 @@ export class SpawnBrokerServer {
       throw error;
     }
 
-    // 7. Network-attach enrichment: learn the quarantine source IP + (for
-    //    browserCdpSocket personas) the per-spawn CDP socket path, and re-register
-    //    enriched. Best-effort: a failed inspect degrades to no source-IP mapping.
-    await this.enrich(containerName, browserCdpSocket);
+    // 7. Browser-CDP enrichment: for browserCdpSocket personas, learn the
+    //    per-spawn CDP socket path and re-register enriched. The CDP socket name
+    //    needs the materialized container, so it can't ride the at-spawn register.
+    if (browserCdpSocket && this.owned.has(containerName)) {
+      await this.identity.enrichOnAttach({
+        containerName,
+        browserCdpSocketPath: browserCdpSocketPath(containerName),
+      });
+    }
 
     const state = await this.currentState(containerName);
     return { ok: true, containerName, state, resolvedMounts: config.mounts };
-  }
-
-  private async enrich(containerName: string, browserCdpSocket: boolean): Promise<void> {
-    if (typeof this.runtime.inspectNetworkIp !== 'function') return;
-    const record = this.owned.get(containerName);
-    const network = record ? await this.networkOf(containerName) : undefined;
-    if (!network) return;
-    let sourceIp: string | undefined;
-    try {
-      sourceIp = await this.runtime.inspectNetworkIp(containerName, network);
-    } catch {
-      return;
-    }
-    if (!sourceIp) return;
-    await this.identity.enrichOnAttach({
-      containerName,
-      sourceIp,
-      ...(browserCdpSocket ? { browserCdpSocketPath: browserCdpSocketPath(containerName) } : {}),
-    });
-  }
-
-  // The quarantine network name the container joined. Derived from the daemon
-  // inspect rather than stored, to keep enrich independent of spec retention.
-  private async networkOf(containerName: string): Promise<string | undefined> {
-    const info = await this.runtime.daemonInspect(containerName);
-    void info;
-    // ContainerInfo doesn't carry the network name; the broker knows personas are
-    // quarantine-networked. Use the well-known quarantine network.
-    return 'quarantine';
   }
 
   private async currentState(containerName: string): Promise<ContainerState> {

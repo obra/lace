@@ -539,41 +539,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         return undefined;
       }
 
-      // A persona container materializes inside the subagent process,
-      // so its container_network_attached/detached updates surface here in the
-      // child's session stream. Forward them up unchanged (the containerId /
-      // containerName are docker-side identifiers, shared across processes — no
-      // child-job-id remapping needed) so the embedder can register/drop the
-      // source-IP → identity mapping for the transparent egress gateway.
-      if (type === 'container_network_attached') {
-        if (
-          typeof p.containerName === 'string' &&
-          typeof p.containerId === 'string' &&
-          typeof p.sourceIp === 'string' &&
-          typeof p.networkName === 'string'
-        ) {
-          await emitSessionUpdate({
-            type: 'container_network_attached',
-            containerName: p.containerName,
-            containerId: p.containerId,
-            sourceIp: p.sourceIp,
-            networkName: p.networkName,
-          });
-        }
-        return undefined;
-      }
-
-      if (type === 'container_network_detached') {
-        if (typeof p.containerName === 'string' && typeof p.containerId === 'string') {
-          await emitSessionUpdate({
-            type: 'container_network_detached',
-            containerName: p.containerName,
-            containerId: p.containerId,
-          });
-        }
-        return undefined;
-      }
-
       if (
         type === 'job_update' &&
         typeof p.jobId === 'string' &&

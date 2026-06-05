@@ -113,64 +113,12 @@ function formatMount(mount: ContainerMount): string {
   return `${mount.source}:${mount.target}${mount.readonly ? ':ro' : ''}`;
 }
 
-/**
- * Observes container network lifecycle for gateway-routed (transparent egress)
- * personas. The embedder wires this to emit `container_network_attached`
- * / `container_network_detached` session updates so it can register/drop the
- * source-IP → identity mapping in lock-step with the container's lifetime.
- */
-export interface ContainerNetworkLifecycleObserver {
-  onAttached(info: {
-    containerName: string;
-    containerId: string;
-    sourceIp: string;
-    networkName: string;
-  }): void;
-  onDetached(info: { containerName: string; containerId: string }): void;
-}
-
 export class ContainerManager {
   private readonly specs = new Map<string, ContainerSpec>();
   private readonly containerIdsBySpecName = new Map<string, string>();
   private readonly materializations = new Map<string, Promise<ContainerHandle>>();
-  private networkObserver?: ContainerNetworkLifecycleObserver;
 
   constructor(private readonly runtime: ContainerRuntime) {}
-
-  /**
-   * Register the network lifecycle observer. Late-bound because the manager is
-   * constructed before the session-update emitter exists.
-   */
-  setNetworkLifecycleObserver(observer: ContainerNetworkLifecycleObserver): void {
-    this.networkObserver = observer;
-  }
-
-  /**
-   * Resolve the gateway-routed container's quarantine IP and notify the observer.
-   * No-op unless the spec is gateway-routed, the runtime can inspect network IPs,
-   * an observer is set, and an IP is resolved. Best-effort: never throws (a
-   * failed inspect degrades to "no source-IP mapping", same as before).
-   */
-  private async notifyNetworkAttached(spec: ContainerSpec, containerId: string): Promise<void> {
-    if (!this.networkObserver) return;
-    if (!spec.gatewayRoute || !spec.network) return;
-    if (typeof this.runtime.inspectNetworkIp !== 'function') return;
-    try {
-      const sourceIp = await this.runtime.inspectNetworkIp(containerId, spec.network);
-      if (!sourceIp) return;
-      this.networkObserver.onAttached({
-        containerName: spec.name,
-        containerId,
-        sourceIp,
-        networkName: spec.network,
-      });
-    } catch (error) {
-      logger.warn('ContainerManager.notifyNetworkAttached failed', {
-        containerId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
 
   /**
    * Materialize a ContainerSpec into a running container.
@@ -277,7 +225,6 @@ export class ContainerManager {
       }
 
       if (adoptable.state === 'running') {
-        await this.notifyNetworkAttached(spec, adoptable.id);
         return { spec, containerId: adoptable.id, state: adoptable.state };
       }
       await this.runtime.start(adoptable.id);
@@ -289,7 +236,6 @@ export class ContainerManager {
       // discover staleness on the next operation.
       const activeContainerId = after?.id ?? adoptable.id;
       this.containerIdsBySpecName.set(spec.name, activeContainerId);
-      await this.notifyNetworkAttached(spec, activeContainerId);
       return { spec, containerId: activeContainerId, state: after?.state ?? 'running' };
     }
 
@@ -306,7 +252,6 @@ export class ContainerManager {
 
     this.specs.set(spec.name, spec);
     this.containerIdsBySpecName.set(spec.name, createdId);
-    await this.notifyNetworkAttached(spec, createdId);
     const info = await this.tryInspect(createdId);
     // Same fallback rationale as the stopped-resume branch above: we just
     // successfully called runtime.create()+start(); if tryInspect cannot see
@@ -330,9 +275,6 @@ export class ContainerManager {
 
   async destroy(specName: string, hooks?: ContainerLifecycleHooks): Promise<void> {
     const containerId = this.resolveBySpecName(specName);
-    // Capture the id before the deletes below so the detached notification can
-    // carry the same join key the attached notification used.
-    const detachedContainerId = containerId;
 
     try {
       await this.runtime.stop(containerId);
@@ -348,8 +290,6 @@ export class ContainerManager {
 
     this.specs.delete(specName);
     this.containerIdsBySpecName.delete(specName);
-
-    this.networkObserver?.onDetached({ containerName: specName, containerId: detachedContainerId });
 
     if (hooks?.afterDestroy) {
       await hooks.afterDestroy();

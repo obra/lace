@@ -360,28 +360,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     });
   };
 
-  // Surface gateway-routed persona container network lifecycle as
-  // session updates so the embedder registers/drops the source-IP → identity
-  // mapping in lock-step with the container (race-free; no docker-inspect poll).
-  if (state.containerManager) {
-    state.containerManager.setNetworkLifecycleObserver({
-      onAttached: ({ containerName, containerId, sourceIp, networkName }) => {
-        void emitSessionUpdate({
-          type: 'container_network_attached',
-          containerName,
-          containerId,
-          sourceIp,
-          networkName,
-        });
-      },
-      onDetached: ({ containerName, containerId }) => {
-        void emitSessionUpdate({ type: 'container_network_detached', containerName, containerId });
-      },
-    });
-  } else {
-    logger.warn('containers: no manager at RPC wiring — network-lifecycle observer NOT installed');
-  }
-
   // Reference to the prompt handler logic, assigned when session/prompt is registered.
   // This allows queueJobNotification to trigger turns internally when notifications
   // are pending and the agent is idle.

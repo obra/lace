@@ -72,9 +72,10 @@ export interface ContainerSpec {
 
   // PRI-2002: when true, this is a quarantined browser-driver spec. The
   // SEN_BROWSER_CDP_SOCKET env is injected at spec-build time (the in-container
-  // relay listens there); ContainerManager.notifyNetworkAttached emits the
-  // matching browserCdpSocketPath so the credential helper can reach the
-  // persona's Chrome CDP over the shared sen-browser-cdp unix socket.
+  // relay listens there); the spawn broker re-registers the persona's identity
+  // with the matching browserCdpSocketPath after the container materializes so
+  // the credential helper can reach the persona's Chrome CDP over the shared
+  // sen-browser-cdp unix socket.
   browserCdpSocket?: boolean;
 
   // Mount target namespaces owned by Lace. When adopting a daemon-side

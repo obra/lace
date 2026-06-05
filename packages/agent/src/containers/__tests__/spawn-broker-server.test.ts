@@ -111,11 +111,6 @@ class MockRuntime extends BaseContainerRuntime {
     const info = this.containers.get(containerId);
     return info ?? { id: containerId, state: 'running' };
   }
-  failInspectNetworkIp = false;
-  async inspectNetworkIp(): Promise<string | undefined> {
-    if (this.failInspectNetworkIp) throw new Error('inspect raced (PRI-1919)');
-    return '172.31.250.7';
-  }
 }
 
 // ── fake catalog (returns a fixed spawn for a known persona) ──────────────────
@@ -480,13 +475,6 @@ describe('SpawnBrokerServer', () => {
       expect(res.ok).toBe(true);
       const containers = res.containers as Array<{ id: string; state: string }>;
       expect(containers.find((c) => c.id === name)?.state).toBe('stopped');
-    });
-
-    it('spawn still succeeds when network-attach enrich (inspectNetworkIp) throws', async () => {
-      runtime.failInspectNetworkIp = true;
-      const res = await sendControl(socketPath, VALID_SPAWN);
-      expect(res.ok).toBe(true);
-      expect(res.containerName).toBe('parent8-ephemeral-shell-sess_chi');
     });
 
     it('execStream replace-mode on an adopted container errors (broker lacks the raw token)', async () => {

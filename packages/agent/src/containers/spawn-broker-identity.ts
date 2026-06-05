@@ -16,10 +16,9 @@ const SEN_AGENT_TOKEN_ENV_NAME = 'SEN_AGENT_TOKEN';
 // refreshed per-exec on a long-running persistent box (refreshOnExec).
 export const DEFAULT_TOKEN_TTL_MS = 300_000;
 
-// Enrichment TTL. Mirrors sen-core lace-runtime-registration RUNTIME_MAPPING_TTL_MS
-// (1h): the source-IP → identity mapping for the transparent egress gateway must
-// comfortably outlive any single job, so the enriched registration gets a longer
-// runtime-lifetime TTL than the base at-spawn one.
+// Enrichment / refresh TTL (1h): a re-registration (browser-CDP enrich,
+// per-exec refresh, or adopt) must comfortably outlive any single job, so it
+// gets a longer runtime-lifetime TTL than the base at-spawn one.
 export const ENRICHMENT_TTL_MS = 60 * 60 * 1000;
 
 // sen-core only accepts 'per_invocation' | 'persistent' for container_sharing.
@@ -54,7 +53,6 @@ export interface RegisterAtSpawnInput {
 
 export interface EnrichOnAttachInput {
   containerName: string;
-  sourceIp: string;
   browserCdpSocketPath?: string;
 }
 
@@ -149,10 +147,10 @@ export class SpawnBrokerIdentity {
     });
   }
 
-  // Re-register the stored identity enriched with the quarantine source IP
-  // (PRI-1919) and, when present, the browser CDP unix-socket url (PRI-2002).
-  // The CDP socket name needs the materialized container, so it rides this
-  // attach event rather than at-spawn. An explicit at-spawn browserCdpUrl wins.
+  // Re-register the stored identity enriched with the browser CDP unix-socket
+  // url (PRI-2002). The CDP socket name needs the materialized container, so it
+  // rides this attach event rather than at-spawn. An explicit at-spawn
+  // browserCdpUrl wins.
   async enrichOnAttach(input: EnrichOnAttachInput): Promise<void> {
     const record = this.requireRecord(input.containerName);
     if (record.browserCdpUrl === undefined && input.browserCdpSocketPath !== undefined) {
@@ -160,7 +158,6 @@ export class SpawnBrokerIdentity {
     }
     await this.sendRegisterRuntime(record, {
       expiresAtMs: this.nowMs() + this.enrichmentTtlMs,
-      sourceIp: input.sourceIp,
     });
   }
 
@@ -218,7 +215,7 @@ export class SpawnBrokerIdentity {
   // session id (sen-core lace-runtime-registration.ts uses parentSessionId).
   private async sendRegisterRuntime(
     record: OwnershipRecord,
-    overrides: { expiresAtMs: number; sourceIp?: string }
+    overrides: { expiresAtMs: number }
   ): Promise<void> {
     const request: Record<string, unknown> = {
       op: 'register_runtime',
@@ -232,7 +229,6 @@ export class SpawnBrokerIdentity {
     };
     if (record.containerId !== undefined) request.container_id = record.containerId;
     if (record.browserCdpUrl !== undefined) request.browser_cdp_url = record.browserCdpUrl;
-    if (overrides.sourceIp !== undefined) request.source_ip = overrides.sourceIp;
 
     const response = await requestJsonOverUnixSocket(this.helperSocketPath, request);
     if (response.ok !== true) {
