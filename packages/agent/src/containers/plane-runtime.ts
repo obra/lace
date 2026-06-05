@@ -77,26 +77,34 @@ class ExecFilePlaneRunner implements PlaneRunner {
   }
 }
 
-// HOME and PATH are owned by the plane container, not the caller: HOME is injected
-// by the shim at create time (from the persona's working directory) and PATH comes
-// from the image. The shim's exec env allowlist deliberately denies caller-provided
-// HOME/PATH (keeping `docker exec -e` inert), so the plane runtime strips them from
-// the inherit-mode overlay rather than forward them and trip the allowlist. Only the
-// `-e` overlay is filtered; `env -i` replace-mode (commandWithExecEnvironment) is left
-// to the caller, which explicitly owns the full env in that mode.
-const CONTAINER_PROVIDED_ENV = new Set(['HOME', 'PATH']);
+// The plane container owns its environment, not the exec caller. Two sources are
+// injected into the container at create time and must NOT be re-passed on
+// `docker exec -e` (the shim's exec env allowlist deliberately denies caller env to
+// keep it inert, so re-passing them fails the exec):
+//   1. HOME (shim-injected from the persona's working directory) and PATH (from the
+//      image) — always container-provided.
+//   2. Every persona-declared var in the container's own spec env (e.g.
+//      NODE_EXTRA_CA_CERTS) — the shim injects these at create from the persona file.
+// Strip both from the inherit-mode `-e` overlay. `env -i` replace-mode
+// (commandWithExecEnvironment) is left to the caller, which owns the full env there.
+const ALWAYS_CONTAINER_PROVIDED_ENV = new Set(['HOME', 'PATH']);
 
 function withoutContainerProvidedEnv<T extends { environment?: Record<string, string> }>(
-  options: T
+  options: T,
+  containerEnv?: Record<string, string>
 ): T {
   if (!options.environment) {
     return options;
   }
   const environment: Record<string, string> = {};
   for (const [key, value] of Object.entries(options.environment)) {
-    if (!CONTAINER_PROVIDED_ENV.has(key)) {
-      environment[key] = value;
+    if (ALWAYS_CONTAINER_PROVIDED_ENV.has(key)) {
+      continue;
     }
+    if (containerEnv && Object.prototype.hasOwnProperty.call(containerEnv, key)) {
+      continue;
+    }
+    environment[key] = value;
   }
   return { ...options, environment };
 }
@@ -203,7 +211,10 @@ export class PlaneRuntime implements ContainerRuntime {
     if (options.workingDirectory) {
       args.push('-w', options.workingDirectory);
     }
-    appendEnvironmentOverlayArgs(args, withoutContainerProvidedEnv(options));
+    appendEnvironmentOverlayArgs(
+      args,
+      withoutContainerProvidedEnv(options, this.containerEnvFor(containerId))
+    );
     args.push(containerId, ...commandWithExecEnvironment(options));
 
     try {
@@ -238,7 +249,10 @@ export class PlaneRuntime implements ContainerRuntime {
     if (options.workingDirectory) {
       args.push('-w', options.workingDirectory);
     }
-    appendEnvironmentOverlayArgs(args, withoutContainerProvidedEnv(options));
+    appendEnvironmentOverlayArgs(
+      args,
+      withoutContainerProvidedEnv(options, this.containerEnvFor(containerId))
+    );
     args.push(containerId, ...commandWithExecEnvironment(options));
 
     logger.debug('Streaming exec in plane container', {
@@ -390,6 +404,14 @@ export class PlaneRuntime implements ContainerRuntime {
         error instanceof Error ? error : undefined
       );
     }
+  }
+
+  // The persona spec env the shim injected into this container at create time, used
+  // to avoid re-passing it on exec (where the shim's allowlist would reject it). Only
+  // ContainerConfig carries an `environment`; PlaneSpawnRequest does not.
+  private containerEnvFor(containerId: string): Record<string, string> | undefined {
+    const config = this.configs.get(containerId);
+    return config && 'environment' in config ? config.environment : undefined;
   }
 
   private updateContainerState(containerId: string, state: ContainerState): void {

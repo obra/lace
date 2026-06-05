@@ -268,6 +268,34 @@ describe('PlaneRuntime', () => {
     );
   });
 
+  it('does not re-forward the container spec env (e.g. NODE_EXTRA_CA_CERTS) on exec', async () => {
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'sen-x-exec\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: 'out', stderr: '', exitCode: 0 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    // The shim injects the persona's spec env into the container at create time, so
+    // re-passing it on `docker exec -e` is redundant and the shim's allowlist rejects
+    // it. Create with a known container env, then assert exec strips those keys.
+    const id = await rt.create({
+      ...spawnRequest(),
+      environment: { NODE_EXTRA_CA_CERTS: '/etc/ca.pem', PERSONA_VAR: 'x' },
+    } as unknown as PlaneSpawnRequest);
+
+    await rt.exec(id, {
+      command: ['sh', '-c', 'true'],
+      workingDirectory: '/work',
+      // Overlay carries the persona vars (inherited back from the spec) plus a genuine
+      // per-call var. Only the per-call var should survive.
+      environment: { NODE_EXTRA_CA_CERTS: '/etc/ca.pem', PERSONA_VAR: 'x', PER_CALL: '1' },
+    });
+
+    expect(run).toHaveBeenLastCalledWith(
+      ['exec', '-w', '/work', '-e', 'PER_CALL=1', id, 'sh', '-c', 'true'],
+      { timeout: 30000 }
+    );
+  });
+
   it('exec forwards timeout to the plane runner', async () => {
     const run = vi
       .fn()
