@@ -22,7 +22,6 @@ import {
   registerBuiltinRuntimes,
   createDefaultContainerManager,
 } from './containers/manager-factory';
-import { PerInvocationReaper } from './jobs/per-invocation-reaper';
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
@@ -131,10 +130,9 @@ async function boot(): Promise<void> {
     process.exit(1);
   }
 
-  // Runtimes registry is now populated — build the manager + reaper.
+  // Runtimes registry is now populated — build the container manager.
   const manager = createDefaultContainerManager();
   state.containerManager = manager;
-  state.perInvocationReaper = new PerInvocationReaper(manager);
   // The workspace reaper routes per_invocation teardown to the shim via the
   // container manager, so it needs the live container manager now that it exists.
   state.workspaceReaper.bindRuntime(manager);

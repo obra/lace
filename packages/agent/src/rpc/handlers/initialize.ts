@@ -13,7 +13,6 @@ import type {
 import { PersonaRegistry } from '../../config/persona-registry';
 import { warnMountConflicts } from '../../config/persona-mount-conflict';
 import { resolveResourcePath } from '../../utils/resource-resolver';
-import { assertResultsBaseDisjoint } from '../../jobs/results-tree';
 import { logger } from '../../utils/logger';
 
 const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
@@ -139,20 +138,6 @@ export function registerInitializeHandler(
     // before the R6 boot scan so the readonly flags are available for conflict
     // filtering.
     state.containerMounts = parseContainerMounts(parsed.containerMounts);
-
-    // The crash sweep (Part 4) is confined to resultsBase(); it must never be
-    // able to descend into a durable persona mount. containerMounts is empty at
-    // boot and only known now, so assert disjointness HERE and fail initialize
-    // on any overlap. (mkdirs resultsBase first so realpath resolves.)
-    try {
-      assertResultsBaseDisjoint(state.containerMounts);
-    } catch (err) {
-      throw {
-        code: -32602,
-        message: err instanceof Error ? err.message : 'containerMounts overlap results base',
-        data: { category: 'protocol' },
-      };
-    }
 
     // R6 boot-time invariant: log a WARN for any per_invocation persona that
     // declares a read-write mount-registry name also claimed by a persistent

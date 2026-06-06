@@ -42,7 +42,6 @@ import { ReminderScheduler, ReminderStore, getAgentTimezone } from './reminders'
 import { logger } from './utils/logger';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import { EnvironmentRuntimeSecretResolver } from './tools/runtime/secrets';
-import { PerInvocationReaper } from './jobs/per-invocation-reaper';
 import { WorkspaceReaper } from './jobs/workspace-reaper';
 
 // Re-export public API from message-builder for backwards compatibility
@@ -105,8 +104,8 @@ export async function createToolExecutorForMode(
 export function createAgentServerState(): AgentServerState {
   // JobManager is created as a placeholder here and properly initialized
   // in registerAgentRpcMethods once we have the peer and other dependencies.
-  // containerManager and perInvocationReaper are resolved in boot() AFTER
-  // built-ins + plugins register into the runtimes registry.
+  // containerManager is resolved in boot() AFTER built-ins + plugins register
+  // into the runtimes registry.
   return {
     initialized: false,
     activeSession: null,
@@ -126,8 +125,6 @@ export function createAgentServerState(): AgentServerState {
     containerManager: null,
     peer: null,
     runtimeSecretResolver: new EnvironmentRuntimeSecretResolver(),
-    // Replaced in boot() with the real manager.
-    perInvocationReaper: new PerInvocationReaper(null),
     // Runtime refs bound in boot() via workspaceReaper.bindRuntime(...).
     workspaceReaper: new WorkspaceReaper(),
   };
@@ -427,7 +424,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       finalizeJob,
       runPromptInternalRef,
       topLevelPeer: peer,
-      reaper: state.perInvocationReaper,
     });
   };
 

@@ -130,11 +130,6 @@ type PersonaContainerSpecInput = {
   // Required for per_invocation; ignored for persistent.
   childSessionId?: string;
   scratchDirHostPath?: string;
-  // Host path of THIS agent's children-results base (<base>/<childSessionId>),
-  // bind-mounted read-only at the same path so this container agent's projected
-  // tools can read the workspaces of agents IT delegates to. Optional: absent in
-  // unit fixtures and for the host root (which reads the host fs directly).
-  childrenReadBaseHostPath?: string;
   jobId?: string;
 };
 
@@ -239,17 +234,6 @@ export function buildProjectedRuntimeSpec(
   const perInvocationMounts: RuntimeMountDescriptor[] = [
     ...mounts,
     { hostPath: input.scratchDirHostPath!, containerPath: '/work', readonly: false },
-    // Read-only view of this agent's own children-results base so its projected
-    // tools can read the (untrusted, possibly-incomplete) workspaces it delegates.
-    ...(input.childrenReadBaseHostPath
-      ? [
-          {
-            hostPath: input.childrenReadBaseHostPath,
-            containerPath: input.childrenReadBaseHostPath,
-            readonly: true,
-          },
-        ]
-      : []),
   ];
 
   const name = buildPerInvocationSpecName({
@@ -307,17 +291,6 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
   const perInvocationMounts: ContainerMount[] = [
     ...toContainerMounts(mounts),
     { source: input.scratchDirHostPath!, target: '/work', readonly: false },
-    // Read-only view of this agent's own children-results base so its projected
-    // tools can read the (untrusted, possibly-incomplete) workspaces it delegates.
-    ...(input.childrenReadBaseHostPath
-      ? [
-          {
-            source: input.childrenReadBaseHostPath,
-            target: input.childrenReadBaseHostPath,
-            readonly: true,
-          },
-        ]
-      : []),
   ];
 
   const name = buildPerInvocationSpecName({

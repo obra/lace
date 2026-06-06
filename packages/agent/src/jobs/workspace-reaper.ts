@@ -1,50 +1,8 @@
 // ABOUTME: WorkspaceReaper — per-process tracker of per_invocation child workspaces (#5)
 // ABOUTME: dispose routes teardown to the shim via ContainerManager.releasePerInvocation
 
-import * as fs from 'node:fs';
 import { logger } from '@lace/agent/utils/logger';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-
-/**
- * The container is always destroyed before this runs (no live writer), but the
- * remover stays symlink-safe (statically-planted links), continue-on-error, and
- * MUST never throw past the caller — an ENOTEMPTY after a skip must not crash
- * the sweep interval or abort teardown.
- *
- * Never follow a child-planted symlink out of the results base. Re-lstat every
- * entry immediately before acting (do NOT trust readdir's cached dirent type),
- * and never let one bad entry abort the walk.
- */
-export function safeRemoveWorkspace(targetPath: string, base: string): void {
-  const realBase = fs.realpathSync(base);
-  const top = fs.lstatSync(targetPath); // lstat: do not follow a symlinked top
-  if (top.isSymbolicLink() || !top.isDirectory()) {
-    fs.unlinkSync(targetPath); // a symlink/file top: unlink, never recurse
-    return;
-  }
-  const real = fs.realpathSync(targetPath);
-  if (real !== realBase && !real.startsWith(realBase + '/')) {
-    throw new Error(`refusing to reap path outside results base: ${real}`);
-  }
-  for (const name of fs.readdirSync(real)) {
-    // names only — re-lstat each, no cached type
-    const p = `${real}/${name}`;
-    try {
-      const st = fs.lstatSync(p);
-      if (st.isSymbolicLink() || !st.isDirectory())
-        fs.unlinkSync(p); // unlink follows nothing
-      else safeRemoveWorkspace(p, realBase); // recurse only REAL dirs
-    } catch (e) {
-      logger.warn(`workspace-reaper: skipping ${p}: ${e}`); // continue-on-error
-    }
-  }
-  try {
-    fs.rmdirSync(real);
-  } catch (e) {
-    // tolerant: a non-empty dir after a skip
-    logger.warn(`workspace-reaper: leaving non-empty ${real}: ${e}`);
-  } // → next pass
-}
 
 /** A tracked per_invocation child workspace. */
 export interface WorkspaceEntry {
@@ -65,8 +23,7 @@ export interface WorkspaceEntry {
 export class WorkspaceReaper {
   private readonly tracked = new Map<string, WorkspaceEntry>();
   // Per-childId lock tail. Serializes release vs resume for the same child so a
-  // resume can't resurrect a workspace mid-dispose. There is no other per-childId
-  // lock in the system (per-invocation-reaper holds only timers).
+  // resume can't resurrect a workspace mid-dispose.
   private readonly locks = new Map<string, Promise<unknown>>();
   // Childs disposed in THIS process — non-resumable. In-memory only (a crash
   // loses it; delegate's empty-workspace gate is the crash backstop).

@@ -1,4 +1,4 @@
-// ABOUTME: Tests for WorkspaceReaper + safeRemoveWorkspace (Part 1 of #5)
+// ABOUTME: Tests for WorkspaceReaper (Part 1 of #5)
 // ABOUTME: dispose routes teardown to the shim via releasePerInvocation; per-entry resilience
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -6,7 +6,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-import { WorkspaceReaper, safeRemoveWorkspace } from '../workspace-reaper';
+import { WorkspaceReaper } from '../workspace-reaper';
 
 function makeFakes() {
   const calls: Array<[string, string, string | undefined]> = [];
@@ -199,89 +199,5 @@ describe('WorkspaceReaper', () => {
     ).rejects.toThrow('boom');
     // The lock is freed: a subsequent call for the same childId still runs.
     await expect(reaper.runExclusive('c1', async () => 'ok')).resolves.toBe('ok');
-  });
-});
-
-describe('safeRemoveWorkspace', () => {
-  let prevWorkDir: string | undefined;
-  let base: string;
-
-  beforeEach(() => {
-    prevWorkDir = process.env.LACE_WORK_DIR;
-    base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-remove-test-'));
-    process.env.LACE_WORK_DIR = base;
-  });
-
-  afterEach(() => {
-    if (prevWorkDir === undefined) delete process.env.LACE_WORK_DIR;
-    else process.env.LACE_WORK_DIR = prevWorkDir;
-    fs.rmSync(base, { recursive: true, force: true });
-  });
-
-  it('removes a normal workspace subtree', () => {
-    const child = path.join(base, 'p1', 'c1');
-    fs.mkdirSync(path.join(child, 'sub'), { recursive: true });
-    fs.writeFileSync(path.join(child, 'a.txt'), 'x');
-    fs.writeFileSync(path.join(child, 'sub', 'b.txt'), 'y');
-
-    safeRemoveWorkspace(child, base);
-    expect(fs.existsSync(child)).toBe(false);
-  });
-
-  it('unlinks a child-planted symlink without following it to its target', () => {
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-outside-'));
-    const outsideFile = path.join(outside, 'precious.txt');
-    fs.writeFileSync(outsideFile, 'do not delete');
-
-    const child = path.join(base, 'p1', 'c1');
-    fs.mkdirSync(child, { recursive: true });
-    fs.symlinkSync(outside, path.join(child, 'escape'));
-
-    safeRemoveWorkspace(child, base);
-
-    expect(fs.existsSync(child)).toBe(false);
-    expect(fs.existsSync(outsideFile)).toBe(true);
-    fs.rmSync(outside, { recursive: true, force: true });
-  });
-
-  it('unlinks a symlinked top dir without recursing into its target', () => {
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-outside-'));
-    fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep');
-    const parent = path.join(base, 'p1');
-    fs.mkdirSync(parent, { recursive: true });
-    const linkTop = path.join(parent, 'linktop');
-    fs.symlinkSync(outside, linkTop);
-
-    safeRemoveWorkspace(linkTop, base);
-
-    expect(fs.existsSync(linkTop)).toBe(false);
-    expect(fs.existsSync(path.join(outside, 'precious.txt'))).toBe(true);
-    fs.rmSync(outside, { recursive: true, force: true });
-  });
-
-  it('throws when a real top dir escapes the results base', () => {
-    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-outside-'));
-    expect(() => safeRemoveWorkspace(outside, base)).toThrow(/outside results base/);
-    fs.rmSync(outside, { recursive: true, force: true });
-  });
-
-  it('skips an un-removable entry and removes the rest; leaves non-empty top without throwing', () => {
-    const child = path.join(base, 'p1', 'c1');
-    fs.mkdirSync(child, { recursive: true });
-    fs.writeFileSync(path.join(child, 'removable.txt'), 'x');
-    const locked = path.join(child, 'locked');
-    fs.mkdirSync(locked);
-    fs.writeFileSync(path.join(locked, 'f.txt'), 'y');
-    fs.chmodSync(locked, 0o000); // readdir(locked) → EACCES → skip
-
-    try {
-      expect(() => safeRemoveWorkspace(child, base)).not.toThrow();
-      // removable file gone; locked subtree retained; top left for next pass
-      expect(fs.existsSync(path.join(child, 'removable.txt'))).toBe(false);
-      expect(fs.existsSync(locked)).toBe(true);
-      expect(fs.existsSync(child)).toBe(true);
-    } finally {
-      fs.chmodSync(locked, 0o700);
-    }
   });
 });

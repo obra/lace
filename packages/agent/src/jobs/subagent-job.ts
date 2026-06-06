@@ -26,7 +26,6 @@ import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { getSkillDirectories } from '@lace/agent/skills';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
-import type { PerInvocationReaper } from './per-invocation-reaper';
 import type { SessionId, ToolResult } from '@lace/ent-protocol';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import { logToolUpdateToJobLog } from './job-log-formatter';
@@ -121,30 +120,6 @@ export interface SubagentJobDependencies {
    * relay translates a `pending_reminders_on_exit` update into a local inject.
    */
   topLevelPeer: JsonRpcPeer;
-  /**
-   * Idle TTL reaper for per_invocation containers (Chunk E).
-   * When present, schedules container destruction after the subagent exits.
-   * Optional so callers that have no container runtime can omit it.
-   */
-  reaper?: PerInvocationReaper;
-}
-
-/**
- * Schedule a container reap for a per_invocation job after its subagent exits.
- * Safe to call from all exit paths — no-ops when conditions aren't met.
- * Exported for unit-testing; not part of the public module API.
- */
-export function maybeScheduleReapAfter(
-  job: JobState,
-  reaper: PerInvocationReaper | undefined
-): void {
-  if (!reaper) return;
-  if (job.containerSharing !== 'per_invocation') return;
-  if (!job.subagentSessionId) return;
-  // Use the pre-computed containerSpecName stored on the job. The delegate tool
-  // computes it once while building the projected runtime binding.
-  if (!job.containerSpecName) return;
-  reaper.scheduleReap(job.subagentSessionId, job.containerSpecName);
 }
 
 function buildRuntimeBindingWithExecutionEnv(

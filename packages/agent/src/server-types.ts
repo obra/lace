@@ -20,7 +20,6 @@ import type { ContainerManager } from './containers/container-manager';
 import type { ReminderScheduler } from './reminders';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
-import type { PerInvocationReaper } from './jobs/per-invocation-reaper';
 import type { WorkspaceReaper } from './jobs/workspace-reaper';
 
 /**
@@ -110,9 +109,9 @@ export type JobState = {
   scratchDirHostPath?: string;
   // Container-sharing mode for this delegate job.
   containerSharing?: 'per_invocation' | 'persistent';
-  // Per-invocation container spec name used by the reaper.
-  // Computed once at delegate time; read by maybeScheduleReapAfter so it
-  // can schedule cleanup after a projected-container subagent exits.
+  // Per-invocation container spec name. Computed once at delegate time and
+  // tracked on the WorkspaceReaper entry so teardown can route through the
+  // shim's releasePerInvocation.
   containerSpecName?: string;
   childTransportClose?: () => void;
   finished: boolean;
@@ -206,14 +205,9 @@ export type AgentServerState = {
   // runExclusive mutex (avoids cross-process events.jsonl write races).
   peer: JsonRpcPeer | null;
   runtimeSecretResolver?: RuntimeSecretResolver;
-  // Idle TTL reaper for per_invocation containers.
-  // Schedules destroy calls after a subagent exits; canceled on resume.
-  // Always present after boot — cost is a Map with zero entries until used.
-  perInvocationReaper: PerInvocationReaper;
   // Per-process map of per_invocation child workspaces in the shared results tree.
-  // Constructed eagerly with null runtime refs; bindRuntime() in boot() supplies
-  // the container manager + perInvocationReaper so dispose can destroy a child's
-  // container before removing its /work.
+  // Constructed eagerly with a null runtime ref; bindRuntime() in boot() supplies
+  // the container manager so dispose can route teardown through the shim.
   workspaceReaper: WorkspaceReaper;
 };
 

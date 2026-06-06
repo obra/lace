@@ -16,7 +16,6 @@ import type { ReminderScheduler } from '@lace/agent/reminders';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ProjectedContainerManager } from '@lace/agent/tools/runtime/projected-container';
 import type { RuntimeSecretResolver } from '@lace/agent/tools/runtime/secrets';
-import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 
 /**
@@ -182,13 +181,6 @@ export interface RunnerDependencies {
    */
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
-
-  /**
-   * Idle TTL reaper for per_invocation containers (Chunk E).
-   * Threaded into ToolContext so the delegate tool can cancel a pending
-   * destruction timer when a resume invocation arrives.
-   */
-  perInvocationReaper?: PerInvocationReaper;
 
   /**
    * Per-process map of per_invocation child workspaces. Threaded into

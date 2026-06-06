@@ -12,7 +12,6 @@ import { ContainerManager } from '@lace/agent/containers/container-manager';
 import { DockerContainerRuntime } from '@lace/agent/containers/docker-container';
 import type { ContainerSpec } from '@lace/agent/containers/spec';
 import { buildProjectedRuntimeSpec } from '@lace/agent/jobs/persona-container-spec';
-import { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { PersonaContainerRuntime } from '@lace/agent/jobs/persona-container-spec';
 
 // ---------------------------------------------------------------------------
@@ -499,43 +498,6 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
     const hostContent = await readFile(join(scratchDir, 'test.txt'), 'utf8');
     expect(hostContent.trim()).toBe('hello');
   }, 120_000);
-
-  // -------------------------------------------------------------------------
-  // Test R5-smoke: per_invocation container removed from docker after idle TTL
-  // -------------------------------------------------------------------------
-
-  it('per_invocation container removed from docker after idle TTL', async () => {
-    const parentId = newSessionId();
-    const childId = newSessionId();
-    const personaName = 'test-shell';
-    const scratchDir = await makeScratchDir();
-
-    const { specName, dockerName } = await materializePerInvocation({
-      parentSessionId: parentId,
-      personaName,
-      childSessionId: childId,
-      scratchDirHostPath: scratchDir,
-    });
-
-    // Confirm the container is running
-    expect(dockerContainerExists(dockerName)).toBe(true);
-
-    // Create a reaper with a short TTL (500ms). The destroy is async (docker stop
-    // may take a few seconds even for a fast container), so we wait generously.
-    const reaper = new PerInvocationReaper(containerManager, { ttlMs: 500 });
-
-    reaper.scheduleReap(childId, specName);
-
-    // Wait for TTL + 15s grace (docker stop -t 10 can run up to 10s + rm overhead)
-    await new Promise<void>((resolve) => setTimeout(resolve, 16000));
-
-    // Container should be gone from docker ps -a
-    expect(dockerContainerExists(dockerName)).toBe(false);
-
-    // Remove from tracking since reaper already destroyed it
-    const idx = createdContainerNames.indexOf(dockerName);
-    if (idx !== -1) createdContainerNames.splice(idx, 1);
-  }, 60_000);
 
   // -------------------------------------------------------------------------
   // Test Resume-1: resume within TTL reuses container + scratch

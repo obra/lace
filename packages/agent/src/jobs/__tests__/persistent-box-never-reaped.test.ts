@@ -1,62 +1,18 @@
-// ABOUTME: Canonical invariant — persistent-box is provably NEVER reaped (#5, security model)
-// ABOUTME: Three legs: (1) no container idle-reap, (2) WorkspaceReaper never tracks it, (3) sweep skips it
+// ABOUTME: Canonical invariant — a persistent box is never tracked by the WorkspaceReaper (#5)
+// ABOUTME: delegate only track()s per_invocation children, so a persistent box is never disposed
 
 import { describe, it, expect, vi } from 'vitest';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
-import { maybeScheduleReapAfter } from '../subagent-job';
-import { sweepPass } from '../workspace-sweep';
 import type { JobState } from '@lace/agent/server-types';
-import type { PerInvocationReaper } from '../per-invocation-reaper';
 import type { WorkspaceReaper } from '../workspace-reaper';
 import { DelegateTool } from '@lace/agent/tools/implementations/delegate';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 
-function makeReaper(): PerInvocationReaper {
-  return {
-    scheduleReap: vi.fn(),
-    cancelReap: vi.fn(),
-    dispose: vi.fn(),
-    hasPendingReap: vi.fn(),
-    ttlMs: 1000,
-  } as unknown as PerInvocationReaper;
-}
-
-function makeJob(overrides: Partial<JobState> = {}): JobState {
-  let resolveCompletion: () => void = () => undefined;
-  const completion = new Promise<void>((r) => {
-    resolveCompletion = r;
-  });
-  return {
-    jobId: 'job_test',
-    type: 'delegate',
-    status: 'completed',
-    startedAt: new Date().toISOString(),
-    outputPath: '/tmp/test.log',
-    finished: true,
-    completion,
-    resolveCompletion,
-    ...overrides,
-  };
-}
-
 describe('persistent-box is never reaped', () => {
-  // Leg 1: a persistent job never schedules a container idle-reap. The early
-  // return on containerSharing !== 'per_invocation' is also exercised in
-  // subagent-job-reaper.test.ts; asserted here as the named invariant.
-  it('leg 1: a persistent job never schedules a container reap', () => {
-    const reaper = makeReaper();
-    const job = makeJob({ containerSharing: 'persistent', subagentSessionId: 'sess_persist' });
-    maybeScheduleReapAfter(job, reaper);
-    expect(reaper.scheduleReap).not.toHaveBeenCalled();
-  });
-
-  // Leg 2: delegate only track()s per_invocation children, so a persistent box
-  // is never in the WorkspaceReaper map (and thus never disposed).
-  it('leg 2: a persistent box is never tracked by the WorkspaceReaper', async () => {
+  // delegate only track()s per_invocation children, so a persistent box is
+  // never in the WorkspaceReaper map (and thus never disposed).
+  it('a persistent box is never tracked by the WorkspaceReaper', async () => {
     const personaRegistry = {
       parsePersona: vi.fn().mockReturnValue({
         config: {
@@ -107,27 +63,5 @@ describe('persistent-box is never reaped', () => {
 
     expect(result.status).toBe('completed');
     expect(track).not.toHaveBeenCalled();
-  });
-
-  // Leg 3: the crash sweep is confined to resultsBase() (disjoint from the box's
-  // durable mount, asserted at initialize) — so it never touches the box's mount,
-  // even if a live persistent container's bind source is in the live set.
-  it("leg 3: the sweep never descends into a persistent box's durable mount", () => {
-    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-persist-sweep-'));
-    const prev = process.env.LACE_WORK_DIR;
-    process.env.LACE_WORK_DIR = path.join(base, 'work');
-    // A durable persona mount living OUTSIDE resultsBase().
-    const durable = path.join(base, 'durable-box');
-    fs.mkdirSync(durable, { recursive: true });
-    fs.writeFileSync(path.join(durable, 'state.db'), 'persistent state');
-    try {
-      // Even passing the durable dir as a "live source" must not pull it into scope.
-      sweepPass(new Set([durable]));
-      expect(fs.existsSync(path.join(durable, 'state.db'))).toBe(true);
-    } finally {
-      if (prev === undefined) delete process.env.LACE_WORK_DIR;
-      else process.env.LACE_WORK_DIR = prev;
-      fs.rmSync(base, { recursive: true, force: true });
-    }
   });
 });

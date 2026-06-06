@@ -43,16 +43,14 @@ describe('per_invocation child workspace mount-scoping', () => {
     const aDir = childWorkspaceDir(parentId, childA);
     const bDir = childWorkspaceDir(parentId, childB);
     const parentBase = childrenBaseDir(parentId); // <base>/<parentId>
-    const aOwnBase = childrenBaseDir(childA); // <base>/<childA>
 
     // Build child A's resolved container spec exactly as delegate would: /work =
-    // A's own workspace dir; a RO view of A's OWN children base for reads.
+    // A's own workspace dir, and nothing else from the shared results tree.
     const specA = buildPersonaContainerSpec({
       parentSessionId: parentId,
       personaName: 'shell',
       childSessionId: childA,
       scratchDirHostPath: aDir,
-      childrenReadBaseHostPath: aOwnBase,
       runtime: perInvocationRuntime,
       containerMounts: {},
     });
@@ -63,11 +61,8 @@ describe('per_invocation child workspace mount-scoping', () => {
     expect(workMounts[0]!.source).toBe(aDir);
     expect(workMounts[0]!.readonly).toBe(false);
 
-    // The read-base mount is A's OWN base, read-only, mounted at the same path.
-    const readBaseMounts = specA.mounts.filter((m) => m.target === aOwnBase);
-    expect(readBaseMounts).toHaveLength(1);
-    expect(readBaseMounts[0]!.source).toBe(aOwnBase);
-    expect(readBaseMounts[0]!.readonly).toBe(true);
+    // /work is the only mount — no read-base, no sibling, no shared parent base.
+    expect(specA.mounts).toHaveLength(1);
 
     // No mount points at a sibling's workspace or at the shared PARENT base
     // (which would expose A's siblings). A only ever sees its own subtree.
@@ -75,18 +70,5 @@ describe('per_invocation child workspace mount-scoping', () => {
     expect(sources).not.toContain(bDir);
     expect(sources).not.toContain(parentBase);
     expect(sources).not.toContain(resultsBase());
-  });
-
-  it('omits the read-base mount when childrenReadBaseHostPath is absent (host root case)', () => {
-    const spec = buildPersonaContainerSpec({
-      parentSessionId: 'sess_pppppppp00000000',
-      personaName: 'shell',
-      childSessionId: 'sess_aaaaaaaa00000000',
-      scratchDirHostPath: childWorkspaceDir('sess_pppppppp00000000', 'sess_aaaaaaaa00000000'),
-      runtime: perInvocationRuntime,
-      containerMounts: {},
-    });
-    expect(spec.mounts.filter((m) => m.readonly)).toHaveLength(0);
-    expect(spec.mounts).toHaveLength(1); // just /work
   });
 });

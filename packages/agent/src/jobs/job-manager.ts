@@ -76,9 +76,9 @@ export type CreateJobOptions = {
   containerSharing?: 'per_invocation' | 'persistent';
   // Persona-bundle support for delegate jobs
   persona?: string;
-  // Per-invocation container spec name for the idle-TTL reaper.
-  // Computed by delegate.ts and stored here so maybeScheduleReapAfter can
-  // use it without reconstructing the projected container binding.
+  // Per-invocation container spec name. Computed by delegate.ts and tracked on
+  // the WorkspaceReaper entry so teardown can route through the shim's
+  // releasePerInvocation.
   containerSpecName?: string;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 };

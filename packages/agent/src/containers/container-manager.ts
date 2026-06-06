@@ -392,27 +392,6 @@ export class ContainerManager {
     return { reaped };
   }
 
-  /**
-   * Host bind-mount sources of every RUNNING `lace-*` container — the live set
-   * the workspace sweep uses to avoid reclaiming a workspace a live container
-   * still holds. Throws if the daemon can't be queried (the caller then skips
-   * the sweep pass rather than risk reaping a live workspace with a stale set).
-   */
-  async liveBindSources(): Promise<Set<string>> {
-    const sources = new Set<string>();
-    const containers = await this.runtime.list();
-    for (const c of containers) {
-      if (c.state !== 'running') continue;
-      let mounts = c.mounts;
-      if (!mounts) {
-        const info = await this.runtime.daemonInspect(c.id);
-        mounts = info?.mounts ?? [];
-      }
-      for (const m of mounts) sources.add(m.source);
-    }
-    return sources;
-  }
-
   private async tryInspect(containerId: string): Promise<ContainerInfo | null> {
     try {
       return await this.runtime.inspect(containerId);

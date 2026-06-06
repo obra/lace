@@ -1740,9 +1740,6 @@ export class ConversationRunner {
         ...(this.deps.containerExecutionIdentity
           ? { containerExecutionIdentity: this.deps.containerExecutionIdentity }
           : {}),
-        ...(this.deps.perInvocationReaper
-          ? { perInvocationReaper: this.deps.perInvocationReaper }
-          : {}),
         ...(this.deps.workspaceReaper ? { workspaceReaper: this.deps.workspaceReaper } : {}),
         compactionRequest,
       }

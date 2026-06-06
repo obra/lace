@@ -9,7 +9,6 @@ import type {
   MountRegistryEntry,
 } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
-import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 
 export interface ToolContext {
@@ -60,12 +59,6 @@ export interface ToolContext {
   // container runtime).
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
   containerExecutionIdentity?: ContainerExecutionIdentityConfig;
-
-  // Idle TTL reaper for per_invocation containers.
-  // When a delegate invocation starts (fresh or resume), the tool calls
-  // cancelReap so the container survives for the new invocation window.
-  // The subagent-job exit handler schedules a new reap after each child exits.
-  perInvocationReaper?: PerInvocationReaper;
 
   // Per-process map of per_invocation child workspaces. job_kill(destroy_container) and
   // the delegate tool use it to track/dispose a child's workspace (destroying
