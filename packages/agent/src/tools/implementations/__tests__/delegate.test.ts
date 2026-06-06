@@ -538,7 +538,7 @@ describe('DelegateTool', () => {
     expect(body.workspace).toBe(expectedScratchDir);
     expect(body.workspaceNote).toContain('UNTRUSTED');
     expect(body.workspaceNote).toContain('INCOMPLETE'); // background → still running
-    expect(body.workspaceNote).toContain('release_delegation');
+    expect(body.workspaceNote).toContain('job_kill');
     // The scratch directory must exist on disk
     expect(fs.existsSync(expectedScratchDir)).toBe(true);
   });
@@ -597,7 +597,7 @@ describe('DelegateTool', () => {
     expect(text).toMatch(/^delegate jobId=job_sync_inv/);
     expect(text).toContain('Subagent workspace:');
     expect(text).toContain('UNTRUSTED');
-    expect(text).toContain('release_delegation');
+    expect(text).toContain('job_kill');
   });
 
   it('resume reuses prior subagent session id and scratch dir for per_invocation', async () => {

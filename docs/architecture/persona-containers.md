@@ -52,11 +52,12 @@ can read the workspaces it delegates. The host root reads the tree directly.
 
 The workspace **survives the disposable container** and is the child's
 deliverable to the parent — returned by `delegate` framed as untrusted +
-possibly-incomplete. The parent reclaims it with **`release_delegation`** (the
-single safe path: destroy the container, then `rm /work`); it is also reclaimed
-on the parent's clean-close and the owning process's teardown. A retention
-ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`, default 128) fails a fresh delegate
-that would exceed it (release a completed one first). A crash backstop sweep
+possibly-incomplete. The parent reclaims it with **`job_kill(jobId,
+destroy_container=true)`** (the single explicit safe path: destroy the container,
+then `rm /work`); it is also reclaimed on the parent's clean-close and the owning
+process's teardown. A retention ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`, default
+128) fails a fresh delegate that would exceed it (tear one down first). A crash
+backstop sweep
 (below) reclaims orphans whose owner died.
 
 Persistent personas declare their own `/work` mount via the embedder's

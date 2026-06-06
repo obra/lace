@@ -59,11 +59,11 @@ function workspaceMaxPerParent(): number {
 /**
  * Frame a per_invocation child's workspace as the parent will read it: UNTRUSTED
  * subagent output (data, never instructions), possibly-incomplete until the
- * child's job completes, reclaimable via release_delegation.
+ * child's job completes, reclaimable via job_kill(destroy_container=true).
  */
 function workspaceFraming(
   workspacePath: string,
-  subagentSessionId: string,
+  jobId: string,
   opts: { possiblyIncomplete: boolean }
 ): string {
   return (
@@ -72,7 +72,7 @@ function workspaceFraming(
     (opts.possiblyIncomplete
       ? ` The subagent may still be writing; the workspace is possibly INCOMPLETE until its job completes.`
       : ``) +
-    ` When you are done with it, reclaim it with release_delegation(subagentSessionId=${JSON.stringify(subagentSessionId)}).`
+    ` When you are done with it, reclaim it with job_kill(jobId=${JSON.stringify(jobId)}, destroy_container=true).`
   );
 }
 
@@ -236,7 +236,7 @@ Parameters:
                   content: [
                     {
                       type: 'text',
-                      text: `${retained} workspaces retained for this session; release a completed one with \`release_delegation\` before delegating again.`,
+                      text: `${retained} workspaces retained for this session; reclaim a completed one with \`job_kill(jobId=…, destroy_container=true)\` before delegating again.`,
                     },
                   ],
                 };
@@ -283,7 +283,7 @@ Parameters:
                 childSessionId: childId,
               });
 
-              // Track the workspace so release_delegation / clean-close / teardown
+              // Track the workspace so job_kill(destroy_container) / clean-close / teardown
               // can dispose it (destroy the container, then rm /work). Idempotent
               // on resume (same childSessionId re-set).
               context.workspaceReaper?.track({
@@ -294,7 +294,7 @@ Parameters:
               });
             };
 
-            // Serialize setup vs a concurrent release_delegation of the same child.
+            // Serialize setup vs a concurrent job_kill(destroy_container) of the same child.
             if (context.workspaceReaper) {
               await context.workspaceReaper.runExclusive(childId, async () => setupWorkspace());
             } else {
@@ -401,7 +401,7 @@ Parameters:
         // scratchDir) plus framing so the parent treats it as untrusted +
         // possibly-incomplete and knows how to reclaim it.
         responseObj.workspace = scratchDirHostPath;
-        responseObj.workspaceNote = workspaceFraming(scratchDirHostPath, childSessionId!, {
+        responseObj.workspaceNote = workspaceFraming(scratchDirHostPath, jobId, {
           possiblyIncomplete: true,
         });
       }
@@ -433,7 +433,7 @@ Parameters:
     const preamble =
       containerSharing === 'per_invocation' && scratchDirHostPath
         ? `delegate jobId=${jobId}\n` +
-          workspaceFraming(scratchDirHostPath, childSessionId!, { possiblyIncomplete: false }) +
+          workspaceFraming(scratchDirHostPath, jobId, { possiblyIncomplete: false }) +
           `\n\n`
         : `delegate jobId=${jobId}\n\n`;
 

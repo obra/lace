@@ -192,7 +192,7 @@ export interface RunnerDependencies {
 
   /**
    * Per-process map of per_invocation child workspaces. Threaded into
-   * ToolContext so delegate can track a child's workspace and release_delegation
+   * ToolContext so delegate can track a child's workspace and job_kill
    * can dispose it (container destroyed before /work removal).
    */
   workspaceReaper?: WorkspaceReaper;

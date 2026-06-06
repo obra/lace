@@ -7,7 +7,6 @@ import { ProjectEnvironmentManager } from '@lace/agent/projects/environment-vari
 import { mkdirSync } from 'fs';
 import { join } from 'path';
 import { DelegateTool } from './implementations/delegate';
-import { ReleaseDelegationTool } from './implementations/release_delegation';
 import { UseSkillTool } from './implementations/use-skill-tool';
 import { MCPServerManager } from '../mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -46,7 +45,6 @@ export const LACE_BUILTIN_TOOL_NAMES = [
   'file_find',
   'url_fetch',
   'delegate',
-  'release_delegation',
   'job_output',
   'jobs_list',
   'job_kill',
@@ -298,7 +296,6 @@ export class ToolExecutor {
     }
 
     this.registerTool('delegate', new DelegateTool({ personaRegistry: options.personaRegistry }));
-    this.registerTool('release_delegation', new ReleaseDelegationTool());
 
     // Add skill tool if registry is provided
     if (skillRegistry) {

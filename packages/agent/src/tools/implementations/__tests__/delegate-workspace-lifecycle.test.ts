@@ -122,7 +122,7 @@ describe('delegate workspace lifecycle', () => {
       ctx(jobManager, parentId)
     );
     expect(third.status).toBe('failed');
-    expect(third.content[0].text).toContain('release_delegation');
+    expect(third.content[0].text).toContain('job_kill');
     expect(third.content[0].text).toContain('2 workspaces retained');
 
     // Releasing one frees a slot → a subsequent fresh delegate succeeds.

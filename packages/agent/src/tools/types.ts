@@ -67,7 +67,7 @@ export interface ToolContext {
   // The subagent-job exit handler schedules a new reap after each child exits.
   perInvocationReaper?: PerInvocationReaper;
 
-  // Per-process map of per_invocation child workspaces. release_delegation and
+  // Per-process map of per_invocation child workspaces. job_kill(destroy_container) and
   // the delegate tool use it to track/dispose a child's workspace (destroying
   // the container before removing /work).
   workspaceReaper?: WorkspaceReaper;

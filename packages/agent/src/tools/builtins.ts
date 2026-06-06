@@ -21,7 +21,7 @@ import { ManageRemindersTool } from './implementations/manage_reminders';
 import { CompactSessionTool } from './implementations/compact_session';
 
 /** The per-session option-taking built-ins; the executor owns their names. */
-export const PER_SESSION_BUILTIN_NAMES = new Set(['delegate', 'release_delegation', 'use_skill']);
+export const PER_SESSION_BUILTIN_NAMES = new Set(['delegate', 'use_skill']);
 
 /**
  * Register all stateless built-in tools into the plugin tools registry (owner: 'builtin').
