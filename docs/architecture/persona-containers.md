@@ -24,9 +24,12 @@ accumulate state across calls.
 | `persistent`     | `sen-<persona>`                             |
 
 `<parentSess8>` and `<childSess8>` are the first 8 characters of the respective
-session ids with the `sess_` prefix stripped. The `lace-` prefix makes
-per_invocation containers visible to the startup orphan reaper; the `sen-`
-prefix keeps persistent containers outside the reaper's scope.
+session ids with the `sess_` prefix stripped. On the plane runtime this name is
+the shim's identity label scheme — the shim owns orphan and idle reaping there,
+so lace's startup orphan reaper is gated off. On the non-plane (docker) runtime
+lace runs the startup reaper, where the `lace-` prefix marks per_invocation
+containers as reap candidates and the `sen-` prefix keeps persistent containers
+outside its scope.
 
 ## Workspace convention (the workspace IS the result)
 
@@ -87,8 +90,11 @@ is the backstop for all orphan and idle cleanup.
 
 Every subagent gets an ephemeral, auto-cleaned `$TMPDIR` separate from `/work`
 (which is the retained, parent-visible result tree). A **host** subagent gets a
-`mkdtemp` host dir (opaque `lace-tmp-` prefix) on its process env, removed in the
-job's exit `finally`. A **container** subagent gets `TMPDIR=/tmp` (the
+`mkdtemp` host dir (opaque `lace-tmp-` prefix) under `<results-base>/.tmp` — the
+shim-owned tree — on its process env, removed in the job's exit `finally`. Placing
+it there means a SIGKILL leak (which skips the `finally`) lands in a known,
+shim-reclaimable location rather than the OS temp root. A **container** subagent
+gets `TMPDIR=/tmp` (the
 container's own fs), set last so a persona cannot redirect temp into `/work`;
 cleaned with the container.
 
@@ -104,11 +110,12 @@ read or plant a sibling's workspace.
 
 ## lace-ps: operator/debug visibility
 
-The sen-docker shim exposes a `lace-ps` verb that lists running per_invocation
-containers with their parent/child session ids and idle state. This is an
-operator- and debug-facing view — lace itself tracks delegations in-process (the
-retention ceiling and resume gate use the `WorkspaceReaper` in-memory map) and
-does not consume `lace-ps` internally.
+The sen-docker shim provides a `lace-ps` verb that lists running per_invocation
+containers with their parent/child session ids and idle state. This is a
+shim-side, operator- and debug-facing view; lace never emits it. lace's plane
+client speaks only `spawn`, `exec`, `exec-stream`, `stop`, `rm`, and `release`,
+and tracks delegations in-process (the retention ceiling and resume gate use the
+`WorkspaceReaper` in-memory map) for the lifecycle decisions it owns.
 
 ## Non-plane (local/docker) runtime
 
