@@ -13,6 +13,7 @@ import {
   type ExecStreamOptions,
 } from '../types';
 import { ContainerManager } from '../container-manager';
+import { PlaneRuntime } from '../plane-runtime';
 import type { ContainerSpec } from '../spec';
 
 class MockContainerRuntime extends BaseContainerRuntime {
@@ -643,6 +644,17 @@ describe('ContainerManager', () => {
 
       // 'a' had stop() throw but destroy() swallows it; remove still runs and succeeds
       expect(result.reaped.sort()).toEqual(['a', 'b']);
+    });
+  });
+
+  describe('isPlaneRuntime', () => {
+    it('returns false for a non-plane runtime', () => {
+      expect(manager.isPlaneRuntime).toBe(false);
+    });
+
+    it('returns true when backed by a PlaneRuntime', () => {
+      const planeManager = new ContainerManager(new PlaneRuntime('/fake/sen-docker'));
+      expect(planeManager.isPlaneRuntime).toBe(true);
     });
   });
 });

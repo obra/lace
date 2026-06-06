@@ -138,9 +138,10 @@ async function boot(): Promise<void> {
   state.workspaceReaper.bindRuntime(manager);
   // Orphan-container reap: destroys orphan lace-* containers via the runtime. The
   // shim owns workspace reaping on the plane, so lace does not run a workspace
-  // sweep here (the removed owner marker defeats its liveness gates). Best-effort;
-  // runs its own try/catch.
-  await runStartupReaper(manager);
+  // sweep here (the removed owner marker defeats its liveness gates). On the
+  // plane runtime runtime.list() returns only the empty in-process cache, so
+  // the reaper is a no-op — skip it. Best-effort; runs its own try/catch.
+  await runStartupReaper(manager?.isPlaneRuntime ? null : manager);
 
   // Safe to attach the stdin consumer NOW — frames that arrived during the plugin
   // await were buffered in the tee and will be delivered in order once the peer wires.

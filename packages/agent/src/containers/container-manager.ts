@@ -14,6 +14,7 @@ import type {
 } from './types';
 import { ContainerError, ContainerNotFoundError } from './types';
 import type { ContainerHandle, ContainerLifecycleHooks, ContainerSpec } from './spec';
+import { PlaneRuntime } from './plane-runtime';
 
 // See ABOUTME above: every container id is namespaced under this prefix so
 // cross-process orphan reaping can scope its scan.
@@ -119,6 +120,15 @@ export class ContainerManager {
   private readonly materializations = new Map<string, Promise<ContainerHandle>>();
 
   constructor(private readonly runtime: ContainerRuntime) {}
+
+  /**
+   * True when the underlying runtime is a PlaneRuntime (the sen-docker shim).
+   * On the plane the shim owns orphan/idle reaping, so the lace-side startup
+   * reaper is a no-op and should be skipped.
+   */
+  get isPlaneRuntime(): boolean {
+    return this.runtime instanceof PlaneRuntime;
+  }
 
   /**
    * Materialize a ContainerSpec into a running container.

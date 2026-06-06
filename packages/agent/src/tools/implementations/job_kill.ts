@@ -1,5 +1,5 @@
 // ABOUTME: Job cancellation tool using JobManager
-// Uses JobManager from ToolContext; destroy_container=true tears down a per_invocation container + workspace
+// Uses JobManager from ToolContext; destroy_container=true routes teardown through the shim (destroys container + removes /work)
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -19,7 +19,7 @@ export class JobKillTool extends Tool {
 
 **Plain kill (\`destroy_container\` omitted/false).** Cancels a \`status="running"\` job. **Does NOT destroy its session** — a delegate job's conversation history survives, so you can pick it back up with \`delegate(resume=<jobId>, prompt=...)\`. Use this to redirect a delegate that's gone off-track. After killing, the job transitions to \`cancelled\` (you'll get a \`job_notify\` 'cancelled' notification if subscribed).
 
-**Teardown (\`destroy_container: true\`).** Reclaim a per_invocation subagent when you're done with its deliverable: destroys the subagent's container AND removes its \`/work\` workspace, making the delegation **non-resumable**. Works whether the job is running (it's cancelled first) or already completed. Only the parent that created the delegation can tear it down. Call this when you've finished reading the workspace path a \`delegate\` returned — it frees a slot against the per-session retention ceiling.
+**Teardown (\`destroy_container: true\`).** Reclaim a per_invocation subagent when you're done with its deliverable: routes teardown through the sen-docker shim, which destroys the subagent's container AND removes its \`/work\` workspace, making the delegation **non-resumable**. Works whether the job is running (it's cancelled first) or already completed. Only the parent that created the delegation can tear it down. Call this when you've finished reading the workspace path a \`delegate\` returned — it frees a slot against the per-session retention ceiling.
 
 Parameters:
 - \`jobId\` (required): the job to kill / tear down.
@@ -64,11 +64,12 @@ Parameters:
       return ok(`Job ${jobId} cancelled`);
     }
 
-    // Teardown: cancelJob (above) stops the PROCESS; dispose destroys the
-    // CONTAINER (the live writer) before removing /work. Serialized per childId
-    // against a concurrent resume; ownership is the server-injected
-    // activeSessionId (the job is already scoped to this session, and dispose
-    // only touches an entry this session owns).
+    // Teardown: cancelJob (above) stops the PROCESS; dispose routes teardown
+    // through the shim (workspaceReaper.dispose → containerManager.releasePerInvocation
+    // → the plane 'release' verb), which destroys the container AND removes /work.
+    // Serialized per childId against a concurrent resume; ownership is the
+    // server-injected activeSessionId (the job is already scoped to this session,
+    // and dispose only touches an entry this session owns).
     const childId = job.subagentSessionId;
     if (childId && workspaceReaper) {
       const entry = workspaceReaper.get(childId);
