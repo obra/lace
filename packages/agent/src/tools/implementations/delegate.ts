@@ -4,8 +4,6 @@
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
-import * as path from 'node:path';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import {
@@ -19,6 +17,11 @@ import {
   PersonaSharingViolationError,
 } from '@lace/agent/config/persona-mount-conflict';
 import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-spec';
+import {
+  childWorkspaceDir,
+  childrenBaseDir,
+  writeOwnerMarker,
+} from '@lace/agent/jobs/results-tree';
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
@@ -161,6 +164,9 @@ Parameters:
     let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
     // Scratch dir host path; set for per_invocation personas.
     let scratchDirHostPath: string | undefined;
+    // This child's OWN children-results base (<base>/<childId>), bind-mounted
+    // read-only into its container so its tools can read what IT delegates.
+    let childrenReadBaseHostPath: string | undefined;
     // Container sharing mode from the resolved persona runtime.
     let containerSharing: 'per_invocation' | 'persistent' | undefined;
     // Per-invocation container spec name; set for per_invocation personas.
@@ -182,18 +188,40 @@ Parameters:
 
           // Per-invocation setup is shared by every projected container persona.
           if (runtime.containerSharing === 'per_invocation') {
-            // Compute and mkdir the per-invocation scratch directory on the
-            // host. Idempotent: the resume path finds an existing dir; the
-            // fresh path creates a new one. mode 0o700 applies only to
-            // newly created dirs — existing dirs keep their mode.
-            const scratchBase = process.env.LACE_WORK_DIR ?? path.join(os.tmpdir(), 'lace-work');
-            scratchDirHostPath = path.join(scratchBase, childSessionId!);
+            const parentId = context.activeSessionId ?? 'delegate';
+            // Write the owner marker BEFORE the first child mkdir to close the
+            // create-gap: a concurrent crash sweep must never see a child dir
+            // under a markerless parent. writeOwnerMarker mkdirs the parent dir.
+            writeOwnerMarker(parentId);
+            // The child's workspace lives in the shared results tree at
+            // <base>/<parentId>/<childId> — it survives the disposable
+            // container and is the child's deliverable to the parent.
+            // Idempotent: the resume path finds an existing dir; the fresh path
+            // creates a new one. mode 0o700 applies only to newly created dirs.
+            scratchDirHostPath = childWorkspaceDir(parentId, childSessionId!);
             fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
 
+            // Create this child's OWN children-results base now (the bind source
+            // must exist before its container starts). It stays markerless until
+            // the child itself first delegates; the Part 4 sweep protects it
+            // while the child's container is live (a live RO bind source).
+            childrenReadBaseHostPath = childrenBaseDir(childSessionId!);
+            fs.mkdirSync(childrenReadBaseHostPath, { recursive: true, mode: 0o700 });
+
             containerSpecName = buildPerInvocationSpecName({
-              parentSessionId: context.activeSessionId ?? 'delegate',
+              parentSessionId: parentId,
               personaName: persona,
               childSessionId: childSessionId!,
+            });
+
+            // Track the workspace so release_delegation / clean-close / teardown
+            // can dispose it (destroy the container, then rm /work). Idempotent
+            // on resume (same childSessionId re-set).
+            context.workspaceReaper?.track({
+              childId: childSessionId!,
+              parentId,
+              path: scratchDirHostPath,
+              containerSpecName,
             });
           }
 
@@ -211,7 +239,7 @@ Parameters:
             runtime,
             containerMounts: context.containerMounts ?? {},
             ...(runtime.containerSharing === 'per_invocation'
-              ? { childSessionId: childSessionId!, scratchDirHostPath }
+              ? { childSessionId: childSessionId!, scratchDirHostPath, childrenReadBaseHostPath }
               : {}),
           });
         }

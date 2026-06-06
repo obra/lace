@@ -528,7 +528,13 @@ describe('DelegateTool', () => {
     expect(typeof body.subagentSessionId).toBe('string');
     expect((body.subagentSessionId as string).startsWith('sess_')).toBe(true);
     expect(typeof body.scratchDir).toBe('string');
-    const expectedScratchDir = path.join(scratchBase, body.subagentSessionId as string);
+    // #5: the child workspace now lives in the shared results tree at
+    // <base>/<parentId>/<childId>, not <base>/<childId>.
+    const expectedScratchDir = path.join(
+      scratchBase,
+      'sess_parent123',
+      body.subagentSessionId as string
+    );
     expect(body.scratchDir).toBe(expectedScratchDir);
     // The scratch directory must exist on disk
     expect(fs.existsSync(expectedScratchDir)).toBe(true);

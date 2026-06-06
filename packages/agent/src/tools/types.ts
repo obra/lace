@@ -10,6 +10,7 @@ import type {
 } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
+import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 
 export interface ToolContext {
   // Execution control - required for cancellation
@@ -65,6 +66,11 @@ export interface ToolContext {
   // cancelReap so the container survives for the new invocation window.
   // The subagent-job exit handler schedules a new reap after each child exits.
   perInvocationReaper?: PerInvocationReaper;
+
+  // Per-process map of per_invocation child workspaces. release_delegation and
+  // the delegate tool use it to track/dispose a child's workspace (destroying
+  // the container before removing /work).
+  workspaceReaper?: WorkspaceReaper;
 
   // Per-turn compaction request cell. The runner creates this object at the
   // start of each turn and passes the same reference into every tool

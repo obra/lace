@@ -31,17 +31,59 @@ function assertSafeSegment(label: string, id: string): void {
   }
 }
 
+/**
+ * `<base>/<parentId>` — the dir holding a parent's children + its `.owner`.
+ * This is the dir a container parent bind-mounts read-only to read its children.
+ */
+export function childrenBaseDir(parentId: string): string {
+  assertSafeSegment('parentId', parentId);
+  return path.join(resultsBase(), parentId);
+}
+
 /** `<base>/<parentId>/<childId>` — both segments validated. */
 export function childWorkspaceDir(parentId: string, childId: string): string {
-  assertSafeSegment('parentId', parentId);
   assertSafeSegment('childId', childId);
-  return path.join(resultsBase(), parentId, childId);
+  return path.join(childrenBaseDir(parentId), childId);
 }
 
 /** `<base>/<parentId>/.owner` — the liveness marker, never inside a child mount. */
 export function ownerMarkerPath(parentId: string): string {
-  assertSafeSegment('parentId', parentId);
-  return path.join(resultsBase(), parentId, '.owner');
+  return path.join(childrenBaseDir(parentId), '.owner');
+}
+
+/** Normalized absolute path: realpath if it exists, else path.resolve (ENOENT). */
+function realpathOrResolve(p: string): string {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return path.resolve(p);
+  }
+}
+
+/** True if a and b are equal or one is a path-nested ancestor of the other. */
+export function pathsOverlap(a: string, b: string): boolean {
+  if (a === b) return true;
+  return a.startsWith(b + path.sep) || b.startsWith(a + path.sep);
+}
+
+/**
+ * Ensure resultsBase() is disjoint from every embedder container mount, so the
+ * crash sweep (confined to resultsBase()) can never descend into a durable
+ * persona mount. Creates the base first (realpath needs it to exist) and throws
+ * on any overlap — the caller (initialize handler) fails initialization.
+ */
+export function assertResultsBaseDisjoint(mounts: Record<string, { hostPath: string }>): void {
+  fs.mkdirSync(resultsBase(), { recursive: true, mode: 0o700 });
+  const realBase = realpathOrResolve(resultsBase());
+  for (const [name, entry] of Object.entries(mounts)) {
+    const realMount = realpathOrResolve(entry.hostPath);
+    if (pathsOverlap(realBase, realMount)) {
+      throw new Error(
+        `results base ${realBase} overlaps container mount '${name}' (${realMount}); ` +
+          `set LACE_WORK_DIR to a path disjoint from all persona mounts`
+      );
+    }
+  }
 }
 
 /** Owner marker contents: the live process pid + its anti-pid-recycle nonce. */
@@ -80,9 +122,7 @@ export function readProcStartTime(pid: number): string | undefined {
  * Idempotent: the live process always wins (rename clobbers any prior marker).
  */
 export function writeOwnerMarker(parentId: string): void {
-  const dir = path.join(resultsBase(), parentId);
-  assertSafeSegment('parentId', parentId);
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  fs.mkdirSync(childrenBaseDir(parentId), { recursive: true, mode: 0o700 });
   const marker: OwnerMarker = {
     pid: process.pid,
     startNonce: readProcStartTime(process.pid) ?? '',

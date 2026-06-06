@@ -17,6 +17,7 @@ import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ProjectedContainerManager } from '@lace/agent/tools/runtime/projected-container';
 import type { RuntimeSecretResolver } from '@lace/agent/tools/runtime/secrets';
 import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
+import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 
 /**
  * Approval mode for tool permissions.
@@ -188,6 +189,13 @@ export interface RunnerDependencies {
    * destruction timer when a resume invocation arrives.
    */
   perInvocationReaper?: PerInvocationReaper;
+
+  /**
+   * Per-process map of per_invocation child workspaces. Threaded into
+   * ToolContext so delegate can track a child's workspace and release_delegation
+   * can dispose it (container destroyed before /work removal).
+   */
+  workspaceReaper?: WorkspaceReaper;
 }
 
 /**

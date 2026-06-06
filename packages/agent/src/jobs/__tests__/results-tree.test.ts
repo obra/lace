@@ -14,7 +14,10 @@ import {
   writeOwnerMarker,
   readOwnerMarker,
   ownerIsAlive,
+  pathsOverlap,
+  assertResultsBaseDisjoint,
 } from '../results-tree';
+import { createAgentServerState } from '../../server';
 
 describe('results-tree layout', () => {
   let prevWorkDir: string | undefined;
@@ -148,5 +151,58 @@ describe('results-tree owner marker', () => {
     fs.mkdirSync(path.join(base, 'corrupt'), { recursive: true });
     fs.writeFileSync(ownerMarkerPath('corrupt'), 'not json');
     expect(readOwnerMarker('corrupt')).toBeNull();
+  });
+});
+
+describe('results-tree disjointness (sweep must never reach a durable mount)', () => {
+  let prevWorkDir: string | undefined;
+  let base: string;
+
+  beforeEach(() => {
+    prevWorkDir = process.env.LACE_WORK_DIR;
+    base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-disjoint-test-'));
+    process.env.LACE_WORK_DIR = path.join(base, 'work');
+  });
+
+  afterEach(() => {
+    if (prevWorkDir === undefined) delete process.env.LACE_WORK_DIR;
+    else process.env.LACE_WORK_DIR = prevWorkDir;
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  it('pathsOverlap: equal, nested either way, and disjoint', () => {
+    expect(pathsOverlap('/a/b', '/a/b')).toBe(true);
+    expect(pathsOverlap('/a', '/a/b')).toBe(true);
+    expect(pathsOverlap('/a/b', '/a')).toBe(true);
+    expect(pathsOverlap('/a/b', '/a/c')).toBe(false);
+    expect(pathsOverlap('/a/bc', '/a/b')).toBe(false); // prefix but not a path nest
+  });
+
+  it('assertResultsBaseDisjoint passes for disjoint mounts and mkdirs the base', () => {
+    const mounts = {
+      repo: { hostPath: path.join(base, 'durable', 'repo') },
+    };
+    expect(() => assertResultsBaseDisjoint(mounts)).not.toThrow();
+    expect(fs.existsSync(resultsBase())).toBe(true);
+  });
+
+  it('assertResultsBaseDisjoint throws when a mount nests the results base', () => {
+    process.env.LACE_WORK_DIR = path.join(base, 'durable', 'work');
+    const mounts = {
+      durable: { hostPath: path.join(base, 'durable') },
+    };
+    expect(() => assertResultsBaseDisjoint(mounts)).toThrow(/overlaps container mount 'durable'/);
+  });
+
+  it('assertResultsBaseDisjoint throws when the results base nests a mount', () => {
+    const mounts = {
+      inner: { hostPath: path.join(base, 'work', 'inner') },
+    };
+    expect(() => assertResultsBaseDisjoint(mounts)).toThrow(/overlaps container mount 'inner'/);
+  });
+
+  it('createAgentServerState has empty containerMounts at boot (populated by initialize)', () => {
+    const state = createAgentServerState();
+    expect(state.containerMounts).toEqual({});
   });
 });

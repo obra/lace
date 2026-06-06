@@ -37,12 +37,14 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   // Required for per_invocation; ignored for persistent.
   childSessionId?: string;
   scratchDirHostPath?: string;
+  childrenReadBaseHostPath?: string;
 }): RuntimeExecutionBinding {
   const containerSpec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
     personaName: input.personaName,
     childSessionId: input.childSessionId,
     scratchDirHostPath: input.scratchDirHostPath,
+    childrenReadBaseHostPath: input.childrenReadBaseHostPath,
     runtime: input.runtime,
     containerMounts: input.containerMounts,
   });
