@@ -43,6 +43,7 @@ import { logger } from './utils/logger';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import { EnvironmentRuntimeSecretResolver } from './tools/runtime/secrets';
 import { PerInvocationReaper } from './jobs/per-invocation-reaper';
+import { WorkspaceReaper } from './jobs/workspace-reaper';
 
 // Re-export public API from message-builder for backwards compatibility
 export {
@@ -127,6 +128,8 @@ export function createAgentServerState(): AgentServerState {
     runtimeSecretResolver: new EnvironmentRuntimeSecretResolver(),
     // Replaced in boot() with the real manager.
     perInvocationReaper: new PerInvocationReaper(null),
+    // Runtime refs bound in boot() via workspaceReaper.bindRuntime(...).
+    workspaceReaper: new WorkspaceReaper(),
   };
 }
 

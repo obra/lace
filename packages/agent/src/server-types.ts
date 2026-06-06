@@ -21,6 +21,7 @@ import type { ReminderScheduler } from './reminders';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
 import type { PerInvocationReaper } from './jobs/per-invocation-reaper';
+import type { WorkspaceReaper } from './jobs/workspace-reaper';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -209,6 +210,11 @@ export type AgentServerState = {
   // Schedules destroy calls after a subagent exits; canceled on resume.
   // Always present after boot — cost is a Map with zero entries until used.
   perInvocationReaper: PerInvocationReaper;
+  // Per-process map of per_invocation child workspaces in the shared results tree.
+  // Constructed eagerly with null runtime refs; bindRuntime() in boot() supplies
+  // the container manager + perInvocationReaper so dispose can destroy a child's
+  // container before removing its /work.
+  workspaceReaper: WorkspaceReaper;
 };
 
 // Single entry in the embedder-supplied containerMounts registry.

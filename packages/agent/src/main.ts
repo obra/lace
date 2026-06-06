@@ -129,6 +129,9 @@ async function boot(): Promise<void> {
   const manager = createDefaultContainerManager();
   state.containerManager = manager;
   state.perInvocationReaper = new PerInvocationReaper(manager);
+  // The workspace reaper destroys a child's container before removing its /work,
+  // so it needs the live container manager + idle reaper now that both exist.
+  state.workspaceReaper.bindRuntime(manager, state.perInvocationReaper);
   // Best-effort orphan reap; runs its own try/catch and never throws.
   void runStartupReaper(manager);
 
