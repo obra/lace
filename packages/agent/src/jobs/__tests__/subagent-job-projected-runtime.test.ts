@@ -554,9 +554,11 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
 
     expect(job.executionEnv).toBeUndefined();
     expect(job.containerExecutionMetadata).toBeUndefined();
-    expect(spawnRequests[0]).not.toMatchObject({
-      executionEnv: expect.anything(),
-    });
+    // A native persona delegate gets an ephemeral host $TMPDIR (#5) but never a
+    // container execution token.
+    const spawnEnv = (spawnRequests[0] as { executionEnv?: Record<string, string> }).executionEnv;
+    expect(spawnEnv?.SEN_AGENT_TOKEN).toBeUndefined();
+    expect(spawnEnv?.TMPDIR).toBeDefined();
 
     const { events } = readDurableEvents(parentSessionDir, {});
     const startedEvents = events.filter((event) => event.type === 'job_started');

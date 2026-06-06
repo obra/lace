@@ -95,7 +95,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
           { type: 'container' }
         >
       ).spec.env
-    ).toEqual({ FOO: 'execution', KEEP: 'runtime', SEN_AGENT_TOKEN: 'token' });
+    ).toEqual({ FOO: 'execution', KEEP: 'runtime', TMPDIR: '/tmp', SEN_AGENT_TOKEN: 'token' });
   });
 
   it('does not invent a jobId before delegate allocates the Lace job', () => {

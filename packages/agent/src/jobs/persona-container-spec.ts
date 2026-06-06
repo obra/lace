@@ -71,6 +71,14 @@ function resolvePersonaMountsAndEnv(input: {
 
   const env: Record<string, string> = { ...(runtimeEnv ?? {}) };
 
+  // Per_invocation subagents get an ephemeral $TMPDIR that dies with the
+  // container — the container's own /tmp, NOT /work/tmp (/work is the retained,
+  // parent-visible, ceiling-counted result tree). Set LAST so a persona can't
+  // redirect temp files into /work.
+  if (containerSharing === 'per_invocation') {
+    env.TMPDIR = '/tmp';
+  }
+
   return { mounts, env };
 }
 

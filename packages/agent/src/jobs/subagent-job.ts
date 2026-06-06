@@ -1,8 +1,9 @@
 // ABOUTME: Subagent job execution - handles spawning and managing AI subagent processes
 
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, existsSync, appendFileSync, statSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, existsSync, appendFileSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import {
   readSessionState,
@@ -227,6 +228,20 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         ? buildRuntimeBindingWithExecutionEnv(job.runtimeBinding, executionEnv)
         : job.runtimeBinding;
 
+    // Every host-side subagent process gets an ephemeral, auto-cleaned $TMPDIR.
+    // Opaque prefix (no session id — the path leaks into the child env and any
+    // logs the parent later reads). This is set ONLY on the spawned host process
+    // env, never on executionEnv (which is merged into the container above), so a
+    // container subagent's tools still get their own /tmp. Removed in `finally`.
+    // Caveat: `finally` does not run on SIGKILL, and this dir lives under the OS
+    // temp root (NOT resultsBase()), so it is not covered by the Part 4 sweep —
+    // on a hard crash it relies on OS temp cleanup.
+    const hostTmpDir = mkdtempSync(join(tmpdir(), 'lace-tmp-'));
+    const spawnExecutionEnv: Record<string, string> = {
+      ...(executionEnv ?? {}),
+      TMPDIR: hostTmpDir,
+    };
+
     // Buffer for collecting stderr output
     let stderrBuffer = '';
     let subagentProc: SubagentProcessHandle | undefined;
@@ -241,7 +256,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     try {
       subagentHostSkillDirs = getSubagentHostSkillDirs(state);
       subagentProc = await spawnSubagent({
-        ...(executionEnv ? { executionEnv } : {}),
+        executionEnv: spawnExecutionEnv,
       });
 
       if (subagentProc.nativeProcess) {
@@ -1125,6 +1140,17 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       }
 
       await finalizeJob(job);
+      // Remove the ephemeral host $TMPDIR. Does not run on SIGKILL (OS temp
+      // cleanup is the backstop there); the workspace (/work) is the child's
+      // result and is NEVER removed here — only the reaper/release/sweep touch it.
+      try {
+        rmSync(hostTmpDir, { recursive: true, force: true });
+      } catch (error) {
+        logger.debug('job.subagent.tmpdir_cleanup.failed', {
+          jobId: job.jobId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       // Schedule idle TTL teardown for per_invocation containers (Chunk E).
       // The reaper cancels this timer when a resume delegate call arrives, preserving
       // the container for the next invocation window.

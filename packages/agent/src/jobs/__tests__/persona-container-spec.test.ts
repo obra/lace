@@ -112,7 +112,8 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       { hostPath: '/host/identity', containerPath: '/etc/identity', readonly: true },
       { hostPath: SCRATCH_PATH, containerPath: '/work', readonly: false },
     ]);
-    expect(spec.env).toEqual({ FOO: 'bar' });
+    // per_invocation auto-sets an ephemeral $TMPDIR (#5) alongside persona env.
+    expect(spec.env).toEqual({ FOO: 'bar', TMPDIR: '/tmp' });
     expect(spec.ports).toBeUndefined();
     expect(spec.sysctls).toBeUndefined();
   });
