@@ -3,12 +3,12 @@
 ## The two sharing models
 
 **`per_invocation`** — each fresh `delegate(persona=X, …)` call mints a new
-subagent session and a new projected tool container. The subagent Lace process
+subagent session and a new projected tool container. The subagent lace process
 runs on the host; its tools execute in the container. The container is isolated
 from all other delegates, even concurrent ones of the same persona. A
 `delegate(resume=jobId, …)` within the idle TTL window reuses the prior subagent
 session and its container (same `/work`, same running processes). After the TTL
-expires the container is reaped; the host scratch directory outlives it.
+expires the shim reaps the container and removes `/work`.
 
 **`persistent`** — a single long-lived container named `sen-<persona>` (e.g.
 `sen-box-shell`) survives process restarts and host reboots. All delegates use
@@ -25,44 +25,66 @@ accumulate state across calls.
 
 `<parentSess8>` and `<childSess8>` are the first 8 characters of the respective
 session ids with the `sess_` prefix stripped. The `lace-` prefix makes
-per_invocation containers visible to the orphan reaper on startup; the `sen-`
-prefix keeps persistent containers outside the orphan reaper's scope.
+per_invocation containers visible to the startup orphan reaper; the `sen-`
+prefix keeps persistent containers outside the reaper's scope.
 
 ## Workspace convention (the workspace IS the result)
 
-For `per_invocation` containers lace auto-injects a bind mount in a **shared
-results tree**:
+For `per_invocation` containers the sen-docker shim provisions a bind-mounted
+workspace at a well-known path:
 
 ```
-host:  <base>/<parentId>/<childId>/   (created with mode 0700)
+host:  <base>/<parentId>/<childId>/
 guest: /work
 ```
 
-`<base>` = `LACE_WORK_DIR` (default `os.tmpdir()/lace-work`); `<parentId>` is the
-delegating session, `<childId>` the subagent session. Each child mounts ONLY its
-own subdir — mount-scoping, not file modes, is the isolation boundary. A
-`<base>/<parentId>/.owner` marker (`{pid, startNonce}`, written before the first
-child mkdir) records the owning process for crash reclamation. The persona must
-NOT declare `mounts.scratch` — rejected at spawn time with a
-`PersonaContainerSpecError`.
+`<base>` = `LACE_WORK_DIR` (default `os.tmpdir()/lace-work`); `<parentId>` is
+the delegating session id, `<childId>` the subagent session id. The shim creates
+and owns this directory — lace only computes the host path (via `childWorkspaceDir`)
+so it can return the result path to the parent agent and track the entry in the
+`WorkspaceReaper`.
 
-A **container** parent additionally gets `<base>/<childId>` (its own
-children-results base) bind-mounted **read-only** at the same path, so its tools
-can read the workspaces it delegates. The host root reads the tree directly.
+Each child mounts ONLY its own subdir — mount-scoping, not file modes, is the
+isolation boundary.
 
-The workspace **survives the disposable container** and is the child's
-deliverable to the parent — returned by `delegate` framed as untrusted +
-possibly-incomplete. The parent reclaims it with **`job_kill(jobId,
-destroy_container=true)`** (the single explicit safe path: destroy the container,
-then `rm /work`); it is also reclaimed on the parent's clean-close and the owning
-process's teardown. A retention ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`, default
-128) fails a fresh delegate that would exceed it (tear one down first). A crash
-backstop sweep
-(below) reclaims orphans whose owner died.
+A container parent additionally gets `<base>/<parentId>` (its own children-results
+base) bind-mounted read-only so its tools can read the workspaces it delegates.
+The host root reads the tree directly.
+
+The workspace **survives the disposable container** and is the child's deliverable
+to the parent — returned by `delegate` framed as UNTRUSTED and
+possibly-incomplete. The parent reclaims it with
+**`job_kill(jobId, destroy_container=true)`** (the primary explicit release path).
+Workspace reclamation also occurs on the parent's clean close and on process
+teardown. A retention ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`, default 128) fails
+a fresh delegate that would exceed it — reclaim a completed one first.
 
 Persistent personas declare their own `/work` mount via the embedder's
 container-mount registry; lace does not auto-inject `/work` for them, and a
-persistent box is provably never reaped.
+persistent box is never reaped.
+
+## Lifecycle ownership: the shim owns per_invocation
+
+The sen-docker shim owns the full per_invocation lifecycle:
+
+1. **Create** — shim provisions the container and its `/work` at spawn time.
+2. **Idle-TTL reap** — when no `exec` arrives within the TTL the shim destroys the
+   container and removes `/work`.
+3. **Release** — on an explicit release request the shim destroys the container
+   and removes `/work` (the `release` verb).
+
+lace's role is limited to:
+
+- Computing the workspace path (a shared convention) to include in the delegate
+  result and to track in-process.
+- Enforcing the per-parent retention ceiling and the resume guard against
+  released or empty workspaces.
+- Routing teardown (`job_kill(destroy_container=true)` / clean-close /
+  process teardown) through `WorkspaceReaper.dispose` →
+  `ContainerManager.releasePerInvocation` → the plane `release` verb.
+
+lace does NOT run a crash sweep, owner marker, or its own idle reaper. The shim
+is the backstop for all orphan and idle cleanup.
 
 ## Ephemeral $TMPDIR
 
@@ -70,10 +92,8 @@ Every subagent gets an ephemeral, auto-cleaned `$TMPDIR` separate from `/work`
 (which is the retained, parent-visible result tree). A **host** subagent gets a
 `mkdtemp` host dir (opaque `lace-tmp-` prefix) on its process env, removed in the
 job's exit `finally`. A **container** subagent gets `TMPDIR=/tmp` (the
-container's own fs), set last so a persona can't redirect temp into `/work`;
-cleaned with the container. Caveat: the host `finally` does not run on SIGKILL
-and `$TMPDIR` is outside `resultsBase()` (not swept) — a hard crash relies on OS
-temp cleanup.
+container's own fs), set last so a persona cannot redirect temp into `/work`;
+cleaned with the container.
 
 ## Host subagents are NOT a security boundary
 
@@ -83,33 +103,24 @@ and the session store. The ephemeral workdir + `$TMPDIR` are **hygiene, not
 isolation**. Therefore **adversarial / untrusted / prompt-injectable work MUST
 run as a `per_invocation` container persona, never as a host subagent.** A
 container child is isolated by mount-scoping (only its own `/work`), so it cannot
-read, forge, or plant a sibling's `.owner`.
+read or plant a sibling's workspace.
 
-## Idle TTL reap
+## lace-ps: operator/debug visibility
 
-Per_invocation containers are reaped 30 minutes after the child process exits. A
-`delegate(resume=jobId, …)` arriving within the window cancels the pending reap
-and reuses the container. The TTL is per subagent session (one timer per
-container).
+The sen-docker shim exposes a `lace-ps` verb that lists running per_invocation
+containers with their parent/child session ids and idle state. This is an
+operator- and debug-facing view — lace itself tracks delegations in-process (the
+retention ceiling and resume gate use the `WorkspaceReaper` in-memory map) and
+does not consume `lace-ps` internally.
 
-Override: `LACE_PER_INVOCATION_IDLE_TTL_MS` (milliseconds). Set to a small value
-(e.g. `100`) in tests for fast assertions. Unset in production.
+## Non-plane (local/docker) runtime
 
-On lace startup the orphan reaper destroys any `lace-*` container not associated
-with a live spec — this covers the case where lace crashed during a TTL window.
-
-## Crash-backstop workspace sweep
-
-The idle TTL reaps the *container*; it does not remove the *workspace*. Workspaces
-are reclaimed on the live paths (release / clean-close / teardown). The crash
-backstop is a base-wide sweep (boot — after `runStartupReaper` — plus a
-`LACE_WORKSPACE_SWEEP_INTERVAL_MS` interval, default 15 min) that any lace process
-runs (no "root" role; idempotent). It is **doubly liveness-gated**: it skips a
-subtree whose `.owner` process is alive, and skips any dir that is a live
-container's bind source (a `/work`, or a markerless read-base during the
-create-gap). Only a dead-owner, no-live-container workspace is removed. The sweep
-is confined to `resultsBase()`, which `initialize` asserts is disjoint from every
-durable persona mount — so it can never descend into a persistent box's mount.
+The per_invocation lifecycle features — idle-TTL reaping, `/work` removal on
+release, and the `resultsBase`⟂mounts disjointness invariant — are provided by
+the sen-docker shim and therefore apply **only on the plane runtime**. The
+non-plane mode (plain Docker or local/host) is used for local development and
+tests; it does not enforce the same isolation model and is not the production
+configuration.
 
 ## Adversarial-content workspace artifacts
 
@@ -137,6 +148,6 @@ Enforcement is two-layer:
   returns `status: 'failed'` with the error text.
 
 Only the per_invocation `scratch` mount name is excluded from the conflict
-check. Other mount names, including the old in-container agent support names
+check. Other mount names, including the in-container agent support names
 (`persona`, `lace-data`, `credentials`, `lace`), are ordinary persona-declared
-mounts.
+mounts subject to the check.
