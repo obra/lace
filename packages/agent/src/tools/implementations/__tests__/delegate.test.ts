@@ -527,15 +527,18 @@ describe('DelegateTool', () => {
     expect(body.status).toBe('started');
     expect(typeof body.subagentSessionId).toBe('string');
     expect((body.subagentSessionId as string).startsWith('sess_')).toBe(true);
-    expect(typeof body.scratchDir).toBe('string');
-    // #5: the child workspace now lives in the shared results tree at
-    // <base>/<parentId>/<childId>, not <base>/<childId>.
+    // #5: the result returns the workspace path (framed untrusted), in the
+    // shared results tree at <base>/<parentId>/<childId>, not <base>/<childId>.
+    expect(typeof body.workspace).toBe('string');
     const expectedScratchDir = path.join(
       scratchBase,
       'sess_parent123',
       body.subagentSessionId as string
     );
-    expect(body.scratchDir).toBe(expectedScratchDir);
+    expect(body.workspace).toBe(expectedScratchDir);
+    expect(body.workspaceNote).toContain('UNTRUSTED');
+    expect(body.workspaceNote).toContain('INCOMPLETE'); // background → still running
+    expect(body.workspaceNote).toContain('release_delegation');
     // The scratch directory must exist on disk
     expect(fs.existsSync(expectedScratchDir)).toBe(true);
   });
@@ -591,7 +594,10 @@ describe('DelegateTool', () => {
 
     expect(result.status).toBe('completed');
     const text = result.content[0].text;
-    expect(text).toMatch(/^delegate jobId=job_sync_inv scratchDir=/);
+    expect(text).toMatch(/^delegate jobId=job_sync_inv/);
+    expect(text).toContain('Subagent workspace:');
+    expect(text).toContain('UNTRUSTED');
+    expect(text).toContain('release_delegation');
   });
 
   it('resume reuses prior subagent session id and scratch dir for per_invocation', async () => {
@@ -639,7 +645,7 @@ describe('DelegateTool', () => {
 
     const firstBody = JSON.parse(firstResult.content[0].text) as Record<string, unknown>;
     const mintedSessionId = firstBody.subagentSessionId as string;
-    const mintedScratchDir = firstBody.scratchDir as string;
+    const mintedScratchDir = firstBody.workspace as string;
     expect(mintedSessionId.startsWith('sess_')).toBe(true);
 
     // Simulate the child having produced output — resume requires a non-empty
@@ -670,7 +676,7 @@ describe('DelegateTool', () => {
 
     const secondBody = JSON.parse(secondResult.content[0].text) as Record<string, unknown>;
     expect(secondBody.subagentSessionId).toBe(mintedSessionId);
-    expect(secondBody.scratchDir).toBe(mintedScratchDir);
+    expect(secondBody.workspace).toBe(mintedScratchDir);
   });
 
   it('persistent persona background response omits subagentSessionId and scratchDir', async () => {
@@ -714,7 +720,7 @@ describe('DelegateTool', () => {
     expect(body.jobId).toBe('job_pers_bg');
     expect(body.status).toBe('started');
     expect(body.subagentSessionId).toBeUndefined();
-    expect(body.scratchDir).toBeUndefined();
+    expect(body.workspace).toBeUndefined();
   });
 
   it('per_invocation resume: createJob receives resumeSessionId, NOT newSubagentSessionId', async () => {

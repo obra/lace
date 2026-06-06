@@ -103,7 +103,7 @@ describe('delegate workspace lifecycle', () => {
       { prompt: 'work', background: true, persona: 'inv' },
       ctx(jobManager, parentId)
     );
-    return JSON.parse(result.content[0].text) as { subagentSessionId: string; scratchDir: string };
+    return JSON.parse(result.content[0].text) as { subagentSessionId: string; workspace: string };
   }
 
   it('ceiling: a fresh delegate beyond the cap fails with the remedy; dispose frees a slot', async () => {
@@ -139,7 +139,7 @@ describe('delegate workspace lifecycle', () => {
 
     const fresh = await freshDelegate(jobManager, parentId);
     // The child produced output, then the parent released the delegation.
-    fs.writeFileSync(path.join(fresh.scratchDir, 'out.txt'), 'done');
+    fs.writeFileSync(path.join(fresh.workspace, 'out.txt'), 'done');
     jobs.push({ jobId: 'job_done', subagentSessionId: fresh.subagentSessionId });
     await reaper.dispose(fresh.subagentSessionId);
 
@@ -160,8 +160,8 @@ describe('delegate workspace lifecycle', () => {
     jobs.push({ jobId: 'job_crash', subagentSessionId: fresh.subagentSessionId });
     // Crash backstop: the in-memory released mark is gone, but /work is empty
     // (the fresh delegate created it; no child output survived). Must NOT resurrect.
-    expect(fs.existsSync(fresh.scratchDir)).toBe(true);
-    expect(fs.readdirSync(fresh.scratchDir)).toHaveLength(0);
+    expect(fs.existsSync(fresh.workspace)).toBe(true);
+    expect(fs.readdirSync(fresh.workspace)).toHaveLength(0);
 
     const tool = new DelegateTool({ personaRegistry: perInvocationRegistry() });
     const result = await tool.execute(
