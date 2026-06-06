@@ -642,6 +642,10 @@ describe('DelegateTool', () => {
     const mintedScratchDir = firstBody.scratchDir as string;
     expect(mintedSessionId.startsWith('sess_')).toBe(true);
 
+    // Simulate the child having produced output — resume requires a non-empty
+    // workspace (the empty-workspace gate refuses a hollow resurrection).
+    fs.writeFileSync(path.join(mintedScratchDir, 'out.txt'), 'prior output');
+
     // Second invocation with resume
     const mockJob2 = {
       jobId: 'job_second',
@@ -746,6 +750,11 @@ describe('DelegateTool', () => {
         .mockReturnValue([{ jobId: 'job_prev_inv', subagentSessionId: 'sess_abc123xyz' }]),
     } as unknown as JobManager;
 
+    // Resume requires a non-empty prior workspace (empty-workspace gate).
+    const priorWs = path.join(scratchBase, 'sess_parent', 'sess_abc123xyz');
+    fs.mkdirSync(priorWs, { recursive: true });
+    fs.writeFileSync(path.join(priorWs, 'out.txt'), 'prior output');
+
     await tool.execute(
       { prompt: 'resume work', background: true, persona: 'inv-persona', resume: 'job_prev_inv' },
       {
@@ -849,6 +858,11 @@ describe('DelegateTool', () => {
           .fn()
           .mockReturnValue([{ jobId: 'job_prev', subagentSessionId: existingSessionId }]),
       } as unknown as JobManager;
+
+      // Resume requires a non-empty prior workspace (empty-workspace gate).
+      const priorWs = path.join(scratchBase, 'sess_parent', existingSessionId);
+      fs.mkdirSync(priorWs, { recursive: true });
+      fs.writeFileSync(path.join(priorWs, 'out.txt'), 'prior output');
 
       await tool.execute(
         { prompt: 'resume task', background: true, persona: 'per-inv-persona', resume: 'job_prev' },

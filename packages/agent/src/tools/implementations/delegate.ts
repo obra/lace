@@ -43,6 +43,19 @@ export interface DelegateToolOptions {
   personaRegistry?: PersonaRegistry;
 }
 
+// Per-parent retained-workspace ceiling. Generous: high enough that normal
+// fan-out width is never the binding constraint — only a session that never
+// releases completed delegations hits it. A fresh delegate that would exceed it
+// fails (never silently evict) and names the remedy.
+const WORKSPACE_MAX_PER_PARENT_DEFAULT = 128;
+
+function workspaceMaxPerParent(): number {
+  const raw = process.env.LACE_WORKSPACE_MAX_PER_PARENT;
+  if (raw === undefined) return WORKSPACE_MAX_PER_PARENT_DEFAULT;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : WORKSPACE_MAX_PER_PARENT_DEFAULT;
+}
+
 export class DelegateTool extends Tool {
   name = 'delegate';
   description = `Spawn or continue a subagent conversation. **Read the mental model below before using.**
@@ -189,40 +202,96 @@ Parameters:
           // Per-invocation setup is shared by every projected container persona.
           if (runtime.containerSharing === 'per_invocation') {
             const parentId = context.activeSessionId ?? 'delegate';
-            // Write the owner marker BEFORE the first child mkdir to close the
-            // create-gap: a concurrent crash sweep must never see a child dir
-            // under a markerless parent. writeOwnerMarker mkdirs the parent dir.
-            writeOwnerMarker(parentId);
-            // The child's workspace lives in the shared results tree at
-            // <base>/<parentId>/<childId> — it survives the disposable
-            // container and is the child's deliverable to the parent.
-            // Idempotent: the resume path finds an existing dir; the fresh path
-            // creates a new one. mode 0o700 applies only to newly created dirs.
-            scratchDirHostPath = childWorkspaceDir(parentId, childSessionId!);
-            fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
+            const childId = childSessionId!;
 
-            // Create this child's OWN children-results base now (the bind source
-            // must exist before its container starts). It stays markerless until
-            // the child itself first delegates; the Part 4 sweep protects it
-            // while the child's container is live (a live RO bind source).
-            childrenReadBaseHostPath = childrenBaseDir(childSessionId!);
-            fs.mkdirSync(childrenReadBaseHostPath, { recursive: true, mode: 0o700 });
+            // Per-parent retention ceiling — checked at delegate time on the O(1)
+            // reaper map (never du the disk). A fresh delegate that would exceed
+            // it fails with the precise remedy; a resume reuses an existing slot.
+            if (!resume && context.workspaceReaper) {
+              const max = workspaceMaxPerParent();
+              const retained = context.workspaceReaper.countForParent(parentId);
+              if (retained >= max) {
+                return {
+                  status: 'failed',
+                  content: [
+                    {
+                      type: 'text',
+                      text: `${retained} workspaces retained for this session; release a completed one with \`release_delegation\` before delegating again.`,
+                    },
+                  ],
+                };
+              }
+            }
 
-            containerSpecName = buildPerInvocationSpecName({
-              parentSessionId: parentId,
-              personaName: persona,
-              childSessionId: childSessionId!,
-            });
+            // On resume, refuse if the prior workspace is gone (released, or lost
+            // to a crash) rather than letting the idempotent mkdir resurrect a
+            // hollow /work. Then lay out the workspace and track it.
+            let resumeRefused = false;
+            const setupWorkspace = (): void => {
+              if (resume) {
+                // Released in this process (explicit), OR the workspace is gone /
+                // empty (crash backstop) — either way refuse rather than let the
+                // idempotent mkdir resurrect a hollow /work.
+                const dir = childWorkspaceDir(parentId, childId);
+                const intact = fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
+                if (context.workspaceReaper?.isReleased(childId) || !intact) {
+                  resumeRefused = true;
+                  return;
+                }
+              }
+              // Write the owner marker BEFORE the first child mkdir to close the
+              // create-gap: a concurrent sweep must never see a child dir under a
+              // markerless parent. writeOwnerMarker mkdirs the parent base.
+              writeOwnerMarker(parentId);
+              // The child's workspace lives in the shared results tree at
+              // <base>/<parentId>/<childId> — it survives the disposable container
+              // and is the child's deliverable to the parent. mode 0o700 applies
+              // only to newly created dirs.
+              scratchDirHostPath = childWorkspaceDir(parentId, childId);
+              fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
 
-            // Track the workspace so release_delegation / clean-close / teardown
-            // can dispose it (destroy the container, then rm /work). Idempotent
-            // on resume (same childSessionId re-set).
-            context.workspaceReaper?.track({
-              childId: childSessionId!,
-              parentId,
-              path: scratchDirHostPath,
-              containerSpecName,
-            });
+              // Create this child's OWN children-results base now (the bind source
+              // must exist before its container starts). It stays markerless until
+              // the child itself first delegates; the Part 4 sweep protects it
+              // while the child's container is live (a live RO bind source).
+              childrenReadBaseHostPath = childrenBaseDir(childId);
+              fs.mkdirSync(childrenReadBaseHostPath, { recursive: true, mode: 0o700 });
+
+              containerSpecName = buildPerInvocationSpecName({
+                parentSessionId: parentId,
+                personaName: persona,
+                childSessionId: childId,
+              });
+
+              // Track the workspace so release_delegation / clean-close / teardown
+              // can dispose it (destroy the container, then rm /work). Idempotent
+              // on resume (same childSessionId re-set).
+              context.workspaceReaper?.track({
+                childId,
+                parentId,
+                path: scratchDirHostPath,
+                containerSpecName,
+              });
+            };
+
+            // Serialize setup vs a concurrent release_delegation of the same child.
+            if (context.workspaceReaper) {
+              await context.workspaceReaper.runExclusive(childId, async () => setupWorkspace());
+            } else {
+              setupWorkspace();
+            }
+
+            if (resumeRefused) {
+              return {
+                status: 'failed',
+                content: [
+                  {
+                    type: 'text',
+                    text: `Cannot resume job ${resume}: this delegation was released; start a fresh delegate.`,
+                  },
+                ],
+              };
+            }
           }
 
           // Project the persona container into a host-side RuntimeExecutionBinding.

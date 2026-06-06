@@ -58,9 +58,10 @@ describe('registerBuiltinTools', () => {
     expect(registries.tools.has('bash')).toBe(true);
   });
 
-  it('PER_SESSION_BUILTIN_NAMES contains delegate and use_skill', () => {
+  it('PER_SESSION_BUILTIN_NAMES contains delegate, release_delegation, and use_skill', () => {
     expect(PER_SESSION_BUILTIN_NAMES.has('delegate')).toBe(true);
+    expect(PER_SESSION_BUILTIN_NAMES.has('release_delegation')).toBe(true);
     expect(PER_SESSION_BUILTIN_NAMES.has('use_skill')).toBe(true);
-    expect(PER_SESSION_BUILTIN_NAMES.size).toBe(2);
+    expect(PER_SESSION_BUILTIN_NAMES.size).toBe(3);
   });
 });

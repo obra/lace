@@ -143,6 +143,72 @@ describe('WorkspaceReaper', () => {
     expect(calls).toEqual(['cancelReap:c1']);
     expect(fs.existsSync(dir)).toBe(false);
   });
+
+  it('get returns the tracked entry (for ownership checks) or undefined', () => {
+    const { containerManager, perInvocationReaper } = makeFakes();
+    const reaper = new WorkspaceReaper();
+    reaper.bindRuntime(containerManager, perInvocationReaper);
+    const dir = makeWorkspace('p1', 'c1');
+    reaper.track({ childId: 'c1', parentId: 'p1', path: dir, containerSpecName: 'spec-c1' });
+
+    expect(reaper.get('c1')).toEqual({ parentId: 'p1', path: dir, containerSpecName: 'spec-c1' });
+    expect(reaper.get('nope')).toBeUndefined();
+  });
+
+  it('countForParent counts only that parent', () => {
+    const reaper = new WorkspaceReaper();
+    reaper.track({ childId: 'a', parentId: 'p1', path: '/x/a' });
+    reaper.track({ childId: 'b', parentId: 'p1', path: '/x/b' });
+    reaper.track({ childId: 'c', parentId: 'p2', path: '/x/c' });
+    expect(reaper.countForParent('p1')).toBe(2);
+    expect(reaper.countForParent('p2')).toBe(1);
+    expect(reaper.countForParent('p3')).toBe(0);
+  });
+
+  it('runExclusive serializes overlapping critical sections for the same childId', async () => {
+    const reaper = new WorkspaceReaper();
+    const order: string[] = [];
+    const slow = reaper.runExclusive('c1', async () => {
+      order.push('A:start');
+      await new Promise((r) => setTimeout(r, 20));
+      order.push('A:end');
+    });
+    const fast = reaper.runExclusive('c1', async () => {
+      order.push('B:start');
+      order.push('B:end');
+    });
+    await Promise.all([slow, fast]);
+    // B must not start until A finished — same childId is serialized.
+    expect(order).toEqual(['A:start', 'A:end', 'B:start', 'B:end']);
+  });
+
+  it('runExclusive does not block different childIds', async () => {
+    const reaper = new WorkspaceReaper();
+    const order: string[] = [];
+    const a = reaper.runExclusive('c1', async () => {
+      order.push('A:start');
+      await new Promise((r) => setTimeout(r, 30));
+      order.push('A:end');
+    });
+    const b = reaper.runExclusive('c2', async () => {
+      order.push('B:start');
+      order.push('B:end');
+    });
+    await Promise.all([a, b]);
+    // Different childIds run concurrently — B finishes before A.
+    expect(order.indexOf('B:end')).toBeLessThan(order.indexOf('A:end'));
+  });
+
+  it('runExclusive releases the lock even if the critical section throws', async () => {
+    const reaper = new WorkspaceReaper();
+    await expect(
+      reaper.runExclusive('c1', async () => {
+        throw new Error('boom');
+      })
+    ).rejects.toThrow('boom');
+    // The lock is freed: a subsequent call for the same childId still runs.
+    await expect(reaper.runExclusive('c1', async () => 'ok')).resolves.toBe('ok');
+  });
 });
 
 describe('safeRemoveWorkspace', () => {

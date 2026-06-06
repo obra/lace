@@ -66,6 +66,13 @@ export interface WorkspaceEntry {
  */
 export class WorkspaceReaper {
   private readonly tracked = new Map<string, WorkspaceEntry>();
+  // Per-childId lock tail. Serializes release vs resume for the same child so a
+  // resume can't resurrect a workspace mid-dispose. There is no other per-childId
+  // lock in the system (per-invocation-reaper holds only timers).
+  private readonly locks = new Map<string, Promise<unknown>>();
+  // Childs disposed in THIS process — non-resumable. In-memory only (a crash
+  // loses it; delegate's empty-workspace gate is the crash backstop).
+  private readonly released = new Set<string>();
   private containerManager: ContainerManager | null = null;
   private perInvocationReaper: PerInvocationReaper | null = null;
 
@@ -84,6 +91,36 @@ export class WorkspaceReaper {
       path,
       ...(containerSpecName ? { containerSpecName } : {}),
     });
+  }
+
+  /** The tracked entry for a child (for ownership checks), or undefined. */
+  get(childId: string): WorkspaceEntry | undefined {
+    return this.tracked.get(childId);
+  }
+
+  /**
+   * Run `fn` with exclusive access to `childId` — serializes release vs resume
+   * for the same child. Different childIds never block each other. The lock is
+   * released even if `fn` throws.
+   */
+  async runExclusive<T>(childId: string, fn: () => Promise<T>): Promise<T> {
+    const prior = this.locks.get(childId) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Our tail resolves after prior's section AND after we release() — so the
+    // next caller queues behind us. gate never rejects, so the chain is robust.
+    const tail = prior.then(() => gate);
+    this.locks.set(childId, tail);
+    await prior; // wait our turn (prior tails never reject)
+    try {
+      return await fn();
+    } finally {
+      release();
+      // Drop the entry only if nobody queued behind us, to bound the map.
+      if (this.locks.get(childId) === tail) this.locks.delete(childId);
+    }
   }
 
   /** Number of workspaces retained for a parent — O(1)-ish, no fs/du. */
@@ -110,6 +147,13 @@ export class WorkspaceReaper {
     }
     safeRemoveWorkspace(entry.path, resultsBase());
     this.tracked.delete(childId);
+    // Close the resume window: a disposed child is non-resumable in this process.
+    this.released.add(childId);
+  }
+
+  /** True once this child has been disposed in this process (non-resumable). */
+  isReleased(childId: string): boolean {
+    return this.released.has(childId);
   }
 
   /** dispose every entry for a parent; per-entry try/catch (one fail ≠ strand rest). */

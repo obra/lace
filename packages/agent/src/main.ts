@@ -81,6 +81,12 @@ const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
   try {
+    // FIRST, before any later await that can hang: dispose every per_invocation
+    // child workspace this process tracks — destroy each container, then rm
+    // /work. No parent-id arg: a process can't know its parent; its own tracked
+    // entries are exactly what must be freed. (Belt; the Part 4 sweep is the
+    // SIGKILL backstop.) releaseAllTracked is per-entry try/catch, never rejects.
+    await state.workspaceReaper.releaseAllTracked();
     await shutdownReminders(state);
     await emitSubagentExitedIfNeeded(state);
   } catch {

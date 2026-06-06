@@ -162,6 +162,14 @@ async function releaseRunningSessionWork(
   await Promise.all(runningJobs.map((job) => state.jobManager.finalizeJob(job)));
   state.pendingPermissionRequests.clear();
   state.jobManager.clearJobs();
+
+  // Reclaim the closing session's per_invocation child workspaces. killAllRunningJobs
+  // above killed the subagent PROCESSES; the CONTAINER teardown happens inside dispose
+  // (which awaits containerManager.destroy) before each /work is removed.
+  const closingSessionId = state.activeSession?.meta.sessionId;
+  if (closingSessionId) {
+    await state.workspaceReaper.releaseAllForParent(closingSessionId);
+  }
 }
 
 async function activateStoredSession(
