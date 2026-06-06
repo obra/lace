@@ -622,7 +622,7 @@ describe('DockerContainerRuntime', () => {
     });
   });
 
-  describe('labels (PRI-2012 spawn-broker ownership)', () => {
+  describe('labels', () => {
     it('emits --label key=value for each config label at create', async () => {
       await runtime.create({
         name: 'persistent-box',

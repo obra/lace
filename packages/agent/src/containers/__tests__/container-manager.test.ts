@@ -151,10 +151,9 @@ describe('ContainerManager', () => {
       expect(config.ports).toBeUndefined();
     });
 
-    it('propagates spec.labels into ContainerConfig (PRI-2012 spawn-broker ownership)', async () => {
-      // The spawn broker stamps sen.broker.* identity labels on the spec; they
-      // must reach ContainerConfig so DockerContainerRuntime emits --label and the
-      // broker can re-read them via inspect to rebuild ownership after a restart.
+    it('propagates spec.labels into ContainerConfig', async () => {
+      // Labels stamped on the spec must reach ContainerConfig so
+      // DockerContainerRuntime emits --label at create.
       const createSpy = vi.spyOn(runtime, 'create');
       const labelledSpec: ContainerSpec = {
         ...baseSpec,

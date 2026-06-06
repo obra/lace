@@ -48,16 +48,13 @@ export interface DockerCreateConfig {
   gatewayRoute?: string;
 
   // Docker object labels stamped at create (`docker create --label key=value`).
-  // Absent or empty ⇒ no --label flags. PRI-2012: the spawn broker stamps
-  // `sen.broker.*` identity labels so it can rebuild its ownership record from
-  // `docker inspect` after a broker restart (survives without persisted state).
+  // Absent or empty ⇒ no --label flags.
   labels?: Record<string, string>;
 
-  // PRI-2012 spawn-broker SELECTOR fields (copied from ContainerSpec by
-  // materializeOnce). The SpawnBrokerContainerRuntime client reads these at
-  // create() to format the wire spawn request. SELECTOR ONLY — never an authority
-  // source (the broker rebuilds the full config from its own catalog using only
-  // persona). The docker/apple runtimes ignore them.
+  // Privileged-runtime SELECTOR fields (copied from ContainerSpec by
+  // materializeOnce). SELECTOR ONLY — never an authority source: the privileged
+  // runtime rebuilds the full container config from its own catalog using only
+  // the persona. The docker/apple runtimes ignore them.
   persona?: string;
   parentSessionId?: string;
   childSessionId?: string;

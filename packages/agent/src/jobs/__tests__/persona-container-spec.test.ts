@@ -330,13 +330,13 @@ describe('buildProjectedRuntimeSpec selector fields', () => {
   });
 });
 
-// PRI-2012 B7.1 — the SELECTOR fields (persona/parentSessionId/childSessionId)
-// must be populated by the spec builder and survive containerSpecToRuntimeSpec so
-// the SpawnBrokerContainerRuntime client can format the wire spawn request. They
-// are SELECTOR ONLY (the broker rebuilds the full config from its catalog); the
-// docker/apple runtimes ignore them. A field dropped here silently breaks persona
-// selection broker-side, so it is asserted at every hop.
-describe('SELECTOR fields (PRI-2012 B7)', () => {
+// The SELECTOR fields (persona/parentSessionId/childSessionId) must be populated
+// by the spec builder and survive containerSpecToRuntimeSpec so the privileged
+// runtime can format its spawn request. They are SELECTOR ONLY (the privileged
+// runtime rebuilds the full config from its catalog); the docker/apple runtimes
+// ignore them. A field dropped here silently breaks persona selection, so it is
+// asserted at every hop.
+describe('SELECTOR fields', () => {
   it('buildPersonaContainerSpec sets persona/parentSessionId/childSessionId (per_invocation)', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,

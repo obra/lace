@@ -6,15 +6,10 @@ import { ContainerManager } from './container-manager';
 import { DockerContainerRuntime } from './docker-container';
 import { PlaneRuntime } from './plane-runtime';
 import { AppleContainerRuntime } from './apple-container';
-import { SpawnBrokerContainerRuntime } from './spawn-broker-runtime';
 import { registries } from '@lace/agent/plugins';
 import type { ContainerRuntime } from './types';
 
 export const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
-// PRI-2012: when set, main-sen has NO docker.sock and reaches Docker only through
-// the spawn broker at this socket path. Selecting the broker runtime here is what
-// makes the closed spawn surface hold in production.
-const SPAWN_BROKER_SOCKET_ENV = 'SEN_SPAWN_BROKER_SOCKET';
 const DOCKER_BIN_ENV = 'LACE_DOCKER_BIN';
 
 function makeDockerRuntime(): ContainerRuntime {
@@ -74,18 +69,8 @@ export function registerBuiltinRuntimes(): void {
 
 export function createDefaultContainerManager(
   platform: NodeJS.Platform = process.platform,
-  runtimeSelection: string | undefined = process.env[CONTAINER_RUNTIME_ENV],
-  spawnBrokerSocket: string | undefined = process.env[SPAWN_BROKER_SOCKET_ENV]
+  runtimeSelection: string | undefined = process.env[CONTAINER_RUNTIME_ENV]
 ): ContainerManager | null {
-  // The spawn broker takes precedence over platform + LACE_CONTAINER_RUNTIME:
-  // when its socket is configured, main-sen has no docker.sock and MUST route all
-  // container ops through the broker (PRI-2012 Root A). No local Docker/Apple.
-  const brokerSocket = spawnBrokerSocket?.trim();
-  if (brokerSocket) {
-    logger.debug('containers.manager_factory.spawn_broker', { socketPath: brokerSocket });
-    return new ContainerManager(new SpawnBrokerContainerRuntime({ socketPath: brokerSocket }));
-  }
-
   // Ensure built-ins are available whether called at module-load or boot.
   // Same pattern as registerAllAvailableTools calling registerBuiltinTools.
   registerBuiltinRuntimes();

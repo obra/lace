@@ -12,18 +12,15 @@ export interface ContainerSpec {
   mounts: ContainerMount[];
   env: Record<string, string>;
   // Docker object labels forwarded to ContainerConfig.labels (→ `--label`).
-  // PRI-2012: the spawn broker stamps `sen.broker.*` identity labels on the spec
-  // so it can rebuild + re-validate its ownership record from `docker inspect`
-  // after a broker restart.
+  // Docker object labels stamped on the spec at create.
   labels?: Record<string, string>;
 
   // Shared selector field. It is a selector only, never an authority source:
   // the privileged runtime validates it and rebuilds the full container spec.
   persona?: string;
 
-  // Spawn-broker selector fields. The SpawnBrokerContainerRuntime client uses
-  // these to format its `{persona,parentSessionId,childSessionId,jobId}` wire
-  // request. Docker/apple runtimes ignore them.
+  // Privileged-runtime selector fields, carried alongside `persona`.
+  // Docker/apple runtimes ignore them.
   parentSessionId?: string;
   childSessionId?: string;
 
