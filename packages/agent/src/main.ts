@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { runStartupReaper } from './containers/startup-reaper';
+import { runWorkspaceSweep, readSweepIntervalMs } from './jobs/workspace-sweep';
 import { fileURLToPath } from 'url';
 import { loadPlugins, PluginLoadError } from './plugins';
 import { registerBuiltinTools } from './tools/builtins';
@@ -76,10 +77,14 @@ const writable = new Writable({
 // Promoted to module scope so shutdown() can guard with ?.
 let peer: JsonRpcPeer | undefined;
 
+// The interval workspace sweep handle; cleared in shutdown().
+let workspaceSweepTimer: ReturnType<typeof setInterval> | undefined;
+
 let shuttingDown = false;
 const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
+  if (workspaceSweepTimer) clearInterval(workspaceSweepTimer);
   try {
     // FIRST, before any later await that can hang: dispose every per_invocation
     // child workspace this process tracks — destroy each container, then rm
@@ -138,8 +143,19 @@ async function boot(): Promise<void> {
   // The workspace reaper destroys a child's container before removing its /work,
   // so it needs the live container manager + idle reaper now that both exist.
   state.workspaceReaper.bindRuntime(manager, state.perInvocationReaper);
-  // Best-effort orphan reap; runs its own try/catch and never throws.
-  void runStartupReaper(manager);
+  // Orphan-container reap FIRST: it destroys all orphan lace-* containers, so the
+  // boot workspace sweep that follows sees an empty live set and reclaims every
+  // dead-owner workspace cleanly. Best-effort; runs its own try/catch.
+  await runStartupReaper(manager);
+  // Boot sweep, then an interval sweep — the crash backstop for workspaces whose
+  // owning process died without disposing them. Doubly liveness-gated; any lace
+  // process runs it (no "root" role). Never throws (per-subtree try/catch).
+  await runWorkspaceSweep(manager);
+  workspaceSweepTimer = setInterval(() => {
+    void runWorkspaceSweep(manager);
+  }, readSweepIntervalMs());
+  // Don't keep the event loop alive solely for the sweep.
+  workspaceSweepTimer.unref?.();
 
   // Safe to attach the stdin consumer NOW — frames that arrived during the plugin
   // await were buffered in the tee and will be delivered in order once the peer wires.

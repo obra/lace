@@ -2,7 +2,11 @@
 // ABOUTME: Three legs: (1) no container idle-reap, (2) WorkspaceReaper never tracks it, (3) sweep skips it
 
 import { describe, it, expect, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { maybeScheduleReapAfter } from '../subagent-job';
+import { sweepPass } from '../workspace-sweep';
 import type { JobState } from '@lace/agent/server-types';
 import type { PerInvocationReaper } from '../per-invocation-reaper';
 import type { WorkspaceReaper } from '../workspace-reaper';
@@ -106,6 +110,24 @@ describe('persistent-box is never reaped', () => {
   });
 
   // Leg 3: the crash sweep is confined to resultsBase() (disjoint from the box's
-  // durable mount) and skips live-container subtrees. Lands in Part 4.
-  it.todo("leg 3: the sweep never descends into a persistent box's durable mount");
+  // durable mount, asserted at initialize) — so it never touches the box's mount,
+  // even if a live persistent container's bind source is in the live set.
+  it("leg 3: the sweep never descends into a persistent box's durable mount", () => {
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-persist-sweep-'));
+    const prev = process.env.LACE_WORK_DIR;
+    process.env.LACE_WORK_DIR = path.join(base, 'work');
+    // A durable persona mount living OUTSIDE resultsBase().
+    const durable = path.join(base, 'durable-box');
+    fs.mkdirSync(durable, { recursive: true });
+    fs.writeFileSync(path.join(durable, 'state.db'), 'persistent state');
+    try {
+      // Even passing the durable dir as a "live source" must not pull it into scope.
+      sweepPass(new Set([durable]));
+      expect(fs.existsSync(path.join(durable, 'state.db'))).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.LACE_WORK_DIR;
+      else process.env.LACE_WORK_DIR = prev;
+      fs.rmSync(base, { recursive: true, force: true });
+    }
+  });
 });
