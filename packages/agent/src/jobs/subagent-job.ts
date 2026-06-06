@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync, existsSync, appendFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { resultsBase } from './results-tree';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import {
   readSessionState,
@@ -232,10 +232,14 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     // logs the parent later reads). This is set ONLY on the spawned host process
     // env, never on executionEnv (which is merged into the container above), so a
     // container subagent's tools still get their own /tmp. Removed in `finally`.
-    // Caveat: `finally` does not run on SIGKILL, and this dir lives under the OS
-    // temp root (NOT resultsBase()), so it is not covered by the Part 4 sweep —
-    // on a hard crash it relies on OS temp cleanup.
-    const hostTmpDir = mkdtempSync(join(tmpdir(), 'lace-tmp-'));
+    // Located under <results-base>/.tmp rather than the OS temp root so a SIGKILL
+    // leak lands in a known, bounded place inside the shim-owned tree (the
+    // container's long-lived writable layer has no OS temp reaper). Normal/SIGTERM
+    // exit removes it below; reclaiming a SIGKILL leak under .tmp is a small shim
+    // follow-up (its workspace GC currently scopes to <parent>/<child> dirs).
+    const hostTmpRoot = join(resultsBase(), '.tmp');
+    mkdirSync(hostTmpRoot, { recursive: true, mode: 0o700 });
+    const hostTmpDir = mkdtempSync(join(hostTmpRoot, 'lace-tmp-'));
     const spawnExecutionEnv: Record<string, string> = {
       ...(executionEnv ?? {}),
       TMPDIR: hostTmpDir,
@@ -1138,9 +1142,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       }
 
       await finalizeJob(job);
-      // Remove the ephemeral host $TMPDIR. Does not run on SIGKILL (OS temp
-      // cleanup is the backstop there); the workspace (/work) is the child's
-      // result and is NEVER removed here — only the reaper/release/sweep touch it.
+      // Remove the ephemeral host $TMPDIR. Does not run on SIGKILL; the leak then
+      // lands under <results-base>/.tmp (a known, bounded location in the
+      // shim-owned tree). The workspace (/work) is the child's result and is NEVER
+      // removed here — the shim owns it.
       try {
         rmSync(hostTmpDir, { recursive: true, force: true });
       } catch (error) {

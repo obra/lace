@@ -202,8 +202,11 @@ describe('subagent $TMPDIR (host)', () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(tmpdirAtSpawn).toBeDefined();
-    // Opaque prefix, under the OS temp root, NOT a session id.
+    // Opaque prefix, under the shim-owned results base's .tmp (not the OS temp
+    // root), NOT a session id.
     expect(tmpdirAtSpawn!).toContain('lace-tmp-');
+    // Under the results base's .tmp (LACE_WORK_DIR unset here → os tmp/lace-work/.tmp).
+    expect(tmpdirAtSpawn!).toContain('/lace-work/.tmp/');
     expect(tmpdirAtSpawn!).not.toContain(parentSessionId);
     expect(existedAtSpawn).toBe(true); // existed during the run
     expect(existsSync(tmpdirAtSpawn!)).toBe(false); // removed on exit
