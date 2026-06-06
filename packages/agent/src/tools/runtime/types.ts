@@ -64,13 +64,6 @@ export type ToolRuntimeDescriptor =
         network?: string;
         // IPv4 address of the egress gateway broker.
         gatewayRoute?: string;
-        // PRI-2002: when true, the persona is a quarantined browser-driver whose
-        // Chrome CDP is exposed over a unix socket on the shared sen-browser-cdp
-        // mount. Lace injects SEN_BROWSER_CDP_SOCKET and emits the matching
-        // browserCdpSocketPath on network attach so the credential helper can
-        // reach it. Mount scope IS the access-control boundary: only personas
-        // with this flag get the socket dir + env.
-        browserCdpSocket?: boolean;
         // Shared selector field. It is a selector only, never an authority
         // source: the selected privileged runtime re-validates it.
         persona?: string;

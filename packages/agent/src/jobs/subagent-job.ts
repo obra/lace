@@ -26,7 +26,7 @@ import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { getSkillDirectories } from '@lace/agent/skills';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
-import type { SessionId, ToolResult } from '@lace/ent-protocol';
+import type { ToolResult } from '@lace/ent-protocol';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import { logToolUpdateToJobLog } from './job-log-formatter';
 import {
@@ -36,7 +36,6 @@ import {
   type JobType,
   type JobState,
   type AgentServerState,
-  type ContainerExecutionMetadata,
 } from '../server-types';
 
 // Types for tool_use update payloads from child processes
@@ -356,48 +355,15 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       return mapped;
     };
 
-    const mapContainerExecutionMetadata = (
-      value: unknown,
-      mappedJobId: string
-    ): ContainerExecutionMetadata | undefined => {
-      if (!value || typeof value !== 'object') return undefined;
-      const metadata = value as Record<string, unknown>;
-      if (
-        typeof metadata.tokenEnvName !== 'string' ||
-        typeof metadata.personaName !== 'string' ||
-        typeof metadata.parentSessionId !== 'string'
-      ) {
-        return undefined;
-      }
-      if (typeof metadata.tokenFingerprint !== 'string') return undefined;
-
-      return {
-        tokenEnvName: metadata.tokenEnvName,
-        tokenFingerprint: metadata.tokenFingerprint,
-        personaName: metadata.personaName,
-        parentSessionId: metadata.parentSessionId as SessionId,
-        jobId: mappedJobId,
-        ...(typeof metadata.containerId === 'string' ? { containerId: metadata.containerId } : {}),
-        ...(typeof metadata.runtimeId === 'string' ? { runtimeId: metadata.runtimeId } : {}),
-        ...(typeof metadata.containerSpecName === 'string'
-          ? { containerSpecName: metadata.containerSpecName }
-          : {}),
-      };
-    };
-
     const ensureForwardedJobRecord = (options: {
       jobId: string;
       parentJobId?: string;
       type: JobType;
       description?: string;
-      containerExecutionMetadata?: ContainerExecutionMetadata;
     }): JobState => {
       const currentState = getState();
       const existing = currentState.jobManager.getJob(options.jobId);
       if (existing) {
-        if (options.containerExecutionMetadata) {
-          existing.containerExecutionMetadata = options.containerExecutionMetadata;
-        }
         return existing;
       }
 
@@ -417,9 +383,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         finished: false,
         completion,
         resolveCompletion,
-        ...(options.containerExecutionMetadata
-          ? { containerExecutionMetadata: options.containerExecutionMetadata }
-          : {}),
       };
 
       currentState.jobManager.addJob(record);
@@ -436,17 +399,12 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           typeof p.parentJobId === 'string' ? mapChildJobId(p.parentJobId) : job.jobId;
         const jobType = p.jobType === 'delegate' ? 'delegate' : 'bash';
         const description = typeof p.description === 'string' ? p.description : undefined;
-        const containerExecutionMetadata = mapContainerExecutionMetadata(
-          p.containerExecutionMetadata,
-          mappedJobId
-        );
 
         ensureForwardedJobRecord({
           jobId: mappedJobId,
           parentJobId: mappedParentJobId,
           type: jobType,
           description,
-          ...(containerExecutionMetadata ? { containerExecutionMetadata } : {}),
         });
 
         await runExclusive(() => {
@@ -459,7 +417,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               parentJobId: mappedParentJobId,
               jobType,
               description,
-              ...(containerExecutionMetadata ? { containerExecutionMetadata } : {}),
             },
           });
           sessionState = nextState;
@@ -474,7 +431,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           parentJobId: mappedParentJobId,
           jobType,
           description,
-          ...(containerExecutionMetadata ? { containerExecutionMetadata } : {}),
         });
 
         return undefined;
@@ -886,9 +842,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         ...(subagentMcpBaseDir ? { mcpBaseDir: subagentMcpBaseDir } : {}),
         skillDirs: subagentSkillDirs,
         config: buildSubagentInitConfig(parentEffective),
-        ...(currentState.containerExecutionIdentity
-          ? { containerExecutionIdentity: currentState.containerExecutionIdentity }
-          : {}),
       });
 
       // Determine whether to resume an existing session or create a new one.

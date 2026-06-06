@@ -9,7 +9,7 @@ import { PassThrough } from 'node:stream';
 import { appendFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { JsonRpcPeer } from '@lace/ent-protocol';
 import {
   writeSessionMeta,
@@ -22,10 +22,6 @@ import type { MountRegistryEntry, JobState } from '@lace/agent/server-types';
 import type { SubagentProcessHandle } from '@lace/agent/jobs/subagent-spawn';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import { JobManager } from '@lace/agent/jobs/job-manager';
-
-function fingerprintToken(token: string): string {
-  return createHash('sha256').update(token, 'utf8').digest('hex');
-}
 
 // Mock spawnSubagent so we don't exec a real child process — return a fake
 // handle whose stdout/stdin are PassThroughs we don't actually drive. The
@@ -321,180 +317,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
     expect(job.status).toBe('completed');
   });
 
-  it('emits container execution metadata for host-placed container persona before prompt delivery', async () => {
-    const runtimeBinding: RuntimeExecutionBinding = {
-      schemaVersion: 1,
-      identity: { runtimeId: 'rt_projected_identity' },
-      toolRuntime: {
-        type: 'container',
-        cwd: '/work',
-        spec: {
-          name: 'parent-browser-child',
-          image: 'node:24-bookworm',
-          workingDirectory: '/work',
-          mounts: [],
-          env: { EXISTING: '1' },
-          persona: 'browser-driver',
-          parentSession: parentSessionId,
-          childSession: 'sess_child_projected',
-        },
-        helper: {
-          mode: 'image',
-          containerPath: '/usr/local/bin/lace-runtime-helper.js',
-          command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
-        },
-      },
-    };
-
-    const emittedUpdates: unknown[] = [];
-    const emitSessionUpdate = vi.fn(async (update: unknown) => {
-      emittedUpdates.push(update);
-    });
-    const finalizeJob = vi.fn(async (j: JobState) => {
-      j.finished = true;
-      j.resolveCompletion();
-    });
-    const state = {
-      activeSession: {
-        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
-        dir: parentSessionDir,
-        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
-      },
-      config: {},
-      jobManager: undefined as unknown as JobManager,
-      containerManager: null as unknown as ContainerManager,
-      containerMounts: {},
-      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
-      personaRegistry: {
-        getUserPersonasPaths: () => [],
-        getMcpBaseDir: () => undefined,
-      },
-    };
-
-    const runCreatedSubagent = (createdJob: JobState) => {
-      runSubagentJobProcess(createdJob, {
-        getState: () => state as never,
-        runExclusive: async <T>(work: () => Promise<T> | T) => work(),
-        emitSessionUpdate,
-        requestPermissionFromClient: vi.fn(),
-        finalizeJob,
-        runPromptInternalRef: { current: null },
-        topLevelPeer: { notify: vi.fn() } as unknown as JsonRpcPeer,
-      });
-    };
-
-    let nextEventSeq = 1;
-    state.jobManager = new JobManager({
-      getActiveSession: () => ({ sessionId: parentSessionId, dir: parentSessionDir }),
-      persistEvent: async (event) => {
-        appendTestDurableEvent(parentSessionDir, event, nextEventSeq++);
-      },
-      emitUpdate: emitSessionUpdate,
-      runShellProcess: vi.fn(),
-      runSubagentProcess: runCreatedSubagent,
-    });
-
-    const { job } = await state.jobManager.createJob('delegate', {
-      prompt: 'noop',
-      persona: 'browser-driver',
-      runtimeBinding,
-      containerSpecName: 'parent-browser-child',
-      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
-    });
-
-    await job.completion;
-
-    const initializeRequest = requestSpy.mock.calls.find(
-      ([method]) => method === 'initialize'
-    )?.[1];
-    expect(initializeRequest).toMatchObject({
-      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
-    });
-
-    const promptIndex = requestSpy.mock.calls.findIndex(([method]) => method === 'session/prompt');
-    const metadataUpdateIndex = emittedUpdates.findIndex(
-      (update) =>
-        (update as { type?: string; containerExecutionMetadata?: unknown }).type ===
-          'job_started' &&
-        (update as { containerExecutionMetadata?: unknown }).containerExecutionMetadata
-    );
-    expect(metadataUpdateIndex).toBeGreaterThanOrEqual(0);
-    expect(promptIndex).toBeGreaterThanOrEqual(0);
-    expect(emitSessionUpdate.mock.invocationCallOrder[metadataUpdateIndex]).toBeLessThan(
-      requestSpy.mock.invocationCallOrder[promptIndex]
-    );
-
-    const metadata = (
-      emittedUpdates[metadataUpdateIndex] as {
-        containerExecutionMetadata: Record<string, unknown>;
-      }
-    ).containerExecutionMetadata;
-    expect(metadata).toMatchObject({
-      tokenEnvName: 'SEN_AGENT_TOKEN',
-      personaName: 'browser-driver',
-      parentSessionId,
-      jobId: job.jobId,
-      runtimeId: 'rt_projected_identity',
-      containerSpecName: 'parent-browser-child',
-    });
-    expect(metadata).not.toHaveProperty('token');
-    expect(metadata).not.toHaveProperty('containerId');
-    expect(typeof metadata.tokenFingerprint).toBe('string');
-    expect(metadata.tokenFingerprint).not.toBe('');
-
-    const executionToken = (
-      sessionNewRequests[0] as {
-        config?: {
-          runtimeBinding?: {
-            toolRuntime?: {
-              spec?: { env?: Record<string, string> };
-            };
-          };
-        };
-      }
-    ).config?.runtimeBinding?.toolRuntime?.spec?.env?.SEN_AGENT_TOKEN;
-    expect(typeof executionToken).toBe('string');
-    expect(executionToken).not.toBe('');
-    expect(metadata.tokenFingerprint).toBe(fingerprintToken(executionToken));
-
-    expect(sessionNewRequests[0]).toMatchObject({
-      config: {
-        runtimeBinding: {
-          toolRuntime: {
-            spec: {
-              env: {
-                EXISTING: '1',
-                SEN_AGENT_TOKEN: executionToken,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const { events } = readDurableEvents(parentSessionDir, {});
-    const startedEvents = events.filter((event) => event.type === 'job_started');
-    expect(startedEvents).toHaveLength(1);
-    expect(startedEvents[0]).toMatchObject({
-      data: expect.objectContaining({
-        jobId: job.jobId,
-        containerExecutionMetadata: metadata,
-      }),
-    });
-
-    const startedUpdates = emittedUpdates.filter(
-      (update) => (update as { type?: string }).type === 'job_started'
-    );
-    expect(startedUpdates).toHaveLength(1);
-    expect(startedUpdates[0]).toMatchObject({
-      jobId: job.jobId,
-      containerExecutionMetadata: metadata,
-    });
-    expect(job.executionEnv).toBeUndefined();
-    expect(job.runtimeBinding?.toolRuntime.type).toBe('container');
-    expect(job.runtimeBinding?.toolRuntime.spec.env).toEqual({ EXISTING: '1' });
-  });
-
   it('does not mint container execution metadata for native persona delegates', async () => {
     const emittedUpdates: unknown[] = [];
     const emitSessionUpdate = vi.fn(async (update: unknown) => {
@@ -514,7 +336,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
       jobManager: undefined as unknown as JobManager,
       containerManager: null as unknown as ContainerManager,
       containerMounts: {},
-      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
@@ -547,7 +368,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
     const { job } = await state.jobManager.createJob('delegate', {
       prompt: 'noop',
       persona: 'shell',
-      containerExecutionIdentity: { tokenEnvName: 'SEN_AGENT_TOKEN' },
     });
 
     await job.completion;
@@ -574,137 +394,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
     expect(startedUpdates[0]).not.toMatchObject({
       containerExecutionMetadata: expect.anything(),
     });
-  });
-
-  it('preserves forwarded child job_started metadata with mapped job id', async () => {
-    const emittedUpdates: unknown[] = [];
-    const emitSessionUpdate = vi.fn(async (update: unknown) => {
-      emittedUpdates.push(update);
-    });
-    const finalizeJob = vi.fn(async (j: JobState) => {
-      j.finished = true;
-      j.resolveCompletion();
-    });
-    const state = {
-      activeSession: {
-        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
-        dir: parentSessionDir,
-        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
-      },
-      config: {},
-      jobManager: undefined as unknown as JobManager,
-      containerManager: null as unknown as ContainerManager,
-      containerMounts: {},
-      personaRegistry: {
-        getUserPersonasPaths: () => [],
-        getMcpBaseDir: () => undefined,
-      },
-    };
-
-    let nextEventSeq = 1;
-    state.jobManager = new JobManager({
-      getActiveSession: () => ({ sessionId: parentSessionId, dir: parentSessionDir }),
-      persistEvent: async (event) => {
-        appendTestDurableEvent(parentSessionDir, event, nextEventSeq++);
-      },
-      emitUpdate: vi.fn(),
-      runShellProcess: vi.fn(),
-      runSubagentProcess: vi.fn(),
-    });
-
-    requestSpy.mockImplementation(async (method: string, params?: unknown) => {
-      if (method === 'initialize') return undefined;
-      if (method === 'session/new') {
-        sessionNewRequests.push(params as Record<string, unknown>);
-        return { sessionId: 'sess_child_projected' };
-      }
-      if (method === 'ent/session/configure') return undefined;
-      if (method === 'session/set_config_option') return undefined;
-      if (method === 'session/prompt') {
-        await sessionUpdateHandler?.({
-          type: 'job_started',
-          jobId: 'job_child_container',
-          jobType: 'delegate',
-          description: 'nested container job',
-          containerExecutionMetadata: {
-            tokenEnvName: 'SEN_AGENT_TOKEN',
-            tokenFingerprint: fingerprintToken('child-token'),
-            personaName: 'browser-driver',
-            parentSessionId,
-            jobId: 'job_child_container',
-            runtimeId: 'rt_child',
-            containerSpecName: 'child-container',
-          },
-        });
-        queueMicrotask(() => fakeHandle.resolveExit());
-        return { stopReason: 'completed' };
-      }
-      throw new Error(`Unexpected childPeer.request method in test: ${method}`);
-    });
-
-    let resolveCompletion: () => void = () => undefined;
-    const completion = new Promise<void>((resolve) => {
-      resolveCompletion = resolve;
-    });
-    const parentJob: JobState = {
-      jobId: 'job_parent_delegate',
-      type: 'delegate',
-      status: 'running',
-      startedAt: new Date().toISOString(),
-      outputPath: join(parentSessionDir, 'jobs', 'job_parent_delegate.log'),
-      finished: false,
-      completion,
-      resolveCompletion,
-      subagentContent: [{ type: 'text', text: 'noop' }],
-    };
-
-    runSubagentJobProcess(parentJob, {
-      getState: () => state as never,
-      runExclusive: async <T>(work: () => Promise<T> | T) => work(),
-      emitSessionUpdate,
-      requestPermissionFromClient: vi.fn(),
-      finalizeJob,
-      runPromptInternalRef: { current: null },
-      topLevelPeer: { notify: vi.fn() } as unknown as JsonRpcPeer,
-    });
-
-    await completion;
-
-    const mappedJobId = 'job_parent_delegate_job_child_container';
-    const expectedMetadata = {
-      tokenEnvName: 'SEN_AGENT_TOKEN',
-      tokenFingerprint: fingerprintToken('child-token'),
-      personaName: 'browser-driver',
-      parentSessionId,
-      jobId: mappedJobId,
-      runtimeId: 'rt_child',
-      containerSpecName: 'child-container',
-    };
-
-    const { events } = readDurableEvents(parentSessionDir, {});
-    expect(events).toContainEqual(
-      expect.objectContaining({
-        type: 'job_started',
-        data: expect.objectContaining({
-          jobId: mappedJobId,
-          parentJobId: parentJob.jobId,
-          containerExecutionMetadata: expectedMetadata,
-        }),
-      })
-    );
-
-    expect(emittedUpdates).toContainEqual(
-      expect.objectContaining({
-        type: 'job_started',
-        jobId: mappedJobId,
-        parentJobId: parentJob.jobId,
-        containerExecutionMetadata: expectedMetadata,
-      })
-    );
-
-    expect(state.jobManager.getJob(mappedJobId)?.containerExecutionMetadata).toEqual(
-      expectedMetadata
-    );
   });
 
   it('ignores raw token in forwarded child job_started metadata', async () => {

@@ -3,12 +3,7 @@
 // ABOUTME: If this test breaks, the mechanism is broken end-to-end. Keep it green.
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  loadPlugins,
-  registries,
-  resetRegistriesForTest,
-  pluginMayUseCapability,
-} from '@lace/agent/plugins';
+import { loadPlugins, registries, resetRegistriesForTest } from '@lace/agent/plugins';
 import { registerBuiltinTools } from '@lace/agent/tools/builtins';
 import {
   registerBuiltinCompaction,
@@ -60,10 +55,9 @@ describe('whole plugin system — reference plugin reaches all four registries',
     expect(pr.parsePersona('reference:scout').body).toContain('Scout');
   });
 
-  it('manifest + owner: plugin owns its entries; credential capability granted; builtin owned by builtin', () => {
+  it('owner: plugin owns its entries; builtin owned by builtin', () => {
     expect(registries.tools.owner('reference:greet')).toBe('reference');
     expect(registries.tools.owner('bash')).toBe('builtin');
-    expect(pluginMayUseCapability('reference', 'credentials')).toBe(true);
   });
 
   it('exec tools: plugin-contributed exec tool is registered and surfaced by ToolExecutor', () => {

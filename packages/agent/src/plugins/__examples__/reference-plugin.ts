@@ -35,8 +35,8 @@ import type { ContainerRuntime } from '@lace/agent/containers/types';
 
 export const meta = { name: 'reference', namespace: 'reference', version: '1.0.0' };
 
-// Declare any privileged capabilities the plugin needs. The credential path (#6)
-// is default-deny: without this declaration, pluginMayUseCapability() returns false.
+// Declare any privileged capabilities the plugin needs. The loader records this
+// via recordManifest(meta.name, manifest).
 export const manifest = { capabilities: ['credentials' as const] };
 
 // ── 1) Tool ──────────────────────────────────────────────────────────────────

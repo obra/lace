@@ -1,7 +1,7 @@
 // ABOUTME: Build container specs from a persona's container runtime + mount registry
 // ABOUTME: Branches on containerSharing (per_invocation vs persistent) and resolves mounts against the registry
 
-import { browserCdpSocketPath, type ContainerSpec } from '@lace/agent/containers/spec';
+import type { ContainerSpec } from '@lace/agent/containers/spec';
 import type { ContainerMount } from '@lace/agent/containers/types';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type {
@@ -88,15 +88,6 @@ function toContainerMounts(mounts: RuntimeMountDescriptor[]): ContainerMount[] {
     target: mount.containerPath,
     readonly: mount.readonly,
   }));
-}
-
-function withBrowserCdpSocketEnv(
-  env: Record<string, string>,
-  browserCdpSocket: boolean | undefined,
-  containerName: string
-): Record<string, string> {
-  if (!browserCdpSocket) return env;
-  return { ...env, SEN_BROWSER_CDP_SOCKET: browserCdpSocketPath(containerName) };
 }
 
 // Extract the first 8 meaningful characters from a session id for use in
@@ -186,14 +177,7 @@ type AssertNoForbiddenProjectedPersonaKeys<T extends never> = T;
 type _ProjectedPersonaSpecHasNoDockerAuthorityFields = AssertNoForbiddenProjectedPersonaKeys<
   Extract<
     keyof ProjectedPersonaRuntimeSpec,
-    | 'containerId'
-    | 'ports'
-    | 'restartPolicy'
-    | 'sysctls'
-    | 'capAdd'
-    | 'network'
-    | 'gatewayRoute'
-    | 'browserCdpSocket'
+    'containerId' | 'ports' | 'restartPolicy' | 'sysctls' | 'capAdd' | 'network' | 'gatewayRoute'
   >
 >;
 
@@ -276,7 +260,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
       mounts: toContainerMounts(mounts),
-      env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
+      env,
       restartPolicy: 'unless-stopped',
       persona: personaName,
       parentSessionId,
@@ -284,7 +268,6 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
       ...(runtime.network ? { network: runtime.network } : {}),
       ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
-      ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
     };
   }
 
@@ -303,7 +286,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
     image: runtime.image,
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
-    env: withBrowserCdpSocketEnv(env, runtime.browserCdpSocket, name),
+    env,
     persona: personaName,
     parentSessionId,
     childSessionId: input.childSessionId,
@@ -312,7 +295,6 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
     ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
     ...(runtime.network ? { network: runtime.network } : {}),
     ...(runtime.gatewayRoute ? { gatewayRoute: runtime.gatewayRoute } : {}),
-    ...(runtime.browserCdpSocket ? { browserCdpSocket: true } : {}),
   };
 }
 
@@ -340,7 +322,6 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.capAdd ? { capAdd: spec.capAdd } : {}),
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
-    ...(spec.browserCdpSocket ? { browserCdpSocket: true } : {}),
     ...(spec.persona ? { persona: spec.persona } : {}),
     ...(spec.parentSessionId ? { parentSessionId: spec.parentSessionId } : {}),
     ...(spec.childSessionId ? { childSessionId: spec.childSessionId } : {}),

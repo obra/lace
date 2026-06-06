@@ -53,7 +53,6 @@ runtime:
     net.ipv6.conf.all.disable_ipv6: "1"
   network: quarantine
   gatewayRoute: 172.31.250.2
-  browserCdpSocket: true
 mcpServers:
   superpowers-chrome:
     command: node
@@ -254,8 +253,8 @@ describe('BrokerPersonaCatalog.buildSpawn', () => {
       });
     });
 
-    it('injects the per-spawn browser CDP socket env keyed on the container name', () => {
-      expect(config.environment?.SEN_BROWSER_CDP_SOCKET).toBe(`/sen-browser-cdp/${name}.sock`);
+    it('does NOT inject a browser CDP socket env (the plane owns CDP injection)', () => {
+      expect(config.environment?.SEN_BROWSER_CDP_SOCKET).toBeUndefined();
     });
 
     it('carries the static persona env (DISPLAY + CA pem paths)', () => {
@@ -272,10 +271,10 @@ describe('BrokerPersonaCatalog.buildSpawn', () => {
       expect(config.environment?.SEN_AGENT_TOKEN).toBeUndefined();
     });
 
-    it('reports per_invocation sharing + browserCdpSocket on the built spawn', () => {
+    it('reports per_invocation sharing; browserCdpSocket is always false (plane owns CDP)', () => {
       const built = catalog.buildSpawn('browser-driver', CTX);
       expect(built.containerSharing).toBe('per_invocation');
-      expect(built.browserCdpSocket).toBe(true);
+      expect(built.browserCdpSocket).toBe(false);
     });
 
     it('creates the per-invocation scratch dir under the work base', () => {

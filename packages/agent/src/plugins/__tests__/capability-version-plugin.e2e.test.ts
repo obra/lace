@@ -7,7 +7,6 @@ import {
   loadPlugins,
   registries,
   resetRegistriesForTest,
-  pluginMayUseCapability,
   createPluginApi,
   makeRegistries,
   PluginVersionError,
@@ -27,22 +26,6 @@ describe('capability-version-plugin — capability manifest + version contract',
     // Built-ins register before plugins (dup→fatal is symmetric).
     registerBuiltinTools();
     await loadPlugins(PLUGIN_SPEC);
-  });
-
-  // ── Capability manifest ───────────────────────────────────────────────────
-
-  it('pluginMayUseCapability: declared capability returns true for this plugin', () => {
-    expect(pluginMayUseCapability('capability-demo', 'credentials')).toBe(true);
-  });
-
-  it('pluginMayUseCapability: undeclared owner returns false (default-deny)', () => {
-    // A plugin name that never loaded and never called recordManifest.
-    expect(pluginMayUseCapability('no-such-plugin', 'credentials')).toBe(false);
-  });
-
-  it('pluginMayUseCapability: builtin owner always returns true (trusted kernel code)', () => {
-    // The 'builtin' owner is permanently trusted regardless of any manifest.
-    expect(pluginMayUseCapability('builtin', 'credentials')).toBe(true);
   });
 
   // ── Tool ownership ────────────────────────────────────────────────────────

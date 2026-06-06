@@ -5,7 +5,7 @@
 import type { ChildProcess } from 'node:child_process';
 import type { z } from 'zod';
 import { SessionUpdateNotificationSchema } from '@lace/ent-protocol';
-import type { JsonRpcId, JsonRpcPeer, SessionId } from '@lace/ent-protocol';
+import type { JsonRpcId, JsonRpcPeer } from '@lace/ent-protocol';
 import type { LoadedSession } from './storage/session-store';
 import type { PendingPermissionRecord } from './storage/permissions-from-events';
 import { ProviderCatalogManager } from './providers/catalog/manager';
@@ -66,19 +66,6 @@ export type SessionUpdateParams = z.infer<typeof SessionUpdateNotificationSchema
 export type SessionUpdate = DistributiveOmit<SessionUpdateParams, 'sessionId' | 'streamSeq'>;
 export type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }>['update'];
 
-export type ContainerExecutionIdentityConfig = { tokenEnvName: string };
-
-export type ContainerExecutionMetadata = {
-  tokenEnvName: string;
-  tokenFingerprint: string;
-  personaName: string;
-  parentSessionId: SessionId;
-  jobId: string;
-  containerId?: string;
-  runtimeId?: string;
-  containerSpecName?: string;
-};
-
 // Job Types
 export type JobType = 'bash' | 'delegate';
 export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
@@ -127,7 +114,6 @@ export type JobState = {
   modelId?: string;
   runtimeBinding?: RuntimeExecutionBinding;
   executionEnv?: Record<string, string>;
-  containerExecutionMetadata?: ContainerExecutionMetadata;
   // Persona bundle applied to subagent session (delegate jobs only)
   persona?: string;
 };
@@ -187,7 +173,6 @@ export type AgentServerState = {
   // container paths, and readonly flags. Always present; defaults to {} when
   // initialize omits the param.
   containerMounts: Record<string, MountRegistryEntry>;
-  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
   // Persona-container materialization (K-49e). null when the host platform
   // has no supported container runtime — persona-container delegate calls
   // then fail with a clear error. Tests inject fakes by replacing this field.

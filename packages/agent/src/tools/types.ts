@@ -4,10 +4,7 @@
 import type { CombinedTokenUsage } from '@lace/agent/token-management/types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { ReminderScheduler } from '@lace/agent/reminders';
-import type {
-  ContainerExecutionIdentityConfig,
-  MountRegistryEntry,
-} from '@lace/agent/server-types';
+import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 
@@ -58,7 +55,6 @@ export interface ToolContext {
   // persona-declared mount names into host paths (delegate → projected
   // container runtime).
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
-  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 
   // Per-process map of per_invocation child workspaces. job_kill(destroy_container) and
   // the delegate tool use it to track/dispose a child's workspace (destroying

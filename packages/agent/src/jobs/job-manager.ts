@@ -1,27 +1,16 @@
 // ABOUTME: Unified job management - state, operations, and notifications
 // Consolidates scattered job code into single session-scoped service
 
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import type {
-  ContainerExecutionIdentityConfig,
-  ContainerExecutionMetadata,
-  JobState,
-  JobStatus,
-  JobType,
-  JobNotificationType,
-} from '../server-types';
+import type { JobState, JobStatus, JobType, JobNotificationType } from '../server-types';
 import { MAX_CONCURRENT_JOBS } from '../server-types';
 import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { readAllSessionEventLines } from '../storage/event-log';
-import type { SessionId } from '@lace/ent-protocol';
-import { resolveContainerId } from '../containers/container-manager';
-import { fingerprintContainerExecutionToken } from './container-execution-metadata';
 import { logger } from '../utils/logger';
 
-// Same POSIX-ish convention used by initialize.ts for containerExecutionIdentity.
 // Host-supplied env var names must look like real env vars; values may be any string.
 // Both upper- and lower-case are valid POSIX env var names — some
 // conventional vars (https_proxy, http_proxy, no_proxy) are commonly lowercase
@@ -80,7 +69,6 @@ export type CreateJobOptions = {
   // the WorkspaceReaper entry so teardown can route through the shim's
   // releasePerInvocation.
   containerSpecName?: string;
-  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 };
 
 /**
@@ -167,8 +155,8 @@ const PROGRESS_BATCH_WINDOW_MS = 200;
  *
  * Filters out:
  *   - names that don't match SPAWN_ENV_NAME_PATTERN (warn + drop)
- *   - names that collide with anything already in base (lace-managed env vars
- *     like SEN_AGENT_TOKEN; warn + drop the embedder value)
+ *   - names that collide with anything already in base (lace-managed env vars;
+ *     warn + drop the embedder value)
  *   - non-string values (warn + drop)
  *
  * Returns a fresh map; never mutates `base`. Caller decides whether to assign
@@ -202,40 +190,20 @@ function mergeEmbedderSpawnEnv(
   return merged;
 }
 
+// Produce the base executionEnv for a containerized delegate spawn. The map is
+// a generic mechanism for projecting env into the spawn (e.g. embedder-supplied
+// bindings merged via host/spawn/env); lace itself injects no credential
+// content. Returns undefined for non-containerized or persona-less delegates so
+// the embedder env hook is skipped for them.
 function buildContainerExecutionContext(input: {
-  identity?: ContainerExecutionIdentityConfig;
-  jobId: string;
   persona?: string;
-  parentSessionId: string;
   runtimeBinding?: RuntimeExecutionBinding;
-  containerSpecName?: string;
-}): { executionEnv: Record<string, string>; metadata: ContainerExecutionMetadata } | undefined {
-  if (!input.identity || !input.persona) return undefined;
+}): { executionEnv: Record<string, string> } | undefined {
+  if (!input.persona) return undefined;
   if (input.runtimeBinding?.toolRuntime.type !== 'container') {
     return undefined;
   }
-
-  const token = randomBytes(32).toString('base64url');
-  const spec = input.runtimeBinding.toolRuntime.spec;
-  const hasPlaneSelectors = Boolean(
-    spec.persona || spec.parentSession || spec.childSession || spec.jobId
-  );
-  const containerId = !spec.containerId && hasPlaneSelectors ? undefined : resolveContainerId(spec);
-  return {
-    executionEnv: { [input.identity.tokenEnvName]: token },
-    metadata: {
-      tokenEnvName: input.identity.tokenEnvName,
-      tokenFingerprint: fingerprintContainerExecutionToken(token),
-      personaName: input.persona,
-      parentSessionId: input.parentSessionId as SessionId,
-      jobId: input.jobId,
-      ...(input.runtimeBinding?.identity.runtimeId
-        ? { runtimeId: input.runtimeBinding.identity.runtimeId }
-        : {}),
-      ...(input.containerSpecName ? { containerSpecName: input.containerSpecName } : {}),
-      ...(containerId ? { containerId } : {}),
-    },
-  };
+  return { executionEnv: {} };
 }
 
 export class JobManager {
@@ -825,20 +793,16 @@ export class JobManager {
     const containerExecutionContext =
       type === 'delegate'
         ? buildContainerExecutionContext({
-            identity: options.containerExecutionIdentity,
-            jobId,
             persona: options.persona,
-            parentSessionId: activeSession.sessionId,
             runtimeBinding: options.runtimeBinding,
-            containerSpecName: options.containerSpecName,
           })
         : undefined;
 
-    // Ask the embedder for per-spawn env additions (e.g. placeholder tokens
-    // for a credential proxy). Only applies to delegate jobs that actually got
-    // a containerExecutionContext (i.e. containerized spawn with an identity
-    // config). Failure of the host RPC is non-fatal — the spawn proceeds with
-    // the base executionEnv.
+    // Ask the embedder for per-spawn env additions (e.g. projected bindings for
+    // a credential proxy). Only applies to delegate jobs that actually got a
+    // containerExecutionContext (i.e. a containerized spawn with a persona).
+    // Failure of the host RPC is non-fatal — the spawn proceeds with the base
+    // executionEnv.
     let finalExecutionEnv = containerExecutionContext?.executionEnv;
     if (
       type === 'delegate' &&
@@ -897,7 +861,6 @@ export class JobManager {
       ...(containerExecutionContext
         ? {
             executionEnv: finalExecutionEnv ?? containerExecutionContext.executionEnv,
-            containerExecutionMetadata: containerExecutionContext.metadata,
           }
         : {}),
       ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
@@ -935,9 +898,6 @@ export class JobManager {
         ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
         ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
         ...(options.containerSpecName ? { containerSpecName: options.containerSpecName } : {}),
-        ...(containerExecutionContext
-          ? { containerExecutionMetadata: containerExecutionContext.metadata }
-          : {}),
       },
     });
 
@@ -948,9 +908,6 @@ export class JobManager {
       parentJobId: options.parentJobId,
       jobType,
       description,
-      ...(containerExecutionContext
-        ? { containerExecutionMetadata: containerExecutionContext.metadata }
-        : {}),
     });
 
     // 7. Set up progress timer ONLY when the operator explicitly opted in

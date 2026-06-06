@@ -3,11 +3,7 @@
 import type { AIProvider, LaceStopDetails } from '@lace/agent/providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
-import type {
-  ContainerExecutionIdentityConfig,
-  MountRegistryEntry,
-  SessionUpdate,
-} from '@lace/agent/server-types';
+import type { MountRegistryEntry, SessionUpdate } from '@lace/agent/server-types';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -180,7 +176,6 @@ export interface RunnerDependencies {
    * when projecting a host-placed persona container.
    */
   containerMounts?: Readonly<Record<string, MountRegistryEntry>>;
-  containerExecutionIdentity?: ContainerExecutionIdentityConfig;
 
   /**
    * Per-process map of per_invocation child workspaces. Threaded into

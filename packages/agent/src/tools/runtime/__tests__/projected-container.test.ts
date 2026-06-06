@@ -577,22 +577,6 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
-  it('threads generic descriptor browserCdpSocket into the materialized spec', async () => {
-    const manager = createFakeContainerManager();
-    const projectedDescriptor = descriptor();
-    projectedDescriptor.spec.browserCdpSocket = true;
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: manager,
-      descriptor: projectedDescriptor,
-    });
-
-    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
-
-    const materializedSpec = manager.materialize.mock.calls[0][0];
-    expect(materializedSpec.browserCdpSocket).toBe(true);
-  });
-
   it('kills the container process when aborted while execStream is starting', async () => {
     const containerHandle = createFakeExecStreamHandle();
     let resolveExecStream!: (handle: typeof containerHandle) => void;

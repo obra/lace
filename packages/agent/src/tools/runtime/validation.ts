@@ -12,7 +12,6 @@ const CONTAINER_AUTHORITY_FIELDS = [
   'capAdd',
   'network',
   'gatewayRoute',
-  'browserCdpSocket',
 ] as const;
 
 function hasDefinedField(value: Record<string, unknown>, field: string): boolean {
@@ -84,9 +83,6 @@ const ContainerRuntimeDescriptorSchema = z
         // IPv4 address of the egress gateway broker. Validated as a
         // non-empty string at this layer.
         gatewayRoute: z.string().min(1).optional(),
-        // PRI-2002: when true, lace injects SEN_BROWSER_CDP_SOCKET + emits
-        // browserCdpSocketPath for this quarantined browser-driver persona.
-        browserCdpSocket: z.boolean().optional(),
         // Shared selector field. The privileged runtime re-validates it.
         persona: z.string().min(1).optional(),
         // Spawn-broker selector fields. They MUST be allowed through this

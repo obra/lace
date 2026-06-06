@@ -19,10 +19,20 @@ import {
   type AdoptResponse,
   type ListResponse,
 } from './spawn-broker-protocol';
-import { browserCdpSocketPath } from './spec';
 import { StreamId, encodeFrame, encodeExitFrame, FrameDecoder } from './spawn-broker-stream-frames';
 
 const SEN_AGENT_TOKEN_ENV_NAME = 'SEN_AGENT_TOKEN';
+
+// The credential helper and the quarantined browser-driver share one host dir
+// (the `sen-browser-cdp` named mount, container path `/sen-browser-cdp`); each
+// container gets a uniquely-named socket on it. A TOP-LEVEL path (NOT under
+// `/run`, which is itself the `sen-cred` mount) — a nested mount target inside
+// another mount's destination fails at container init ("read-only file system").
+const BROWSER_CDP_SOCKET_DIR = '/sen-browser-cdp';
+
+function browserCdpSocketPath(containerName: string): string {
+  return `${BROWSER_CDP_SOCKET_DIR}/${containerName}.sock`;
+}
 
 // The docker-label namespace the broker stamps identity into at create, so it
 // can rebuild + re-validate its ownership record from `docker inspect` after a

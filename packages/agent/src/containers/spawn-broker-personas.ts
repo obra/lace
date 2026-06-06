@@ -206,7 +206,7 @@ export class BrokerPersonaCatalog implements PersonaCatalog {
     return {
       config,
       containerSharing: runtime.containerSharing,
-      browserCdpSocket: runtime.browserCdpSocket ?? false,
+      browserCdpSocket: false,
     };
   }
 }

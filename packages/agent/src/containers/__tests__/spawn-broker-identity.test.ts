@@ -3,11 +3,15 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import net from 'node:net';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fingerprintContainerExecutionToken } from '../../jobs/container-execution-metadata';
 import { SpawnBrokerIdentity } from '../spawn-broker-identity';
+
+function fingerprintContainerExecutionToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
 // A real newline-delimited-JSON unix-socket server matching the helper's
 // register_runtime wire framing (sen-core admin-socket-client.ts): read one

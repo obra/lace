@@ -23,7 +23,6 @@ export {
 } from './contributed-dirs';
 export {
   recordManifest,
-  pluginMayUseCapability,
   resetManifestsForTest,
   type Capability,
   type CapabilityManifest,

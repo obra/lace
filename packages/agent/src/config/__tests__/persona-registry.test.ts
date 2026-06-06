@@ -111,11 +111,10 @@ Body.`;
       mounts: ['scratch', 'knowledge'],
       env: { FOO: 'bar' },
       ports: [{ host: 8080, container: 80 }],
-      browserCdpSocket: false,
     });
   });
 
-  it('parses runtime.type=container with browserCdpSocket defaulting false', () => {
+  it('rejects the removed browserCdpSocket persona field (strict schema)', () => {
     const content = `---
 runtime:
   type: container
@@ -129,27 +128,7 @@ Body.`;
     writeFileSync(path.join(tempBundledDir, 'browser-cdp-runtime.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
-    expect(registry.parsePersona('browser-cdp-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      browserCdpSocket: true,
-    });
-
-    const omitted = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /work
-  mounts: []
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'no-browser-cdp-runtime.md'), omitted);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('no-browser-cdp-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      browserCdpSocket: false,
-    });
+    expect(() => registry.parsePersona('browser-cdp-runtime')).toThrow();
   });
 
   it('clamps container runtime ports to u16 bounds', () => {
@@ -226,7 +205,6 @@ Body.`;
       workingDirectory: '/w',
       mounts: [],
       env: {},
-      browserCdpSocket: false,
     });
   });
 
@@ -253,7 +231,6 @@ Body.`;
       workingDirectory: '/home/agent',
       mounts: ['home'],
       env: { HOME: '/home/agent' },
-      browserCdpSocket: false,
     });
   });
 

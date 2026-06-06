@@ -23,9 +23,7 @@ export const meta = {
 };
 
 // Declare the 'credentials' capability. The loader records this via
-// recordManifest(meta.name, manifest). pluginMayUseCapability() gates on it
-// (default-deny for unknown owners). Currently recorded but not enforced in
-// production — enforcement lands with the credential-path work (spec #6).
+// recordManifest(meta.name, manifest).
 export const manifest = { capabilities: ['credentials' as const] };
 
 // ── Tool ──────────────────────────────────────────────────────────────────────

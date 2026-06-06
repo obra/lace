@@ -189,18 +189,6 @@ describe('runtime binding validation', () => {
     ).toThrow(/selector.*authority|authority.*selector/i);
   });
 
-  it('rejects selector specs mixed with browserCdpSocket authority', () => {
-    expect(() =>
-      parseRuntimeExecutionBinding(
-        containerBinding({
-          persona: 'browser-driver',
-          parentSession: 'sess_parent_projected',
-          browserCdpSocket: true,
-        })
-      )
-    ).toThrow(/selector.*authority|authority.*selector/i);
-  });
-
   it('accepts selector-only projected container specs', () => {
     expect(() =>
       parseRuntimeExecutionBinding(
@@ -323,7 +311,7 @@ describe('runtime binding validation', () => {
     ).not.toThrow();
   });
 
-  it('accepts projected container binding with browserCdpSocket', () => {
+  it('rejects the removed browserCdpSocket field as an unknown property', () => {
     expect(() =>
       parseRuntimeExecutionBinding({
         schemaVersion: 1,
@@ -340,7 +328,7 @@ describe('runtime binding validation', () => {
           },
         },
       })
-    ).not.toThrow();
+    ).toThrow();
   });
 
   it('rejects legacy agentPlacement on runtime bindings', () => {

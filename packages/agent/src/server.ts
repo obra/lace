@@ -473,7 +473,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     scratchDirHostPath?: string;
     containerSharing?: 'per_invocation' | 'persistent';
     containerSpecName?: string;
-    containerExecutionMetadata?: JobState['containerExecutionMetadata'];
   }): Promise<void> => {
     await runExclusive(() => {
       let sessionState = readSessionState(state.activeSession!.dir);
@@ -491,9 +490,6 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
           ...(event.scratchDirHostPath ? { scratchDirHostPath: event.scratchDirHostPath } : {}),
           ...(event.containerSharing ? { containerSharing: event.containerSharing } : {}),
           ...(event.containerSpecName ? { containerSpecName: event.containerSpecName } : {}),
-          ...(event.containerExecutionMetadata
-            ? { containerExecutionMetadata: event.containerExecutionMetadata }
-            : {}),
         },
       });
       sessionState = nextState;

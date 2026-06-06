@@ -64,7 +64,6 @@ const CONTAINER_AUTHORITY_FIELDS = [
   'capAdd',
   'network',
   'gatewayRoute',
-  'browserCdpSocket',
 ] as const;
 
 interface ProjectedContainerSecretContext {
@@ -260,9 +259,6 @@ async function containerSpecFromDescriptor(
     }
     if (descriptor.spec.gatewayRoute) {
       spec.gatewayRoute = descriptor.spec.gatewayRoute;
-    }
-    if (descriptor.spec.browserCdpSocket) {
-      spec.browserCdpSocket = true;
     }
   }
   // Selector fields — carried through to the ContainerSpec so the selected

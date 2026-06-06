@@ -3,8 +3,11 @@
 // ABOUTME: token; an adversarial main-sen never sees or controls it (PRI-2012 Component B).
 
 import net from 'node:net';
-import { randomBytes } from 'node:crypto';
-import { fingerprintContainerExecutionToken } from '../jobs/container-execution-metadata';
+import { createHash, randomBytes } from 'node:crypto';
+
+function fingerprintContainerExecutionToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
 
 // The literal env var name the persona container reads its execution token from
 // (sen-core main.ts:1228 contract). The broker injects this; stripCallerToken

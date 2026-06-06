@@ -65,7 +65,6 @@ const runtimeContainerSchema = z
     mounts: z.array(mountNameSchema),
     env: z.record(z.string(), z.string()).optional().default({}),
     ports: z.array(portMappingSchema).optional(),
-    browserCdpSocket: z.boolean().optional().default(false),
     // Linux kernel sysctls for runtimes that directly materialize persona
     // containers. Lace projected persona specs omit this docker authority; the
     // plane rebuilds it from the persona.

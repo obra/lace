@@ -1737,9 +1737,6 @@ export class ConversationRunner {
         ...(this.config.persona ? { persona: this.config.persona } : {}),
         activeSessionDir: this.config.sessionDir,
         ...(this.deps.containerMounts ? { containerMounts: this.deps.containerMounts } : {}),
-        ...(this.deps.containerExecutionIdentity
-          ? { containerExecutionIdentity: this.deps.containerExecutionIdentity }
-          : {}),
         ...(this.deps.workspaceReaper ? { workspaceReaper: this.deps.workspaceReaper } : {}),
         compactionRequest,
       }

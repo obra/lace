@@ -32,14 +32,7 @@ const persistentRuntime: PersonaContainerRuntime = {
 type ProjectedSpecKeys = keyof ReturnType<typeof buildProjectedRuntimeSpec>;
 type ForbiddenProjectedPersonaKeys = Extract<
   ProjectedSpecKeys,
-  | 'containerId'
-  | 'ports'
-  | 'restartPolicy'
-  | 'sysctls'
-  | 'capAdd'
-  | 'network'
-  | 'gatewayRoute'
-  | 'browserCdpSocket'
+  'containerId' | 'ports' | 'restartPolicy' | 'sysctls' | 'capAdd' | 'network' | 'gatewayRoute'
 >;
 
 describe('buildProjectedRuntimeSpec types', () => {
