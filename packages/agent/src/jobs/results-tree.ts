@@ -30,10 +30,7 @@ function assertSafeSegment(label: string, id: string): void {
   }
 }
 
-/**
- * `<base>/<parentId>` — the dir holding a parent's children.
- * This is the dir a container parent bind-mounts read-only to read its children.
- */
+/** `<base>/<parentId>` — the dir holding a parent's children. */
 export function childrenBaseDir(parentId: string): string {
   assertSafeSegment('parentId', parentId);
   return path.join(resultsBase(), parentId);

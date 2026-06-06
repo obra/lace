@@ -45,11 +45,8 @@ so it can return the result path to the parent agent and track the entry in the
 `WorkspaceReaper`.
 
 Each child mounts ONLY its own subdir — mount-scoping, not file modes, is the
-isolation boundary.
-
-A container parent additionally gets `<base>/<parentId>` (its own children-results
-base) bind-mounted read-only so its tools can read the workspaces it delegates.
-The host root reads the tree directly.
+isolation boundary. The host root reads the full results tree directly via the
+filesystem.
 
 The workspace **survives the disposable container** and is the child's deliverable
 to the parent — returned by `delegate` framed as UNTRUSTED and
@@ -140,7 +137,7 @@ that persists into `sen-*` containers.
 
 Enforcement is two-layer:
 
-- **Boot-time WARN**: `warnMountConflicts(registry)` logs
+- **Boot-time WARN**: `warnMountConflicts(registry, containerMounts)` logs
   `{persona, mountName, conflictsWith}` for each violation. Does not abort
   startup.
 - **Spawn-time reject**: `assertNoMountConflict(…)` throws
