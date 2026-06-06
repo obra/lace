@@ -1,11 +1,9 @@
-// ABOUTME: WorkspaceReaper — per-process map of per_invocation child workspaces (#5)
-// ABOUTME: dispose = destroy the owning container BEFORE rm; safeRemoveWorkspace is symlink-safe + tolerant
+// ABOUTME: WorkspaceReaper — per-process tracker of per_invocation child workspaces (#5)
+// ABOUTME: dispose routes teardown to the shim via ContainerManager.releasePerInvocation
 
 import * as fs from 'node:fs';
 import { logger } from '@lace/agent/utils/logger';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-import type { PerInvocationReaper } from './per-invocation-reaper';
-import { resultsBase } from './results-tree';
 
 /**
  * The container is always destroyed before this runs (no live writer), but the
@@ -56,13 +54,13 @@ export interface WorkspaceEntry {
 }
 
 /**
- * In-memory, per-process map of the per_invocation child workspaces THIS process
- * created. No timers. `dispose` is the single safe-remove primitive: it destroys
- * the owning container (the live writer) and cancels its idle-reap BEFORE rm.
+ * In-memory, per-process tracker of the per_invocation child workspaces THIS
+ * process created. No timers. `dispose` routes teardown to the shim via
+ * ContainerManager.releasePerInvocation — the shim destroys the container AND
+ * removes its `/work` (and owns the idle TTL). lace no longer reaps workspaces.
  *
- * Runtime refs (containerManager / perInvocationReaper) are late-bound in boot()
- * after the container manager resolves — mirror how perInvocationReaper itself is
- * constructed null and replaced in main.ts.
+ * The containerManager ref is late-bound in boot() after the container manager
+ * resolves.
  */
 export class WorkspaceReaper {
   private readonly tracked = new Map<string, WorkspaceEntry>();
@@ -74,14 +72,9 @@ export class WorkspaceReaper {
   // loses it; delegate's empty-workspace gate is the crash backstop).
   private readonly released = new Set<string>();
   private containerManager: ContainerManager | null = null;
-  private perInvocationReaper: PerInvocationReaper | null = null;
 
-  bindRuntime(
-    containerManager: ContainerManager | null,
-    perInvocationReaper: PerInvocationReaper | null
-  ): void {
+  bindRuntime(containerManager: ContainerManager | null): void {
     this.containerManager = containerManager;
-    this.perInvocationReaper = perInvocationReaper;
   }
 
   track(entry: { childId: string } & WorkspaceEntry): void {
@@ -131,21 +124,21 @@ export class WorkspaceReaper {
   }
 
   /**
-   * The single safe-remove primitive. Order is load-bearing:
-   *   cancelReap → destroy(container) → rm dir → forget.
-   * If destroy rejects we do NOT rm (the container may still hold /work RW); the
-   * error propagates so callers' per-entry try/catch leaves the entry tracked.
-   * dispose of an unknown id is a no-op (the sweep is the backstop for forgotten
-   * entries).
+   * Route teardown of a per_invocation child through the shim: the shim owns
+   * destroying the container AND removing its `/work` workspace (and the idle
+   * TTL). lace no longer reaps the workspace itself. If releasePerInvocation
+   * rejects the error propagates so callers' per-entry try/catch leaves the
+   * entry tracked. dispose of an unknown id is a no-op (the shim's idle reaper
+   * is the backstop for forgotten entries).
    */
   async dispose(childId: string): Promise<void> {
     const entry = this.tracked.get(childId);
     if (!entry) return;
-    this.perInvocationReaper?.cancelReap(childId);
-    if (entry.containerSpecName) {
-      await this.containerManager?.destroy(entry.containerSpecName);
-    }
-    safeRemoveWorkspace(entry.path, resultsBase());
+    await this.containerManager?.releasePerInvocation(
+      entry.parentId,
+      childId,
+      entry.containerSpecName
+    );
     this.tracked.delete(childId);
     // Close the resume window: a disposed child is non-resumable in this process.
     this.released.add(childId);

@@ -488,6 +488,55 @@ describe('ContainerManager', () => {
     });
   });
 
+  describe('releasePerInvocation', () => {
+    it('calls runtime.releasePerInvocation when the runtime defines it', async () => {
+      const releasePerInvocation = vi.fn(async () => {});
+      (
+        runtime as unknown as { releasePerInvocation: typeof releasePerInvocation }
+      ).releasePerInvocation = releasePerInvocation;
+      await manager.materialize(baseSpec);
+      runtime.callLog.length = 0;
+
+      await manager.releasePerInvocation('sess_parent', 'sess_child', 'sess1-worker');
+
+      expect(releasePerInvocation).toHaveBeenCalledWith('sess_parent', 'sess_child');
+      // The shim owns container+/work teardown — manager does NOT also destroy.
+      expect(runtime.callLog).toEqual([]);
+    });
+
+    it('falls back to destroy(fallbackSpecName) when the runtime has no release verb', async () => {
+      await manager.materialize(baseSpec);
+      runtime.callLog.length = 0;
+
+      await manager.releasePerInvocation('sess_parent', 'sess_child', 'sess1-worker');
+
+      expect(runtime.callLog).toEqual(['stop:lace-sess1-worker', 'remove:lace-sess1-worker']);
+    });
+
+    it('is a no-op when no release verb and no fallback spec name', async () => {
+      await manager.materialize(baseSpec);
+      runtime.callLog.length = 0;
+
+      await expect(
+        manager.releasePerInvocation('sess_parent', 'sess_child')
+      ).resolves.toBeUndefined();
+      expect(runtime.callLog).toEqual([]);
+    });
+
+    it('tolerates a rejecting runtime release (best-effort/idempotent)', async () => {
+      const releasePerInvocation = vi.fn(async () => {
+        throw new Error('release boom');
+      });
+      (
+        runtime as unknown as { releasePerInvocation: typeof releasePerInvocation }
+      ).releasePerInvocation = releasePerInvocation;
+
+      await expect(
+        manager.releasePerInvocation('sess_parent', 'sess_child', 'sess1-worker')
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe('execStream', () => {
     it('delegates to runtime with resolved container id', async () => {
       const fakeHandle = {} as ExecStreamHandle;

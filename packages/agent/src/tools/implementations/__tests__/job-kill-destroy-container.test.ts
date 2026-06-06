@@ -1,5 +1,5 @@
-// ABOUTME: job_kill(destroy_container=true) — tears down a per_invocation container + workspace (#5)
-// ABOUTME: destroys the container then removes /work; cross-session/untracked are no-ops; running jobs are cancelled first
+// ABOUTME: job_kill(destroy_container=true) — tears down a per_invocation delegation (#5)
+// ABOUTME: routes release through the shim; cross-session/untracked are no-ops; running jobs are cancelled first
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
@@ -8,7 +8,6 @@ import * as path from 'node:path';
 import { JobKillTool } from '../job_kill';
 import { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
 import type { ToolContext } from '../../types';
@@ -31,17 +30,11 @@ describe('job_kill destroy_container', () => {
 
   function setup(jobStatus: 'running' | 'completed', parentId = 'sess_parent') {
     const calls: string[] = [];
-    const destroy = vi.fn(async (spec: string) => {
-      calls.push(`destroy:${spec}`);
-    });
-    const cancelReap = vi.fn((id: string) => {
-      calls.push(`cancelReap:${id}`);
+    const releasePerInvocation = vi.fn(async (_parent: string, child: string, spec?: string) => {
+      calls.push(`release:${child}:${spec}`);
     });
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(
-      { destroy } as unknown as ContainerManager,
-      { cancelReap } as unknown as PerInvocationReaper
-    );
+    reaper.bindRuntime({ releasePerInvocation } as unknown as ContainerManager);
     const childId = 'sess_child';
     const dir = path.join(base, parentId, childId);
     fs.mkdirSync(dir, { recursive: true });
@@ -55,57 +48,65 @@ describe('job_kill destroy_container', () => {
     const jobManager = { getJob: vi.fn().mockReturnValue(job), cancelJob } as unknown as JobManager;
 
     const tool = new JobKillTool();
-    return { calls, destroy, cancelJob, reaper, parentId, childId, dir, jobManager, tool };
+    return {
+      calls,
+      releasePerInvocation,
+      cancelJob,
+      reaper,
+      parentId,
+      childId,
+      dir,
+      jobManager,
+      tool,
+    };
   }
 
   function ctx(over: Partial<ToolContext>): ToolContext {
     return { signal: new AbortController().signal, ...over } as ToolContext;
   }
 
-  it('tears down a completed delegation: destroys the container, then removes /work', async () => {
-    const { calls, reaper, parentId, childId, dir, jobManager, tool } = setup('completed');
+  it('tears down a completed delegation: routes release through the shim', async () => {
+    const { calls, reaper, parentId, childId, jobManager, tool } = setup('completed');
     const result = await tool.execute(
       { jobId: 'job_x', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: parentId })
     );
     expect(result.status).toBe('completed');
-    expect(calls).toEqual([`cancelReap:${childId}`, 'destroy:spec-child']); // not running → no cancelJob
-    expect(fs.existsSync(dir)).toBe(false);
+    expect(calls).toEqual([`release:${childId}:spec-child`]); // not running → no cancelJob
     expect(reaper.get(childId)).toBeUndefined();
     expect(reaper.isReleased(childId)).toBe(true);
   });
 
-  it('cancels a running job first, then tears it down', async () => {
-    const { calls, dir, jobManager, tool, reaper, parentId } = setup('running');
+  it('cancels a running job first, then tears it down via the shim', async () => {
+    const { calls, childId, jobManager, tool, reaper, parentId } = setup('running');
     const result = await tool.execute(
       { jobId: 'job_x', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: parentId })
     );
     expect(result.status).toBe('completed');
     expect(calls[0]).toBe('cancelJob');
-    expect(calls).toContain('destroy:spec-child');
-    expect(fs.existsSync(dir)).toBe(false);
+    expect(calls).toContain(`release:${childId}:spec-child`);
   });
 
   it('does NOT tear down a workspace owned by another session', async () => {
-    const { destroy, dir, jobManager, tool, reaper } = setup('completed');
+    const { releasePerInvocation, dir, jobManager, tool, reaper } = setup('completed');
     const result = await tool.execute(
       { jobId: 'job_x', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: 'sess_other' })
     );
     expect(result.status).toBe('completed'); // the kill still "succeeds"
-    expect(destroy).not.toHaveBeenCalled(); // but the cross-session workspace is untouched
+    expect(releasePerInvocation).not.toHaveBeenCalled(); // cross-session: untouched
     expect(fs.existsSync(dir)).toBe(true);
   });
 
-  it('plain kill (destroy_container=false) leaves the workspace intact', async () => {
-    const { destroy, dir, jobManager, tool, reaper, parentId } = setup('running');
+  it('plain kill (destroy_container=false) leaves the delegation tracked', async () => {
+    const { releasePerInvocation, dir, jobManager, tool, reaper, parentId } = setup('running');
     const result = await tool.execute(
       { jobId: 'job_x' },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: parentId })
     );
     expect(result.status).toBe('completed');
-    expect(destroy).not.toHaveBeenCalled();
+    expect(releasePerInvocation).not.toHaveBeenCalled();
     expect(fs.existsSync(dir)).toBe(true); // resumable: workspace preserved
     expect(reaper.get('sess_child')).toBeDefined();
   });

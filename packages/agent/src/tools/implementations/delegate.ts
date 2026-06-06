@@ -17,11 +17,7 @@ import {
   PersonaSharingViolationError,
 } from '@lace/agent/config/persona-mount-conflict';
 import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-spec';
-import {
-  childWorkspaceDir,
-  childrenBaseDir,
-  writeOwnerMarker,
-} from '@lace/agent/jobs/results-tree';
+import { childWorkspaceDir } from '@lace/agent/jobs/results-tree';
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
@@ -122,7 +118,7 @@ Parameters:
     args: z.infer<typeof delegateSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    const { jobManager, runtimeBinding, perInvocationReaper } = context;
+    const { jobManager, runtimeBinding } = context;
 
     if (!jobManager) {
       return {
@@ -181,8 +177,8 @@ Parameters:
       }
       resumeSessionId = previousJob.subagentSessionId;
       // For per_invocation resume, the child session id is the prior one (same
-      // session, same container name prefix). The host reuses the pre-existing
-      // scratch directory idempotently via mkdirSync({ recursive: true }).
+      // session, same container name prefix). The shim re-uses the pre-existing
+      // /work it owns for that child.
       childSessionId = resumeSessionId;
     } else {
       // Fresh spawn — mint a new session id. Used only when the persona is
@@ -197,9 +193,6 @@ Parameters:
     let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
     // Scratch dir host path; set for per_invocation personas.
     let scratchDirHostPath: string | undefined;
-    // This child's OWN children-results base (<base>/<childId>), bind-mounted
-    // read-only into its container so its tools can read what IT delegates.
-    let childrenReadBaseHostPath: string | undefined;
     // Container sharing mode from the resolved persona runtime.
     let containerSharing: 'per_invocation' | 'persistent' | undefined;
     // Per-invocation container spec name; set for per_invocation personas.
@@ -243,15 +236,15 @@ Parameters:
               }
             }
 
-            // On resume, refuse if the prior workspace is gone (released, or lost
-            // to a crash) rather than letting the idempotent mkdir resurrect a
-            // hollow /work. Then lay out the workspace and track it.
+            // On resume, refuse if the PRIOR workspace is gone (released, or lost
+            // to a crash) rather than resurrecting a hollow /work. The shim
+            // provisions /work at spawn; lace only computes the path + tracks it.
             let resumeRefused = false;
             const setupWorkspace = (): void => {
               if (resume) {
-                // Released in this process (explicit), OR the workspace is gone /
-                // empty (crash backstop) — either way refuse rather than let the
-                // idempotent mkdir resurrect a hollow /work.
+                // Released in this process (explicit), OR the prior workspace is
+                // gone / empty (crash backstop) — either way refuse rather than
+                // let a fresh spawn resurrect a hollow /work.
                 const dir = childWorkspaceDir(parentId, childId);
                 const intact = fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
                 if (context.workspaceReaper?.isReleased(childId) || !intact) {
@@ -259,23 +252,10 @@ Parameters:
                   return;
                 }
               }
-              // Write the owner marker BEFORE the first child mkdir to close the
-              // create-gap: a concurrent sweep must never see a child dir under a
-              // markerless parent. writeOwnerMarker mkdirs the parent base.
-              writeOwnerMarker(parentId);
-              // The child's workspace lives in the shared results tree at
-              // <base>/<parentId>/<childId> — it survives the disposable container
-              // and is the child's deliverable to the parent. mode 0o700 applies
-              // only to newly created dirs.
+              // The child's workspace lives at <base>/<parentId>/<childId> — the
+              // shim creates and owns it at spawn. lace only computes the host
+              // path so it can return the result path and track the entry.
               scratchDirHostPath = childWorkspaceDir(parentId, childId);
-              fs.mkdirSync(scratchDirHostPath, { recursive: true, mode: 0o700 });
-
-              // Create this child's OWN children-results base now (the bind source
-              // must exist before its container starts). It stays markerless until
-              // the child itself first delegates; the Part 4 sweep protects it
-              // while the child's container is live (a live RO bind source).
-              childrenReadBaseHostPath = childrenBaseDir(childId);
-              fs.mkdirSync(childrenReadBaseHostPath, { recursive: true, mode: 0o700 });
 
               containerSpecName = buildPerInvocationSpecName({
                 parentSessionId: parentId,
@@ -284,8 +264,9 @@ Parameters:
               });
 
               // Track the workspace so job_kill(destroy_container) / clean-close / teardown
-              // can dispose it (destroy the container, then rm /work). Idempotent
-              // on resume (same childSessionId re-set).
+              // can dispose it — routing release through the shim (which destroys
+              // the container + removes /work). Idempotent on resume (same
+              // childSessionId re-set).
               context.workspaceReaper?.track({
                 childId,
                 parentId,
@@ -328,7 +309,7 @@ Parameters:
             runtime,
             containerMounts: context.containerMounts ?? {},
             ...(runtime.containerSharing === 'per_invocation'
-              ? { childSessionId: childSessionId!, scratchDirHostPath, childrenReadBaseHostPath }
+              ? { childSessionId: childSessionId!, scratchDirHostPath }
               : {}),
           });
         }
@@ -345,14 +326,6 @@ Parameters:
         }
         throw err;
       }
-    }
-
-    // Cancel any pending idle-TTL reap for this per_invocation container.
-    // Fresh delegates call cancelReap idempotently (no timer exists — safe no-op).
-    // Resume delegates cancel the timer that was set when the prior invocation's
-    // subagent exited, preserving the container for this new invocation window.
-    if (containerSharing === 'per_invocation' && childSessionId && perInvocationReaper) {
-      perInvocationReaper.cancelReap(childSessionId);
     }
 
     // Per-call modelId wins; otherwise fall back to persona default (if any).

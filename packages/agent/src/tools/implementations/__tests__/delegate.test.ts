@@ -539,8 +539,8 @@ describe('DelegateTool', () => {
     expect(body.workspaceNote).toContain('UNTRUSTED');
     expect(body.workspaceNote).toContain('INCOMPLETE'); // background → still running
     expect(body.workspaceNote).toContain('job_kill');
-    // The scratch directory must exist on disk
-    expect(fs.existsSync(expectedScratchDir)).toBe(true);
+    // lace no longer mkdirs /work — the shim provisions it at spawn. lace only
+    // computes the host path for the result + tracking.
   });
 
   it('sync per_invocation preamble includes scratchDir', async () => {
@@ -648,8 +648,10 @@ describe('DelegateTool', () => {
     const mintedScratchDir = firstBody.workspace as string;
     expect(mintedSessionId.startsWith('sess_')).toBe(true);
 
-    // Simulate the child having produced output — resume requires a non-empty
-    // workspace (the empty-workspace gate refuses a hollow resurrection).
+    // Simulate the shim having provisioned /work and the child having produced
+    // output — resume requires a non-empty workspace (the empty-workspace gate
+    // refuses a hollow resurrection).
+    fs.mkdirSync(mintedScratchDir, { recursive: true });
     fs.writeFileSync(path.join(mintedScratchDir, 'out.txt'), 'prior output');
 
     // Second invocation with resume
@@ -774,198 +776,6 @@ describe('DelegateTool', () => {
     const opts = createJob.mock.calls[0]![1] as Record<string, unknown>;
     expect(opts.resumeSessionId).toBe('sess_abc123xyz');
     expect(opts.newSubagentSessionId).toBeUndefined();
-  });
-
-  // reaper cancel wiring
-  describe('per_invocation reaper cancel wiring', () => {
-    function makePerInvocationPersonaRegistry(): PersonaRegistry {
-      return {
-        parsePersona: vi.fn().mockReturnValue({
-          config: {
-            runtime: {
-              type: 'container',
-              containerSharing: 'per_invocation',
-              image: 'example/subagent:latest',
-              workingDirectory: '/workspace',
-              mounts: [],
-              env: {},
-            },
-          },
-          body: 'per_invocation persona',
-        }),
-        listAvailablePersonas: vi.fn().mockReturnValue([]),
-      } as unknown as PersonaRegistry;
-    }
-
-    function makeReaper() {
-      return {
-        scheduleReap: vi.fn(),
-        cancelReap: vi.fn(),
-        dispose: vi.fn(),
-        hasPendingReap: vi.fn().mockReturnValue(false),
-        ttlMs: 1800000,
-      };
-    }
-
-    it('calls cancelReap with the fresh childSessionId on a fresh per_invocation delegate', async () => {
-      const personaRegistry = makePerInvocationPersonaRegistry();
-      const tool = new DelegateTool({ personaRegistry });
-      const reaper = makeReaper();
-
-      const mockJob = {
-        jobId: 'job_fresh',
-        type: 'delegate' as const,
-        status: 'running' as const,
-        completion: new Promise<void>(() => {}),
-      } as unknown as JobState;
-
-      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_fresh', job: mockJob });
-      const jobManager = {
-        createJob,
-        listJobs: vi.fn().mockReturnValue([]),
-      } as unknown as JobManager;
-
-      await tool.execute(
-        { prompt: 'fresh task', background: true, persona: 'per-inv-persona' },
-        {
-          signal: new AbortController().signal,
-          jobManager,
-          runtimeBinding,
-          activeSessionId: 'sess_parent',
-
-          perInvocationReaper: reaper as any,
-        }
-      );
-
-      // cancelReap must have been called with the minted childSessionId
-      expect(reaper.cancelReap).toHaveBeenCalledOnce();
-      const [calledSessionId] = reaper.cancelReap.mock.calls[0]!;
-      expect(typeof calledSessionId).toBe('string');
-      expect(calledSessionId).toMatch(/^sess_/);
-    });
-
-    it('calls cancelReap with the resumed childSessionId on a resume per_invocation delegate', async () => {
-      const personaRegistry = makePerInvocationPersonaRegistry();
-      const tool = new DelegateTool({ personaRegistry });
-      const reaper = makeReaper();
-
-      const existingSessionId = 'sess_existing_child';
-      const mockJob = {
-        jobId: 'job_resume',
-        type: 'delegate' as const,
-        status: 'running' as const,
-        completion: new Promise<void>(() => {}),
-      } as unknown as JobState;
-
-      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_resume', job: mockJob });
-      const jobManager = {
-        createJob,
-        listJobs: vi
-          .fn()
-          .mockReturnValue([{ jobId: 'job_prev', subagentSessionId: existingSessionId }]),
-      } as unknown as JobManager;
-
-      // Resume requires a non-empty prior workspace (empty-workspace gate).
-      const priorWs = path.join(scratchBase, 'sess_parent', existingSessionId);
-      fs.mkdirSync(priorWs, { recursive: true });
-      fs.writeFileSync(path.join(priorWs, 'out.txt'), 'prior output');
-
-      await tool.execute(
-        { prompt: 'resume task', background: true, persona: 'per-inv-persona', resume: 'job_prev' },
-        {
-          signal: new AbortController().signal,
-          jobManager,
-          runtimeBinding,
-          activeSessionId: 'sess_parent',
-
-          perInvocationReaper: reaper as any,
-        }
-      );
-
-      // cancelReap must have been called with the PRIOR session id
-      expect(reaper.cancelReap).toHaveBeenCalledOnce();
-      expect(reaper.cancelReap).toHaveBeenCalledWith(existingSessionId);
-    });
-
-    it('does NOT call cancelReap when reaper is absent from context', async () => {
-      const personaRegistry = makePerInvocationPersonaRegistry();
-      const tool = new DelegateTool({ personaRegistry });
-
-      const mockJob = {
-        jobId: 'job_no_reaper',
-        type: 'delegate' as const,
-        status: 'running' as const,
-        completion: new Promise<void>(() => {}),
-      } as unknown as JobState;
-
-      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_no_reaper', job: mockJob });
-      const jobManager = {
-        createJob,
-        listJobs: vi.fn().mockReturnValue([]),
-      } as unknown as JobManager;
-
-      // Should not throw when reaper is absent
-      await expect(
-        tool.execute(
-          { prompt: 'task', background: true, persona: 'per-inv-persona' },
-          {
-            signal: new AbortController().signal,
-            jobManager,
-            runtimeBinding,
-            activeSessionId: 'sess_parent',
-            // perInvocationReaper intentionally absent
-          }
-        )
-      ).resolves.not.toThrow();
-    });
-
-    it('does NOT call cancelReap for a persistent persona delegate', async () => {
-      const persistentPersonaRegistry = {
-        parsePersona: vi.fn().mockReturnValue({
-          config: {
-            runtime: {
-              type: 'container',
-              containerSharing: 'persistent',
-              image: 'example/sen-box:latest',
-              workingDirectory: '/home/agent',
-              mounts: [],
-              env: {},
-            },
-          },
-          body: 'persistent persona',
-        }),
-        listAvailablePersonas: vi.fn().mockReturnValue([]),
-      } as unknown as PersonaRegistry;
-
-      const tool = new DelegateTool({ personaRegistry: persistentPersonaRegistry });
-      const reaper = makeReaper();
-
-      const mockJob = {
-        jobId: 'job_persistent2',
-        type: 'delegate' as const,
-        status: 'running' as const,
-        completion: new Promise<void>(() => {}),
-      } as unknown as JobState;
-
-      const createJob = vi.fn().mockResolvedValue({ jobId: 'job_persistent2', job: mockJob });
-      const jobManager = {
-        createJob,
-        listJobs: vi.fn().mockReturnValue([]),
-      } as unknown as JobManager;
-
-      await tool.execute(
-        { prompt: 'persistent task', background: true, persona: 'box-shell' },
-        {
-          signal: new AbortController().signal,
-          jobManager,
-          runtimeBinding,
-
-          perInvocationReaper: reaper as any,
-        }
-      );
-
-      expect(reaper.cancelReap).not.toHaveBeenCalled();
-    });
   });
 
   // ---------------------------------------------------------------------------

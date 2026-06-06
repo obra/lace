@@ -1,25 +1,22 @@
 // ABOUTME: Tests for WorkspaceReaper + safeRemoveWorkspace (Part 1 of #5)
-// ABOUTME: dispose order (cancelReap→destroy→rm), per-entry resilience, symlink/escape/tolerant remover
+// ABOUTME: dispose routes teardown to the shim via releasePerInvocation; per-entry resilience
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-import type { PerInvocationReaper } from '../per-invocation-reaper';
 import { WorkspaceReaper, safeRemoveWorkspace } from '../workspace-reaper';
 
 function makeFakes() {
-  const calls: string[] = [];
-  const destroy = vi.fn(async (specName: string) => {
-    calls.push(`destroy:${specName}`);
-  });
-  const cancelReap = vi.fn((childId: string) => {
-    calls.push(`cancelReap:${childId}`);
-  });
-  const containerManager = { destroy } as unknown as ContainerManager;
-  const perInvocationReaper = { cancelReap } as unknown as PerInvocationReaper;
-  return { calls, destroy, cancelReap, containerManager, perInvocationReaper };
+  const calls: Array<[string, string, string | undefined]> = [];
+  const releasePerInvocation = vi.fn(
+    async (parentId: string, childId: string, specName?: string) => {
+      calls.push([parentId, childId, specName]);
+    }
+  );
+  const containerManager = { releasePerInvocation } as unknown as ContainerManager;
+  return { calls, releasePerInvocation, containerManager };
 }
 
 describe('WorkspaceReaper', () => {
@@ -45,49 +42,49 @@ describe('WorkspaceReaper', () => {
     return dir;
   }
 
-  it('track retains the workspace until dispose', async () => {
-    const { containerManager, perInvocationReaper } = makeFakes();
+  it('dispose forgets the entry (the shim owns container + /work teardown)', async () => {
+    const { containerManager } = makeFakes();
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
     const dir = makeWorkspace('p1', 'c1');
     reaper.track({ childId: 'c1', parentId: 'p1', path: dir, containerSpecName: 'spec-c1' });
 
-    expect(fs.existsSync(dir)).toBe(true);
     await reaper.dispose('c1');
-    expect(fs.existsSync(dir)).toBe(false);
+    expect(reaper.list()).toEqual([]);
+    expect(reaper.isReleased('c1')).toBe(true);
   });
 
-  it('dispose calls cancelReap, then destroy(specName), then removes the dir', async () => {
-    const { calls, containerManager, perInvocationReaper } = makeFakes();
+  it('dispose routes teardown to the shim via releasePerInvocation; does NOT rm the dir', async () => {
+    const { calls, containerManager } = makeFakes();
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
     const dir = makeWorkspace('p1', 'c1');
     reaper.track({ childId: 'c1', parentId: 'p1', path: dir, containerSpecName: 'spec-c1' });
 
     await reaper.dispose('c1');
 
-    expect(calls).toEqual(['cancelReap:c1', 'destroy:spec-c1']);
-    expect(fs.existsSync(dir)).toBe(false);
+    expect(calls).toEqual([['p1', 'c1', 'spec-c1']]);
+    // lace no longer removes the workspace — the shim's release does.
+    expect(fs.existsSync(dir)).toBe(true);
     expect(reaper.list()).toEqual([]);
   });
 
-  it('dispose of an unknown id is a no-op (no destroy, no throw)', async () => {
-    const { calls, destroy, containerManager, perInvocationReaper } = makeFakes();
+  it('dispose of an unknown id is a no-op (no release, no throw)', async () => {
+    const { calls, releasePerInvocation, containerManager } = makeFakes();
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
     await expect(reaper.dispose('nope')).resolves.toBeUndefined();
-    expect(destroy).not.toHaveBeenCalled();
+    expect(releasePerInvocation).not.toHaveBeenCalled();
     expect(calls).toEqual([]);
   });
 
-  it('releaseAllForParent disposes only that parent and survives a destroy rejection', async () => {
-    const { perInvocationReaper } = makeFakes();
-    const destroy = vi.fn(async (specName: string) => {
-      if (specName === 'spec-bad') throw new Error('boom');
+  it('releaseAllForParent disposes only that parent and survives a release rejection', async () => {
+    const releasePerInvocation = vi.fn(async (_parentId: string, childId: string) => {
+      if (childId === 'bad') throw new Error('boom');
     });
-    const containerManager = { destroy } as unknown as ContainerManager;
+    const containerManager = { releasePerInvocation } as unknown as ContainerManager;
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
 
     const bad = makeWorkspace('p1', 'bad');
     const good = makeWorkspace('p1', 'good');
@@ -98,10 +95,8 @@ describe('WorkspaceReaper', () => {
 
     await reaper.releaseAllForParent('p1');
 
-    // good removed; bad retained (container may still be live); p2 untouched
-    expect(fs.existsSync(good)).toBe(false);
-    expect(fs.existsSync(bad)).toBe(true);
-    expect(fs.existsSync(other)).toBe(true);
+    // good released (forgotten); bad retained (release rejected); p2 untouched.
+    expect(releasePerInvocation).toHaveBeenCalledWith('p1', 'good', 'spec-good');
     expect(
       reaper
         .list()
@@ -110,14 +105,13 @@ describe('WorkspaceReaper', () => {
     ).toEqual(['bad', 'x']);
   });
 
-  it('releaseAllTracked disposes everything and survives a destroy rejection', async () => {
-    const { perInvocationReaper } = makeFakes();
-    const destroy = vi.fn(async (specName: string) => {
-      if (specName === 'spec-bad') throw new Error('boom');
+  it('releaseAllTracked disposes everything and survives a release rejection', async () => {
+    const releasePerInvocation = vi.fn(async (_parentId: string, childId: string) => {
+      if (childId === 'bad') throw new Error('boom');
     });
-    const containerManager = { destroy } as unknown as ContainerManager;
+    const containerManager = { releasePerInvocation } as unknown as ContainerManager;
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
 
     const bad = makeWorkspace('p1', 'bad');
     const good = makeWorkspace('p2', 'good');
@@ -126,28 +120,25 @@ describe('WorkspaceReaper', () => {
 
     await reaper.releaseAllTracked();
 
-    expect(fs.existsSync(good)).toBe(false);
-    expect(fs.existsSync(bad)).toBe(true);
     expect(reaper.list().map((e) => e.childId)).toEqual(['bad']);
   });
 
-  it('dispose tolerates a missing containerSpecName (host-only entry)', async () => {
-    const { calls, destroy, containerManager, perInvocationReaper } = makeFakes();
+  it('dispose tolerates a missing containerSpecName (passes undefined to the shim)', async () => {
+    const { calls, containerManager } = makeFakes();
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
     const dir = makeWorkspace('p1', 'c1');
     reaper.track({ childId: 'c1', parentId: 'p1', path: dir });
 
     await reaper.dispose('c1');
-    expect(destroy).not.toHaveBeenCalled();
-    expect(calls).toEqual(['cancelReap:c1']);
-    expect(fs.existsSync(dir)).toBe(false);
+    expect(calls).toEqual([['p1', 'c1', undefined]]);
+    expect(reaper.list()).toEqual([]);
   });
 
   it('get returns the tracked entry (for ownership checks) or undefined', () => {
-    const { containerManager, perInvocationReaper } = makeFakes();
+    const { containerManager } = makeFakes();
     const reaper = new WorkspaceReaper();
-    reaper.bindRuntime(containerManager, perInvocationReaper);
+    reaper.bindRuntime(containerManager);
     const dir = makeWorkspace('p1', 'c1');
     reaper.track({ childId: 'c1', parentId: 'p1', path: dir, containerSpecName: 'spec-c1' });
 

@@ -192,6 +192,36 @@ export class PlaneRuntime implements ContainerRuntime {
     this.configs.delete(containerId);
   }
 
+  // The shim owns the per_invocation lifecycle: `release` destroys the child's
+  // container AND removes its `/work` workspace. lace just sends the verb and
+  // drops the child from its local cache.
+  async releasePerInvocation(parentSession: string, childSession: string): Promise<void> {
+    await this.runChecked(
+      ['release', parentSession, childSession],
+      childSession,
+      'plane release failed'
+    );
+    // `create` keys the cache under the container name (spawn stdout), not the bare
+    // session id, so we cannot delete by `childSession` directly. Find the cached
+    // entry whose config records this child and evict it from both maps.
+    const cachedKey = this.cacheKeyForChild(childSession);
+    if (cachedKey !== undefined) {
+      this.containers.delete(cachedKey);
+      this.configs.delete(cachedKey);
+    }
+  }
+
+  private cacheKeyForChild(childSession: string): string | undefined {
+    for (const [key, config] of this.configs) {
+      const cachedChild =
+        config.childSession ?? ('childSessionId' in config ? config.childSessionId : undefined);
+      if (cachedChild === childSession) {
+        return key;
+      }
+    }
+    return undefined;
+  }
+
   async exec(containerId: string, options: ExecOptions): Promise<ExecResult> {
     const info = this.containers.get(containerId);
     if (!info) {

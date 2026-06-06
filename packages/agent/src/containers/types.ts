@@ -172,6 +172,15 @@ export interface ContainerRuntime {
    * runtime has no caches to populate.
    */
   adopt(config: ContainerConfig, state: ContainerState): Promise<void>;
+
+  /**
+   * Release a per_invocation child: the runtime owns destroying the child's
+   * container AND removing its `/work` workspace. Only the plane runtime
+   * implements this — it routes the shim's `release` verb. Runtimes without a
+   * shim leave this undefined; ContainerManager falls back to destroying the
+   * container only (the shim is the production owner of `/work`).
+   */
+  releasePerInvocation?(parentSession: string, childSession: string): Promise<void>;
 }
 
 export class ContainerError extends Error {

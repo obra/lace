@@ -8,7 +8,6 @@ import * as path from 'node:path';
 import { DelegateTool } from '../delegate';
 import { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-import type { PerInvocationReaper } from '@lace/agent/jobs/per-invocation-reaper';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
@@ -45,19 +44,16 @@ describe('delegate workspace lifecycle', () => {
   let prevWorkDir: string | undefined;
   let prevMax: string | undefined;
   let reaper: WorkspaceReaper;
-  let destroy: ReturnType<typeof vi.fn>;
+  let releasePerInvocation: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     prevWorkDir = process.env.LACE_WORK_DIR;
     prevMax = process.env.LACE_WORKSPACE_MAX_PER_PARENT;
     base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-lifecycle-test-'));
     process.env.LACE_WORK_DIR = base;
-    destroy = vi.fn().mockResolvedValue(undefined);
+    releasePerInvocation = vi.fn().mockResolvedValue(undefined);
     reaper = new WorkspaceReaper();
-    reaper.bindRuntime(
-      { destroy } as unknown as ContainerManager,
-      { cancelReap: vi.fn() } as unknown as PerInvocationReaper
-    );
+    reaper.bindRuntime({ releasePerInvocation } as unknown as ContainerManager);
   });
 
   afterEach(() => {
@@ -138,7 +134,9 @@ describe('delegate workspace lifecycle', () => {
     const parentId = 'sess_relparent';
 
     const fresh = await freshDelegate(jobManager, parentId);
-    // The child produced output, then the parent released the delegation.
+    // The shim provisioned /work at spawn; the child then produced output, and
+    // the parent released the delegation.
+    fs.mkdirSync(fresh.workspace, { recursive: true });
     fs.writeFileSync(path.join(fresh.workspace, 'out.txt'), 'done');
     jobs.push({ jobId: 'job_done', subagentSessionId: fresh.subagentSessionId });
     await reaper.dispose(fresh.subagentSessionId);
@@ -159,7 +157,8 @@ describe('delegate workspace lifecycle', () => {
     const fresh = await freshDelegate(jobManager, parentId);
     jobs.push({ jobId: 'job_crash', subagentSessionId: fresh.subagentSessionId });
     // Crash backstop: the in-memory released mark is gone, but /work is empty
-    // (the fresh delegate created it; no child output survived). Must NOT resurrect.
+    // (the shim provisioned it; no child output survived). Must NOT resurrect.
+    fs.mkdirSync(fresh.workspace, { recursive: true });
     expect(fs.existsSync(fresh.workspace)).toBe(true);
     expect(fs.readdirSync(fresh.workspace)).toHaveLength(0);
 

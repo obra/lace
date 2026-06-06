@@ -296,6 +296,37 @@ export class ContainerManager {
     }
   }
 
+  /**
+   * Tear down a per_invocation child. On the plane runtime the shim owns the
+   * lifecycle: it destroys the container AND removes its `/work` workspace, so
+   * we route the `release` verb through `runtime.releasePerInvocation`. On
+   * runtimes without a shim we fall back to destroying the container by spec
+   * name (lace no longer removes the workspace off-plane — the shim is the
+   * production owner). Best-effort and idempotent: a failed release is logged,
+   * never thrown, so teardown of sibling entries is not stranded.
+   */
+  async releasePerInvocation(
+    parentSession: string,
+    childSession: string,
+    fallbackSpecName?: string
+  ): Promise<void> {
+    try {
+      if (this.runtime.releasePerInvocation) {
+        await this.runtime.releasePerInvocation(parentSession, childSession);
+        return;
+      }
+      if (fallbackSpecName) {
+        await this.destroy(fallbackSpecName);
+      }
+    } catch (error) {
+      logger.warn('ContainerManager.releasePerInvocation failed', {
+        parentSession,
+        childSession,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle> {
     const containerId = this.resolveBySpecName(specName);
     return this.runtime.execStream(containerId, options);

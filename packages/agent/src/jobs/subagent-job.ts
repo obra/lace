@@ -182,7 +182,6 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     requestPermissionFromClient,
     finalizeJob,
     topLevelPeer,
-    reaper,
   } = deps;
 
   // Helper to write error output directly to the job output file.
@@ -338,9 +337,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         stderr: stderrBuffer.trim() || undefined,
       });
       await finalizeJob(job);
-      // Schedule reap in case the container was partially materialized before the error.
-      // destroy() on a non-existent container is safe (ContainerManager handles it gracefully).
-      maybeScheduleReapAfter(job, reaper);
+      // The shim owns per_invocation idle-TTL teardown; lace no longer schedules
+      // its own reap (doing so would double-reap/conflict with the shim).
       return;
     }
 
@@ -1151,10 +1149,8 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           error: error instanceof Error ? error.message : String(error),
         });
       }
-      // Schedule idle TTL teardown for per_invocation containers (Chunk E).
-      // The reaper cancels this timer when a resume delegate call arrives, preserving
-      // the container for the next invocation window.
-      maybeScheduleReapAfter(job, reaper);
+      // The shim owns per_invocation idle-TTL teardown; lace no longer schedules
+      // its own reap (doing so would double-reap/conflict with the shim).
     }
   })();
 }

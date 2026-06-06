@@ -489,6 +489,43 @@ describe('PlaneRuntime', () => {
     expect(run).toHaveBeenNthCalledWith(5, ['rm', '-f', id]);
   });
 
+  it('releasePerInvocation sends the release verb and evicts the cache keyed by container name', async () => {
+    // The container name (spawn stdout) deliberately DIFFERS from the child session
+    // id, so eviction must locate the cache entry by its recorded childSession, not
+    // by assuming the name equals the session id.
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'parent-shell-child\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: '', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({
+        stdout: '',
+        stderr: 'no such container: parent-shell-child',
+        exitCode: 1,
+      });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest({ childSession: 'sess_child' }));
+    expect(id).toBe('parent-shell-child');
+
+    await rt.releasePerInvocation('sess_parent', 'sess_child');
+
+    expect(run).toHaveBeenNthCalledWith(2, ['release', 'sess_parent', 'sess_child']);
+    // The cache entry under the container NAME is actually removed.
+    await expect(rt.inspect(id)).rejects.toThrow(/Container not found/);
+  });
+
+  it('releasePerInvocation surfaces a failed release verb', async () => {
+    const run = vi
+      .fn<PlaneRunner['run']>()
+      .mockResolvedValueOnce({ stdout: 'parent-shell-child\n', stderr: '', exitCode: 0 })
+      .mockResolvedValueOnce({ stdout: '', stderr: 'release boom', exitCode: 1 });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    await rt.create(spawnRequest({ childSession: 'sess_child' }));
+
+    await expect(rt.releasePerInvocation('sess_parent', 'sess_child')).rejects.toThrow(
+      /plane release failed/
+    );
+  });
+
   it('stop translates timeout milliseconds to whole seconds', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-stop-timeout\n',
