@@ -1,8 +1,5 @@
 # Persona containers
 
-> PRI-1796 reference. For the implementation plan see
-> [`../superpowers/plans/2026-05-23-pri-1796-container-sharing-model.md`](../superpowers/plans/2026-05-23-pri-1796-container-sharing-model.md).
-
 ## The two sharing models
 
 **`per_invocation`** — each fresh `delegate(persona=X, …)` call mints a new
@@ -31,27 +28,61 @@ session ids with the `sess_` prefix stripped. The `lace-` prefix makes
 per_invocation containers visible to the orphan reaper on startup; the `sen-`
 prefix keeps persistent containers outside the orphan reaper's scope.
 
-## Scratch dir convention
+## Workspace convention (the workspace IS the result)
 
-For `per_invocation` containers lace auto-injects a bind mount:
+For `per_invocation` containers lace auto-injects a bind mount in a **shared
+results tree**:
 
 ```
-host:  /var/sen/instance/work/<childSessionId>/   (created with mode 0700)
+host:  <base>/<parentId>/<childId>/   (created with mode 0700)
 guest: /work
 ```
 
-The base path is overridable via `LACE_WORK_DIR`. The directory is created
-before the container starts; on resume it already exists and keeps its contents.
-The persona must NOT declare `mounts.scratch` — doing so is rejected at spawn
-time with a `PersonaContainerSpecError`.
+`<base>` = `LACE_WORK_DIR` (default `os.tmpdir()/lace-work`); `<parentId>` is the
+delegating session, `<childId>` the subagent session. Each child mounts ONLY its
+own subdir — mount-scoping, not file modes, is the isolation boundary. A
+`<base>/<parentId>/.owner` marker (`{pid, startNonce}`, written before the first
+child mkdir) records the owning process for crash reclamation. The persona must
+NOT declare `mounts.scratch` — rejected at spawn time with a
+`PersonaContainerSpecError`.
+
+A **container** parent additionally gets `<base>/<childId>` (its own
+children-results base) bind-mounted **read-only** at the same path, so its tools
+can read the workspaces it delegates. The host root reads the tree directly.
+
+The workspace **survives the disposable container** and is the child's
+deliverable to the parent — returned by `delegate` framed as untrusted +
+possibly-incomplete. The parent reclaims it with **`release_delegation`** (the
+single safe path: destroy the container, then `rm /work`); it is also reclaimed
+on the parent's clean-close and the owning process's teardown. A retention
+ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`, default 128) fails a fresh delegate
+that would exceed it (release a completed one first). A crash backstop sweep
+(below) reclaims orphans whose owner died.
 
 Persistent personas declare their own `/work` mount via the embedder's
-container-mount registry (the `mounts.scratch` key in frontmatter). Lace does
-not auto-inject `/work` for persistent containers.
+container-mount registry; lace does not auto-inject `/work` for them, and a
+persistent box is provably never reaped.
 
-The host scratch directory outlives the container. After the idle TTL reaps the
-container, the directory stays on the host until the agent decides to clean it
-up (see the GC reminder below).
+## Ephemeral $TMPDIR
+
+Every subagent gets an ephemeral, auto-cleaned `$TMPDIR` separate from `/work`
+(which is the retained, parent-visible result tree). A **host** subagent gets a
+`mkdtemp` host dir (opaque `lace-tmp-` prefix) on its process env, removed in the
+job's exit `finally`. A **container** subagent gets `TMPDIR=/tmp` (the
+container's own fs), set last so a persona can't redirect temp into `/work`;
+cleaned with the container. Caveat: the host `finally` does not run on SIGKILL
+and `$TMPDIR` is outside `resultsBase()` (not swept) — a hard crash relies on OS
+temp cleanup.
+
+## Host subagents are NOT a security boundary
+
+A host child-process subagent runs as the same uid, inherits the parent's env and
+workDir, and sees the whole host filesystem — it can read any sibling's workspace
+and the session store. The ephemeral workdir + `$TMPDIR` are **hygiene, not
+isolation**. Therefore **adversarial / untrusted / prompt-injectable work MUST
+run as a `per_invocation` container persona, never as a host subagent.** A
+container child is isolated by mount-scoping (only its own `/work`), so it cannot
+read, forge, or plant a sibling's `.owner`.
 
 ## Idle TTL reap
 
@@ -66,7 +97,20 @@ Override: `LACE_PER_INVOCATION_IDLE_TTL_MS` (milliseconds). Set to a small value
 On lace startup the orphan reaper destroys any `lace-*` container not associated
 with a live spec — this covers the case where lace crashed during a TTL window.
 
-## R10 — adversarial-content scratch artifacts
+## Crash-backstop workspace sweep
+
+The idle TTL reaps the *container*; it does not remove the *workspace*. Workspaces
+are reclaimed on the live paths (release / clean-close / teardown). The crash
+backstop is a base-wide sweep (boot — after `runStartupReaper` — plus a
+`LACE_WORKSPACE_SWEEP_INTERVAL_MS` interval, default 15 min) that any lace process
+runs (no "root" role; idempotent). It is **doubly liveness-gated**: it skips a
+subtree whose `.owner` process is alive, and skips any dir that is a live
+container's bind source (a `/work`, or a markerless read-base during the
+create-gap). Only a dead-owner, no-live-container workspace is removed. The sweep
+is confined to `resultsBase()`, which `initialize` asserts is disjoint from every
+durable persona mount — so it can never descend into a persistent box's mount.
+
+## Adversarial-content workspace artifacts
 
 Scratch directories written by per_invocation personas that browse the open web
 (e.g. `browser-driver`) contain **adversarial content**: screenshots, HTML
@@ -75,7 +119,7 @@ prompt-injection attempts, deceptive layouts, or fabricated data. When the
 parent agent reads them back, they must be treated as quoted material — not as
 trusted analysis or recommendations.
 
-## R6 — mount-conflict invariant
+## Mount-conflict invariant
 
 A per_invocation persona must not declare a mount-registry name also declared by
 any persistent persona. Mixing adversarial-content isolation with persistent
