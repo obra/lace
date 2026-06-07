@@ -51,6 +51,8 @@ export interface RunnerConfig {
   maxBudgetUsd?: number;
   /** Persona name for this session; stamped into every ToolContext. */
   persona?: string;
+  /** Host-only credential broker socket for this session's role (Part B). */
+  credentialBrokerSocket?: string;
 }
 
 /**

@@ -44,6 +44,12 @@ export interface ToolContext {
   /** Authoritative persona for the active session, resolved SERVER-SIDE. Never from
    *  tool arguments — the keystone invariant. */
   persona?: string;
+
+  /** Host-only credential broker socket coordinate for THIS session's role.
+   *  Stamped server-side, never from tool arguments. Present only for tools the
+   *  capability gate authorized (Task 5). */
+  credentialBrokerSocket?: string;
+
   /** Per-call timeout for out-of-process tools (one-shot-exec). */
   timeoutMs?: number;
 

@@ -301,6 +301,9 @@ export function registerPromptHandler(
         runtimeBinding: state.activeSession.state.config?.runtimeBinding,
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
         ...(state.activeSession.meta.persona ? { persona: state.activeSession.meta.persona } : {}),
+        ...(state.activeSession.state.config?.credentialBrokerSocket
+          ? { credentialBrokerSocket: state.activeSession.state.config.credentialBrokerSocket }
+          : {}),
       };
 
       const sessionIdForCache = state.activeSession.meta.sessionId;

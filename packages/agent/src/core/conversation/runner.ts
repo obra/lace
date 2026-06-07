@@ -1735,6 +1735,9 @@ export class ConversationRunner {
         ...(this.deps.reminderScheduler ? { reminderScheduler: this.deps.reminderScheduler } : {}),
         ...(this.deps.activeSessionId ? { activeSessionId: this.deps.activeSessionId } : {}),
         ...(this.config.persona ? { persona: this.config.persona } : {}),
+        ...(this.config.credentialBrokerSocket
+          ? { credentialBrokerSocket: this.config.credentialBrokerSocket }
+          : {}),
         activeSessionDir: this.config.sessionDir,
         ...(this.deps.containerMounts ? { containerMounts: this.deps.containerMounts } : {}),
         ...(this.deps.workspaceReaper ? { workspaceReaper: this.deps.workspaceReaper } : {}),
