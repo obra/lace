@@ -44,16 +44,6 @@ function resolvePersonaMountsAndEnv(input: {
 
   const mounts: RuntimeMountDescriptor[] = [];
   for (const mountName of runtimeMounts) {
-    // 'sen-cred' is plane-provided, not embedder-provided: a persona declaring it
-    // is the sen-docker shim's GATE SIGNAL. The shim detects the declaration and
-    // injects its own per-container capability socket at /run/sen-cred.sock. lace
-    // must accept the declaration (so the gate stays) but must NOT resolve it
-    // against the registry or emit a bind for it — that bind would be redundant
-    // (the shim substitutes its own) and on the plane lace's mounts are discarded
-    // anyway (PlaneRuntime sends only selector verbs). Skip it.
-    if (mountName === 'sen-cred') {
-      continue;
-    }
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
     // the per-invocation work directory at /work. Persistent personas may still
     // use 'scratch' as a named mount resolved through the registry.

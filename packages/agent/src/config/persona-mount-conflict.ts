@@ -4,11 +4,10 @@
 import type { EnvironmentRegistry, ParsedEnvironment } from './environment-registry';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 
-// `scratch` is Lace-managed for per_invocation environments and `sen-cred` is
-// plane-provided (the shim injects a per-container capability socket; the name
-// is the gate signal, not a shared host path). Neither counts as an
-// author-chosen overlap. Other names are ordinary environment-declared mounts.
-const RESERVED_MOUNT_NAMES = new Set(['scratch', 'sen-cred']);
+// `scratch` is Lace-managed for per_invocation environments — it does not count
+// as an author-chosen overlap. Other names are ordinary environment-declared
+// mounts resolved against the registry.
+const RESERVED_MOUNT_NAMES = new Set(['scratch']);
 
 export class EnvironmentMountConflictError extends Error {
   constructor(
