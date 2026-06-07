@@ -1,674 +1,159 @@
-// ABOUTME: Tests for the R6 mount-conflict validator.
-// Tests that per_invocation personas cannot share mount-registry names
-// with persistent personas, and that the boot-time warning function fires correctly.
+// ABOUTME: Tests for the R6 mount-conflict validator, re-homed onto environments.
+// Tests that per_invocation environments cannot share a writable mount-registry
+// name with persistent environments, and that the boot-time assert fires.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import { tmpdir } from 'os';
+import { EnvironmentRegistry } from '../environment-registry';
+import {
+  findEnvironmentMountConflicts,
+  assertNoEnvironmentMountConflict,
+  EnvironmentMountConflictError,
+} from '../persona-mount-conflict';
 
-// We import the logger module before loading the validator so we can spy on it.
-// The validator imports logger from the same path; vi.mock will intercept it.
-vi.mock('@lace/agent/utils/logger', () => ({
-  logger: {
-    warn: vi.fn(),
-    debug: vi.fn(),
-    info: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+describe('environment-mount-conflict validator', () => {
+  let dir: string;
 
-// Dynamic imports after mock setup so the mock is in place.
-let PersonaRegistry: typeof import('../persona-registry').PersonaRegistry;
-let assertNoMountConflict: typeof import('../persona-mount-conflict').assertNoMountConflict;
-let warnMountConflicts: typeof import('../persona-mount-conflict').warnMountConflicts;
-let PersonaSharingViolationError: typeof import('../persona-mount-conflict').PersonaSharingViolationError;
-
-describe('persona-mount-conflict validator', () => {
-  let tempDir: string;
-
-  beforeEach(async () => {
-    vi.resetModules();
-
-    // Re-import after reset so mocks are fresh
-    ({ PersonaRegistry } = await import('../persona-registry'));
-    ({ assertNoMountConflict, warnMountConflicts, PersonaSharingViolationError } = await import(
-      '../persona-mount-conflict'
-    ));
-
-    tempDir = fs.mkdtempSync(path.join(tmpdir(), 'persona-conflict-test-'));
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(tmpdir(), 'env-conflict-test-'));
   });
 
   afterEach(() => {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-    vi.restoreAllMocks();
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  // ---------------------------------------------------------------------------
-  // Helper: write a persona file into the temp directory
-  // ---------------------------------------------------------------------------
-  function writePersona(name: string, frontmatter: string, body = 'Body.'): void {
-    const content = frontmatter ? `---\n${frontmatter}\n---\n${body}` : body;
-    fs.writeFileSync(path.join(tempDir, `${name}.md`), content);
+  function writeEnv(name: string, body: string): void {
+    fs.writeFileSync(path.join(dir, `${name}.md`), body);
   }
 
-  function makeRegistry(): InstanceType<typeof PersonaRegistry> {
-    return new PersonaRegistry({
-      bundledPersonasPath: tempDir,
-      userPersonasPaths: [],
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Test 1: non-overlapping per_invocation persona passes
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict allows non-overlapping per_invocation persona', () => {
-    writePersona(
-      'pets',
-      `runtime:
+  function persistentEnv(mounts: string[]): string {
+    return `---
+runtime:
   type: container
   containerSharing: persistent
   image: img:latest
   workingDirectory: /home
   mounts:
-    - home`
-    );
-    writePersona(
-      'cattle',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /data
-  mounts:
-    - data`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('cattle');
+${mounts.map((m) => `    - ${m}`).join('\n')}
+---
+Body.`;
+  }
 
-    // Should not throw
-    expect(() => assertNoMountConflict('cattle', parsed, reg, {})).not.toThrow();
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 2: overlapping mount name (not host path, but registry name) throws
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict throws PersonaSharingViolationError when mount name conflicts', () => {
-    writePersona(
-      'brain',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'worker',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('worker');
-
-    let caught: unknown;
-    try {
-      assertNoMountConflict('worker', parsed, reg, {
-        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
-      });
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(PersonaSharingViolationError);
-    const err = caught as InstanceType<typeof PersonaSharingViolationError>;
-    expect(err.personaName).toBe('worker');
-    expect(err.mountName).toBe('knowledge');
-    expect(err.conflictsWith).toContain('brain');
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 3: only the Lace-managed scratch mount name is excluded from conflict detection
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict ignores only the scratch mount name', () => {
-    // The persona schema rejects scratch on per_invocation at materialization
-    // time, but the conflict validator still filters it because Lace owns that
-    // injected mount. Legacy auto-injected names are ordinary declared mounts now.
-    const parsed = {
-      config: {
-        runtime: {
-          type: 'container' as const,
-          containerSharing: 'per_invocation' as const,
-          image: 'img:latest',
-          workingDirectory: '/work',
-          mounts: ['scratch'],
-          env: {},
-        },
-      },
-      body: 'Body.',
-    };
-
-    const fakeRegistry = {
-      listAvailablePersonas: () => [
-        { name: 'persistent-pet', isUserDefined: false, path: '/fake/persistent-pet.md' },
-      ],
-      parsePersona: (_name: string) => ({
-        config: {
-          runtime: {
-            type: 'container' as const,
-            containerSharing: 'persistent' as const,
-            image: 'img:latest',
-            workingDirectory: '/home',
-            mounts: ['scratch'],
-            env: {},
-          },
-        },
-        body: 'Body.',
-      }),
-    };
-
-    expect(() =>
-      assertNoMountConflict(
-        'worker',
-        parsed,
-        fakeRegistry as Parameters<typeof assertNoMountConflict>[2],
-        {}
-      )
-    ).not.toThrow();
-  });
-
-  it('assertNoMountConflict ignores the plane-provided sen-cred mount name', () => {
-    // sen-cred is the shim's gate signal, not a host path lace owns. Every
-    // credentialed persona declares it, so per_invocation and persistent
-    // personas legitimately share the name — it must not be flagged as an R6
-    // shared-host-path conflict.
-    const parsed = {
-      config: {
-        runtime: {
-          type: 'container' as const,
-          containerSharing: 'per_invocation' as const,
-          image: 'img:latest',
-          workingDirectory: '/work',
-          mounts: ['sen-cred'],
-          env: {},
-        },
-      },
-      body: 'Body.',
-    };
-
-    const fakeRegistry = {
-      listAvailablePersonas: () => [
-        { name: 'persistent-pet', isUserDefined: false, path: '/fake/persistent-pet.md' },
-      ],
-      parsePersona: (_name: string) => ({
-        config: {
-          runtime: {
-            type: 'container' as const,
-            containerSharing: 'persistent' as const,
-            image: 'img:latest',
-            workingDirectory: '/home',
-            mounts: ['sen-cred'],
-            env: {},
-          },
-        },
-        body: 'Body.',
-      }),
-    };
-
-    expect(() =>
-      assertNoMountConflict(
-        'worker',
-        parsed,
-        fakeRegistry as Parameters<typeof assertNoMountConflict>[2],
-        {}
-      )
-    ).not.toThrow();
-  });
-
-  it('assertNoMountConflict treats legacy auto-injected names as ordinary mounts', () => {
-    writePersona(
-      'persistent-personas',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /personas
-  mounts:
-    - persona`
-    );
-    writePersona(
-      'worker',
-      `runtime:
+  function ephemeralEnv(mounts: string[]): string {
+    return `---
+runtime:
   type: container
   containerSharing: per_invocation
   image: img:latest
   workingDirectory: /work
   mounts:
-    - persona`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('worker');
+${mounts.map((m) => `    - ${m}`).join('\n')}
+---
+Body.`;
+  }
 
-    expect(() => assertNoMountConflict('worker', parsed, reg, {})).toThrow(
-      PersonaSharingViolationError
-    );
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 4: assertNoMountConflict is a no-op for persistent personas
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict is a no-op for persistent personas (even if they overlap)', () => {
-    writePersona(
-      'pet-a',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /home
-  mounts:
-    - home`
-    );
-    writePersona(
-      'pet-b',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /home
-  mounts:
-    - home`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('pet-b');
-
-    // persistent-on-persistent overlap is fine — no throw
-    expect(() => assertNoMountConflict('pet-b', parsed, reg, {})).not.toThrow();
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 5: warnMountConflicts logs a warn for each violation; does not throw
-  // ---------------------------------------------------------------------------
-  it('warnMountConflicts logs a warn for each violation without throwing', async () => {
-    writePersona(
-      'brain',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'worker',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const { logger } = await import('@lace/agent/utils/logger');
-
-    // Should not throw
-    expect(() =>
-      warnMountConflicts(reg, {
-        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
-      })
-    ).not.toThrow();
-
-    // Should have logged a warn with the conflict details
-    expect(logger.warn).toHaveBeenCalledWith(
-      'persona_mount_conflict',
-      expect.objectContaining({
-        persona: 'worker',
-        mountName: 'knowledge',
-        conflictsWith: expect.arrayContaining(['brain']),
-      })
-    );
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 6: warnMountConflicts emits no warnings when no conflicts
-  // ---------------------------------------------------------------------------
-  it('warnMountConflicts emits zero persona_mount_conflict warnings when no conflicts exist', async () => {
-    writePersona(
-      'brain',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /home
-  mounts:
-    - home`
-    );
-    writePersona(
-      'worker',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /data
-  mounts:
-    - data`
-    );
-    const reg = makeRegistry();
-    const { logger } = await import('@lace/agent/utils/logger');
-
-    warnMountConflicts(reg, {});
-
-    // Check that warn was not called with the conflict key
-    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
-    const conflictWarns = warnCalls.filter((args) => args[0] === 'persona_mount_conflict');
-    expect(conflictWarns).toHaveLength(0);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 7: warnMountConflicts handles a parse error gracefully
-  // ---------------------------------------------------------------------------
-  it('warnMountConflicts skips invalid personas and continues', async () => {
-    // Write an invalid persona (bad YAML that the schema will reject)
-    fs.writeFileSync(
-      path.join(tempDir, 'broken.md'),
-      `---\nruntime:\n  type: container\n  containerSharing: BOGUS_VALUE\n  image: img:latest\n  workingDirectory: /w\n  mounts: []\n---\nBody.`
-    );
-    writePersona(
-      'brain',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /home
-  mounts:
-    - home`
-    );
-    writePersona(
-      'worker',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /data
-  mounts:
-    - data`
-    );
-    const reg = makeRegistry();
-    const { logger } = await import('@lace/agent/utils/logger');
-
-    // Should not throw even though 'broken' fails to parse
-    expect(() => warnMountConflicts(reg, {})).not.toThrow();
-
-    // The debug skip log should have been emitted for the broken persona
-    const debugCalls = (logger.debug as ReturnType<typeof vi.fn>).mock.calls;
-    const skipLogs = debugCalls.filter(
-      (args) => args[0] === 'persona_mount_conflict.parse_skipped'
-    );
-    expect(skipLogs.length).toBeGreaterThan(0);
-
-    // The valid non-conflicting personas should not have produced a warn
-    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
-    const conflictWarns = warnCalls.filter((args) => args[0] === 'persona_mount_conflict');
-    expect(conflictWarns).toHaveLength(0);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 8: Multiple persistent personas conflicting on the same mount name
-  //         produce a single message listing all of them
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict lists all conflicting persistent personas', () => {
-    writePersona(
-      'pet-a',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /logs
-  mounts:
-    - logs`
-    );
-    writePersona(
-      'pet-b',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /logs2
-  mounts:
-    - logs`
-    );
-    writePersona(
-      'cattle-c',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /cattle-logs
-  mounts:
-    - logs`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('cattle-c');
-
-    let caught: unknown;
-    try {
-      assertNoMountConflict('cattle-c', parsed, reg, {
-        logs: { hostPath: '/srv/logs', containerPath: '/logs', readonly: false },
-      });
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(PersonaSharingViolationError);
-    const err = caught as InstanceType<typeof PersonaSharingViolationError>;
-    expect(err.personaName).toBe('cattle-c');
-    expect(err.mountName).toBe('logs');
-    expect(err.conflictsWith).toHaveLength(2);
-    expect(err.conflictsWith).toContain('pet-a');
-    expect(err.conflictsWith).toContain('pet-b');
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 9: readonly mount in registry — assertNoMountConflict must NOT throw
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict allows overlapping readonly mount when registry says so', () => {
-    writePersona(
-      'box-shell',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'shell',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('shell');
-
-    // Registry says 'knowledge' is readonly — no threat, should not throw.
-    expect(() =>
-      assertNoMountConflict('shell', parsed, reg, {
-        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: true },
-      })
-    ).not.toThrow();
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 10: read-write mount in registry — assertNoMountConflict must throw
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict still throws on overlapping read-write mount', () => {
-    writePersona(
-      'box-shell',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'shell',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('shell');
-
-    let caught: unknown;
-    try {
-      assertNoMountConflict('shell', parsed, reg, {
-        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
-      });
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(PersonaSharingViolationError);
-    const err = caught as InstanceType<typeof PersonaSharingViolationError>;
-    expect(err.mountName).toBe('knowledge');
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 11: mount not in registry — conservative default (treat as read-write)
-  // ---------------------------------------------------------------------------
-  it('assertNoMountConflict treats missing-from-registry mounts as read-write (conservative default)', () => {
-    writePersona(
-      'box-shell',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'shell',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const parsed = reg.parsePersona('shell');
-
-    // Pass an empty registry — 'knowledge' is not listed, so treat as read-write → throw.
-    let caught: unknown;
-    try {
-      assertNoMountConflict('shell', parsed, reg, {});
-    } catch (err) {
-      caught = err;
-    }
-
-    expect(caught).toBeInstanceOf(PersonaSharingViolationError);
-    const err = caught as InstanceType<typeof PersonaSharingViolationError>;
-    expect(err.mountName).toBe('knowledge');
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 12: warnMountConflicts skips readonly mounts — no WARN emitted
-  // ---------------------------------------------------------------------------
-  it('warnMountConflicts skips readonly mounts (no WARN)', async () => {
-    writePersona(
-      'box-shell',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'shell',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const { logger } = await import('@lace/agent/utils/logger');
-
-    // Registry marks 'knowledge' readonly — not a threat, no WARN expected.
-    expect(() =>
-      warnMountConflicts(reg, {
-        knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: true },
-      })
-    ).not.toThrow();
-
-    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
-    const conflictWarns = warnCalls.filter((args) => args[0] === 'persona_mount_conflict');
-    expect(conflictWarns).toHaveLength(0);
-  });
-
-  // ---------------------------------------------------------------------------
-  // Test 13: warnMountConflicts still warns on read-write overlap
-  // ---------------------------------------------------------------------------
-  it('warnMountConflicts still warns on read-write overlap', async () => {
-    writePersona(
-      'box-shell',
-      `runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /knowledge
-  mounts:
-    - knowledge`
-    );
-    writePersona(
-      'shell',
-      `runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /shared
-  mounts:
-    - knowledge`
-    );
-    const reg = makeRegistry();
-    const { logger } = await import('@lace/agent/utils/logger');
-
-    // Registry marks 'knowledge' read-write — genuine threat → WARN expected.
-    warnMountConflicts(reg, {
-      knowledge: { hostPath: '/srv/knowledge', containerPath: '/knowledge', readonly: false },
+  it('flags a per_invocation environment sharing a writable mount with a persistent environment', () => {
+    writeEnv('persistent-box', persistentEnv(['home']));
+    writeEnv('leaky-ephemeral', ephemeralEnv(['home']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    const conflicts = findEnvironmentMountConflicts(reg, {
+      home: { hostPath: '/h/home', containerPath: '/home/sen', readonly: false },
     });
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].environment).toBe('leaky-ephemeral');
+    expect(conflicts[0].mountName).toBe('home');
+    expect(conflicts[0].conflictsWith).toEqual(['persistent-box']);
+  });
 
-    expect(logger.warn).toHaveBeenCalledWith(
-      'persona_mount_conflict',
-      expect.objectContaining({
-        persona: 'shell',
-        mountName: 'knowledge',
-        conflictsWith: expect.arrayContaining(['box-shell']),
-      })
-    );
+  it('does not flag a readonly shared mount (no write path)', () => {
+    writeEnv('persistent-box', persistentEnv(['knowledge']));
+    writeEnv('eph', ephemeralEnv(['knowledge']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    const conflicts = findEnvironmentMountConflicts(reg, {
+      knowledge: { hostPath: '/h/k', containerPath: '/knowledge', readonly: true },
+    });
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it('treats a mount missing from the registry as read-write (conservative default)', () => {
+    writeEnv('persistent-box', persistentEnv(['knowledge']));
+    writeEnv('eph', ephemeralEnv(['knowledge']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    const conflicts = findEnvironmentMountConflicts(reg, {});
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].mountName).toBe('knowledge');
+  });
+
+  it('does not flag non-overlapping environments', () => {
+    writeEnv('persistent-box', persistentEnv(['home']));
+    writeEnv('eph', ephemeralEnv(['data']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    expect(findEnvironmentMountConflicts(reg, {})).toHaveLength(0);
+  });
+
+  it('ignores reserved mount names (scratch, sen-cred)', () => {
+    writeEnv('persistent-box', persistentEnv(['sen-cred']));
+    writeEnv('eph', ephemeralEnv(['sen-cred']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    expect(findEnvironmentMountConflicts(reg, {})).toHaveLength(0);
+  });
+
+  it('does not flag persistent-on-persistent overlap', () => {
+    writeEnv('pet-a', persistentEnv(['home']));
+    writeEnv('pet-b', persistentEnv(['home']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    expect(findEnvironmentMountConflicts(reg, {})).toHaveLength(0);
+  });
+
+  it('lists all conflicting persistent environments for a single mount', () => {
+    writeEnv('pet-a', persistentEnv(['logs']));
+    writeEnv('pet-b', persistentEnv(['logs']));
+    writeEnv('cattle', ephemeralEnv(['logs']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    const conflicts = findEnvironmentMountConflicts(reg, {
+      logs: { hostPath: '/srv/logs', containerPath: '/logs', readonly: false },
+    });
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].conflictsWith).toEqual(['pet-a', 'pet-b']);
+  });
+
+  it('skips environments that fail to parse and still scans the rest', () => {
+    writeEnv('persistent-box', persistentEnv(['home']));
+    writeEnv('leaky-ephemeral', ephemeralEnv(['home']));
+    writeEnv('broken', `---\nruntime:\n  type: container\n  containerSharing: BOGUS\n---\nBody.`);
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    const conflicts = findEnvironmentMountConflicts(reg, {
+      home: { hostPath: '/h/home', containerPath: '/home/sen', readonly: false },
+    });
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].environment).toBe('leaky-ephemeral');
+  });
+
+  it('assertNoEnvironmentMountConflict throws on the first conflict', () => {
+    writeEnv('persistent-box', persistentEnv(['home']));
+    writeEnv('leaky-ephemeral', ephemeralEnv(['home']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    let caught: unknown;
+    try {
+      assertNoEnvironmentMountConflict(reg, {
+        home: { hostPath: '/h/home', containerPath: '/home/sen', readonly: false },
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(EnvironmentMountConflictError);
+    const err = caught as EnvironmentMountConflictError;
+    expect(err.environmentName).toBe('leaky-ephemeral');
+    expect(err.mountName).toBe('home');
+    expect(err.conflictsWith).toEqual(['persistent-box']);
+  });
+
+  it('assertNoEnvironmentMountConflict is a no-op when there are no conflicts', () => {
+    writeEnv('persistent-box', persistentEnv(['home']));
+    writeEnv('eph', ephemeralEnv(['data']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+    expect(() => assertNoEnvironmentMountConflict(reg, {})).not.toThrow();
   });
 });
