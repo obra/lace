@@ -3,6 +3,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   buildPersonaContainerSpec,
+  buildPerInvocationSpecName,
   buildProjectedRuntimeSpec,
   containerSpecToRuntimeSpec,
   PersonaContainerSpecError,
@@ -35,6 +36,36 @@ type ForbiddenProjectedPersonaKeys = Extract<
   'containerId' | 'ports' | 'restartPolicy' | 'sysctls' | 'capAdd' | 'network' | 'gatewayRoute'
 >;
 
+describe('environment-keyed container identity', () => {
+  it('keys the persistent container name on the environment, not the role', () => {
+    const spec = buildProjectedRuntimeSpec({
+      parentSessionId: 'sess_parent01',
+      personaName: 'persistent-box-worker', // ROLE
+      environmentName: 'persistent-box', // ENVIRONMENT
+      runtime: {
+        type: 'container',
+        containerSharing: 'persistent',
+        image: 'sen-persistent-box:dev',
+        workingDirectory: '/home/sen',
+        mounts: [],
+        env: {},
+      },
+      containerMounts: {},
+    });
+    expect(spec.name).toBe('persistent-box'); // env, not role
+    expect(spec.persona).toBe('persistent-box'); // shim selector value = env
+  });
+
+  it('composes the per_invocation name from the environment name', () => {
+    const name = buildPerInvocationSpecName({
+      parentSessionId: 'sess_aaaaaaaaZZZ',
+      environmentName: 'ephemeral-box',
+      childSessionId: 'sess_bbbbbbbbYYY',
+    });
+    expect(name).toBe('aaaaaaaa-ephemeral-box-bbbbbbbb');
+  });
+});
+
 describe('buildProjectedRuntimeSpec types', () => {
   // eslint-disable-next-line vitest/expect-expect -- expectTypeOf performs compile-time assertions.
   it('does not expose docker authority fields in the projected persona spec type', () => {
@@ -45,6 +76,7 @@ describe('buildProjectedRuntimeSpec types', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -63,6 +95,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -86,6 +119,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
+      environmentName: 'browser',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -116,6 +150,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        environmentName: 'shell',
         scratchDirHostPath: SCRATCH_PATH,
         runtime: perInvocationRuntime,
         containerMounts: {},
@@ -126,6 +161,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        environmentName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         runtime: perInvocationRuntime,
         containerMounts: {},
@@ -138,6 +174,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: 'evil; rm -rf /',
         personaName: 'shell',
+        environmentName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
         runtime: perInvocationRuntime,
@@ -149,6 +186,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: '../etc/passwd',
+        environmentName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
         runtime: perInvocationRuntime,
@@ -160,6 +198,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        environmentName: 'shell',
         childSessionId: '!!!',
         scratchDirHostPath: SCRATCH_PATH,
         runtime: perInvocationRuntime,
@@ -171,6 +210,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        environmentName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
         runtime: { ...perInvocationRuntime, mounts: ['missing'] },
@@ -184,6 +224,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       buildProjectedRuntimeSpec({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        environmentName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
         runtime: { ...perInvocationRuntime, mounts: ['scratch'] },
@@ -202,6 +243,7 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: { ...perInvocationRuntime, mounts: ['sen-cred'] },
@@ -221,6 +263,7 @@ describe('buildProjectedRuntimeSpec persistent', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'box-shell',
+      environmentName: 'box-shell',
       runtime: persistentRuntime,
       containerMounts: {},
     });
@@ -241,6 +284,7 @@ describe('buildProjectedRuntimeSpec persistent', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'sen',
+      environmentName: 'sen',
       runtime: {
         ...persistentRuntime,
         mounts: ['persona', 'lace-data', 'credentials', 'lace', 'scratch'],
@@ -271,6 +315,7 @@ describe('buildProjectedRuntimeSpec persistent', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'sen',
+      environmentName: 'sen',
       runtime: persistentRuntime,
       containerMounts: {
         persona: { hostPath: '/host/personas', containerPath: '/personas', readonly: true },
@@ -292,6 +337,7 @@ describe('buildProjectedRuntimeSpec persistent', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess1',
       personaName: 'sen',
+      environmentName: 'sen',
       runtime: {
         ...persistentRuntime,
         env: { LACE_DIR: '/persona/lace', OTHER: 'keep' },
@@ -310,6 +356,7 @@ describe('buildProjectedRuntimeSpec persistent', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser',
+      environmentName: 'browser',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -332,6 +379,7 @@ describe('buildProjectedRuntimeSpec selector fields', () => {
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: { ...perInvocationRuntime, env: { FOO: 'bar' } },
@@ -362,6 +410,7 @@ describe('SELECTOR fields', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -377,6 +426,7 @@ describe('SELECTOR fields', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
+      environmentName: 'box',
       runtime: persistentRuntime,
       containerMounts: {},
     });
@@ -391,6 +441,7 @@ describe('SELECTOR fields', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,

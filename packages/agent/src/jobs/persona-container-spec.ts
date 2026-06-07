@@ -9,11 +9,10 @@ import type {
   RuntimeMountDescriptor,
 } from '@lace/agent/tools/runtime/types';
 
-// Single source of truth for the persona container runtime shape: the
-// `type: 'container'` arm of the persona schema's discriminated union.
-// Other call sites (JobState, delegate, job-manager options) import this.
-import type { PersonaRuntime } from '@lace/agent/config/persona-registry';
-export type PersonaContainerRuntime = Extract<PersonaRuntime, { type: 'container' }>;
+import type { EnvironmentRuntime } from '@lace/agent/config/environment-registry';
+// The resolved environment runtime carries the container spec (image/mounts/...).
+// Kept exported under the historical name so downstream imports are unchanged.
+export type PersonaContainerRuntime = EnvironmentRuntime;
 
 // Spec-name components compose into a container name on the host; defend with
 // an allowlist before composing. Same shape on both sides keeps the rule
@@ -109,23 +108,27 @@ export function sessionIdShort(id: string): string {
 }
 
 /**
- * Build the per-invocation container spec name from parent session, persona
- * name, and child session. Exported so delegate.ts can compute it once and
- * store it on the job state — keeping the formula in a single place.
+ * Build the per-invocation container spec name from parent session, ENVIRONMENT
+ * name, and child session. The container identity is the environment, not the
+ * role — multiple roles sharing an environment must collide onto one box.
  *
- * Format: <parent8>-<personaName>-<child8>
+ * Format: <parent8>-<environmentName>-<child8>. MUST match the sen-docker shim's
+ * compute_name (which prefixes `lace-`).
  */
 export function buildPerInvocationSpecName(input: {
   parentSessionId: string;
-  personaName: string;
+  environmentName: string;
   childSessionId: string;
 }): string {
-  return `${sessionIdShort(input.parentSessionId)}-${input.personaName}-${sessionIdShort(input.childSessionId)}`;
+  return `${sessionIdShort(input.parentSessionId)}-${input.environmentName}-${sessionIdShort(input.childSessionId)}`;
 }
 
 type PersonaContainerSpecInput = {
   parentSessionId: string;
+  // The role name — used for log/error text only (not container identity).
   personaName: string;
+  // The environment name — keys all container identity (name/selector/id).
+  environmentName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
   // Required for per_invocation; ignored for persistent.
@@ -145,6 +148,11 @@ function validatePersonaContainerSpecInput(input: PersonaContainerSpecInput): vo
   if (!SPEC_NAME_COMPONENT_RE.test(personaName)) {
     throw new PersonaContainerSpecError(
       `Invalid personaName for container spec name: '${personaName}'`
+    );
+  }
+  if (!SPEC_NAME_COMPONENT_RE.test(input.environmentName)) {
+    throw new PersonaContainerSpecError(
+      `Invalid environmentName for container spec name: '${input.environmentName}'`
     );
   }
 
@@ -207,22 +215,23 @@ export function buildProjectedRuntimeSpec(
   });
 
   if (runtime.containerSharing === 'persistent') {
-    const name = personaName;
+    const name = input.environmentName;
     return {
       name,
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
       mounts,
       env,
-      // Root A selector fields (persistent has no child session).
-      persona: personaName,
+      // Root A selector fields (persistent has no child session). The shim keys
+      // spawn/ownership on the environment name.
+      persona: input.environmentName,
       parentSession: parentSessionId,
       ...(input.jobId ? { jobId: input.jobId } : {}),
     };
   }
 
   // per_invocation: compose a name unique to this child session so concurrent
-  // delegates of the same persona from the same parent don't collide.
+  // delegates of the same environment from the same parent don't collide.
   // Auto-inject the per-invocation scratch directory at /work so the subagent
   // has an isolated writable workspace for the duration of this invocation.
   const perInvocationMounts: RuntimeMountDescriptor[] = [
@@ -232,7 +241,7 @@ export function buildProjectedRuntimeSpec(
 
   const name = buildPerInvocationSpecName({
     parentSessionId,
-    personaName,
+    environmentName: input.environmentName,
     childSessionId: input.childSessionId!,
   });
   return {
@@ -242,7 +251,7 @@ export function buildProjectedRuntimeSpec(
     mounts: perInvocationMounts,
     env,
     // Root A selector fields.
-    persona: personaName,
+    persona: input.environmentName,
     parentSession: parentSessionId,
     childSession: input.childSessionId,
     ...(input.jobId ? { jobId: input.jobId } : {}),
@@ -263,16 +272,16 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
   });
 
   if (runtime.containerSharing === 'persistent') {
-    const name = personaName;
+    const name = input.environmentName;
     return {
       name,
-      containerId: `sen-${personaName}`,
+      containerId: `sen-${input.environmentName}`,
       image: runtime.image,
       workingDirectory: runtime.workingDirectory,
       mounts: toContainerMounts(mounts),
       env,
       restartPolicy: 'unless-stopped',
-      persona: personaName,
+      persona: input.environmentName,
       parentSessionId,
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
@@ -288,7 +297,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
 
   const name = buildPerInvocationSpecName({
     parentSessionId,
-    personaName,
+    environmentName: input.environmentName,
     childSessionId: input.childSessionId!,
   });
   return {
@@ -297,7 +306,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
     workingDirectory: runtime.workingDirectory,
     mounts: perInvocationMounts,
     env,
-    persona: personaName,
+    persona: input.environmentName,
     parentSessionId,
     childSessionId: input.childSessionId,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
