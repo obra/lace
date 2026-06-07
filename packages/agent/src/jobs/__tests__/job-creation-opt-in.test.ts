@@ -78,7 +78,6 @@ describe('createSubagentJob — opt-in progress', () => {
         prompt: 'do work',
         executionEnv: { SEN_AGENT_TOKEN: 'token' },
         containerExecutionMetadata: {
-          tokenEnvName: 'SEN_AGENT_TOKEN',
           token: 'token',
           personaName: 'shell',
           parentSessionId: 'sess_parent',

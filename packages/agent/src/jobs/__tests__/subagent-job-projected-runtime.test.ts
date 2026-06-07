@@ -447,7 +447,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
           jobType: 'delegate',
           description: 'nested container job',
           containerExecutionMetadata: {
-            tokenEnvName: 'SEN_AGENT_TOKEN',
             token: 'child-token',
             personaName: 'browser-driver',
             parentSessionId,
