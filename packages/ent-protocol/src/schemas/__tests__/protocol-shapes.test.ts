@@ -138,36 +138,6 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).not.toThrow();
 
-    // initialize with embedder-supplied containerExecutionIdentity is accepted.
-    expect(() =>
-      EntProtocolRequestSchema.parse({
-        jsonrpc: '2.0',
-        id: 'init-container-execution-identity',
-        method: 'initialize',
-        params: {
-          protocolVersion: '1.0',
-          clientInfo: { name: 'test-client', version: '0.0.0' },
-          capabilities: { streaming: true },
-          containerExecutionIdentity: { tokenEnvName: 'AGENT_TOKEN' },
-        },
-      })
-    ).not.toThrow();
-
-    // unsafe containerExecutionIdentity token env var names are rejected.
-    expect(() =>
-      EntProtocolRequestSchema.parse({
-        jsonrpc: '2.0',
-        id: 'init-bad-container-execution-identity',
-        method: 'initialize',
-        params: {
-          protocolVersion: '1.0',
-          clientInfo: { name: 'test-client', version: '0.0.0' },
-          capabilities: { streaming: true },
-          containerExecutionIdentity: { tokenEnvName: 'bad-name' },
-        },
-      })
-    ).toThrow();
-
     // invalid mount name (uppercase) is rejected.
     expect(() =>
       EntProtocolRequestSchema.parse({

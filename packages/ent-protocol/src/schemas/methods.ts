@@ -23,7 +23,6 @@ import {
 } from './shared';
 
 const EmptyParamsSchema = z.object({}).strict();
-const ContainerExecutionTokenEnvNameSchema = z.string().regex(/^[A-Z_][A-Z0-9_]*$/);
 export const DurableHandoffStatusSchema = z.enum([
   'persisted-new',
   'duplicate-already-handled',
@@ -161,12 +160,6 @@ const InitializeParamsSchema = z
       )
       .optional()
       .default({}),
-    containerExecutionIdentity: z
-      .object({
-        tokenEnvName: ContainerExecutionTokenEnvNameSchema,
-      })
-      .strict()
-      .optional(),
   })
   .strict();
 export type InitializeParams = z.infer<typeof InitializeParamsSchema>;
@@ -2362,7 +2355,7 @@ export const SessionRequestPermissionResponseSchema = z
   .strict();
 
 // host/spawn/env — outbound (lace → embedder). During delegate-job creation,
-// after lace builds the base executionEnv from containerExecutionIdentity, it
+// after lace builds the base executionEnv, it
 // asks the embedder for any additional env vars to merge into the spawn env
 // (e.g. per-spawn placeholder tokens injected by the embedder). The embedder may return an
 // empty record, or not implement the method at all — lace treats both as
