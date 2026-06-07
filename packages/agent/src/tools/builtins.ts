@@ -20,8 +20,11 @@ import { TodoWriteTool } from './implementations/todo_write';
 import { ManageRemindersTool } from './implementations/manage_reminders';
 import { CompactSessionTool } from './implementations/compact_session';
 
-/** The per-session option-taking built-ins; the executor owns their names. */
-export const PER_SESSION_BUILTIN_NAMES = new Set(['delegate', 'use_skill']);
+/** The per-session option-taking built-ins; the executor owns their names.
+ *  'request_credential' is a host-only sen-core exec-tool, NOT a lace builtin. It is
+ *  listed here ONLY to reserve the name so a persona tool cannot shadow it (Part B);
+ *  the reservation does not make lace register a builtin under that name. */
+export const PER_SESSION_BUILTIN_NAMES = new Set(['delegate', 'use_skill', 'request_credential']);
 
 /**
  * Register all stateless built-in tools into the plugin tools registry (owner: 'builtin').

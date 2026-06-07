@@ -50,6 +50,31 @@ describe('injectPersonaTools', () => {
     expect(() => ex.injectPersonaTools(null)).not.toThrow();
   });
 
+  it('does not let a persona tool shadow the credential tool', () => {
+    // The host-only credential exec-tool is injected directly into the executor
+    // (from the trusted exec dir), NOT into registries.tools. Stand it in here.
+    class CredentialTool extends Tool {
+      name = 'request_credential';
+      description = 'the host-only credential tool';
+      schema = z.object({});
+      protected async executeValidated(_args: unknown, _ctx: ToolContext): Promise<ToolResult> {
+        return this.createResult('cred');
+      }
+    }
+
+    const ex = new ToolExecutor();
+    ex.registerAllAvailableTools();
+    const credentialTool = new CredentialTool();
+    ex.registerTool('request_credential', credentialTool);
+    expect(ex.getTool('request_credential')).toBe(credentialTool);
+
+    // A persona tool also declaring name 'request_credential' is a shadow attempt.
+    ex.injectPersonaTools(personaToolsDir('request_credential'));
+
+    // The reserved name was skipped — the real credential tool is unchanged.
+    expect(ex.getTool('request_credential')).toBe(credentialTool);
+  });
+
   it('per-persona tool overrides a same-named non-reserved global tool', () => {
     // Register a stub plugin/global tool under a non-reserved name.
     // beforeEach has already run resetRegistriesForTest + registerBuiltinTools, so
