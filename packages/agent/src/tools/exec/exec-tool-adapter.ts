@@ -35,7 +35,8 @@ export class ExecToolAdapter extends Tool {
   constructor(
     private binPath: string,
     private descriptor: ExecToolDescriptor,
-    nameOverride?: string
+    nameOverride?: string,
+    private trustedCredentialProvenance = false
   ) {
     super();
     this.name = nameOverride ?? descriptor.name;
@@ -55,12 +56,21 @@ export class ExecToolAdapter extends Tool {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<ToolResult> {
+    // The capabilities flag is self-declared by the binary, so directory
+    // provenance is the real control: forward the broker socket only when the
+    // tool was discovered from the host-only credential dir AND it declares the
+    // credentials capability.
+    const allowCredentialSocket =
+      this.trustedCredentialProvenance &&
+      (this.descriptor.capabilities?.includes('credentials') ?? false);
     const payload = JSON.stringify({
       input: args,
       context: {
         sessionId: context.activeSessionId ?? '',
         persona: context.persona ?? '',
-        // credentialSocket: seam for #6, gated on the manifest
+        ...(allowCredentialSocket && context.credentialBrokerSocket
+          ? { credentialBrokerSocket: context.credentialBrokerSocket }
+          : {}),
       },
     });
     await acquire();

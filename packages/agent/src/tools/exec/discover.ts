@@ -11,7 +11,11 @@ const PER_BINARY_MS = 5000;
 const TOTAL_BUDGET_MS = 30000;
 const MAX_BINARIES = 64;
 
-export function discoverExecToolsSync(dir: string, namePrefix = ''): ExecToolAdapter[] {
+export function discoverExecToolsSync(
+  dir: string,
+  namePrefix = '',
+  trustedCredentialProvenance = false
+): ExecToolAdapter[] {
   let entries: string[];
   try {
     entries = readdirSync(dir);
@@ -42,7 +46,7 @@ export function discoverExecToolsSync(dir: string, namePrefix = ''): ExecToolAda
       }
       const desc = parseExecToolDescriptor(stdout);
       const name = namePrefix ? `${namePrefix}${desc.name}` : desc.name;
-      out.push(new ExecToolAdapter(bin, desc, name));
+      out.push(new ExecToolAdapter(bin, desc, name, trustedCredentialProvenance));
     } catch (err) {
       logger.warn('exectool.discover.skipped', {
         bin,
