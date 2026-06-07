@@ -82,21 +82,16 @@ Body.`;
     expect(result.config.runtime).toEqual({ type: 'root' });
   });
 
-  it('parses runtime.type=container with required fields', () => {
+  it('parses a container role that references an environment by name', () => {
+    // Under Part A the container role runtime is a REFERENCE to a named
+    // environment; the image/mounts/caps live in the environment def, not here.
     const content = `---
+model: claude-sonnet-4-6
+tools:
+  - bash
 runtime:
   type: container
-  containerSharing: per_invocation
-  image: ghcr.io/example/lace-shell:latest
-  workingDirectory: /workspace
-  mounts:
-    - scratch
-    - knowledge
-  env:
-    FOO: bar
-  ports:
-    - host: 8080
-      container: 80
+  environment: persistent-box
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'container-runtime.md'), content);
@@ -105,346 +100,71 @@ Body.`;
     const result = registry.parsePersona('container-runtime');
     expect(result.config.runtime).toEqual({
       type: 'container',
-      containerSharing: 'per_invocation',
-      image: 'ghcr.io/example/lace-shell:latest',
-      workingDirectory: '/workspace',
-      mounts: ['scratch', 'knowledge'],
-      env: { FOO: 'bar' },
-      ports: [{ host: 8080, container: 80 }],
+      environment: 'persistent-box',
     });
   });
 
-  it('rejects the removed browserCdpSocket persona field (strict schema)', () => {
+  it('rejects a container role that still carries an inline image', () => {
+    // The inline container spec moved to the environment def; a role that still
+    // declares image/mounts is now an unrecognized-key error (.strict()).
     const content = `---
 runtime:
   type: container
-  containerSharing: per_invocation
-  image: sen-browser:dev
-  workingDirectory: /work
-  mounts: []
-  browserCdpSocket: true
+  environment: persistent-box
+  image: sen-persistent-box:dev
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'browser-cdp-runtime.md'), content);
+    writeFileSync(path.join(tempBundledDir, 'inline-image-role.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
-    expect(() => registry.parsePersona('browser-cdp-runtime')).toThrow();
+    expect(() => registry.parsePersona('inline-image-role')).toThrow();
   });
 
-  it('clamps container runtime ports to u16 bounds', () => {
-    const atBounds = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /work
-  mounts: []
-  ports:
-    - host: 65535
-      container: 0
-    - host: 0
-      container: 65535
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'port-bounds.md'), atBounds);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('port-bounds').config.runtime).toMatchObject({
-      type: 'container',
-      ports: [
-        { host: 65535, container: 0 },
-        { host: 0, container: 65535 },
-      ],
-    });
-
-    const outOfRangeCases = [
-      { name: 'host-below-lower-bound', host: -1, container: 80 },
-      { name: 'host-over-upper-bound', host: 65536, container: 80 },
-      { name: 'container-below-lower-bound', host: 8080, container: -1 },
-      { name: 'container-over-upper-bound', host: 8080, container: 65536 },
-    ];
-
-    for (const { name, host, container } of outOfRangeCases) {
-      const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /work
-  mounts: []
-  ports:
-    - host: ${host}
-      container: ${container}
----
-Body.`;
-      writeFileSync(path.join(tempBundledDir, `port-${name}.md`), content);
-      registry = makeRegistry([userPersonaDir]);
-
-      expect(() => registry.parsePersona(`port-${name}`)).toThrow(/ports/i);
-    }
-  });
-
-  it('parses runtime.type=container with empty mounts and defaulted env', () => {
+  it('rejects a container role missing its environment reference', () => {
     const content = `---
 runtime:
   type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /w
-  mounts: []
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'container-minimal.md'), content);
+    writeFileSync(path.join(tempBundledDir, 'no-environment.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
-    const result = registry.parsePersona('container-minimal');
-    expect(result.config.runtime).toEqual({
-      type: 'container',
-      containerSharing: 'per_invocation',
-      image: 'img:latest',
-      workingDirectory: '/w',
-      mounts: [],
-      env: {},
-    });
+    expect(() => registry.parsePersona('no-environment')).toThrow(/environment/i);
   });
 
-  it('parses runtime.type=container with persistent lifecycle', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: persistent
-  image: ghcr.io/example/sen-box:latest
-  workingDirectory: /home/agent
-  mounts:
-    - home
-  env:
-    HOME: /home/agent
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'persistent-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('persistent-runtime').config.runtime).toEqual({
-      type: 'container',
-      containerSharing: 'persistent',
-      image: 'ghcr.io/example/sen-box:latest',
-      workingDirectory: '/home/agent',
-      mounts: ['home'],
-      env: { HOME: '/home/agent' },
-    });
-  });
-
-  it('parses runtime.type=container with sysctls', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: sen-browser:dev
-  workingDirectory: /work
-  mounts: []
-  sysctls:
-    net.ipv6.conf.lo.disable_ipv6: "0"
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'sysctls-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('sysctls-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      sysctls: { 'net.ipv6.conf.lo.disable_ipv6': '0' },
-    });
-  });
-
-  it('parses runtime.type=container with capAdd', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: sen-box:dev
-  workingDirectory: /work
-  mounts: []
-  capAdd:
-    - NET_ADMIN
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'capadd-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('capadd-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      capAdd: ['NET_ADMIN'],
-    });
-  });
-
-  it('parses runtime.type=container with network', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: sen-box:dev
-  workingDirectory: /work
-  mounts: []
-  network: quarantine
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'network-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('network-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      network: 'quarantine',
-    });
-  });
-
-  it('parses runtime.type=container with gatewayRoute', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: sen-box:dev
-  workingDirectory: /work
-  mounts: []
-  gatewayRoute: "172.31.250.1"
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'gateway-runtime.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(registry.parsePersona('gateway-runtime').config.runtime).toMatchObject({
-      type: 'container',
-      gatewayRoute: '172.31.250.1',
-    });
-  });
-
-  it('rejects legacy runtime.agentPlacement', () => {
-    const content = `---
-runtime:
-  type: container
-  agentPlacement: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /w
-  mounts: []
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'legacy-placement.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('legacy-placement')).toThrow(/agentPlacement/);
-  });
-
-  it('throws when runtime.type=container is missing image', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  workingDirectory: /w
-  mounts: []
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'no-image.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('no-image')).toThrow(/image/i);
-  });
-
-  it('throws when runtime.type=container is missing mounts', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /w
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'no-mounts.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('no-mounts')).toThrow(/mounts/i);
-  });
-
-  it('rejects invalid mount names (uppercase / leading digit)', () => {
+  it('rejects an invalid environment name (uppercase / leading digit)', () => {
     const upper = `---
 runtime:
   type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /w
-  mounts:
-    - Scratch
+  environment: Persistent-Box
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'bad-mount-upper.md'), upper);
+    writeFileSync(path.join(tempBundledDir, 'bad-env-upper.md'), upper);
     registry = makeRegistry([userPersonaDir]);
-    expect(() => registry.parsePersona('bad-mount-upper')).toThrow(/mounts/i);
+    expect(() => registry.parsePersona('bad-env-upper')).toThrow(/environment/i);
 
     const leadingDigit = `---
 runtime:
   type: container
-  containerSharing: per_invocation
-  image: img:latest
-  workingDirectory: /w
-  mounts:
-    - 1scratch
+  environment: 1box
 ---
 Body.`;
-    writeFileSync(path.join(tempBundledDir, 'bad-mount-digit.md'), leadingDigit);
+    writeFileSync(path.join(tempBundledDir, 'bad-env-digit.md'), leadingDigit);
     registry = makeRegistry([userPersonaDir]);
-    expect(() => registry.parsePersona('bad-mount-digit')).toThrow(/mounts/i);
+    expect(() => registry.parsePersona('bad-env-digit')).toThrow(/environment/i);
   });
 
   it('rejects old persona runtime.type=box', () => {
     const content = `---
 runtime:
   type: box
-  image: img:latest
-  workingDirectory: /home/agent
-  mounts: []
+  environment: persistent-box
 ---
 Body.`;
     writeFileSync(path.join(tempBundledDir, 'old-box.md'), content);
     registry = makeRegistry([userPersonaDir]);
 
     expect(() => registry.parsePersona('old-box')).toThrow(/runtime/i);
-  });
-
-  it('rejects the old containerLifecycle field name with a helpful error', () => {
-    // After the rename to containerSharing, containerLifecycle is an unknown
-    // key. The .strict() schema rejects it with "Unrecognized key(s)" which
-    // includes the key name, giving the persona author a clear migration hint.
-    const content = `---
-runtime:
-  type: container
-  containerLifecycle: session
-  image: node:24-bookworm
-  workingDirectory: /work
-  mounts: []
----
-body
-`;
-    writeFileSync(path.join(tempBundledDir, 'old-lifecycle-field.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('old-lifecycle-field')).toThrow(/containerLifecycle/);
-  });
-
-  it('rejects persistent container runtime with ports', () => {
-    const content = `---
-runtime:
-  type: container
-  containerSharing: persistent
-  image: img:latest
-  workingDirectory: /home/agent
-  mounts: []
-  ports:
-    - host: 8080
-      container: 80
----
-Body.`;
-    writeFileSync(path.join(tempBundledDir, 'persistent-with-ports.md'), content);
-    registry = makeRegistry([userPersonaDir]);
-
-    expect(() => registry.parsePersona('persistent-with-ports')).toThrow(/ports/i);
   });
 
   it('rejects unknown runtime discriminator', () => {

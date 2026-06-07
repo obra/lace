@@ -19,64 +19,26 @@ export interface PersonaInfo {
   path: string;
 }
 
-// Mount names are lowercase alpha-leading, alphanumeric + hyphen thereafter.
-// They reference the embedder's named-mount registry supplied at ent/initialize.
-const mountNameSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
-
 const runtimeRootSchema = z
   .object({
     type: z.literal('root'),
   })
   .strict();
 
-const portMappingSchema = z
-  .object({
-    host: z.number().int().min(0).max(65535),
-    container: z.number().int().min(0).max(65535),
-  })
-  .strict();
-
-// containerSharing declares the sharing model: 'per_invocation' creates a fresh
-// container per delegate invocation; 'persistent' adopts a long-lived one shared
-// across delegates. In both cases the lace agent stays on the host and projects
-// tools into the container runtime.
-const containerSharingSchema = z.enum(['per_invocation', 'persistent']);
-
-// Linux sysctl keys are dot-separated lowercase tokens (e.g.
-// net.ipv6.conf.lo.disable_ipv6). Validate the shape here so a typo in the
-// persona file fails at parse time instead of mid-`docker create`.
-const sysctlKeySchema = z.string().regex(/^[a-z0-9_]+(\.[a-z0-9_]+)+$/);
+// Environment-name reference: lowercase alpha-leading, alphanumeric + hyphen.
+// Must match the sen-docker closed ENVIRONMENTS allowlist member it names.
+const environmentNameSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
 
 /**
- * Coupled to sen-core-v2/sen-docker/src/persona.rs `PersonaSpec`: container
- * runtime frontmatter is the single-source `.md` schema consumed by both lace
- * and the plane. Future edits to these runtime fields need plane round-trip
- * tests because Rust deserializes the same `runtime:` mapping with
- * `deny_unknown_fields`.
+ * A container role's runtime: a REFERENCE to a named environment (the container
+ * definition lives in /etc/sen-environments, resolved by the EnvironmentRegistry
+ * and the sen-docker shim). The role file no longer carries image/mounts/caps —
+ * those are environment properties. Multiple roles may name the same environment.
  */
 const runtimeContainerSchema = z
   .object({
     type: z.literal('container'),
-    containerSharing: containerSharingSchema,
-    image: z.string().min(1),
-    workingDirectory: z.string().min(1),
-    // Mount names resolved against the embedder-provided containerMounts
-    // registry at materialization time. The registry owns container paths.
-    mounts: z.array(mountNameSchema),
-    env: z.record(z.string(), z.string()).optional().default({}),
-    ports: z.array(portMappingSchema).optional(),
-    // Linux kernel sysctls for runtimes that directly materialize persona
-    // containers. Lace projected persona specs omit this docker authority; the
-    // plane rebuilds it from the persona.
-    sysctls: z.record(sysctlKeySchema, z.string()).optional(),
-    // Linux capabilities for runtimes that directly materialize persona
-    // containers. Lace projected persona specs omit this docker authority.
-    capAdd: z.array(z.string().regex(/^[A-Z_]+$/)).optional(),
-    // Docker network name for runtimes that directly materialize persona
-    // containers. Lace projected persona specs carry selectors instead.
-    network: z.string().min(1).optional(),
-    // IPv4 address of the egress gateway broker.
-    gatewayRoute: z.string().min(1).optional(),
+    environment: environmentNameSchema,
   })
   .strict();
 
@@ -127,25 +89,7 @@ const personaConfigSchema = z
       .strict()
       .optional(),
   })
-  .strict()
-  .superRefine((config, ctx) => {
-    // Persistent containers are long-lived daemons reached via docker exec;
-    // they intentionally do not publish host ports. Reject at parse time so
-    // misconfiguration fails loudly rather than producing a silently-broken
-    // container.
-    const runtime = config.runtime;
-    if (
-      runtime?.type === 'container' &&
-      runtime.containerSharing === 'persistent' &&
-      runtime.ports?.length
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['runtime', 'ports'],
-        message: 'persistent container runtimes do not support host ports',
-      });
-    }
-  });
+  .strict();
 
 export type PersonaConfig = z.infer<typeof personaConfigSchema>;
 
