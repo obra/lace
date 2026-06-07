@@ -91,6 +91,7 @@ describe('PRI-2012 B7.1 SELECTOR round-trip to create() config', () => {
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,

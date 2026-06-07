@@ -214,6 +214,7 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
       containerManager: null as unknown as ContainerManager,
       containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
       personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
@@ -268,6 +269,7 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
       containerManager: null as unknown as ContainerManager,
       containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
       personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
@@ -317,6 +319,7 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
       containerManager: null as unknown as ContainerManager,
       containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
       personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     runSubagentJobProcess(job, makeSubagentJobDeps({ state }));

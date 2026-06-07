@@ -13,9 +13,11 @@ import {
   PersonaParseError,
 } from '@lace/agent/config/persona-registry';
 import {
-  assertNoMountConflict,
-  PersonaSharingViolationError,
-} from '@lace/agent/config/persona-mount-conflict';
+  EnvironmentRegistry,
+  environmentRegistry as defaultEnvironmentRegistry,
+  EnvironmentNotFoundError,
+  EnvironmentParseError,
+} from '@lace/agent/config/environment-registry';
 import { buildPerInvocationSpecName } from '@lace/agent/jobs/persona-container-spec';
 import { childWorkspaceDir } from '@lace/agent/jobs/results-tree';
 import { buildPersonaProjectedRuntimeBinding } from '@lace/agent/jobs/persona-projected-binding';
@@ -37,6 +39,7 @@ const delegateSchema = z
 
 export interface DelegateToolOptions {
   personaRegistry?: PersonaRegistry;
+  environmentRegistry?: EnvironmentRegistry;
 }
 
 // Per-parent retained-workspace ceiling. Generous: high enough that normal
@@ -108,10 +111,12 @@ Parameters:
   };
 
   private readonly personaRegistry: PersonaRegistry;
+  private readonly environmentRegistry: EnvironmentRegistry;
 
   constructor(opts: DelegateToolOptions = {}) {
     super();
     this.personaRegistry = opts.personaRegistry ?? defaultPersonaRegistry;
+    this.environmentRegistry = opts.environmentRegistry ?? defaultEnvironmentRegistry;
   }
 
   protected async executeValidated(
@@ -202,14 +207,16 @@ Parameters:
     if (persona) {
       try {
         const parsed = this.personaRegistry.parsePersona(persona);
-        // R6 security invariant: per_invocation personas must not share
-        // mount-registry names with persistent personas.
-        // Readonly mounts are excluded — they carry no write path so they are
-        // not an adversarial-write threat.
-        assertNoMountConflict(persona, parsed, this.personaRegistry, context.containerMounts ?? {});
         personaModelDefault = parsed.config.model;
         if (parsed.config.runtime.type === 'container') {
-          const runtime = parsed.config.runtime;
+          // The role references an environment by name; resolve the container
+          // spec from the environment registry. The role contributes
+          // prompt/tools/model; the environment contributes the box. The R6
+          // mount-conflict invariant is an environment-pair property checked at
+          // boot (assertNoEnvironmentMountConflict), not per delegate call.
+          const environmentName = parsed.config.runtime.environment;
+          const parsedEnv = this.environmentRegistry.parseEnvironment(environmentName);
+          const runtime = parsedEnv.runtime;
           containerSharing = runtime.containerSharing;
 
           // Per-invocation setup is shared by every projected container persona.
@@ -259,7 +266,7 @@ Parameters:
 
               containerSpecName = buildPerInvocationSpecName({
                 parentSessionId: parentId,
-                personaName: persona,
+                environmentName,
                 childSessionId: childId,
               });
 
@@ -306,6 +313,7 @@ Parameters:
           projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
             parentSessionId: context.activeSessionId ?? 'delegate',
             personaName: persona,
+            environmentName,
             runtime,
             containerMounts: context.containerMounts ?? {},
             ...(runtime.containerSharing === 'per_invocation'
@@ -317,7 +325,8 @@ Parameters:
         if (
           err instanceof PersonaNotFoundError ||
           err instanceof PersonaParseError ||
-          err instanceof PersonaSharingViolationError
+          err instanceof EnvironmentNotFoundError ||
+          err instanceof EnvironmentParseError
         ) {
           return {
             status: 'failed',

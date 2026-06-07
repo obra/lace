@@ -9,6 +9,7 @@ import { DelegateTool } from '../delegate';
 import { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
+import type { EnvironmentRegistry } from '@lace/agent/config/environment-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
@@ -17,20 +18,27 @@ import type { ToolContext } from '../../types';
 function perInvocationRegistry(): PersonaRegistry {
   return {
     parsePersona: vi.fn().mockReturnValue({
-      config: {
-        runtime: {
-          type: 'container',
-          containerSharing: 'per_invocation',
-          image: 'example/subagent:latest',
-          workingDirectory: '/workspace',
-          mounts: [],
-          env: {},
-        },
-      },
+      config: { runtime: { type: 'container', environment: 'inv' } },
       body: 'per_invocation persona',
     }),
     listAvailablePersonas: vi.fn().mockReturnValue([]),
   } as unknown as PersonaRegistry;
+}
+
+function perInvocationEnvRegistry(): EnvironmentRegistry {
+  return {
+    parseEnvironment: vi.fn().mockReturnValue({
+      runtime: {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'example/subagent:latest',
+        workingDirectory: '/workspace',
+        mounts: [],
+        env: {},
+      },
+    }),
+    listAvailable: vi.fn().mockReturnValue(['inv']),
+  } as unknown as EnvironmentRegistry;
 }
 
 const runtimeBinding = {
@@ -94,7 +102,10 @@ describe('delegate workspace lifecycle', () => {
   }
 
   async function freshDelegate(jobManager: JobManager, parentId: string) {
-    const tool = new DelegateTool({ personaRegistry: perInvocationRegistry() });
+    const tool = new DelegateTool({
+      personaRegistry: perInvocationRegistry(),
+      environmentRegistry: perInvocationEnvRegistry(),
+    });
     const result = await tool.execute(
       { prompt: 'work', background: true, persona: 'inv' },
       ctx(jobManager, parentId)
@@ -112,7 +123,10 @@ describe('delegate workspace lifecycle', () => {
     expect(reaper.countForParent(parentId)).toBe(2);
 
     // Third fresh delegate exceeds the cap → fail with the precise remedy.
-    const tool = new DelegateTool({ personaRegistry: perInvocationRegistry() });
+    const tool = new DelegateTool({
+      personaRegistry: perInvocationRegistry(),
+      environmentRegistry: perInvocationEnvRegistry(),
+    });
     const third = await tool.execute(
       { prompt: 'work', background: true, persona: 'inv' },
       ctx(jobManager, parentId)
@@ -141,7 +155,10 @@ describe('delegate workspace lifecycle', () => {
     jobs.push({ jobId: 'job_done', subagentSessionId: fresh.subagentSessionId });
     await reaper.dispose(fresh.subagentSessionId);
 
-    const tool = new DelegateTool({ personaRegistry: perInvocationRegistry() });
+    const tool = new DelegateTool({
+      personaRegistry: perInvocationRegistry(),
+      environmentRegistry: perInvocationEnvRegistry(),
+    });
     const result = await tool.execute(
       { prompt: 'continue', background: true, persona: 'inv', resume: 'job_done' },
       ctx(jobManager, parentId)
@@ -162,7 +179,10 @@ describe('delegate workspace lifecycle', () => {
     expect(fs.existsSync(fresh.workspace)).toBe(true);
     expect(fs.readdirSync(fresh.workspace)).toHaveLength(0);
 
-    const tool = new DelegateTool({ personaRegistry: perInvocationRegistry() });
+    const tool = new DelegateTool({
+      personaRegistry: perInvocationRegistry(),
+      environmentRegistry: perInvocationEnvRegistry(),
+    });
     const result = await tool.execute(
       { prompt: 'continue', background: true, persona: 'inv', resume: 'job_crash' },
       ctx(jobManager, parentId)

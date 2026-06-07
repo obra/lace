@@ -15,6 +15,7 @@ import { MCPToolAdapter } from '../mcp/tool-adapter';
 import { logger } from '@lace/agent/utils/logger';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
+import type { EnvironmentRegistry } from '@lace/agent/config/environment-registry';
 import { registries } from '@lace/agent/plugins';
 import { registerBuiltinTools, PER_SESSION_BUILTIN_NAMES } from './builtins';
 import { discoverExecToolsSync } from './exec/discover';
@@ -22,6 +23,8 @@ import { discoverExecToolsSync } from './exec/discover';
 export interface RegisterToolsOptions {
   /** PersonaRegistry to wire into DelegateTool. Defaults to the global singleton. */
   personaRegistry?: PersonaRegistry;
+  /** EnvironmentRegistry to wire into DelegateTool. Defaults to the global singleton. */
+  environmentRegistry?: EnvironmentRegistry;
 }
 
 /**
@@ -295,7 +298,13 @@ export class ToolExecutor {
       }
     }
 
-    this.registerTool('delegate', new DelegateTool({ personaRegistry: options.personaRegistry }));
+    this.registerTool(
+      'delegate',
+      new DelegateTool({
+        personaRegistry: options.personaRegistry,
+        environmentRegistry: options.environmentRegistry,
+      })
+    );
 
     // Add skill tool if registry is provided
     if (skillRegistry) {

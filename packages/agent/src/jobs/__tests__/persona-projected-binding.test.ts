@@ -14,6 +14,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -74,6 +75,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -102,6 +104,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -125,6 +128,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess1',
       personaName: 'box-shell',
+      environmentName: 'box-shell',
       runtime: {
         type: 'container',
         containerSharing: 'persistent',
@@ -160,6 +164,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'browser-driver',
+      environmentName: 'browser-driver',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -184,6 +189,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
+      environmentName: 'box',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -208,6 +214,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'box',
+      environmentName: 'box',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -232,6 +239,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const tagOnly = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -255,6 +263,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
     const digestPinned = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: {
@@ -281,6 +290,7 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
       buildPersonaProjectedRuntimeBinding({
         parentSessionId: PARENT_SESSION_ID,
         personaName: 'shell',
+        environmentName: 'shell',
         childSessionId: CHILD_SESSION_ID,
         scratchDirHostPath: SCRATCH_PATH,
         runtime: {
@@ -319,6 +329,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess_aaaaaaaa11111111',
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: 'sess_bbbbbbbb22222222',
       scratchDirHostPath: '/tmp/my-scratch',
       runtime: perInvocationRuntime,
@@ -343,6 +354,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -356,6 +368,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const binding = buildPersonaProjectedRuntimeBinding({
       parentSessionId: 'sess1',
       personaName: 'sen',
+      environmentName: 'sen',
       runtime: persistentRuntime,
       containerMounts: {},
     });
@@ -367,6 +380,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const bindingA = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: 'sess_aaaaaaaa11111111',
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -376,6 +390,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const bindingB = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: 'sess_bbbbbbbb22222222',
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -395,6 +410,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const binding1 = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -404,6 +420,7 @@ describe('buildPersonaProjectedRuntimeBinding with containerSharing discriminato
     const binding2 = buildPersonaProjectedRuntimeBinding({
       parentSessionId: PARENT_SESSION_ID,
       personaName: 'shell',
+      environmentName: 'shell',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,

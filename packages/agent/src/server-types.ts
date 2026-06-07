@@ -16,6 +16,7 @@ import type { ToolExecutor } from './tools/executor';
 import type { Tool } from './tools/tool';
 import type { SkillRegistry } from './skills';
 import type { PersonaRegistry } from './config/persona-registry';
+import type { EnvironmentRegistry } from './config/environment-registry';
 import type { ContainerManager } from './containers/container-manager';
 import type { ReminderScheduler } from './reminders';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
@@ -39,7 +40,8 @@ export type CreateToolExecutorFn = (
   skillRegistry?: SkillRegistry,
   toolScope?: AgentToolScope,
   personaRegistry?: PersonaRegistry,
-  activePersona?: string
+  activePersona?: string,
+  environmentRegistry?: EnvironmentRegistry
 ) => Promise<{
   executor: ToolExecutor;
   toolsForProvider: Tool[];
@@ -164,6 +166,10 @@ export type AgentServerState = {
   // Embedder-controlled persona resolver. Defaulted to the module singleton;
   // initialize handler replaces it when the client supplies userPersonasPaths.
   personaRegistry: PersonaRegistry;
+  // Embedder-controlled environment resolver (container defs). Defaulted to the
+  // module singleton; initialize handler replaces it when the client supplies
+  // userEnvironmentsPaths.
+  environmentRegistry: EnvironmentRegistry;
   // Embedder-controlled skill directories (ordered, earlier wins). When unset,
   // skill registry construction falls back to getSkillDirectories(workDir).
   // Set by the initialize handler when the client supplies skillDirs.

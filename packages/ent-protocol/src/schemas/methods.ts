@@ -133,6 +133,11 @@ const InitializeParamsSchema = z
     // Ordered persona search paths (earlier paths win). When omitted, the
     // agent uses its default user-persona directory under laceDir.
     userPersonasPaths: z.array(NonEmptyStringSchema).optional(),
+    // Ordered environment-def search paths (earlier paths win). Environments are
+    // the container definitions a role's `runtime.environment` resolves to. When
+    // omitted, the agent uses its default agent-environments directory under
+    // laceDir.
+    userEnvironmentsPaths: z.array(NonEmptyStringSchema).optional(),
     // Embedder package root. lace resolves relative `command`/`args`
     // of host-placement MCP servers declared in a persona against this base (the
     // server scripts live under the embedder's package, not lace's cwd).

@@ -332,7 +332,8 @@ export function registerPromptHandler(
               skillReg,
               sessionToolScope,
               personaReg,
-              sessionActivePersona
+              sessionActivePersona,
+              state.environmentRegistry
             ),
           sessionToolScope
         )) as RunnerDependencies['createToolExecutor'];

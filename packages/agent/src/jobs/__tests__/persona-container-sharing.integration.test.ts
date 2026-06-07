@@ -222,6 +222,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
     const spec = buildProjectedRuntimeSpec({
       parentSessionId,
       personaName,
+      environmentName: personaName,
       runtime: perInvocationRuntime,
       containerMounts: {},
       childSessionId,
@@ -254,6 +255,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
     const spec = buildProjectedRuntimeSpec({
       parentSessionId: 'sess_parentforpersistent',
       personaName,
+      environmentName: personaName,
       runtime: persistentRuntime,
       containerMounts: {},
     });

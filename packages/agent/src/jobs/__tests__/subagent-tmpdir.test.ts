@@ -182,6 +182,7 @@ describe('subagent $TMPDIR (host)', () => {
       containerManager: null as unknown as ContainerManager,
       containerMounts: {},
       personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     runSubagentJobProcess(job, {

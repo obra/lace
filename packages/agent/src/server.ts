@@ -10,6 +10,10 @@ import {
   personaRegistry as defaultPersonaRegistry,
   type PersonaRegistry,
 } from './config/persona-registry';
+import {
+  environmentRegistry as defaultEnvironmentRegistry,
+  type EnvironmentRegistry,
+} from './config/environment-registry';
 import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { SkillRegistry } from '@lace/agent/skills';
@@ -58,14 +62,19 @@ export async function createToolExecutorForMode(
   skillRegistry?: SkillRegistry,
   toolScope?: AgentToolScope,
   personaRegistry?: PersonaRegistry,
-  activePersona?: string
+  activePersona?: string,
+  environmentRegistry?: EnvironmentRegistry
 ): Promise<{
   executor: ToolExecutor;
   toolsForProvider: CoreTool[];
 }> {
   const registry = personaRegistry ?? defaultPersonaRegistry;
+  const envRegistry = environmentRegistry ?? defaultEnvironmentRegistry;
   const executor = new ToolExecutor();
-  executor.registerAllAvailableTools(skillRegistry, { personaRegistry: registry });
+  executor.registerAllAvailableTools(skillRegistry, {
+    personaRegistry: registry,
+    environmentRegistry: envRegistry,
+  });
 
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
@@ -120,6 +129,7 @@ export function createAgentServerState(): AgentServerState {
     sessionMutex: Promise.resolve(),
     toolExecutorCache: new Map(),
     personaRegistry: defaultPersonaRegistry,
+    environmentRegistry: defaultEnvironmentRegistry,
     containerMounts: {},
     // Resolved in boot() AFTER built-ins + plugins register (the plane is a runtime plugin).
     containerManager: null,

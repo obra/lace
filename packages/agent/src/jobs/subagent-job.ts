@@ -825,6 +825,11 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       const subagentUserPersonasPaths: string[] = [
         ...currentState.personaRegistry.getUserPersonasPaths(),
       ];
+      // The child resolves environments (container defs) for its own nested
+      // delegations; thread the parent's env search paths through identically.
+      const subagentUserEnvironmentsPaths: string[] = [
+        ...currentState.environmentRegistry.getEnvironmentsPaths(),
+      ];
       const subagentSkillDirs = [...subagentHostSkillDirs];
       // The child re-parses personas, so it needs the same MCP base
       // dir to resolve relative host-placement command/args.
@@ -839,6 +844,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           'ent/jobStreaming': currentState.jobManager.getStreamingMode(),
         },
         userPersonasPaths: subagentUserPersonasPaths,
+        userEnvironmentsPaths: subagentUserEnvironmentsPaths,
         ...(subagentMcpBaseDir ? { mcpBaseDir: subagentMcpBaseDir } : {}),
         skillDirs: subagentSkillDirs,
         config: buildSubagentInitConfig(parentEffective),

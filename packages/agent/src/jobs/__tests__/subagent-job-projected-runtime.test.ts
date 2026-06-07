@@ -268,6 +268,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
       },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     // Stand in for the top-level peer. subagent-job only ever invokes
@@ -340,6 +341,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
       },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     const runCreatedSubagent = (createdJob: JobState) => {
@@ -419,6 +421,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
       },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     let nextEventSeq = 1;

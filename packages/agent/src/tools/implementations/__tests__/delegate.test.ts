@@ -7,9 +7,53 @@ import { tmpdir } from 'node:os';
 import { DelegateTool } from '../delegate';
 import { isSessionId } from '@lace/ent-protocol';
 import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
+import type {
+  EnvironmentRegistry,
+  EnvironmentRuntime,
+} from '@lace/agent/config/environment-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
+
+// A role persona now references an environment by name; the container spec is
+// resolved from the environment registry. These helpers build the matching pair
+// of fakes so the delegate tests drive the real role→environment resolution.
+function rolePersona(environmentName: string, model?: string): unknown {
+  return {
+    config: {
+      ...(model ? { model } : {}),
+      runtime: { type: 'container', environment: environmentName },
+    },
+    body: 'role body',
+  };
+}
+
+function fakePersonaRegistry(environmentName: string, model?: string): PersonaRegistry {
+  return {
+    parsePersona: vi.fn().mockReturnValue(rolePersona(environmentName, model)),
+    listAvailablePersonas: vi.fn().mockReturnValue([]),
+  } as unknown as PersonaRegistry;
+}
+
+function fakeEnvironmentRegistry(byName: Record<string, EnvironmentRuntime>): EnvironmentRegistry {
+  return {
+    parseEnvironment: vi.fn((name: string) => {
+      const runtime = byName[name];
+      if (!runtime) throw new Error(`no fake environment '${name}'`);
+      return { runtime };
+    }),
+    listAvailable: vi.fn().mockReturnValue(Object.keys(byName)),
+  } as unknown as EnvironmentRegistry;
+}
+
+const PER_INVOCATION_RT: EnvironmentRuntime = {
+  type: 'container',
+  containerSharing: 'per_invocation',
+  image: 'example/subagent:latest',
+  workingDirectory: '/workspace',
+  mounts: [],
+  env: {},
+};
 
 describe('DelegateTool', () => {
   const runtimeBinding: RuntimeExecutionBinding = {
@@ -179,24 +223,68 @@ describe('DelegateTool', () => {
     );
   });
 
+  it("drives the shim by the role's environment, not the role name", async () => {
+    // role 'persistent-box-worker' references environment 'persistent-box'.
+    // The created job's containerSpec / selector must carry 'persistent-box'.
+    const personaRegistry = fakePersonaRegistry('persistent-box');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'persistent-box': {
+        type: 'container',
+        containerSharing: 'persistent',
+        image: 'sen-persistent-box:dev',
+        workingDirectory: '/home/sen',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
+
+    const mockJob = {
+      jobId: 'job_env_keyed',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_env_keyed', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
+
+    await tool.execute(
+      { prompt: 'do something', background: true, persona: 'persistent-box-worker' },
+      { signal: new AbortController().signal, jobManager, runtimeBinding }
+    );
+
+    const jobOptions = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    expect(jobOptions.containerSharing).toBe('persistent');
+    // selector / spec name carries the ENVIRONMENT, never the role name
+    expect(JSON.stringify(jobOptions)).toContain('persistent-box');
+    expect(JSON.stringify(jobOptions)).not.toContain('persistent-box-worker-');
+    const binding = jobOptions.runtimeBinding as RuntimeExecutionBinding;
+    expect(
+      (
+        binding.toolRuntime as Extract<
+          RuntimeExecutionBinding['toolRuntime'],
+          { type: 'container' }
+        >
+      ).spec
+    ).toMatchObject({ name: 'persistent-box', persona: 'persistent-box' });
+  });
+
   it('passes projected runtimeBinding for host-placed session-lifecycle container personas', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent@sha256:' + 'a'.repeat(64),
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'container persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('container-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'container-persona': {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'example/subagent@sha256:' + 'a'.repeat(64),
+        workingDirectory: '/workspace',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_projected',
@@ -228,23 +316,18 @@ describe('DelegateTool', () => {
   });
 
   it('passes tag-only persona images through verbatim (no pre-resolution)', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'sen-box:dev',
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'tag-only persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('tag-only');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'tag-only': {
+        type: 'container',
+        containerSharing: 'per_invocation',
+        image: 'sen-box:dev',
+        workingDirectory: '/workspace',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_tag_only',
@@ -279,23 +362,18 @@ describe('DelegateTool', () => {
   });
 
   it('passes projected runtimeBinding for persistent container personas', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'persistent',
-            image: 'example/sen-box@sha256:' + 'a'.repeat(64),
-            workingDirectory: '/home/agent',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'persistent persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('box-shell');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'box-shell': {
+        type: 'container',
+        containerSharing: 'persistent',
+        image: 'example/sen-box@sha256:' + 'a'.repeat(64),
+        workingDirectory: '/home/agent',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_persistent',
@@ -327,25 +405,20 @@ describe('DelegateTool', () => {
   });
 
   it('uses containerMounts from context when building projected binding', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            // Use persistent so we can test a named mount without triggering
-            // the 'scratch' reservation error for per_invocation.
-            containerSharing: 'persistent',
-            image: 'example/subagent@sha256:' + 'a'.repeat(64),
-            workingDirectory: '/work',
-            mounts: ['data'],
-            env: {},
-          },
-        },
-        body: 'mounts persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('mounts-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'mounts-persona': {
+        type: 'container',
+        // Use persistent so we can test a named mount without triggering
+        // the 'scratch' reservation error for per_invocation.
+        containerSharing: 'persistent',
+        image: 'example/subagent@sha256:' + 'a'.repeat(64),
+        workingDirectory: '/work',
+        mounts: ['data'],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_mounts',
@@ -480,23 +553,9 @@ describe('DelegateTool', () => {
   // ---------------------------------------------------------------------------
 
   it('background per_invocation response includes subagentSessionId and scratchDir', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_per_inv',
@@ -544,23 +603,9 @@ describe('DelegateTool', () => {
   });
 
   it('sync per_invocation preamble includes scratchDir', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     let resolveJob!: () => void;
     const completion = new Promise<void>((r) => {
@@ -601,23 +646,9 @@ describe('DelegateTool', () => {
   });
 
   it('resume reuses prior subagent session id and scratch dir for per_invocation', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob1 = {
       jobId: 'job_first',
@@ -682,23 +713,18 @@ describe('DelegateTool', () => {
   });
 
   it('persistent persona background response omits subagentSessionId and scratchDir', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'persistent',
-            image: 'example/sen-box:latest',
-            workingDirectory: '/home/agent',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'persistent persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('box-shell');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'box-shell': {
+        type: 'container',
+        containerSharing: 'persistent',
+        image: 'example/sen-box:latest',
+        workingDirectory: '/home/agent',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_pers_bg',
@@ -726,23 +752,9 @@ describe('DelegateTool', () => {
   });
 
   it('per_invocation resume: createJob receives resumeSessionId, NOT newSubagentSessionId', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_resume_check',
@@ -782,23 +794,9 @@ describe('DelegateTool', () => {
   // minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
   // ---------------------------------------------------------------------------
   it('mints childSessionId in SessionIdSchema format (hyphenated UUID)', async () => {
-    const personaRegistry = {
-      parsePersona: vi.fn().mockReturnValue({
-        config: {
-          runtime: {
-            type: 'container',
-            containerSharing: 'per_invocation',
-            image: 'example/subagent:latest',
-            workingDirectory: '/workspace',
-            mounts: [],
-            env: {},
-          },
-        },
-        body: 'per_invocation persona',
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([]),
-    } as unknown as PersonaRegistry;
-    const tool = new DelegateTool({ personaRegistry });
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
     const mockJob = {
       jobId: 'job_uuid_check',
@@ -830,70 +828,9 @@ describe('DelegateTool', () => {
     expect(isSessionId(mintedId)).toBe(true);
   });
 
-  // ---------------------------------------------------------------------------
-  // PersonaSharingViolationError propagation
-  // ---------------------------------------------------------------------------
-  it('delegate fails with PersonaSharingViolationError when per_invocation persona conflicts with persistent', async () => {
-    // box-shell: persistent with mounts.home
-    // shell: per_invocation with mounts.home (conflict!)
-    const personaRegistry = {
-      parsePersona: vi.fn((name: string) => {
-        if (name === 'box-shell') {
-          return {
-            config: {
-              runtime: {
-                type: 'container',
-                containerSharing: 'persistent',
-                image: 'img:latest',
-                workingDirectory: '/home',
-                mounts: ['home'],
-                env: {},
-              },
-            },
-            body: 'box-shell body',
-          };
-        }
-        // 'shell' — per_invocation with the same mount name
-        return {
-          config: {
-            runtime: {
-              type: 'container',
-              containerSharing: 'per_invocation',
-              image: 'img:latest',
-              workingDirectory: '/shared',
-              mounts: ['home'],
-              env: {},
-            },
-          },
-          body: 'shell body',
-        };
-      }),
-      listAvailablePersonas: vi.fn().mockReturnValue([
-        { name: 'box-shell', isUserDefined: false, path: '/fake/box-shell.md' },
-        { name: 'shell', isUserDefined: false, path: '/fake/shell.md' },
-      ]),
-    } as unknown as PersonaRegistry;
-
-    const tool = new DelegateTool({ personaRegistry });
-
-    const jobManager = {
-      listJobs: vi.fn().mockReturnValue([]),
-      createJob: vi.fn(),
-    } as unknown as JobManager;
-
-    const result = await tool.execute(
-      { prompt: 'task', background: true, persona: 'shell' },
-      {
-        signal: new AbortController().signal,
-        jobManager,
-        runtimeBinding,
-        activeSessionId: 'sess_parent',
-      }
-    );
-
-    expect(result.status).toBe('failed');
-    // The error message must name the mount and the conflicting persistent persona
-    expect(result.content[0].text).toContain('home');
-    expect(result.content[0].text).toContain('box-shell');
-  });
+  // The per-delegate-call mount-conflict rejection moved OUT of delegate under
+  // Part A: a role no longer carries mounts, so the R6 invariant is an
+  // environment-pair property checked at boot via assertNoEnvironmentMountConflict
+  // (covered in persona-mount-conflict.test.ts). delegate no longer runs a
+  // per-call mount-conflict check, so there is no delegate-level test for it.
 });

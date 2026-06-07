@@ -10,7 +10,8 @@ import type {
   MountRegistryEntry,
 } from '../../server-types';
 import { PersonaRegistry } from '../../config/persona-registry';
-import { warnMountConflicts } from '../../config/persona-mount-conflict';
+import { EnvironmentRegistry } from '../../config/environment-registry';
+import { assertNoEnvironmentMountConflict } from '../../config/persona-mount-conflict';
 import { resolveResourcePath } from '../../utils/resource-resolver';
 import { logger } from '../../utils/logger';
 
@@ -107,6 +108,18 @@ export function registerInitializeHandler(
       });
     }
 
+    // Embedder-controlled environment-def search paths; ordered, earlier wins.
+    if (Array.isArray(parsed.userEnvironmentsPaths)) {
+      const envPaths: string[] = [];
+      for (const p of parsed.userEnvironmentsPaths) {
+        if (typeof p !== 'string' || p.length === 0) {
+          throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+        }
+        envPaths.push(p);
+      }
+      state.environmentRegistry = new EnvironmentRegistry({ environmentsPaths: envPaths });
+    }
+
     // Embedder-supplied named-mount registry. Persona containers list mount
     // names in `runtime.mounts`; this registry supplies host paths, container
     // paths, and readonly flags. Always stored on state (defaults to {}). Parse
@@ -114,16 +127,16 @@ export function registerInitializeHandler(
     // filtering.
     state.containerMounts = parseContainerMounts(parsed.containerMounts);
 
-    // R6 boot-time invariant: log a WARN for any per_invocation persona that
-    // declares a read-write mount-registry name also claimed by a persistent
-    // persona. Readonly mounts are not a threat and are excluded. Never throws —
-    // a bad persona config is surfaced here but doesn't prevent the embedder
-    // from finishing initialization. The spawn-time assertNoMountConflict in
-    // delegate.ts provides the hard reject.
+    // R6 boot-time invariant: a per_invocation environment must not declare a
+    // read-write mount-registry name also claimed by a persistent environment.
+    // Readonly mounts are not a threat and are excluded. Surfaced here as a WARN
+    // (never throws) so a bad environment config is visible but doesn't prevent
+    // the embedder from finishing initialization. This is the boot-time home for
+    // R6 under the role/environment split — the role no longer carries mounts.
     try {
-      warnMountConflicts(state.personaRegistry, state.containerMounts);
+      assertNoEnvironmentMountConflict(state.environmentRegistry, state.containerMounts);
     } catch (err) {
-      logger.warn('persona_mount_conflict.boot_scan_error', {
+      logger.warn('environment_mount_conflict', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

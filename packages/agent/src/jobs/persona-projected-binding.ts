@@ -31,6 +31,7 @@ function resolveRuntimeHelperDescriptor(): RuntimeHelperDescriptor {
 export function buildPersonaProjectedRuntimeBinding(input: {
   parentSessionId: string;
   personaName: string;
+  environmentName: string;
   runtime: PersonaContainerRuntime;
   containerMounts: Readonly<Record<string, MountRegistryEntry>>;
   executionEnv?: Record<string, string>;
@@ -41,6 +42,7 @@ export function buildPersonaProjectedRuntimeBinding(input: {
   const containerSpec = buildPersonaContainerSpec({
     parentSessionId: input.parentSessionId,
     personaName: input.personaName,
+    environmentName: input.environmentName,
     childSessionId: input.childSessionId,
     scratchDirHostPath: input.scratchDirHostPath,
     runtime: input.runtime,

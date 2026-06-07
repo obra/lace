@@ -137,6 +137,7 @@ describe('runSubagentJobProcess — surfaces stopDetails from session/prompt', (
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
       },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
     requestSpy = vi

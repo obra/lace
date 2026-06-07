@@ -89,6 +89,11 @@ export class EnvironmentRegistry {
     this.environmentsPaths = opts.environmentsPaths;
   }
 
+  /** Ordered list of environment search paths (earlier wins). */
+  getEnvironmentsPaths(): readonly string[] {
+    return this.environmentsPaths;
+  }
+
   private resolvePath(name: string): string | undefined {
     for (const dir of this.environmentsPaths) {
       const candidate = path.join(dir, `${name}.md`);
