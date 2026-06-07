@@ -69,7 +69,13 @@ export class ExecToolAdapter extends Tool {
         sessionId: context.activeSessionId ?? '',
         persona: context.persona ?? '',
         ...(allowCredentialSocket && context.credentialBrokerSocket
-          ? { credentialBrokerSocket: context.credentialBrokerSocket }
+          ? {
+              credentialBrokerSocket: context.credentialBrokerSocket,
+              // The role's spawn environment (Part B): the broker binds a minted
+              // placeholder to it. Forwarded with the broker socket under the
+              // same provenance gate.
+              environment: context.roleEnvironment ?? '',
+            }
           : {}),
       },
     });

@@ -42,18 +42,24 @@ describe('ExecToolAdapter', () => {
     expect(r.content[0].text).toContain('echo:hi');
     expect(r.content[0].text).toContain('persona:researcher');
   });
-  it('forwards the broker socket only for a trusted credentials tool', async () => {
+  it('forwards the broker socket + role environment only for a trusted credentials tool', async () => {
     const SOCK = '/run/host/sen-cred-role.sock';
-    // Trusted provenance + capabilities:['credentials'] → socket forwarded.
+    // Trusted provenance + capabilities:['credentials'] → socket + environment forwarded.
     const trusted = new ExecToolAdapter(DUMP, credDescriptor, undefined, true);
-    expect(
-      (await dumpedContext(trusted, ctx({ credentialBrokerSocket: SOCK }))).credentialBrokerSocket
-    ).toBe(SOCK);
-    // Same descriptor, UNtrusted provenance → socket absent.
+    const trustedCtx = await dumpedContext(
+      trusted,
+      ctx({ credentialBrokerSocket: SOCK, roleEnvironment: 'ephemeral-box' })
+    );
+    expect(trustedCtx.credentialBrokerSocket).toBe(SOCK);
+    expect(trustedCtx.environment).toBe('ephemeral-box');
+    // Same descriptor, UNtrusted provenance → socket + environment absent.
     const untrusted = new ExecToolAdapter(DUMP, credDescriptor, undefined, false);
-    expect(
-      (await dumpedContext(untrusted, ctx({ credentialBrokerSocket: SOCK }))).credentialBrokerSocket
-    ).toBeUndefined();
+    const untrustedCtx = await dumpedContext(
+      untrusted,
+      ctx({ credentialBrokerSocket: SOCK, roleEnvironment: 'ephemeral-box' })
+    );
+    expect(untrustedCtx.credentialBrokerSocket).toBeUndefined();
+    expect(untrustedCtx.environment).toBeUndefined();
     // Trusted provenance but no credentials capability → socket absent.
     const plain = new ExecToolAdapter(DUMP, plainDescriptor, undefined, true);
     expect(

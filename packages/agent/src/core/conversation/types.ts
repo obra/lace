@@ -51,6 +51,10 @@ export interface RunnerConfig {
   maxBudgetUsd?: number;
   /** Persona name for this session; stamped into every ToolContext. */
   persona?: string;
+  /** The spawn environment the session's role runs in (Part A), resolved from
+   *  the role's persona runtime. Stamped into ToolContext so the credential
+   *  exec-tool can bind a minted placeholder to this environment (Part B). */
+  roleEnvironment?: string;
   /** Host-only credential broker socket for this session's role (Part B). */
   credentialBrokerSocket?: string;
 }
