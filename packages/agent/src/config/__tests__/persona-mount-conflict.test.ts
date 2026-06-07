@@ -183,6 +183,54 @@ describe('persona-mount-conflict validator', () => {
     ).not.toThrow();
   });
 
+  it('assertNoMountConflict ignores the plane-provided sen-cred mount name', () => {
+    // sen-cred is the shim's gate signal, not a host path lace owns. Every
+    // credentialed persona declares it, so per_invocation and persistent
+    // personas legitimately share the name — it must not be flagged as an R6
+    // shared-host-path conflict.
+    const parsed = {
+      config: {
+        runtime: {
+          type: 'container' as const,
+          containerSharing: 'per_invocation' as const,
+          image: 'img:latest',
+          workingDirectory: '/work',
+          mounts: ['sen-cred'],
+          env: {},
+        },
+      },
+      body: 'Body.',
+    };
+
+    const fakeRegistry = {
+      listAvailablePersonas: () => [
+        { name: 'persistent-pet', isUserDefined: false, path: '/fake/persistent-pet.md' },
+      ],
+      parsePersona: (_name: string) => ({
+        config: {
+          runtime: {
+            type: 'container' as const,
+            containerSharing: 'persistent' as const,
+            image: 'img:latest',
+            workingDirectory: '/home',
+            mounts: ['sen-cred'],
+            env: {},
+          },
+        },
+        body: 'Body.',
+      }),
+    };
+
+    expect(() =>
+      assertNoMountConflict(
+        'worker',
+        parsed,
+        fakeRegistry as Parameters<typeof assertNoMountConflict>[2],
+        {}
+      )
+    ).not.toThrow();
+  });
+
   it('assertNoMountConflict treats legacy auto-injected names as ordinary mounts', () => {
     writePersona(
       'persistent-personas',

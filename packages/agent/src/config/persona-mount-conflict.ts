@@ -5,9 +5,11 @@ import type { PersonaRegistry, ParsedPersona } from './persona-registry';
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import { logger } from '@lace/agent/utils/logger';
 
-// `scratch` is Lace-managed for per_invocation personas and does not count as
-// an author-chosen overlap. Other names are ordinary persona-declared mounts.
-const RESERVED_MOUNT_NAMES = new Set(['scratch']);
+// `scratch` is Lace-managed for per_invocation personas and `sen-cred` is
+// plane-provided (the shim injects a per-container capability socket; the name
+// is the gate signal, not a shared host path). Neither counts as an
+// author-chosen overlap. Other names are ordinary persona-declared mounts.
+const RESERVED_MOUNT_NAMES = new Set(['scratch', 'sen-cred']);
 
 export class PersonaSharingViolationError extends Error {
   constructor(

@@ -193,6 +193,27 @@ describe('buildProjectedRuntimeSpec per_invocation', () => {
       })
     ).toThrow(/scratch/);
   });
+
+  it('treats sen-cred as plane-provided: accepts the declaration without a registry entry and emits no bind', () => {
+    // The persona declaring `sen-cred` is the sen-docker shim's gate signal: the
+    // shim provisions a per-container capability socket at /run/sen-cred.sock.
+    // lace must accept the declaration (not reject as "unknown mount") and must
+    // NOT emit a redundant bind for it — the shim owns that mount on the plane.
+    const spec = buildProjectedRuntimeSpec({
+      parentSessionId: PARENT_SESSION_ID,
+      personaName: 'shell',
+      childSessionId: CHILD_SESSION_ID,
+      scratchDirHostPath: SCRATCH_PATH,
+      runtime: { ...perInvocationRuntime, mounts: ['sen-cred'] },
+      containerMounts: {},
+    });
+
+    // Only lace's auto-injected /work bind is present; no sen-cred bind.
+    expect(spec.mounts).toEqual([
+      { hostPath: SCRATCH_PATH, containerPath: '/work', readonly: false },
+    ]);
+    expect(spec.mounts.some((m) => m.containerPath.includes('sen-cred'))).toBe(false);
+  });
 });
 
 describe('buildProjectedRuntimeSpec persistent', () => {
