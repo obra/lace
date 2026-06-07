@@ -550,8 +550,6 @@ describe('protocol shapes (representative examples)', () => {
           jobId: 'job_container_identity',
           jobType: 'delegate',
           containerExecutionMetadata: {
-            tokenEnvName: 'AGENT_TOKEN',
-            tokenFingerprint: 'token-fingerprint',
             personaName: 'browser-driver',
             parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
             jobId: 'job_container_identity',
@@ -574,8 +572,6 @@ describe('protocol shapes (representative examples)', () => {
           jobId: 'job_container_identity_without_container_id',
           jobType: 'delegate',
           containerExecutionMetadata: {
-            tokenEnvName: 'AGENT_TOKEN',
-            tokenFingerprint: 'token-fingerprint',
             personaName: 'browser-driver',
             parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
             jobId: 'job_container_identity_without_container_id',
@@ -586,6 +582,7 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).not.toThrow();
 
+    // The strict schema rejects unknown keys in containerExecutionMetadata.
     expect(() =>
       EntProtocolNotificationSchema.parse({
         jsonrpc: '2.0',
@@ -597,12 +594,11 @@ describe('protocol shapes (representative examples)', () => {
           jobId: 'job_container_identity',
           jobType: 'delegate',
           containerExecutionMetadata: {
-            tokenEnvName: 'bad-name',
-            tokenFingerprint: 'token-fingerprint',
             personaName: 'browser-driver',
             parentSessionId: 'sess_00000000-0000-0000-0000-000000000001',
             jobId: 'job_container_identity',
             containerId: 'lace-parent-browser-child',
+            unknownField: 'nope',
           },
         },
       })

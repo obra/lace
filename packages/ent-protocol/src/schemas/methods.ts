@@ -2030,8 +2030,6 @@ const SessionUpdateToolUseSchema = z
 
 const ContainerExecutionMetadataSchema = z
   .object({
-    tokenEnvName: ContainerExecutionTokenEnvNameSchema,
-    tokenFingerprint: NonEmptyStringSchema,
     personaName: NonEmptyStringSchema,
     parentSessionId: SessionIdSchema,
     jobId: NonEmptyStringSchema,
