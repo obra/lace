@@ -151,10 +151,10 @@ const InitializeParamsSchema = z
     // `runtime.type: 'container'` is materialized. Each persona declares
     // logical mount names; this registry pins the matching host path,
     // container-side path, and readonly flag. Mount names must match
-    // ^[a-z][a-z0-9-]*$ . Defaults to {} when omitted.
+    // ^[a-z][a-z0-9_-]*$ . Defaults to {} when omitted.
     containerMounts: z
       .record(
-        z.string().regex(/^[a-z][a-z0-9-]*$/),
+        z.string().regex(/^[a-z][a-z0-9_-]*$/),
         z
           .object({
             hostPath: NonEmptyStringSchema,

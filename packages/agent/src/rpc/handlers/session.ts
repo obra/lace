@@ -63,6 +63,7 @@ import {
   parseRuntimeExecutionBinding,
 } from '../../tools/runtime/validation';
 import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
+import { buildPersonaProjectedRuntimeBinding } from '../../jobs/persona-projected-binding';
 import { assertCompactionStrategyRegistered } from '../../compaction/strategy';
 import { compactionStrategyNameForSession } from '../../compaction/select';
 
@@ -106,6 +107,88 @@ function parseSessionRuntimeBinding(value: unknown): RuntimeExecutionBinding {
     throwInvalidParams(`config.runtimeBinding is invalid: ${message}`);
   }
   return runtimeBinding;
+}
+
+/**
+ * Resolve a container RuntimeExecutionBinding for the MAIN session from its
+ * persona's declared environment. Mirrors delegate.ts's proven resolution path:
+ * parsePersona → if runtime.type==='container', parseEnvironment(name).runtime →
+ * buildPersonaProjectedRuntimeBinding. The persona's environment is PERSISTENT
+ * for a main session, so childSessionId/scratchDirHostPath (per_invocation only)
+ * are not passed.
+ *
+ * A non-container (root/host) persona returns undefined cleanly — the caller
+ * then falls back to a host binding, which is the CORRECT runtime for those
+ * personas.
+ *
+ * FAIL-CLOSED: a persona that DECLARES a container environment but whose
+ * environment cannot be resolved (typo'd `environment:`, missing/invalid env
+ * file, projection failure) must NOT silently downgrade to a host session —
+ * that would run a persona that expects a box unboxed on the host, reintroducing
+ * the very escape hole the container binding closes. So for the container branch
+ * we do NOT catch-and-swallow: any resolution error is rethrown with a
+ * descriptive message and propagates out of session/new and activateStoredSession,
+ * failing session creation loudly. This mirrors delegate.ts, which fails (never
+ * runs the subagent host-side) on the same error.
+ */
+function resolvePersonaContainerBinding(
+  state: AgentServerState,
+  sessionId: string,
+  personaName: string
+): RuntimeExecutionBinding | undefined {
+  // Resolve the persona runtime FIRST. Host/root personas return before any
+  // environment resolution so they never throw — host is correct for them.
+  const personaRuntime = state.personaRegistry.parsePersona(personaName).config.runtime;
+  if (personaRuntime.type !== 'container') return undefined;
+
+  // Container persona: resolve the environment WITHOUT swallowing errors.
+  try {
+    const envRuntime = state.environmentRegistry.parseEnvironment(
+      personaRuntime.environment
+    ).runtime;
+    return buildPersonaProjectedRuntimeBinding({
+      parentSessionId: sessionId,
+      personaName,
+      environmentName: personaRuntime.environment,
+      runtime: envRuntime,
+      containerMounts: state.containerMounts ?? {},
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('session.persona_container_binding_failed', {
+      sessionId,
+      persona: personaName,
+      environment: personaRuntime.environment,
+      error: message,
+    });
+    throw new Error(
+      `session persona '${personaName}' declares container environment ` +
+        `'${personaRuntime.environment}' but it failed to resolve: ${message}`
+    );
+  }
+}
+
+/**
+ * Cheaply determine whether a persona DECLARES a container runtime, WITHOUT
+ * resolving its environment. This only reads the persona's frontmatter
+ * (`runtime.type === 'container'`); it never calls parseEnvironment, so a
+ * persona whose environment is broken still reports `true` here (and is then
+ * sent down the fail-closed resolvePersonaContainerBinding path).
+ *
+ * A missing/unparseable persona returns `false` (host path) so resume never
+ * crashes on the consistency check itself — a persona that genuinely declares a
+ * container will still fail-closed later via resolvePersonaContainerBinding.
+ */
+function personaDeclaresContainer(
+  state: AgentServerState,
+  personaName: string | undefined
+): boolean {
+  if (personaName === undefined) return false;
+  try {
+    return state.personaRegistry.parsePersona(personaName).config.runtime.type === 'container';
+  } catch {
+    return false;
+  }
 }
 
 function rehydrateServerConfigFromSession(
@@ -210,13 +293,43 @@ async function activateStoredSession(
     loaded.state.config?.runtimeBinding !== undefined
       ? parseSessionRuntimeBinding(loaded.state.config.runtimeBinding)
       : undefined;
-  const activeRuntimeBinding =
-    params.runtimeBinding ??
-    persistedRuntimeBinding ??
-    buildDefaultBoundedHostRuntimeBinding({
-      sessionId: params.sessionId,
-      cwd: loaded.meta.workDir,
-    });
+
+  // Resolve the binding CONSISTENCY-AWARE. An explicit params.runtimeBinding
+  // always wins. Otherwise a persisted binding may be trusted ONLY when its
+  // container-ness matches the persona's NOW-declared runtime type:
+  //   - declared container + persisted container → keep (lazy; tolerates a
+  //     transiently-broken env, since we don't re-resolve).
+  //   - declared container + persisted host (or none) → re-resolve from the
+  //     persona, FAIL-CLOSED (boxes a session persisted before boxing; a
+  //     declared-container persona must NEVER run host-side).
+  //   - declared host + persisted host (or none) → host binding.
+  //   - declared host + persisted container → discard and re-resolve to host.
+  // declaredContainer is determined CHEAPLY (no env resolution), so a broken
+  // env never breaks the consistency check — only the re-resolve path throws.
+  let activeRuntimeBinding = params.runtimeBinding;
+  if (!activeRuntimeBinding) {
+    const personaName = loaded.state.config?.personaName ?? loaded.meta.persona;
+    const declaredContainer = personaDeclaresContainer(state, personaName);
+    const persistedType = persistedRuntimeBinding?.toolRuntime.type;
+    const persistedMatches =
+      persistedRuntimeBinding !== undefined &&
+      (declaredContainer ? persistedType === 'container' : persistedType !== 'container');
+    if (persistedMatches) {
+      activeRuntimeBinding = persistedRuntimeBinding;
+    } else if (declaredContainer) {
+      // personaDeclaresContainer returning true implies personaName !== undefined.
+      activeRuntimeBinding = resolvePersonaContainerBinding(
+        state,
+        params.sessionId,
+        personaName as string
+      );
+    } else {
+      activeRuntimeBinding = buildDefaultBoundedHostRuntimeBinding({
+        sessionId: params.sessionId,
+        cwd: loaded.meta.workDir,
+      });
+    }
+  }
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,
@@ -514,8 +627,18 @@ export function registerSessionHandlers(
         ? parsed.sessionId
         : `sess_${randomUUID()}`;
     const created = new Date().toISOString();
-    const activeRuntimeBinding =
+    // When the embedder did not supply an explicit binding and the session has
+    // a persona whose runtime declares a container environment, materialize the
+    // container binding here so the MAIN coworker session runs in its box (not
+    // the host). Falls back to a host binding for root personas or on resolution
+    // failure.
+    const resolvedRuntimeBinding =
       runtimeBinding ??
+      (requestedPersona
+        ? resolvePersonaContainerBinding(state, sessionId, requestedPersona)
+        : undefined);
+    const activeRuntimeBinding =
+      resolvedRuntimeBinding ??
       buildDefaultBoundedHostRuntimeBinding({
         sessionId,
         cwd: parsed.cwd,
