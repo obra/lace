@@ -15,7 +15,7 @@ import { assertNoEnvironmentMountConflict } from '../../config/persona-mount-con
 import { resolveResourcePath } from '../../utils/resource-resolver';
 import { logger } from '../../utils/logger';
 
-const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
+const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9_-]*$/;
 
 function invalidParams(): never {
   throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
