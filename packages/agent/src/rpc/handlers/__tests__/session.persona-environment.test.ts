@@ -308,6 +308,126 @@ describe('session/new honors a persona container environment', () => {
     }
   });
 
+  // CUTOVER FIX (key regression): a session persisted BEFORE boxing carries a
+  // stale boundedHost binding, but its persona now declares a container
+  // environment. Resume MUST discard the stale host binding and re-resolve to a
+  // container binding — otherwise a declared-container persona would resume
+  // host-side (unboxed, credential-forgeable).
+  it('re-resolves to container when a container persona has a stale host binding', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    let sessionId: string;
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+      })) as { sessionId: string };
+      sessionId = result.sessionId;
+      // Sanity: session/new already produced a container binding.
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+    } finally {
+      client.close();
+      server.close();
+    }
+
+    // Simulate a pre-boxing session: overwrite the persisted runtimeBinding with
+    // a boundedHost binding (as if it had been created before the persona was
+    // boxed). The persona on disk still declares the container environment.
+    const statePath = join(getSessionDir(sessionId), 'state.json');
+    const stale = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      config: { runtimeBinding: unknown };
+    };
+    stale.config.runtimeBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'stale-host' },
+      toolRuntime: { type: 'boundedHost', root: workDir, cwd: workDir },
+    };
+    writeFileSync(statePath, JSON.stringify(stale));
+    expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('boundedHost');
+
+    // Resume in a fresh server. The env file is still present, so re-resolution
+    // succeeds and the session is boxed.
+    const state2 = createAgentServerState();
+    const { client: client2, server: server2 } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, state2)
+    );
+    try {
+      await client2.request('initialize', initParams());
+      await client2.request('session/resume', {
+        sessionId,
+        cwd: workDir,
+        mcpServers: [],
+      });
+
+      // The stale host binding was discarded; the session is now boxed.
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+    } finally {
+      client2.close();
+      server2.close();
+    }
+  });
+
+  // REVERSE STALENESS: a session persisted with a VALID container binding whose
+  // persona is now host/root (e.g. the persona was un-boxed) must re-resolve to
+  // a boundedHost binding on resume rather than keep running in a box it no
+  // longer declares. We build a genuine container binding by creating a boxed
+  // session, then rewrite the persona reference to a host persona on disk.
+  it('re-resolves to boundedHost when a host persona has a stale container binding', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    let sessionId: string;
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+      })) as { sessionId: string };
+      sessionId = result.sessionId;
+      // Real, schema-valid container binding produced by session/new.
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+    } finally {
+      client.close();
+      server.close();
+    }
+
+    // Flip the persona to a host persona on disk (both config.personaName and
+    // meta.persona) — the session keeps its valid persisted container binding,
+    // now inconsistent with the host persona it points at.
+    const statePath = join(getSessionDir(sessionId), 'state.json');
+    const stale = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      config: { personaName?: string };
+    };
+    stale.config.personaName = 'plain';
+    writeFileSync(statePath, JSON.stringify(stale));
+    const metaPath = join(getSessionDir(sessionId), 'meta.json');
+    const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as { persona?: string };
+    meta.persona = 'plain';
+    writeFileSync(metaPath, JSON.stringify(meta));
+    expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+
+    const state2 = createAgentServerState();
+    const { client: client2, server: server2 } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, state2)
+    );
+    try {
+      await client2.request('initialize', initParams());
+      await client2.request('session/resume', {
+        sessionId,
+        cwd: workDir,
+        mcpServers: [],
+      });
+
+      // The stale container binding was discarded for the host persona.
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('boundedHost');
+    } finally {
+      client2.close();
+      server2.close();
+    }
+  });
+
   it('lets an explicit runtimeBinding override persona container resolution', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
