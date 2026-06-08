@@ -270,24 +270,31 @@ async function activateStoredSession(
     loaded.state.config?.runtimeBinding !== undefined
       ? parseSessionRuntimeBinding(loaded.state.config.runtimeBinding)
       : undefined;
-  // Safety net: a session/new from before this change (or a session whose
-  // persisted binding was dropped) may lack a container binding even though its
-  // persona declares a container environment. Re-resolve from the persona so a
-  // resumed boxed coworker still runs in its box. Normally the persisted binding
-  // already carries the container binding, so this only fires as a fallback.
-  const personaName = loaded.state.config?.personaName ?? loaded.meta.persona;
-  const personaContainerBinding =
-    personaName !== undefined
-      ? resolvePersonaContainerBinding(state, params.sessionId, personaName)
-      : undefined;
-  const activeRuntimeBinding =
-    params.runtimeBinding ??
-    persistedRuntimeBinding ??
-    personaContainerBinding ??
-    buildDefaultBoundedHostRuntimeBinding({
-      sessionId: params.sessionId,
-      cwd: loaded.meta.workDir,
-    });
+
+  // Resolve the binding LAZILY: if an explicit params.runtimeBinding or a
+  // persisted container binding already exists, use it directly without touching
+  // the persona/environment registry. This lets a session whose persisted binding
+  // is already a valid container binding resume successfully even when the env
+  // file is transiently broken (e.g. env dir removed after deployment). The
+  // fail-closed behavior is preserved for the FRESH-session case: if neither
+  // explicit nor persisted binding is present and the persona declares a container
+  // environment that can't resolve, resolvePersonaContainerBinding still throws.
+  let activeRuntimeBinding = params.runtimeBinding ?? persistedRuntimeBinding;
+  if (!activeRuntimeBinding) {
+    const personaName = loaded.state.config?.personaName ?? loaded.meta.persona;
+    // Safety net: a session/new from before this change (or a session whose
+    // persisted binding was dropped) may lack a container binding even though
+    // its persona declares a container environment. Re-resolve from the persona
+    // so a resumed boxed coworker still runs in its box.
+    activeRuntimeBinding =
+      (personaName !== undefined
+        ? resolvePersonaContainerBinding(state, params.sessionId, personaName)
+        : undefined) ??
+      buildDefaultBoundedHostRuntimeBinding({
+        sessionId: params.sessionId,
+        cwd: loaded.meta.workDir,
+      });
+  }
 
   const loadedWithMcpServers = mergeMcpServersIntoLoadedSession(
     loaded,

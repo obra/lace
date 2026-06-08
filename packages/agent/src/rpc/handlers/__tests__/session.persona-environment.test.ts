@@ -260,6 +260,54 @@ describe('session/new honors a persona container environment', () => {
     }
   });
 
+  it('resumes with persisted container binding even when env file is gone (lazy resolution)', async () => {
+    // Create the session while the env file is present — persists a container binding.
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    let sessionId: string;
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+      })) as { sessionId: string };
+      sessionId = result.sessionId;
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+    } finally {
+      client.close();
+      server.close();
+    }
+
+    // Remove the environment definition file — simulates a transiently broken env.
+    rmSync(join(environmentsDir, 'boxed-env.md'));
+
+    // Resume in a fresh server instance (no warm state). The persona's env can no
+    // longer be resolved from disk, but the persisted container binding is valid.
+    // Resume MUST succeed and the active binding MUST remain type:container.
+    const state2 = createAgentServerState();
+    const { client: client2, server: server2 } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, state2)
+    );
+    try {
+      await client2.request('initialize', initParams());
+      // Must NOT throw even though resolvePersonaContainerBinding would fail.
+      await expect(
+        client2.request('session/resume', {
+          sessionId,
+          cwd: workDir,
+          mcpServers: [],
+        })
+      ).resolves.toBeDefined();
+
+      // The persisted binding is still container — did not downgrade to host.
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+    } finally {
+      client2.close();
+      server2.close();
+    }
+  });
+
   it('lets an explicit runtimeBinding override persona container resolution', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
