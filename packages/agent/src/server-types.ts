@@ -174,6 +174,11 @@ export type AgentServerState = {
   // skill registry construction falls back to getSkillDirectories(workDir).
   // Set by the initialize handler when the client supplies skillDirs.
   skillDirs?: string[];
+  // Host-only credential exec-tool directories supplied by the embedder. The
+  // initialize handler registers each globally with trusted credential
+  // provenance (owner: 'credential') and records the paths here. Defaults to []
+  // when initialize omits the param.
+  credentialToolsPaths?: string[];
   // Embedder-supplied named-mount registry. Consulted at persona-container
   // materialization to resolve persona `runtime.mounts` names into host paths,
   // container paths, and readonly flags. Always present; defaults to {} when

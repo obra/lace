@@ -14,6 +14,8 @@ import { EnvironmentRegistry } from '../../config/environment-registry';
 import { assertNoEnvironmentMountConflict } from '../../config/persona-mount-conflict';
 import { resolveResourcePath } from '../../utils/resource-resolver';
 import { logger } from '../../utils/logger';
+import { registerExecDirInto } from '../../tools/exec/register-exec';
+import { registries } from '@lace/agent/plugins';
 
 const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9_-]*$/;
 
@@ -152,6 +154,26 @@ export function registerInitializeHandler(
       }
       state.skillDirs = skillDirs;
     }
+
+    // Embedder-supplied host-only credential exec-tool directories. Registered
+    // globally with trusted provenance (owner: 'credential') so the executor's
+    // reserved-name carve permits request_credential and the broker socket is
+    // forwarded only from these trusted dirs. Must run BEFORE the tool executor
+    // is built below so registerAllAvailableTools draws the tools.
+    const credentialToolsPaths: string[] = [];
+    if (Array.isArray(parsed.credentialToolsPaths)) {
+      for (const p of parsed.credentialToolsPaths) {
+        if (typeof p !== 'string' || p.length === 0) {
+          throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
+        }
+        credentialToolsPaths.push(p);
+        // Skip dirs whose tools are already registered (idempotent re-init guard).
+        if (!registries.tools.has('request_credential')) {
+          registerExecDirInto(p, { owner: 'credential', trustedCredentialProvenance: true });
+        }
+      }
+    }
+    state.credentialToolsPaths = credentialToolsPaths;
 
     state.initialized = true;
     if (config?.executionMode === 'plan') state.config.executionMode = 'plan';
