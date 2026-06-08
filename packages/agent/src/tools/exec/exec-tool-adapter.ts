@@ -35,7 +35,8 @@ export class ExecToolAdapter extends Tool {
   constructor(
     private binPath: string,
     private descriptor: ExecToolDescriptor,
-    nameOverride?: string
+    nameOverride?: string,
+    private trustedCredentialProvenance = false
   ) {
     super();
     this.name = nameOverride ?? descriptor.name;
@@ -55,19 +56,42 @@ export class ExecToolAdapter extends Tool {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<ToolResult> {
+    // The capabilities flag is self-declared by the binary, so directory
+    // provenance is the real control: forward the broker socket only when the
+    // tool was discovered from the host-only credential dir AND it declares the
+    // credentials capability.
+    const allowCredentialSocket =
+      this.trustedCredentialProvenance &&
+      (this.descriptor.capabilities?.includes('credentials') ?? false);
     const payload = JSON.stringify({
       input: args,
       context: {
         sessionId: context.activeSessionId ?? '',
         persona: context.persona ?? '',
-        // credentialSocket: seam for #6, gated on the manifest
+        ...(allowCredentialSocket && context.credentialBrokerSocket
+          ? {
+              role: context.persona ?? '',
+              credentialBrokerSocket: context.credentialBrokerSocket,
+              // The role's spawn environment (Part B): the broker binds a minted
+              // placeholder to it. Forwarded with the broker socket under the
+              // same provenance gate.
+              environment: context.roleEnvironment ?? '',
+            }
+          : {}),
       },
     });
+    // The trusted credential tool runs host-side and talks to the broker over
+    // the socket; it never needs the session cwd. For a container session,
+    // context.workingDirectory is a container path (e.g. /work) that does not
+    // exist on the host → ENOENT at spawn. Spawn it in a host-valid dir instead.
+    const cwd = allowCredentialSocket
+      ? (context.toolTempDir ?? process.cwd())
+      : (context.workingDirectory ?? context.toolTempDir ?? process.cwd());
     await acquire();
     try {
       const res = await runExecToolProcess(this.binPath, ['lace-tool-invoke'], {
         stdin: payload,
-        cwd: context.workingDirectory ?? context.toolTempDir ?? process.cwd(),
+        cwd,
         timeoutMs: context.timeoutMs ?? 120_000,
         signal: context.signal,
       });

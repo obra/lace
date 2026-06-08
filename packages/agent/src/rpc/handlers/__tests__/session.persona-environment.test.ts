@@ -59,11 +59,11 @@ runtime:
 `;
 
 function readPersistedRuntimeBinding(sessionId: string): {
-  toolRuntime: { type: string };
+  toolRuntime: { type: string; spec?: { role?: string } };
 } {
   const statePath = join(getSessionDir(sessionId), 'state.json');
   const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as {
-    config?: { runtimeBinding?: { toolRuntime: { type: string } } };
+    config?: { runtimeBinding?: { toolRuntime: { type: string; spec?: { role?: string } } } };
   };
   if (!parsed.config?.runtimeBinding) {
     throw new Error('no runtimeBinding persisted');
@@ -422,6 +422,64 @@ describe('session/new honors a persona container environment', () => {
 
       // The stale container binding was discarded for the host persona.
       expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('boundedHost');
+    } finally {
+      client2.close();
+      server2.close();
+    }
+  });
+
+  // ROLE RE-KEY REGRESSION: a session persisted BEFORE the role field was added
+  // to container bindings carries a container binding whose spec lacks `role`.
+  // PlaneRuntime.create now REQUIRES config.role, so resuming with such a stale
+  // binding makes the main session's own bash fail. Resume MUST re-resolve the
+  // container binding from the persona so `role` is present (= the persona name).
+  it('re-resolves a container binding that is missing role on resume', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    let sessionId: string;
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+      })) as { sessionId: string };
+      sessionId = result.sessionId;
+      // session/new already mints a container binding carrying role.
+      expect(readPersistedRuntimeBinding(sessionId).toolRuntime.spec?.role).toBe('boxed');
+    } finally {
+      client.close();
+      server.close();
+    }
+
+    // Simulate a pre-role-fix persisted state: strip `role` from the persisted
+    // container binding's spec, leaving an otherwise valid container binding.
+    const statePath = join(getSessionDir(sessionId), 'state.json');
+    const stale = JSON.parse(readFileSync(statePath, 'utf8')) as {
+      config: { runtimeBinding: { toolRuntime: { type: string; spec: { role?: string } } } };
+    };
+    delete stale.config.runtimeBinding.toolRuntime.spec.role;
+    writeFileSync(statePath, JSON.stringify(stale));
+    expect(readPersistedRuntimeBinding(sessionId).toolRuntime.type).toBe('container');
+    expect(readPersistedRuntimeBinding(sessionId).toolRuntime.spec?.role).toBeUndefined();
+
+    // Resume in a fresh server. The env file is present so re-resolution succeeds
+    // and the effective binding regains role = the persona name.
+    const state2 = createAgentServerState();
+    const { client: client2, server: server2 } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, state2)
+    );
+    try {
+      await client2.request('initialize', initParams());
+      await client2.request('session/resume', {
+        sessionId,
+        cwd: workDir,
+        mcpServers: [],
+      });
+
+      const binding = readPersistedRuntimeBinding(sessionId);
+      expect(binding.toolRuntime.type).toBe('container');
+      expect(binding.toolRuntime.spec?.role).toBe('boxed');
     } finally {
       client2.close();
       server2.close();

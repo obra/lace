@@ -44,16 +44,6 @@ function resolvePersonaMountsAndEnv(input: {
 
   const mounts: RuntimeMountDescriptor[] = [];
   for (const mountName of runtimeMounts) {
-    // 'sen-cred' is plane-provided, not embedder-provided: a persona declaring it
-    // is the sen-docker shim's GATE SIGNAL. The shim detects the declaration and
-    // injects its own per-container capability socket at /run/sen-cred.sock. lace
-    // must accept the declaration (so the gate stays) but must NOT resolve it
-    // against the registry or emit a bind for it — that bind would be redundant
-    // (the shim substitutes its own) and on the plane lace's mounts are discarded
-    // anyway (PlaneRuntime sends only selector verbs). Skip it.
-    if (mountName === 'sen-cred') {
-      continue;
-    }
     // 'scratch' is reserved for per_invocation personas only — lace auto-injects
     // the per-invocation work directory at /work. Persistent personas may still
     // use 'scratch' as a named mount resolved through the registry.
@@ -186,6 +176,7 @@ export interface ProjectedPersonaRuntimeSpec {
   mounts: RuntimeMountDescriptor[];
   env: Record<string, string>;
   persona: string;
+  role: string;
   parentSession: string;
   childSession?: string;
   jobId?: string;
@@ -223,8 +214,10 @@ export function buildProjectedRuntimeSpec(
       mounts,
       env,
       // Root A selector fields (persistent has no child session). The shim keys
-      // spawn/ownership on the environment name.
+      // spawn/ownership on the environment name; `role` is the persona/role name
+      // forwarded for credential-helper authz.
       persona: input.environmentName,
+      role: personaName,
       parentSession: parentSessionId,
       ...(input.jobId ? { jobId: input.jobId } : {}),
     };
@@ -252,6 +245,7 @@ export function buildProjectedRuntimeSpec(
     env,
     // Root A selector fields.
     persona: input.environmentName,
+    role: personaName,
     parentSession: parentSessionId,
     childSession: input.childSessionId,
     ...(input.jobId ? { jobId: input.jobId } : {}),
@@ -282,6 +276,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
       env,
       restartPolicy: 'unless-stopped',
       persona: input.environmentName,
+      role: personaName,
       parentSessionId,
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
@@ -307,6 +302,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
     mounts: perInvocationMounts,
     env,
     persona: input.environmentName,
+    role: personaName,
     parentSessionId,
     childSessionId: input.childSessionId,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
@@ -342,6 +338,7 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
     ...(spec.persona ? { persona: spec.persona } : {}),
+    ...(spec.role ? { role: spec.role } : {}),
     ...(spec.parentSessionId ? { parentSessionId: spec.parentSessionId } : {}),
     ...(spec.childSessionId ? { childSessionId: spec.childSessionId } : {}),
     ...(spec.parentSession ? { parentSession: spec.parentSession } : {}),

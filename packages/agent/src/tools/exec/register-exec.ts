@@ -6,11 +6,18 @@ import { discoverExecToolsSync } from './discover';
 
 export function registerExecDirInto(
   dir: string,
-  opts: { namespace?: string; owner: string }
+  opts: { namespace?: string; owner: string; trustedCredentialProvenance?: boolean }
 ): void {
   if (!existsSync(dir)) return; // FS-only; absent → no-op
   const prefix = opts.namespace ? `${opts.namespace}:` : '';
-  for (const tool of discoverExecToolsSync(dir, prefix)) {
+  // trustedCredentialProvenance flows through only when the embedder registers a
+  // host-only, sen-core-owned credential dir. Persona/workspace dirs never set it,
+  // so a self-declared capabilities:['credentials'] from an untrusted dir is inert.
+  for (const tool of discoverExecToolsSync(
+    dir,
+    prefix,
+    opts.trustedCredentialProvenance ?? false
+  )) {
     registries.tools.register(tool.name, tool, opts.owner);
   }
 }

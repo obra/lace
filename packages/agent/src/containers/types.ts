@@ -56,6 +56,9 @@ export interface DockerCreateConfig {
   // runtime rebuilds the full container config from its own catalog using only
   // the persona. The docker/apple runtimes ignore them.
   persona?: string;
+  // The spawned persona's role name. SELECTOR ONLY (credential-helper authz);
+  // PlaneRuntime forwards it as the spawn argv's role. Docker/apple ignore it.
+  role?: string;
   parentSessionId?: string;
   childSessionId?: string;
 }
@@ -70,8 +73,13 @@ export interface PlaneSpawnRequest {
   id?: string;
   name?: string;
 
-  // Selector fields for plane spawn: `spawn <persona> <parent> <child> <jobId>`.
+  // Selector fields for plane spawn:
+  // `spawn <persona/env> <parent> <child> <jobId> <role>`.
+  // `persona` is the ENVIRONMENT (the shim's environment allowlist value);
+  // `role` is the spawned persona's role name, used by the credential helper
+  // for egress source-IP → role authz. Both are required for a plane spawn.
   persona: string;
+  role?: string;
   parentSession?: string;
   childSession?: string;
   jobId?: string;

@@ -85,6 +85,8 @@ export type SessionState = {
     toolScope?: string[];
     /** Persona name used to render the session's system prompt. */
     personaName?: string;
+    /** Host-only credential broker socket for this session's role (Part B). */
+    credentialBrokerSocket?: string;
   };
 };
 

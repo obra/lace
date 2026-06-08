@@ -210,6 +210,21 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).toThrow();
 
+    // initialize with embedder-supplied credentialToolsPaths is accepted and
+    // round-trips the array of exec-dir paths.
+    const initWithCredPaths = EntProtocolRequestSchema.parse({
+      jsonrpc: '2.0',
+      id: 'init-credential-tools-paths',
+      method: 'initialize',
+      params: {
+        protocolVersion: '1.0',
+        clientInfo: { name: 'test-client', version: '0.0.0' },
+        capabilities: { streaming: true },
+        credentialToolsPaths: ['/x', '/y/credential-tool'],
+      },
+    }) as { params: { credentialToolsPaths?: string[] } };
+    expect(initWithCredPaths.params.credentialToolsPaths).toEqual(['/x', '/y/credential-tool']);
+
     expect(() =>
       EntProtocolRequestSchema.parse({
         jsonrpc: '2.0',
@@ -682,53 +697,6 @@ describe('protocol shapes (representative examples)', () => {
         jsonrpc: '2.0',
         id: 'a_1',
         result: { decision: 'allow' },
-      })
-    ).not.toThrow();
-  });
-
-  it('accepts host/spawn/env request and response shapes', () => {
-    expect(() =>
-      schema('HostSpawnEnvRequestSchema').parse({
-        jsonrpc: '2.0',
-        id: 'a_1',
-        method: 'host/spawn/env',
-        params: {
-          jobId: 'job_abc',
-          persona: 'shell',
-          parentSessionId: 'sess_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-          runtimeId: 'rt_xyz',
-        },
-      })
-    ).not.toThrow();
-
-    // runtimeId is optional
-    expect(() =>
-      schema('HostSpawnEnvRequestSchema').parse({
-        jsonrpc: '2.0',
-        id: 'a_2',
-        method: 'host/spawn/env',
-        params: {
-          jobId: 'job_abc',
-          persona: 'shell',
-          parentSessionId: 'sess_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
-        },
-      })
-    ).not.toThrow();
-
-    expect(() =>
-      schema('HostSpawnEnvResponseSchema').parse({
-        jsonrpc: '2.0',
-        id: 'a_1',
-        result: { env: { HTTPBIN_BEARER_TEST: 'sen-placeholder-abc' } },
-      })
-    ).not.toThrow();
-
-    // Empty env is valid (embedder declined to inject anything).
-    expect(() =>
-      schema('HostSpawnEnvResponseSchema').parse({
-        jsonrpc: '2.0',
-        id: 'a_2',
-        result: { env: {} },
       })
     ).not.toThrow();
   });

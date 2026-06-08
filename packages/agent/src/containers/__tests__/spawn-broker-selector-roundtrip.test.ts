@@ -84,14 +84,16 @@ describe('PRI-2012 B7.1 SELECTOR round-trip to create() config', () => {
 
   afterEach(() => {});
 
-  it('threads persona/parentSessionId/childSessionId from a persona binding to create()', async () => {
+  it('threads persona/role/parentSessionId/childSessionId from a persona binding to create()', async () => {
     // Hops 1+2: build the daemon spec, then the projected runtime spec (the wire
     // descriptor shape). This is the exact production path buildPersonaProjected-
     // RuntimeBinding takes. Helper omitted — irrelevant to the selector thread.
+    // personaName (the ROLE) is intentionally DISTINCT from environmentName so the
+    // round-trip proves the role — not the environment — reaches create().
     const spec = buildPersonaContainerSpec({
       parentSessionId: PARENT_SESSION_ID,
-      personaName: 'shell',
-      environmentName: 'shell',
+      personaName: 'ephemeral-box-worker',
+      environmentName: 'ephemeral-box',
       childSessionId: CHILD_SESSION_ID,
       scratchDirHostPath: SCRATCH_PATH,
       runtime: perInvocationRuntime,
@@ -112,7 +114,9 @@ describe('PRI-2012 B7.1 SELECTOR round-trip to create() config', () => {
 
     expect(runtime.createdConfigs).toHaveLength(1);
     const config = runtime.createdConfigs[0];
-    expect(config.persona).toBe('shell');
+    // persona (the SELECTOR) is the environment; role is the persona/role name.
+    expect(config.persona).toBe('ephemeral-box');
+    expect(config.role).toBe('ephemeral-box-worker');
     expect(config.parentSessionId).toBe(PARENT_SESSION_ID);
     expect(config.childSessionId).toBe(CHILD_SESSION_ID);
   });

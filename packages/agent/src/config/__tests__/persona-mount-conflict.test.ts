@@ -93,9 +93,9 @@ Body.`;
     expect(findEnvironmentMountConflicts(reg, {})).toHaveLength(0);
   });
 
-  it('ignores reserved mount names (scratch, sen-cred)', () => {
-    writeEnv('persistent-box', persistentEnv(['sen-cred']));
-    writeEnv('eph', ephemeralEnv(['sen-cred']));
+  it('ignores the reserved mount name (scratch)', () => {
+    writeEnv('persistent-box', persistentEnv(['scratch']));
+    writeEnv('eph', ephemeralEnv(['scratch']));
     const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
     expect(findEnvironmentMountConflicts(reg, {})).toHaveLength(0);
   });

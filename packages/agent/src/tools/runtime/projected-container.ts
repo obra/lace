@@ -266,6 +266,9 @@ async function containerSpecFromDescriptor(
   if (descriptor.spec.persona) {
     spec.persona = descriptor.spec.persona;
   }
+  if (descriptor.spec.role) {
+    spec.role = descriptor.spec.role;
+  }
   if (descriptor.spec.parentSession) {
     spec.parentSession = descriptor.spec.parentSession;
   }

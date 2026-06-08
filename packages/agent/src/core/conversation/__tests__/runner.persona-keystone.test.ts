@@ -220,6 +220,31 @@ describe('ConversationRunner — persona keystone', () => {
     expect(capturedCtx?.persona).toBe('researcher');
   });
 
+  it('stamps credentialBrokerSocket into the tool context', async () => {
+    let capturedCtx: ToolContext | undefined;
+
+    const provider = new OneToolCallProvider('capture', {});
+    const executor = makeCapturingExecutor((_toolCall, ctx) => {
+      capturedCtx = ctx;
+    });
+    const deps = createMockDeps(provider, executor);
+    const runner = new ConversationRunner(
+      makeConfig({ credentialBrokerSocket: '/run/host/sen-cred-role.sock' }),
+      deps
+    );
+
+    await runner.run({
+      content: [{ type: 'text', text: 'Run the capture tool.' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+      maxTurns: 2,
+    });
+
+    expect(executor.execute).toHaveBeenCalled();
+    expect(capturedCtx?.credentialBrokerSocket).toBe('/run/host/sen-cred-role.sock');
+  });
+
   it('leaves ToolContext.persona undefined when config.persona is not set', async () => {
     let capturedCtx: ToolContext | undefined;
 

@@ -288,6 +288,22 @@ export function registerPromptHandler(
       );
       const skillRegistry = new SkillRegistry({ skillDirs });
 
+      // Resolve the session role's spawn environment (Part A) so the credential
+      // exec-tool can bind a minted placeholder to it (Part B). A container role
+      // declares `runtime: { type: container, environment }`; a root persona
+      // declares no environment. Best-effort — a parse failure must not block a
+      // prompt, so we leave roleEnvironment unset (the broker defaults to '').
+      let roleEnvironment: string | undefined;
+      const sessionPersona = state.activeSession.meta.persona;
+      if (sessionPersona !== undefined) {
+        try {
+          const runtime = state.personaRegistry.parsePersona(sessionPersona).config.runtime;
+          if (runtime.type === 'container') roleEnvironment = runtime.environment;
+        } catch {
+          // Unknown/invalid persona — leave roleEnvironment unset.
+        }
+      }
+
       // Build runner config
       const config: RunnerConfig = {
         sessionDir: state.activeSession.dir,
@@ -301,6 +317,10 @@ export function registerPromptHandler(
         runtimeBinding: state.activeSession.state.config?.runtimeBinding,
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
         ...(state.activeSession.meta.persona ? { persona: state.activeSession.meta.persona } : {}),
+        ...(roleEnvironment ? { roleEnvironment } : {}),
+        ...(effectiveConfig.credentialBrokerSocket
+          ? { credentialBrokerSocket: effectiveConfig.credentialBrokerSocket }
+          : {}),
       };
 
       const sessionIdForCache = state.activeSession.meta.sessionId;

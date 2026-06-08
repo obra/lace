@@ -15,6 +15,8 @@ export interface SubagentEffectiveConfig {
   connectionId?: string;
   modelId?: string;
   approvalMode?: ApprovalMode;
+  /** Host-only credential broker socket inherited from the parent (Part B). */
+  credentialBrokerSocket?: string;
 }
 
 /**
@@ -30,8 +32,36 @@ export interface SubagentEffectiveConfig {
  */
 export function buildSubagentInitConfig(effective: SubagentEffectiveConfig): {
   approvalMode: ApprovalMode;
+  credentialBrokerSocket?: string;
 } {
-  return { approvalMode: effective.approvalMode ?? 'ask' };
+  return {
+    approvalMode: effective.approvalMode ?? 'ask',
+    // Forward the parent's broker socket so the child's effective config carries
+    // it and its runner stamps it into the credential exec-tool envelope. The
+    // credential dir itself is forwarded separately as a top-level init param
+    // (see buildSubagentCredentialInitParams) — this builds only the config block.
+    ...(effective.credentialBrokerSocket
+      ? { credentialBrokerSocket: effective.credentialBrokerSocket }
+      : {}),
+  };
+}
+
+/**
+ * Build the top-level credential init params forwarded to a subagent child.
+ *
+ * The credential exec-tool directory is registered globally at the child's own
+ * initialize (it is not part of the session `config` block), so it must travel
+ * as a top-level param alongside userPersonasPaths — not through
+ * buildSubagentInitConfig. The child re-registers the dir with trusted
+ * provenance and re-stamps the broker socket; a child whose role owns no
+ * credential is simply denied at the broker.
+ */
+export function buildSubagentCredentialInitParams(parent: { credentialToolsPaths?: string[] }): {
+  credentialToolsPaths?: string[];
+} {
+  return parent.credentialToolsPaths && parent.credentialToolsPaths.length > 0
+    ? { credentialToolsPaths: parent.credentialToolsPaths }
+    : {};
 }
 
 export interface SubagentConfigSlot {
