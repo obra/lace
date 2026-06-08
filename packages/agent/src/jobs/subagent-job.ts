@@ -18,6 +18,7 @@ import { persistSubagentChildExit } from './subagent-exit-handler';
 import {
   applyEffectiveJobConfig,
   buildSubagentInitConfig,
+  buildSubagentCredentialInitParams,
   formatSubagentStopDetails,
   jobStatusFromStopReason,
   rpcErrorMessage,
@@ -847,6 +848,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         userEnvironmentsPaths: subagentUserEnvironmentsPaths,
         ...(subagentMcpBaseDir ? { mcpBaseDir: subagentMcpBaseDir } : {}),
         skillDirs: subagentSkillDirs,
+        // Forward the credential exec-tool dir as a top-level param (the child
+        // re-registers it with trusted provenance at its own initialize); the
+        // broker socket rides in the config block via buildSubagentInitConfig.
+        ...buildSubagentCredentialInitParams(currentState),
         config: buildSubagentInitConfig(parentEffective),
       });
 
