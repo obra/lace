@@ -80,11 +80,18 @@ export class ExecToolAdapter extends Tool {
           : {}),
       },
     });
+    // The trusted credential tool runs host-side and talks to the broker over
+    // the socket; it never needs the session cwd. For a container session,
+    // context.workingDirectory is a container path (e.g. /work) that does not
+    // exist on the host → ENOENT at spawn. Spawn it in a host-valid dir instead.
+    const cwd = allowCredentialSocket
+      ? (context.toolTempDir ?? process.cwd())
+      : (context.workingDirectory ?? context.toolTempDir ?? process.cwd());
     await acquire();
     try {
       const res = await runExecToolProcess(this.binPath, ['lace-tool-invoke'], {
         stdin: payload,
-        cwd: context.workingDirectory ?? context.toolTempDir ?? process.cwd(),
+        cwd,
         timeoutMs: context.timeoutMs ?? 120_000,
         signal: context.signal,
       });
