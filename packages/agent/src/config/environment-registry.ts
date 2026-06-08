@@ -12,7 +12,7 @@ import { getLaceDir } from './lace-dir';
 // the role persona used to carry inline (pre Part A); it now lives in a separate
 // environment file referenced by name. Coupled to sen-docker/src/persona.rs
 // PersonaSpec (deny_unknown_fields) — edits here need a plane round-trip.
-const mountNameSchema = z.string().regex(/^[a-z][a-z0-9-]*$/);
+const mountNameSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/);
 const portMappingSchema = z
   .object({
     host: z.number().int().min(0).max(65535),
