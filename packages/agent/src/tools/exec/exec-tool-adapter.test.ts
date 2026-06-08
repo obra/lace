@@ -66,6 +66,17 @@ describe('ExecToolAdapter', () => {
       (await dumpedContext(plain, ctx({ credentialBrokerSocket: SOCK }))).credentialBrokerSocket
     ).toBeUndefined();
   });
+  it('stamps role (from persona) alongside persona for a trusted credentials tool', async () => {
+    const SOCK = '/run/host/sen-cred-role.sock';
+    const trusted = new ExecToolAdapter(DUMP, credDescriptor, undefined, true);
+    const dumped = await dumpedContext(
+      trusted,
+      ctx({ persona: 'reviewer-role', credentialBrokerSocket: SOCK })
+    );
+    expect(dumped.role).toBe('reviewer-role');
+    // persona remains present and unchanged (other tools/tests depend on it).
+    expect(dumped.persona).toBe('reviewer-role');
+  });
   it('maps non-zero exit to failed', async () => {
     const fail = parseExecToolDescriptor(
       '{"name":"fail","description":"x","inputSchema":{"type":"object","properties":{}}}'

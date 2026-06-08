@@ -70,6 +70,7 @@ export class ExecToolAdapter extends Tool {
         persona: context.persona ?? '',
         ...(allowCredentialSocket && context.credentialBrokerSocket
           ? {
+              role: context.persona ?? '',
               credentialBrokerSocket: context.credentialBrokerSocket,
               // The role's spawn environment (Part B): the broker binds a minted
               // placeholder to it. Forwarded with the broker socket under the
