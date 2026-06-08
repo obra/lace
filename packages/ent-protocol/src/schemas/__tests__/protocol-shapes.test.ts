@@ -210,6 +210,21 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).toThrow();
 
+    // initialize with embedder-supplied credentialToolsPaths is accepted and
+    // round-trips the array of exec-dir paths.
+    const initWithCredPaths = EntProtocolRequestSchema.parse({
+      jsonrpc: '2.0',
+      id: 'init-credential-tools-paths',
+      method: 'initialize',
+      params: {
+        protocolVersion: '1.0',
+        clientInfo: { name: 'test-client', version: '0.0.0' },
+        capabilities: { streaming: true },
+        credentialToolsPaths: ['/x', '/y/credential-tool'],
+      },
+    }) as { params: { credentialToolsPaths?: string[] } };
+    expect(initWithCredPaths.params.credentialToolsPaths).toEqual(['/x', '/y/credential-tool']);
+
     expect(() =>
       EntProtocolRequestSchema.parse({
         jsonrpc: '2.0',

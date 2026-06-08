@@ -165,6 +165,12 @@ const InitializeParamsSchema = z
       )
       .optional()
       .default({}),
+    // Host-only exec-tool directories supplied by the embedder, registered
+    // globally with trusted credential provenance. Each dir holds sen-core's
+    // credential exec-tools (e.g. request_credential); directory provenance —
+    // not the binary's self-declared capability — is what grants the broker
+    // socket.
+    credentialToolsPaths: z.array(z.string()).optional(),
   })
   .strict();
 export type InitializeParams = z.infer<typeof InitializeParamsSchema>;
