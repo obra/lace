@@ -85,6 +85,9 @@ const ContainerRuntimeDescriptorSchema = z
         gatewayRoute: z.string().min(1).optional(),
         // Shared selector field. The privileged runtime re-validates it.
         persona: z.string().min(1).optional(),
+        // The spawned persona's role name, carried alongside `persona` (the
+        // environment) for the credential helper's source-IP → role authz.
+        role: z.string().min(1).optional(),
         // Spawn-broker selector fields. They MUST be allowed through this
         // .strict() runtime-binding validator or broker round-trips fail.
         parentSessionId: z.string().min(1).optional(),

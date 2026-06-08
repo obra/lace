@@ -67,6 +67,9 @@ export type ToolRuntimeDescriptor =
         // Shared selector field. It is a selector only, never an authority
         // source: the selected privileged runtime re-validates it.
         persona?: string;
+        // The spawned persona's role name, carried alongside `persona` (the
+        // environment) for the credential helper's egress source-IP → role authz.
+        role?: string;
         // Spawn-broker selector fields. Carried verbatim across the
         // ContainerSpec -> RuntimeSpec -> ContainerSpec round-trip.
         parentSessionId?: string;

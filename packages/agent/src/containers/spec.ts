@@ -19,6 +19,10 @@ export interface ContainerSpec {
   // the privileged runtime validates it and rebuilds the full container spec.
   persona?: string;
 
+  // The spawned persona's role name. Carried alongside `persona` (the
+  // environment) so PlaneRuntime can forward it for credential-helper authz.
+  role?: string;
+
   // Privileged-runtime selector fields, carried alongside `persona`.
   // Docker/apple runtimes ignore them.
   parentSessionId?: string;

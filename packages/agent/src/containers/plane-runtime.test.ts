@@ -53,6 +53,7 @@ function makeFakeChild(): FakeChild {
 function spawnRequest(extra: Partial<PlaneSpawnRequest> = {}): PlaneSpawnRequest {
   return {
     persona: 'ephemeral-shell',
+    role: 'ephemeral-box-worker',
     parentSession: 'sess_parent',
     childSession: 'sess_child',
     jobId: 'job_1',
@@ -65,7 +66,7 @@ describe('PlaneRuntime', () => {
     spawnMock.mockReset();
   });
 
-  it('create emits the 4-arg spawn verb and returns the daemon name', async () => {
+  it('create emits the 5-arg spawn verb (role last) and returns the daemon name', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-abc\n',
       stderr: '',
@@ -81,6 +82,7 @@ describe('PlaneRuntime', () => {
       'sess_parent',
       'sess_child',
       'job_1',
+      'ephemeral-box-worker',
     ]);
     expect(id).toBe('sen-x-abc');
   });
@@ -95,6 +97,7 @@ describe('PlaneRuntime', () => {
 
     await rt.create({
       persona: 'ephemeral-shell',
+      role: 'ephemeral-box-worker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
       image: 'ignored-by-plane:latest',
@@ -109,6 +112,7 @@ describe('PlaneRuntime', () => {
       'sess_parent',
       'sess_child',
       'job_1',
+      'ephemeral-box-worker',
     ]);
   });
 
@@ -135,6 +139,21 @@ describe('PlaneRuntime', () => {
     ).rejects.toThrow(/persona/);
   });
 
+  it('rejects when role is missing', async () => {
+    const rt = new PlaneRuntime('/bin/sen-docker-client', {
+      run: vi.fn<PlaneRunner['run']>(),
+    });
+
+    await expect(
+      rt.create({
+        persona: 'ephemeral-shell',
+        parentSession: 'sess_parent',
+        childSession: 'sess_child',
+        jobId: 'job_1',
+      } as PlaneSpawnRequest)
+    ).rejects.toThrow(/role/);
+  });
+
   it('synthesizes jobId from the child session when absent', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-child\n',
@@ -145,6 +164,7 @@ describe('PlaneRuntime', () => {
 
     await rt.create({
       persona: 'ephemeral-shell',
+      role: 'ephemeral-box-worker',
       parentSession: 'sess_parent',
       childSession: 'sess_child',
     } as PlaneSpawnRequest);
@@ -155,6 +175,7 @@ describe('PlaneRuntime', () => {
       'sess_parent',
       'sess_child',
       'job_child',
+      'ephemeral-box-worker',
     ]);
   });
 
@@ -218,6 +239,7 @@ describe('PlaneRuntime', () => {
       'sess_parent',
       'sess_child',
       'job_1',
+      'ephemeral-box-worker',
     ]);
     await expect(rt.inspect('sen-x-adopt')).resolves.toMatchObject({ state: 'running' });
   });

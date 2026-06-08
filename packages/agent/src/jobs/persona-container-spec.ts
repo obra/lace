@@ -176,6 +176,7 @@ export interface ProjectedPersonaRuntimeSpec {
   mounts: RuntimeMountDescriptor[];
   env: Record<string, string>;
   persona: string;
+  role: string;
   parentSession: string;
   childSession?: string;
   jobId?: string;
@@ -213,8 +214,10 @@ export function buildProjectedRuntimeSpec(
       mounts,
       env,
       // Root A selector fields (persistent has no child session). The shim keys
-      // spawn/ownership on the environment name.
+      // spawn/ownership on the environment name; `role` is the persona/role name
+      // forwarded for credential-helper authz.
       persona: input.environmentName,
+      role: personaName,
       parentSession: parentSessionId,
       ...(input.jobId ? { jobId: input.jobId } : {}),
     };
@@ -242,6 +245,7 @@ export function buildProjectedRuntimeSpec(
     env,
     // Root A selector fields.
     persona: input.environmentName,
+    role: personaName,
     parentSession: parentSessionId,
     childSession: input.childSessionId,
     ...(input.jobId ? { jobId: input.jobId } : {}),
@@ -272,6 +276,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
       env,
       restartPolicy: 'unless-stopped',
       persona: input.environmentName,
+      role: personaName,
       parentSessionId,
       ...(runtime.sysctls ? { sysctls: runtime.sysctls } : {}),
       ...(runtime.capAdd ? { capAdd: runtime.capAdd } : {}),
@@ -297,6 +302,7 @@ export function buildPersonaContainerSpec(input: PersonaContainerSpecInput): Con
     mounts: perInvocationMounts,
     env,
     persona: input.environmentName,
+    role: personaName,
     parentSessionId,
     childSessionId: input.childSessionId,
     ...(runtime.ports ? { ports: runtime.ports } : {}),
@@ -332,6 +338,7 @@ export function containerSpecToRuntimeSpec(input: {
     ...(spec.network ? { network: spec.network } : {}),
     ...(spec.gatewayRoute ? { gatewayRoute: spec.gatewayRoute } : {}),
     ...(spec.persona ? { persona: spec.persona } : {}),
+    ...(spec.role ? { role: spec.role } : {}),
     ...(spec.parentSessionId ? { parentSessionId: spec.parentSessionId } : {}),
     ...(spec.childSessionId ? { childSessionId: spec.childSessionId } : {}),
     ...(spec.parentSession ? { parentSession: spec.parentSession } : {}),

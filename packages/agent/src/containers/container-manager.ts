@@ -190,6 +190,7 @@ export class ContainerManager {
       gatewayRoute: spec.gatewayRoute,
       labels: spec.labels,
       persona: spec.persona,
+      role: spec.role,
       parentSessionId: spec.parentSessionId,
       childSessionId: spec.childSessionId,
       parentSession: spec.parentSession,

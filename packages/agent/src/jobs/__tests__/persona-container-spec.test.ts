@@ -54,6 +54,7 @@ describe('environment-keyed container identity', () => {
     });
     expect(spec.name).toBe('persistent-box'); // env, not role
     expect(spec.persona).toBe('persistent-box'); // shim selector value = env
+    expect(spec.role).toBe('persistent-box-worker'); // role for credential authz
   });
 
   it('composes the per_invocation name from the environment name', () => {

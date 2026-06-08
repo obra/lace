@@ -129,6 +129,13 @@ export class PlaneRuntime implements ContainerRuntime {
         config.name ?? config.id
       );
     }
+    const role = config.role;
+    if (!role) {
+      throw new ContainerError(
+        'PlaneRuntime.create requires config.role (credential-helper authz selector)',
+        config.name ?? config.id
+      );
+    }
     const requestedName = config.id ?? config.name ?? config.jobId ?? persona;
 
     const parentSession =
@@ -141,13 +148,14 @@ export class PlaneRuntime implements ContainerRuntime {
 
     logger.info('Spawning persona via sen-docker plane', {
       persona,
+      role,
       parentSession,
       childSession: childSession || undefined,
       jobId,
     });
 
     const result = await this.runChecked(
-      ['spawn', persona, parentSession, childSession, jobId],
+      ['spawn', persona, parentSession, childSession, jobId, role],
       requestedName,
       `plane spawn failed for persona '${persona}'`
     );
