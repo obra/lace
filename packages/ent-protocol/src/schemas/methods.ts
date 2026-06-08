@@ -127,6 +127,10 @@ const InitializeParamsSchema = z
         maxThinkingTokens: z.number().optional(),
         enableFileCheckpointing: z.boolean().optional(),
         sandbox: SandboxConfigSchema.optional(),
+        // Host-only credential broker socket path for this connection. Merged
+        // into every session's effective config and forwarded into the
+        // credential exec-tool envelope (Part B).
+        credentialBrokerSocket: z.string().optional(),
       })
       .strict()
       .optional(),

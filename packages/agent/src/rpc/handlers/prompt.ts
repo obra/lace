@@ -318,8 +318,8 @@ export function registerPromptHandler(
         maxBudgetUsd: effectiveConfig.maxBudgetUsd,
         ...(state.activeSession.meta.persona ? { persona: state.activeSession.meta.persona } : {}),
         ...(roleEnvironment ? { roleEnvironment } : {}),
-        ...(state.activeSession.state.config?.credentialBrokerSocket
-          ? { credentialBrokerSocket: state.activeSession.state.config.credentialBrokerSocket }
+        ...(effectiveConfig.credentialBrokerSocket
+          ? { credentialBrokerSocket: effectiveConfig.credentialBrokerSocket }
           : {}),
       };
 

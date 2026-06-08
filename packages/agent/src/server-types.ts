@@ -138,6 +138,12 @@ export type AgentServerState = {
     maxBudgetUsd?: number;
     maxThinkingTokens?: number;
     environment?: Record<string, string>;
+    /**
+     * Host-only credential broker socket path for this connection. Stamped from
+     * the initialize config and merged into every session's effective config so
+     * the runner forwards it into the credential exec-tool envelope (Part B).
+     */
+    credentialBrokerSocket?: string;
   };
   activeTurn: null | {
     turnId: string;

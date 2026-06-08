@@ -203,6 +203,13 @@ export function registerInitializeHandler(
       }
       state.config.environment = Object.keys(envObj).length > 0 ? envObj : undefined;
     }
+    // Host-only credential broker socket for this connection (Part B). Stored at
+    // the server level so getEffectiveConfig merges it into every session — the
+    // runner reads it from effectiveConfig and forwards it into the credential
+    // exec-tool envelope.
+    if (typeof config?.credentialBrokerSocket === 'string') {
+      state.config.credentialBrokerSocket = config.credentialBrokerSocket;
+    }
 
     const jobStreaming = capabilities['ent/jobStreaming'];
     if (jobStreaming === 'full' || jobStreaming === 'coalesced' || jobStreaming === 'none') {

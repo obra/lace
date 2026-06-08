@@ -254,6 +254,9 @@ export class TestAgentProvider extends AIProvider {
             case 'todo_read':
               content = 'Reading todos...';
               break;
+            case 'request_credential':
+              content = `Requesting credential ${(requested.args as Record<string, unknown>).id as string}...`;
+              break;
             case 'todo_write': {
               const args = requested.args as Record<string, unknown>;
               if (args.id) {
@@ -345,9 +348,22 @@ export class TestAgentProvider extends AIProvider {
   }
 
   private extractRequestedTool(text: string): null | {
-    name: 'delegate' | 'file_read' | 'file_write' | 'bash' | 'todo_read' | 'todo_write';
+    name:
+      | 'delegate'
+      | 'file_read'
+      | 'file_write'
+      | 'bash'
+      | 'todo_read'
+      | 'todo_write'
+      | 'request_credential';
     args: Record<string, unknown>;
   } {
+    // Handle "request credential <id>" pattern (exec-tool credential flow). Used
+    // by the credential-broker-socket chain test to drive request_credential.
+    const credentialMatch = text.match(/request\s+credential\s+(.+)\s*$/i);
+    const credentialId = credentialMatch?.[1]?.trim();
+    if (credentialId) return { name: 'request_credential', args: { id: credentialId } };
+
     // Handle "add todo: <title>" or "todo add: <title>" pattern
     const todoAddMatch = text.match(/(?:add\s+todo|todo\s+add)[:\s]\s*(.+)\s*$/i);
     const todoTitle = todoAddMatch?.[1]?.trim();
