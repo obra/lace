@@ -292,8 +292,11 @@ export class ToolExecutor {
     }
 
     // Per-session option-taking built-ins. Fail loudly if a plugin claimed their reserved names.
+    // The credential exec-dir is the one sanctioned exception: the embedder registers it globally
+    // with owner 'credential' (trusted provenance) at initialize, so a 'request_credential'
+    // registration under that owner is permitted; any other owner is still fatal.
     for (const reserved of PER_SESSION_BUILTIN_NAMES) {
-      if (registries.tools.has(reserved)) {
+      if (registries.tools.has(reserved) && registries.tools.owner(reserved) !== 'credential') {
         throw new Error(`plugin registered reserved built-in tool name "${reserved}"`);
       }
     }

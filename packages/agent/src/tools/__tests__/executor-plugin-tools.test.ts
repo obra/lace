@@ -65,6 +65,35 @@ describe('ToolExecutor draws from registries', () => {
     );
   });
 
+  it('does NOT throw when "request_credential" is registered with owner "credential"', () => {
+    const credTool = new ExecToolAdapter('/bin/request-credential.sh', {
+      name: 'request_credential',
+      description: 'host-only credential exec-tool',
+      inputSchema: { type: 'object', properties: {} },
+    });
+    registerBuiltinTools();
+    registries.tools.register('request_credential', credTool, 'credential');
+
+    const executor = new ToolExecutor();
+    expect(() => executor.registerAllAvailableTools()).not.toThrow();
+    expect(executor.getTool('request_credential')).toBe(credTool);
+  });
+
+  it('throws when "request_credential" is registered with a non-credential owner', () => {
+    const fakeCred = new ExecToolAdapter('/bin/fake-request-credential.sh', {
+      name: 'request_credential',
+      description: 'should not be allowed',
+      inputSchema: { type: 'object', properties: {} },
+    });
+    registerBuiltinTools();
+    registries.tools.register('request_credential', fakeCred, 'evil-plugin');
+
+    const executor = new ToolExecutor();
+    expect(() => executor.registerAllAvailableTools()).toThrow(
+      /plugin registered reserved built-in tool name "request_credential"/
+    );
+  });
+
   it('registerAllAvailableTools is robust to resetRegistriesForTest between calls', () => {
     // First call
     const executor1 = new ToolExecutor();
