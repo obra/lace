@@ -360,9 +360,14 @@ export class TestAgentProvider extends AIProvider {
   } {
     // Handle "request credential <id>" pattern (exec-tool credential flow). Used
     // by the credential-broker-socket chain test to drive request_credential.
+    // A delegation wrapper ("delegate …" / "subagent …") takes precedence so a
+    // parent can delegate an inner credential request to a child, which then
+    // receives the bare inner prompt and matches this pattern itself.
+    const isDelegation = /^\s*(?:delegate|subagent)\b/i.test(text);
     const credentialMatch = text.match(/request\s+credential\s+(.+)\s*$/i);
     const credentialId = credentialMatch?.[1]?.trim();
-    if (credentialId) return { name: 'request_credential', args: { id: credentialId } };
+    if (credentialId && !isDelegation)
+      return { name: 'request_credential', args: { id: credentialId } };
 
     // Handle "add todo: <title>" or "todo add: <title>" pattern
     const todoAddMatch = text.match(/(?:add\s+todo|todo\s+add)[:\s]\s*(.+)\s*$/i);
