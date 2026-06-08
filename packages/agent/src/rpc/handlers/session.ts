@@ -117,19 +117,32 @@ function parseSessionRuntimeBinding(value: unknown): RuntimeExecutionBinding {
  * for a main session, so childSessionId/scratchDirHostPath (per_invocation only)
  * are not passed.
  *
- * Returns undefined for a non-container (root/host) persona, or when persona /
- * environment resolution fails — the caller then falls back to a host binding.
- * Resolution failure must not crash session creation, so errors are logged and
- * swallowed; a VALID container persona produces a container binding.
+ * A non-container (root/host) persona returns undefined cleanly — the caller
+ * then falls back to a host binding, which is the CORRECT runtime for those
+ * personas.
+ *
+ * FAIL-CLOSED: a persona that DECLARES a container environment but whose
+ * environment cannot be resolved (typo'd `environment:`, missing/invalid env
+ * file, projection failure) must NOT silently downgrade to a host session —
+ * that would run a persona that expects a box unboxed on the host, reintroducing
+ * the very escape hole the container binding closes. So for the container branch
+ * we do NOT catch-and-swallow: any resolution error is rethrown with a
+ * descriptive message and propagates out of session/new and activateStoredSession,
+ * failing session creation loudly. This mirrors delegate.ts, which fails (never
+ * runs the subagent host-side) on the same error.
  */
 function resolvePersonaContainerBinding(
   state: AgentServerState,
   sessionId: string,
   personaName: string
 ): RuntimeExecutionBinding | undefined {
+  // Resolve the persona runtime FIRST. Host/root personas return before any
+  // environment resolution so they never throw — host is correct for them.
+  const personaRuntime = state.personaRegistry.parsePersona(personaName).config.runtime;
+  if (personaRuntime.type !== 'container') return undefined;
+
+  // Container persona: resolve the environment WITHOUT swallowing errors.
   try {
-    const personaRuntime = state.personaRegistry.parsePersona(personaName).config.runtime;
-    if (personaRuntime.type !== 'container') return undefined;
     const envRuntime = state.environmentRegistry.parseEnvironment(
       personaRuntime.environment
     ).runtime;
@@ -141,12 +154,17 @@ function resolvePersonaContainerBinding(
       containerMounts: state.containerMounts ?? {},
     });
   } catch (error) {
-    logger.warn('session.persona_container_binding_failed', {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error('session.persona_container_binding_failed', {
       sessionId,
       persona: personaName,
-      error: error instanceof Error ? error.message : String(error),
+      environment: personaRuntime.environment,
+      error: message,
     });
-    return undefined;
+    throw new Error(
+      `session persona '${personaName}' declares container environment ` +
+        `'${personaRuntime.environment}' but it failed to resolve: ${message}`
+    );
   }
 }
 

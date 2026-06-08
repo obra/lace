@@ -2,7 +2,7 @@
 // ABOUTME: for the MAIN session when the persona declares a container environment.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -31,6 +31,14 @@ runtime:
   environment: boxed-env
 ---
 You run in a box.
+`;
+
+const CONTAINER_PERSONA_BAD_ENV = `---
+runtime:
+  type: container
+  environment: does-not-exist
+---
+You declare a box whose environment is missing.
 `;
 
 const HOST_PERSONA = `---
@@ -86,6 +94,7 @@ describe('session/new honors a persona container environment', () => {
     mkdirSync(environmentsDir, { recursive: true });
     writeFileSync(join(personasDir, 'boxed.md'), CONTAINER_PERSONA);
     writeFileSync(join(personasDir, 'plain.md'), HOST_PERSONA);
+    writeFileSync(join(personasDir, 'boxed-broken.md'), CONTAINER_PERSONA_BAD_ENV);
     writeFileSync(join(environmentsDir, 'boxed-env.md'), CONTAINER_ENV);
   });
 
@@ -168,6 +177,109 @@ describe('session/new honors a persona container environment', () => {
 
       const binding = readPersistedRuntimeBinding(result.sessionId);
       expect(binding.toolRuntime.type).toBe('boundedHost');
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  // SECURITY REGRESSION: a persona that DECLARES a container environment whose
+  // environment can't resolve must FAIL session creation — never silently fall
+  // back to a host-bound (unboxed) session.
+  it('fails closed when a container persona references a missing environment', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    try {
+      await client.request('initialize', initParams());
+
+      await expect(
+        client.request('session/new', {
+          cwd: workDir,
+          mcpServers: [],
+          persona: 'boxed-broken',
+        })
+      ).rejects.toThrow(/does-not-exist/);
+
+      // Assert no host-bound session leaked through: every persisted session for
+      // this persona must NOT carry a boundedHost/host binding. We scan the lace
+      // sessions dir; either no session was created, or none is host-bound.
+      const sessionsRoot = join(tempDir, 'sessions');
+      let created: string[] = [];
+      try {
+        created = readdirSync(sessionsRoot).filter((name) => name.startsWith('sess_'));
+      } catch {
+        created = [];
+      }
+      for (const sessionId of created) {
+        const statePath = join(getSessionDir(sessionId), 'state.json');
+        let raw: string;
+        try {
+          raw = readFileSync(statePath, 'utf8');
+        } catch {
+          continue;
+        }
+        const parsed = JSON.parse(raw) as {
+          config?: { personaName?: string; runtimeBinding?: { toolRuntime: { type: string } } };
+        };
+        if (parsed.config?.personaName === 'boxed-broken') {
+          const type = parsed.config.runtimeBinding?.toolRuntime.type;
+          expect(type).not.toBe('boundedHost');
+          expect(type).not.toBe('host');
+        }
+      }
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('preserves a container binding across resume', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+      })) as { sessionId: string };
+
+      expect(readPersistedRuntimeBinding(result.sessionId).toolRuntime.type).toBe('container');
+
+      await client.request('session/resume', {
+        sessionId: result.sessionId,
+        cwd: workDir,
+        mcpServers: [],
+      });
+
+      // The active (persisted) binding still resolves to a container after resume.
+      expect(readPersistedRuntimeBinding(result.sessionId).toolRuntime.type).toBe('container');
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('lets an explicit runtimeBinding override persona container resolution', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+        config: {
+          runtimeBinding: {
+            schemaVersion: 1,
+            identity: { runtimeId: 'explicit-host' },
+            toolRuntime: { type: 'host', cwd: workDir },
+          },
+        },
+      })) as { sessionId: string };
+
+      // Explicit host binding wins over the persona's declared container env.
+      expect(readPersistedRuntimeBinding(result.sessionId).toolRuntime.type).toBe('host');
     } finally {
       client.close();
       server.close();
