@@ -296,9 +296,15 @@ async function activateStoredSession(
 
   // Resolve the binding CONSISTENCY-AWARE. An explicit params.runtimeBinding
   // always wins. Otherwise a persisted binding may be trusted ONLY when its
-  // container-ness matches the persona's NOW-declared runtime type:
-  //   - declared container + persisted container → keep (lazy; tolerates a
-  //     transiently-broken env, since we don't re-resolve).
+  // container-ness matches the persona's NOW-declared runtime type AND (for a
+  // container) it is not stale on a field the runtime now requires:
+  //   - declared container + persisted container WITH role → keep (lazy;
+  //     tolerates a transiently-broken env, since we don't re-resolve).
+  //   - declared container + persisted container MISSING role → re-resolve from
+  //     the persona, FAIL-CLOSED. A binding persisted before the role field was
+  //     added lacks `role`, which PlaneRuntime.create now REQUIRES; re-resolving
+  //     repopulates it (= the persona name) and is robust to future
+  //     binding-field additions across upgrades.
   //   - declared container + persisted host (or none) → re-resolve from the
   //     persona, FAIL-CLOSED (boxes a session persisted before boxing; a
   //     declared-container persona must NEVER run host-side).
@@ -311,9 +317,14 @@ async function activateStoredSession(
     const personaName = loaded.state.config?.personaName ?? loaded.meta.persona;
     const declaredContainer = personaDeclaresContainer(state, personaName);
     const persistedType = persistedRuntimeBinding?.toolRuntime.type;
+    const persistedContainerCarriesRole =
+      persistedRuntimeBinding?.toolRuntime.type === 'container' &&
+      persistedRuntimeBinding.toolRuntime.spec.role !== undefined;
     const persistedMatches =
       persistedRuntimeBinding !== undefined &&
-      (declaredContainer ? persistedType === 'container' : persistedType !== 'container');
+      (declaredContainer
+        ? persistedType === 'container' && persistedContainerCarriesRole
+        : persistedType !== 'container');
     if (persistedMatches) {
       activeRuntimeBinding = persistedRuntimeBinding;
     } else if (declaredContainer) {
