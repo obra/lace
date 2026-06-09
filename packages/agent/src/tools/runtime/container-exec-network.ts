@@ -25,11 +25,12 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       headerArgs.push('-H', `${key}: ${value}`);
     }
 
-    // `sh -c 'curl "$@" | base64 -w0' curl ...args` passes url/headers as curl's
+    // `bash -c 'curl "$@" | base64 -w0' curl ...args` passes url/headers as curl's
     // positional $@ — no shell interpolation, so they cannot be injected. pipefail
-    // propagates curl's exit code through the base64 pipe.
+    // propagates curl's exit code through the base64 pipe. MUST be bash, not sh:
+    // /bin/sh is dash in the persona images and rejects `set -o pipefail`.
     const argv = [
-      'sh',
+      'bash',
       '-c',
       'set -o pipefail; curl "$@" | base64 -w0',
       'curl',

@@ -79,6 +79,9 @@ describe('ContainerExecNetworkClient', () => {
     const secret = 'super-secret-payload';
     await client.fetch('https://example.com/post', { method: 'POST', body: secret });
     const argv = calls[0]!;
+    // Interpreter MUST be bash: the command uses `set -o pipefail`, which /bin/sh
+    // (dash, in the persona images) rejects with "Illegal option -o pipefail".
+    expect(argv[0]).toBe('bash');
     expect(stdinWrites).toContain(secret);
     expect(argv).toContain('--data-binary');
     expect(argv).toContain('@-');
