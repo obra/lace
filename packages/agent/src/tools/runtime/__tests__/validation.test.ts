@@ -20,6 +20,29 @@ function containerBinding(specExtra: Record<string, unknown> = {}): unknown {
 }
 
 describe('runtime binding validation', () => {
+  it('tolerates a legacy `helper` key on a persisted container binding (resume-compat)', () => {
+    // Pre-helperless sessions persisted a `helper` descriptor on the binding.
+    // The helper is gone, but a resumed binding still carries the key; the
+    // strict schema must accept (ignore) it, not reject, or sessionResume fails.
+    expect(() =>
+      parseRuntimeExecutionBinding({
+        schemaVersion: 1,
+        identity: { runtimeId: 'rt_container' },
+        toolRuntime: {
+          type: 'container',
+          cwd: '/work',
+          spec: { name: 'sess1-box', image: 'sen-box:dev', workingDirectory: '/work', mounts: [] },
+          helper: {
+            mode: 'mount',
+            hostPath: '/x',
+            containerPath: '/usr/local/bin/lace-runtime-helper.js',
+            command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
+          },
+        },
+      })
+    ).not.toThrow();
+  });
+
   it('defaults missing host state to boundedHost runtime', () => {
     expect(
       buildDefaultBoundedHostRuntimeBinding({ sessionId: 'sess_123', cwd: '/repo' })

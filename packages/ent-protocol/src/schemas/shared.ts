@@ -84,6 +84,11 @@ const ContainerRuntimeDescriptorSchema = z
         restartPolicy: z.literal('unless-stopped').optional(),
       })
       .strict(),
+    // Legacy field: pre-helperless sessions persisted a `helper` descriptor on
+    // the binding. The helper is gone and nothing reads this, but the field must
+    // be TOLERATED (not strict-rejected) so those persisted sessions still
+    // resume. Ignored on parse. Do not reintroduce a producer.
+    helper: z.unknown().optional(),
   })
   .strict();
 

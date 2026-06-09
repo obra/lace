@@ -112,6 +112,10 @@ const ContainerRuntimeDescriptorSchema = z
           message: 'Container selector fields cannot be combined with docker authority fields',
         });
       }),
+    // Legacy field: pre-helperless sessions persisted a `helper` descriptor on
+    // the binding. Gone and unread now, but TOLERATED (not strict-rejected) so
+    // those persisted sessions still resume/validate. Ignored. No producer.
+    helper: z.unknown().optional(),
   })
   .strict();
 
