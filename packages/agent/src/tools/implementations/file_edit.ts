@@ -45,7 +45,7 @@ export class FileEditTool extends Tool {
 
 * All edits are applied atomically - if any edit fails validation, no changes are made
 * Each edit replaces old_text with new_text exactly once by default
-* Use file_read first to see exact content, then copy text precisely
+* You MUST file_read a path before editing it — read-before-edit is enforced; an edit to an unread path fails. Read first to see exact content, then copy text precisely
 
 Notes for the edits parameter:
 * The old_text must match EXACTLY one or more consecutive lines from the file. Be mindful of whitespaces!
