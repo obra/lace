@@ -222,7 +222,7 @@ describe('runtime binding validation', () => {
     expect(() =>
       parseRuntimeExecutionBinding(
         containerBinding({
-          persona: 'ephemeral-shell',
+          persona: 'ephemeral-box',
           parentSessionId: 'sess_parent00112233',
           childSessionId: 'sess_child00112233',
           ports: [{ host: 7777, container: 7777 }],

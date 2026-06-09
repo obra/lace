@@ -52,7 +52,7 @@ function makeFakeChild(): FakeChild {
 
 function spawnRequest(extra: Partial<PlaneSpawnRequest> = {}): PlaneSpawnRequest {
   return {
-    persona: 'ephemeral-shell',
+    persona: 'ephemeral-box',
     role: 'ephemeral-box-worker',
     parentSession: 'sess_parent',
     childSession: 'sess_child',
@@ -78,7 +78,7 @@ describe('PlaneRuntime', () => {
 
     expect(run).toHaveBeenCalledWith([
       'spawn',
-      'ephemeral-shell',
+      'ephemeral-box',
       'sess_parent',
       'sess_child',
       'job_1',
@@ -96,7 +96,7 @@ describe('PlaneRuntime', () => {
     const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
 
     await rt.create({
-      persona: 'ephemeral-shell',
+      persona: 'ephemeral-box',
       role: 'ephemeral-box-worker',
       parentSessionId: 'sess_parent',
       childSessionId: 'sess_child',
@@ -108,7 +108,7 @@ describe('PlaneRuntime', () => {
 
     expect(run).toHaveBeenCalledWith([
       'spawn',
-      'ephemeral-shell',
+      'ephemeral-box',
       'sess_parent',
       'sess_child',
       'job_1',
@@ -146,7 +146,7 @@ describe('PlaneRuntime', () => {
 
     await expect(
       rt.create({
-        persona: 'ephemeral-shell',
+        persona: 'ephemeral-box',
         parentSession: 'sess_parent',
         childSession: 'sess_child',
         jobId: 'job_1',
@@ -163,7 +163,7 @@ describe('PlaneRuntime', () => {
     const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
 
     await rt.create({
-      persona: 'ephemeral-shell',
+      persona: 'ephemeral-box',
       role: 'ephemeral-box-worker',
       parentSession: 'sess_parent',
       childSession: 'sess_child',
@@ -171,7 +171,7 @@ describe('PlaneRuntime', () => {
 
     expect(run).toHaveBeenCalledWith([
       'spawn',
-      'ephemeral-shell',
+      'ephemeral-box',
       'sess_parent',
       'sess_child',
       'job_child',
@@ -235,7 +235,7 @@ describe('PlaneRuntime', () => {
 
     expect(run).toHaveBeenCalledWith([
       'spawn',
-      'ephemeral-shell',
+      'ephemeral-box',
       'sess_parent',
       'sess_child',
       'job_1',
