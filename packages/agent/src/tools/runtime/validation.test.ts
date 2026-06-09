@@ -27,14 +27,14 @@ describe('parseRuntimeExecutionBinding — selector-field completeness (bug-#7 g
   it('accepts a container binding carrying all four selector fields', () => {
     const b = parseRuntimeExecutionBinding(
       containerBinding({
-        persona: 'ephemeral-shell',
+        persona: 'ephemeral-box',
         parentSession: 'sess_p',
         childSession: 'sess_c',
         jobId: 'job_x',
       })
     );
     const spec = (b.toolRuntime as { type: 'container'; spec: Record<string, unknown> }).spec;
-    expect(spec.persona).toBe('ephemeral-shell');
+    expect(spec.persona).toBe('ephemeral-box');
     expect(spec.parentSession).toBe('sess_p');
     expect(spec.childSession).toBe('sess_c');
     expect(spec.jobId).toBe('job_x');
