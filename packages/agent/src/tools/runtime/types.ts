@@ -24,13 +24,6 @@ export interface RuntimePortDescriptor {
   container: number;
 }
 
-export interface RuntimeHelperDescriptor {
-  mode: 'copy' | 'mount' | 'image';
-  hostPath?: string;
-  containerPath: string;
-  command: string[];
-}
-
 export type ToolRuntimeDescriptor =
   | { type: 'host'; cwd: string }
   | {
@@ -81,7 +74,6 @@ export type ToolRuntimeDescriptor =
         jobId?: string;
       };
       cwd: string;
-      helper?: RuntimeHelperDescriptor;
     };
 
 export interface RuntimeExecutionBinding {

@@ -99,12 +99,6 @@ describe('runtime identity', () => {
           ports: [{ container: 3000, host: 13000 }],
         },
         cwd: '/workspace',
-        helper: {
-          mode: 'image',
-          containerPath: '/usr/local/bin/lace-runtime-helper',
-          hostPath: '/tmp/lace-runtime-helper',
-          command: ['node', '/usr/local/bin/lace-runtime-helper'],
-        },
       },
     };
 
@@ -141,11 +135,6 @@ describe('runtime identity', () => {
           ],
         },
         cwd: '/workspace',
-        helper: {
-          mode: 'image',
-          containerPath: '/usr/local/bin/lace-runtime-helper',
-          command: ['node', '/usr/local/bin/lace-runtime-helper'],
-        },
       },
     };
     const second: RuntimeExecutionBinding = {
@@ -163,7 +152,6 @@ describe('runtime identity', () => {
           ports: [...(first.toolRuntime.spec.ports ?? [])].reverse(),
         },
         cwd: first.toolRuntime.cwd,
-        helper: first.toolRuntime.helper,
       },
     };
 

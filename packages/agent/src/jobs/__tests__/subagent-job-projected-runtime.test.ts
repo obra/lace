@@ -217,11 +217,6 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
           workingDirectory: '/work',
           mounts: [],
         },
-        helper: {
-          mode: 'image',
-          containerPath: '/usr/local/bin/lace-runtime-helper.js',
-          command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
-        },
       },
     };
 

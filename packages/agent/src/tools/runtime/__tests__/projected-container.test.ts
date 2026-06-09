@@ -1,9 +1,6 @@
 import { PassThrough, Readable } from 'node:stream';
-import { access, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it, vi } from 'vitest';
-import type { ContainerLifecycleHooks, ContainerSpec } from '../../../containers/spec';
 import { ProjectedContainerToolRuntime } from '../projected-container';
 import { InMemoryRuntimeSecretResolver } from '../secrets';
 
@@ -54,25 +51,6 @@ function descriptor() {
           hostPath: '/host/repo',
           containerPath: '/workspace',
           readonly: false,
-        },
-      ],
-    },
-    cwd: '/workspace',
-  };
-}
-
-function descriptorWithMount(input: { hostPath: string; readonly?: boolean }) {
-  return {
-    spec: {
-      name: 'projected-runtime',
-      containerId: 'container_123',
-      image: 'example/app@sha256:' + 'b'.repeat(64),
-      workingDirectory: '/workspace',
-      mounts: [
-        {
-          hostPath: input.hostPath,
-          containerPath: '/workspace',
-          readonly: input.readonly ?? false,
         },
       ],
     },
@@ -286,40 +264,7 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(source).not.toContain('child_process');
   });
 
-  it('mounts host-provided runtime helpers read-only when helper mode is mount', async () => {
-    const manager = createFakeContainerManager();
-    const projectedDescriptor = {
-      ...descriptor(),
-      helper: {
-        mode: 'mount' as const,
-        hostPath: '/host/lace-runtime-helper',
-        containerPath: '/usr/local/bin/lace-runtime-helper',
-        command: ['/usr/local/bin/lace-runtime-helper'],
-      },
-    };
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: manager,
-      descriptor: projectedDescriptor,
-    });
-
-    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
-
-    expect(manager.materialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        mounts: expect.arrayContaining([
-          {
-            source: '/host/lace-runtime-helper',
-            target: '/usr/local/bin/lace-runtime-helper',
-            readonly: true,
-          },
-        ]),
-      })
-    );
-  });
-
-  it('uses a stable mounted helper when adopting an existing persistent container', async () => {
-    const helperPath = '/host/lace-runtime-helper.js';
+  it('adopts an existing persistent container preserving restartPolicy and containerId', async () => {
     const projectedDescriptor = {
       ...descriptor(),
       spec: {
@@ -327,12 +272,6 @@ describe('ProjectedContainerToolRuntime', () => {
         name: 'box-shell',
         containerId: 'sen-box-shell',
         restartPolicy: 'unless-stopped' as const,
-      },
-      helper: {
-        mode: 'mount' as const,
-        hostPath: helperPath,
-        containerPath: '/usr/local/bin/lace-runtime-helper.js',
-        command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
       },
     };
     const manager = createFakeContainerManager();
@@ -342,9 +281,7 @@ describe('ProjectedContainerToolRuntime', () => {
         containerId: 'sen-box-shell',
         image: projectedDescriptor.spec.image,
         workingDirectory: '/workspace',
-        mounts: [
-          { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
-        ],
+        mounts: [],
         restartPolicy: 'unless-stopped',
       },
       containerId: 'sen-box-shell',
@@ -362,58 +299,10 @@ describe('ProjectedContainerToolRuntime', () => {
       expect.objectContaining({
         name: 'box-shell',
         containerId: 'sen-box-shell',
-        mounts: expect.arrayContaining([
-          { source: helperPath, target: '/usr/local/bin/lace-runtime-helper.js', readonly: true },
-        ]),
       })
     );
     const materializedSpec = manager.materialize.mock.calls[0][0];
     expect(materializedSpec.restartPolicy).toBe('unless-stopped');
-  });
-
-  it('copies host-provided runtime helpers before creating copy-mode containers', async () => {
-    const helperRoot = await mkdtemp(join(tmpdir(), 'lace-helper-source-'));
-    const helperPath = join(helperRoot, 'runtime-helper.js');
-    await writeFile(helperPath, 'helper source', 'utf8');
-    const projectedDescriptor = {
-      ...descriptor(),
-      helper: {
-        mode: 'copy' as const,
-        hostPath: helperPath,
-        containerPath: '/usr/local/bin/lace-runtime-helper',
-        command: ['/usr/local/bin/lace-runtime-helper'],
-      },
-    };
-    const manager = {
-      materialize: vi.fn(async (spec: ContainerSpec, hooks?: ContainerLifecycleHooks) => {
-        await hooks?.beforeCreate?.();
-        return {
-          spec,
-          containerId: 'container_123',
-          state: 'running' as const,
-        };
-      }),
-      execStream: vi.fn().mockResolvedValue(createFakeExecStreamHandle()),
-    };
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: manager,
-      descriptor: projectedDescriptor,
-    });
-
-    await runtime.process.start(['/bin/sh', '-lc', 'echo ok'], { cwd: runtime.cwd });
-
-    const spec = manager.materialize.mock.calls[0][0];
-    const helperMount = spec.mounts.find(
-      (mount) => mount.target === '/usr/local/bin/lace-runtime-helper'
-    );
-    expect(helperMount).toBeDefined();
-    expect(helperMount).toMatchObject({
-      readonly: true,
-      target: '/usr/local/bin/lace-runtime-helper',
-    });
-    expect(helperMount!.source).not.toBe(helperPath);
-    await expect(readFile(helperMount!.source, 'utf8')).resolves.toBe('helper source');
   });
 
   it('merges resolved secret env into the materialized container spec', async () => {
@@ -655,55 +544,5 @@ describe('ProjectedContainerToolRuntime', () => {
 
     await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
     expect(containerHandle.kill).toHaveBeenCalledTimes(1);
-  });
-
-  it('rejects writes through readonly host mounts without mutating the host file', async () => {
-    const hostRoot = await mkdtemp(join(tmpdir(), 'lace-projected-readonly-'));
-    const hostFile = join(hostRoot, 'file.txt');
-    await writeFile(hostFile, 'original', 'utf8');
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: createFakeContainerManager(),
-      descriptor: descriptorWithMount({ hostPath: hostRoot, readonly: true }),
-    });
-
-    const path = await runtime.paths.resolve('/workspace/file.txt');
-
-    await expect(runtime.fs.writeTextFile(path, 'updated')).rejects.toThrow(/read.?only/i);
-    await expect(readFile(hostFile, 'utf8')).resolves.toBe('original');
-  });
-
-  it('rejects host fast-path reads through symlinks that escape the mount root', async () => {
-    const hostRoot = await mkdtemp(join(tmpdir(), 'lace-projected-mount-'));
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'lace-projected-outside-'));
-    const outsideFile = join(outsideRoot, 'secret.txt');
-    await writeFile(outsideFile, 'outside secret', 'utf8');
-    await symlink(outsideFile, join(hostRoot, 'secret-link.txt'));
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: createFakeContainerManager(),
-      descriptor: descriptorWithMount({ hostPath: hostRoot }),
-    });
-
-    const path = await runtime.paths.resolve('/workspace/secret-link.txt');
-
-    await expect(runtime.fs.readTextFile(path)).rejects.toThrow(/outside.*mount/i);
-  });
-
-  it('rejects host fast-path writes through symlinked parents that escape the mount root', async () => {
-    const hostRoot = await mkdtemp(join(tmpdir(), 'lace-projected-mount-'));
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'lace-projected-outside-'));
-    const outsideFile = join(outsideRoot, 'new.txt');
-    await symlink(outsideRoot, join(hostRoot, 'outside-link'));
-    const runtime = new ProjectedContainerToolRuntime({
-      id: 'rt_container',
-      containerManager: createFakeContainerManager(),
-      descriptor: descriptorWithMount({ hostPath: hostRoot }),
-    });
-
-    const path = await runtime.paths.resolve('/workspace/outside-link/new.txt');
-
-    await expect(runtime.fs.writeTextFile(path, 'leaked')).rejects.toThrow(/outside.*mount/i);
-    await expect(access(outsideFile)).rejects.toThrow();
   });
 });

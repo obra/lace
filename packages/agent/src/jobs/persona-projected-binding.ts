@@ -3,30 +3,12 @@
 
 import type { MountRegistryEntry } from '@lace/agent/server-types';
 import { buildRuntimeId } from '@lace/agent/tools/runtime/identity';
-import type {
-  RuntimeExecutionBinding,
-  RuntimeHelperDescriptor,
-} from '@lace/agent/tools/runtime/types';
-import { fileURLToPath } from 'node:url';
+import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import {
   buildPersonaContainerSpec,
   containerSpecToRuntimeSpec,
   type PersonaContainerRuntime,
 } from './persona-container-spec';
-
-const HELPER_CONTAINER_PATH = '/usr/local/bin/lace-runtime-helper.js';
-
-function resolveRuntimeHelperDescriptor(): RuntimeHelperDescriptor {
-  const hostPath =
-    process.env.LACE_RUNTIME_HELPER_HOST_PATH ??
-    fileURLToPath(new URL('../tools/runtime/container-helper.js', import.meta.url));
-  return {
-    mode: 'mount',
-    hostPath,
-    containerPath: HELPER_CONTAINER_PATH,
-    command: ['node', HELPER_CONTAINER_PATH],
-  };
-}
 
 export function buildPersonaProjectedRuntimeBinding(input: {
   parentSessionId: string;
@@ -62,7 +44,6 @@ export function buildPersonaProjectedRuntimeBinding(input: {
       type: 'container',
       spec: runtimeSpec,
       cwd: input.runtime.workingDirectory,
-      helper: resolveRuntimeHelperDescriptor(),
     },
     // Tag the binding with the lifecycle so post-exit handlers (Chunk E) can
     // branch on per_invocation vs persistent without inspecting toolRuntime

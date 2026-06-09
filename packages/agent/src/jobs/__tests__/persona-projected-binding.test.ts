@@ -41,31 +41,12 @@ describe('buildPersonaProjectedRuntimeBinding', () => {
         parentSessionId: PARENT_SESSION_ID,
         childSessionId: CHILD_SESSION_ID,
       },
-      helper: {
-        mode: 'mount',
-        containerPath: '/usr/local/bin/lace-runtime-helper.js',
-        command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
-      },
     });
     const containerRuntime = binding.toolRuntime as Extract<
       RuntimeExecutionBinding['toolRuntime'],
       { type: 'container' }
     >;
     expect(containerRuntime.spec.ports).toEqual([{ host: 6080, container: 6080 }]);
-
-    // Helper descriptor must be present on every projected binding.
-    expect(
-      (
-        binding.toolRuntime as Extract<
-          RuntimeExecutionBinding['toolRuntime'],
-          { type: 'container' }
-        >
-      ).helper
-    ).toMatchObject({
-      mode: 'mount',
-      containerPath: '/usr/local/bin/lace-runtime-helper.js',
-      command: ['node', '/usr/local/bin/lace-runtime-helper.js'],
-    });
 
     // Runtime id should be deterministic and start with the session prefix.
     expect(binding.identity.runtimeId).toMatch(/^runtime:session:/);
