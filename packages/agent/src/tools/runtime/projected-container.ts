@@ -20,13 +20,13 @@ import {
   resolve as resolveHostPath,
   sep,
 } from 'node:path';
-import type { Readable, Writable } from 'node:stream';
 import type {
   ContainerHandle,
   ContainerLifecycleHooks,
   ContainerSpec,
 } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
+import { streamToString, writeStreamAndClose } from './container-exec-shared';
 import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
 import {
   RuntimeSecretResolutionError,
@@ -122,26 +122,6 @@ function pathRelativeToMount(containerPath: string, runtimePath: string): string
     return runtimePath.slice(1);
   }
   return posix.relative(containerPath, runtimePath);
-}
-
-function streamToString(stream: Readable | undefined): Promise<string> {
-  if (!stream) return Promise.resolve('');
-
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer | string) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-  });
-}
-
-function writeStreamAndClose(stream: Writable, content: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    stream.once('error', reject);
-    stream.end(content, 'utf8', resolve);
-  });
 }
 
 function abortErrorFromSignal(signal: AbortSignal | undefined): Error {

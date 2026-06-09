@@ -1,9 +1,8 @@
 // ABOUTME: RuntimeFileSystem implemented by shelling stock binaries through a brokered process runner.
 // ABOUTME: Byte-bearing payloads are base64-wrapped so the runner's utf8 stdout/stdin transport is lossless.
 
-import type { Readable, Writable } from 'node:stream';
 import type { RuntimeFileSystem, RuntimePath, RuntimeProcessRunner } from './types';
-import { nodeErrorFromExec } from './container-exec-shared';
+import { nodeErrorFromExec, streamToString, writeStreamAndClose } from './container-exec-shared';
 
 export class ContainerExecFileSystem implements RuntimeFileSystem {
   constructor(private readonly process: RuntimeProcessRunner) {}
@@ -41,10 +40,10 @@ export class ContainerExecFileSystem implements RuntimeFileSystem {
       throw new Error('ContainerExecFileSystem write stream unavailable');
     }
     await writeStreamAndClose(handle.stdin, Buffer.from(content, 'utf8').toString('base64'));
+    const stderrPromise = streamToString(handle.stderr);
     const { exitCode } = await handle.completion;
     if (exitCode !== 0) {
-      const stderr = await streamToString(handle.stderr);
-      throw nodeErrorFromExec(exitCode ?? -1, stderr, 'writeTextFile', p);
+      throw nodeErrorFromExec(exitCode ?? -1, await stderrPromise, 'writeTextFile', p);
     }
   }
 
@@ -83,24 +82,4 @@ export class ContainerExecFileSystem implements RuntimeFileSystem {
         };
       });
   }
-}
-
-function streamToString(stream: Readable | undefined): Promise<string> {
-  if (!stream) return Promise.resolve('');
-
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk: Buffer | string) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
-  });
-}
-
-function writeStreamAndClose(stream: Writable, content: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    stream.once('error', reject);
-    stream.end(content, 'utf8', resolve);
-  });
 }
