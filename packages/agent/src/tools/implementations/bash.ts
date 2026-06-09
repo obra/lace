@@ -50,7 +50,8 @@ Parameters:
 When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
 Background jobs send completion notifications automatically. Progress notifications are opt-in (see progressIntervalMs / job_notify).
 
-Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.`;
+Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.
+A sync command is subject to a runtime timeout (tens of seconds) and is killed if it exceeds it — for anything long-running (installs, builds, long fetches) use background=true and poll job_output(jobId).`;
   schema = bashSchema;
   annotations: ToolAnnotations = {
     title: 'Run commands with bash',
