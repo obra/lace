@@ -60,12 +60,6 @@ function containerRuntimeBinding() {
         ports: [{ host: 3000, container: 3000 }],
         restartPolicy: 'unless-stopped',
       },
-      helper: {
-        mode: 'mount',
-        hostPath: '/host/lace-runtime-helper',
-        containerPath: '/usr/local/bin/lace-runtime-helper',
-        command: ['/usr/local/bin/lace-runtime-helper'],
-      },
     },
   };
 }

@@ -112,15 +112,6 @@ const ContainerRuntimeDescriptorSchema = z
           message: 'Container selector fields cannot be combined with docker authority fields',
         });
       }),
-    helper: z
-      .object({
-        mode: z.enum(['copy', 'mount', 'image']),
-        hostPath: z.string().min(1).optional(),
-        containerPath: z.string().min(1),
-        command: z.array(z.string().min(1)),
-      })
-      .strict()
-      .optional(),
   })
   .strict();
 

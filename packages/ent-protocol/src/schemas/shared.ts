@@ -65,15 +65,6 @@ const RuntimePortDescriptorSchema = z
   })
   .strict();
 
-const RuntimeHelperDescriptorSchema = z
-  .object({
-    mode: z.enum(['copy', 'mount', 'image']),
-    hostPath: NonEmptyStringSchema.optional(),
-    containerPath: NonEmptyStringSchema,
-    command: z.array(NonEmptyStringSchema),
-  })
-  .strict();
-
 const ContainerRuntimeDescriptorSchema = z
   .object({
     type: z.literal('container'),
@@ -93,7 +84,6 @@ const ContainerRuntimeDescriptorSchema = z
         restartPolicy: z.literal('unless-stopped').optional(),
       })
       .strict(),
-    helper: RuntimeHelperDescriptorSchema.optional(),
   })
   .strict();
 
