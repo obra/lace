@@ -93,13 +93,6 @@ function normalizeToolRuntimeForIdentity(toolRuntime: ToolRuntimeDescriptor): un
         : undefined,
     },
     cwd: toolRuntime.cwd,
-    helper: toolRuntime.helper
-      ? {
-          mode: toolRuntime.helper.mode,
-          containerPath: toolRuntime.helper.containerPath,
-          command: toolRuntime.helper.command,
-        }
-      : undefined,
   };
 }
 

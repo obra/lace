@@ -45,7 +45,6 @@ export function createToolRuntimeFromBinding(input: {
   const descriptor: ProjectedContainerToolRuntimeDescriptor = {
     spec: runtime.spec,
     cwd: runtime.cwd,
-    ...(runtime.helper ? { helper: runtime.helper } : {}),
   };
 
   return new ProjectedContainerToolRuntime({

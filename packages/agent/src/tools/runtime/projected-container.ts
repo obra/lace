@@ -1,33 +1,13 @@
-import {
-  cp,
-  lstat,
-  mkdtemp,
-  mkdir as mkdirHost,
-  readdir as readdirHost,
-  readFile,
-  realpath,
-  stat as statHost,
-  writeFile,
-} from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import {
-  basename,
-  dirname,
-  isAbsolute,
-  join,
-  posix,
-  relative,
-  resolve as resolveHostPath,
-  sep,
-} from 'node:path';
+import { posix, resolve as resolveHostPath } from 'node:path';
 import type {
   ContainerHandle,
   ContainerLifecycleHooks,
   ContainerSpec,
 } from '../../containers/spec';
 import type { ExecStreamHandle, ExecStreamOptions } from '../../containers/types';
-import { streamToString, writeStreamAndClose } from './container-exec-shared';
-import { decodeHelperResponse, encodeHelperRequest, type HelperRequest } from './helper-protocol';
+import { streamToString } from './container-exec-shared';
+import { ContainerExecFileSystem } from './container-exec-fs';
+import { ContainerExecNetworkClient } from './container-exec-network';
 import {
   RuntimeSecretResolutionError,
   type RuntimeSecretResolver,
@@ -36,8 +16,6 @@ import {
 } from './secrets';
 import type {
   RuntimeFileSystem,
-  RuntimeFetchOptions,
-  RuntimeFetchResult,
   RuntimeNetworkClient,
   RuntimePath,
   RuntimePathService,
@@ -72,15 +50,10 @@ interface ProjectedContainerSecretContext {
   secretResolver?: RuntimeSecretResolver;
 }
 
-interface NodeError extends Error {
-  code?: string;
-}
-
 interface ProjectedHostMount {
   hostPath: string;
   containerPath: string;
   readonly: boolean;
-  realHostPath?: Promise<string>;
 }
 
 export interface ProjectedContainerManager {
@@ -88,26 +61,8 @@ export interface ProjectedContainerManager {
   execStream(specName: string, options: ExecStreamOptions): Promise<ExecStreamHandle>;
 }
 
-function isNotFoundError(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && (error as NodeError).code === 'ENOENT';
-}
-
 function containerPathIsInside(root: string, path: string): boolean {
   return root === '/' || path === root || path.startsWith(`${root}/`);
-}
-
-function hostPathIsInside(root: string, path: string): boolean {
-  const relativePath = relative(root, path);
-  return (
-    relativePath === '' ||
-    (!relativePath.startsWith(`..${sep}`) && relativePath !== '..' && !isAbsolute(relativePath))
-  );
-}
-
-function requireHostPathInside(root: string, path: string, message: string): void {
-  if (!hostPathIsInside(root, path)) {
-    throw new Error(message);
-  }
 }
 
 function normalizeContainerPath(inputPath: string, cwd: string): string {
@@ -132,14 +87,6 @@ function abortErrorFromSignal(signal: AbortSignal | undefined): Error {
   const error = new Error('The operation was aborted');
   error.name = 'AbortError';
   return error;
-}
-
-function firstResponseLine(output: string): string {
-  const line = output.split(/\r?\n/, 1)[0];
-  if (!line) {
-    throw new Error('Projected runtime helper returned no response');
-  }
-  return line;
 }
 
 function definedEnvironment(
@@ -193,22 +140,18 @@ function assertNoMixedSelectorAuthority(
 async function containerSpecFromDescriptor(
   descriptor: ProjectedContainerToolRuntimeDescriptor,
   secretContext: ProjectedContainerSecretContext
-): Promise<{ spec: ContainerSpec; hooks?: ContainerLifecycleHooks }> {
+): Promise<ContainerSpec> {
   assertNoMixedSelectorAuthority(descriptor.spec);
   const secretEntries = Object.entries(descriptor.spec.secretEnv ?? {});
   const resolvedSecrets =
     secretEntries.length === 0
       ? {}
       : await resolveProjectedContainerSecrets(descriptor, secretContext, secretEntries);
-  const helper = await helperMaterialization(descriptor.helper);
   const mounts: ContainerSpec['mounts'] = descriptor.spec.mounts.map((mount) => ({
     source: mount.hostPath,
     target: mount.containerPath,
     readonly: mount.readonly,
   }));
-  if (helper.mount) {
-    mounts.push(helper.mount);
-  }
   const spec: ContainerSpec = {
     name: descriptor.spec.name,
     image: descriptor.spec.image,
@@ -265,52 +208,7 @@ async function containerSpecFromDescriptor(
     spec.childSessionId = descriptor.spec.childSessionId;
   }
 
-  return helper.hooks ? { spec, hooks: helper.hooks } : { spec };
-}
-
-async function helperMaterialization(
-  helper: ProjectedContainerToolRuntimeDescriptor['helper']
-): Promise<{ mount?: ContainerSpec['mounts'][number]; hooks?: ContainerLifecycleHooks }> {
-  if (!helper || helper.mode === 'image') {
-    return {};
-  }
-
-  const target = normalizeContainerPath(helper.containerPath, '/');
-  const hostPath = requireHelperHostPath(helper);
-
-  if (helper.mode === 'mount') {
-    return {
-      mount: {
-        source: hostPath,
-        target,
-        readonly: true,
-      },
-    };
-  }
-
-  const copyRoot = await mkdtemp(join(tmpdir(), 'lace-runtime-helper-'));
-  const copyPath = join(copyRoot, basename(hostPath) || 'helper');
-  return {
-    mount: {
-      source: copyPath,
-      target,
-      readonly: true,
-    },
-    hooks: {
-      beforeCreate: async () => {
-        await cp(hostPath, copyPath, { recursive: true, force: true });
-      },
-    },
-  };
-}
-
-function requireHelperHostPath(
-  helper: NonNullable<ProjectedContainerToolRuntimeDescriptor['helper']>
-): string {
-  if (!helper.hostPath) {
-    throw new Error(`Projected runtime helper ${helper.mode} mode requires hostPath`);
-  }
-  return resolveHostPath(helper.hostPath);
+  return spec;
 }
 
 async function resolveProjectedContainerSecrets(
@@ -337,85 +235,6 @@ async function resolveProjectedContainerSecrets(
     runtimeId: context.runtimeId,
     sessionId,
   });
-}
-
-function helperUnavailable(): never {
-  throw new Error('Projected runtime helper unavailable');
-}
-
-function ensureRecord(value: unknown, context: string): Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`Invalid helper ${context} response`);
-  }
-  return value as Record<string, unknown>;
-}
-
-function parseFileType(value: unknown, context: string): 'file' | 'directory' {
-  if (value === 'file' || value === 'directory') return value;
-  throw new Error(`Invalid helper ${context} response`);
-}
-
-function parseStringRecord(value: unknown, context: string): Record<string, string> {
-  const record = ensureRecord(value, context);
-  return Object.fromEntries(
-    Object.entries(record).map(([key, entry]) => {
-      if (typeof entry !== 'string') {
-        throw new Error(`Invalid helper ${context} response`);
-      }
-      return [key, entry];
-    })
-  );
-}
-
-function parseStatValue(value: unknown): { type: 'file' | 'directory'; size: number; mtime: Date } {
-  const record = ensureRecord(value, 'stat');
-  if (typeof record.size !== 'number') {
-    throw new Error('Invalid helper stat response');
-  }
-  const mtime = new Date(record.mtime as string | number | Date);
-  if (Number.isNaN(mtime.getTime())) {
-    throw new Error('Invalid helper stat response');
-  }
-  return {
-    type: parseFileType(record.type, 'stat'),
-    size: record.size,
-    mtime,
-  };
-}
-
-function parseReaddirValue(value: unknown): Array<{ name: string; type: 'file' | 'directory' }> {
-  if (!Array.isArray(value)) {
-    throw new Error('Invalid helper readdir response');
-  }
-  return value.map((entry) => {
-    const record = ensureRecord(entry, 'readdir');
-    if (typeof record.name !== 'string') {
-      throw new Error('Invalid helper readdir response');
-    }
-    return {
-      name: record.name,
-      type: parseFileType(record.type, 'readdir'),
-    };
-  });
-}
-
-function parseFetchBody(value: unknown): Uint8Array {
-  if (typeof value === 'string') {
-    return new Uint8Array(Buffer.from(value, 'base64'));
-  }
-  throw new Error('Invalid helper fetch response');
-}
-
-function parseFetchValue(value: unknown): RuntimeFetchResult {
-  const record = ensureRecord(value, 'fetch');
-  if (typeof record.status !== 'number') {
-    throw new Error('Invalid helper fetch response');
-  }
-  return {
-    status: record.status,
-    headers: parseStringRecord(record.headers ?? {}, 'fetch'),
-    body: parseFetchBody(record.body ?? ''),
-  };
 }
 
 class ProjectedContainerPathService implements RuntimePathService {
@@ -455,75 +274,6 @@ class ProjectedContainerPathService implements RuntimePathService {
   }
 }
 
-class ProjectedContainerFileSystem implements RuntimeFileSystem {
-  constructor(
-    private readonly helper: ProjectedContainerRuntimeHelper,
-    private readonly hostAccess: ProjectedContainerHostAccess
-  ) {}
-
-  async stat(
-    path: RuntimePath
-  ): Promise<{ type: 'file' | 'directory'; size: number; mtime: Date }> {
-    if (path.hostPath) {
-      const hostPath = await this.hostAccess.requireExistingPath(path);
-      const result = await statHost(hostPath);
-      return {
-        type: result.isDirectory() ? 'directory' : 'file',
-        size: result.size,
-        mtime: result.mtime,
-      };
-    }
-
-    return parseStatValue(await this.helper.request({ op: 'stat', path: path.runtimePath }));
-  }
-
-  async readTextFile(path: RuntimePath): Promise<string> {
-    if (path.hostPath) {
-      return await readFile(await this.hostAccess.requireExistingPath(path), 'utf8');
-    }
-
-    const value = await this.helper.request({ op: 'readTextFile', path: path.runtimePath });
-    if (typeof value !== 'string') {
-      throw new Error('Invalid helper readTextFile response');
-    }
-    return value;
-  }
-
-  async writeTextFile(path: RuntimePath, content: string): Promise<void> {
-    if (path.hostPath) {
-      await writeFile(await this.hostAccess.requireWritablePath(path), content, 'utf8');
-      return;
-    }
-
-    await this.helper.request({ op: 'writeTextFile', path: path.runtimePath, content });
-  }
-
-  async mkdir(path: RuntimePath, opts?: { recursive?: boolean }): Promise<void> {
-    if (path.hostPath) {
-      await mkdirHost(await this.hostAccess.requireCreatableDirectory(path), {
-        recursive: opts?.recursive,
-      });
-      return;
-    }
-
-    await this.helper.request({ op: 'mkdir', path: path.runtimePath, recursive: opts?.recursive });
-  }
-
-  async readdir(path: RuntimePath): Promise<Array<{ name: string; type: 'file' | 'directory' }>> {
-    if (path.hostPath) {
-      const entries = await readdirHost(await this.hostAccess.requireExistingPath(path), {
-        withFileTypes: true,
-      });
-      return entries.map((entry) => ({
-        name: entry.name,
-        type: entry.isDirectory() ? 'directory' : 'file',
-      }));
-    }
-
-    return parseReaddirValue(await this.helper.request({ op: 'readdir', path: path.runtimePath }));
-  }
-}
-
 function normalizeHostMounts(
   mounts: ProjectedContainerToolRuntimeDescriptor['spec']['mounts']
 ): ProjectedHostMount[] {
@@ -534,123 +284,6 @@ function normalizeHostMounts(
       readonly: mount.readonly,
     }))
     .sort((left, right) => right.containerPath.length - left.containerPath.length);
-}
-
-class ProjectedContainerHostAccess {
-  private readonly mounts: ProjectedHostMount[];
-
-  constructor(mounts: ProjectedContainerToolRuntimeDescriptor['spec']['mounts']) {
-    this.mounts = normalizeHostMounts(mounts);
-  }
-
-  private mountedHostPath(path: RuntimePath): { mount: ProjectedHostMount; hostPath: string } {
-    if (!path.hostPath) {
-      throw new Error(
-        `Access denied: path is not backed by a projected host mount: ${path.displayPath}`
-      );
-    }
-
-    const mount = this.mounts.find((candidate) =>
-      containerPathIsInside(candidate.containerPath, path.runtimePath)
-    );
-    if (!mount) {
-      throw new Error(`Access denied: path is outside projected host mounts: ${path.displayPath}`);
-    }
-
-    const hostPath = resolveHostPath(path.hostPath);
-    requireHostPathInside(
-      mount.hostPath,
-      hostPath,
-      `Access denied: path resolves outside projected host mount: ${path.displayPath}`
-    );
-    return { mount, hostPath };
-  }
-
-  private async assertRealInside(
-    mount: ProjectedHostMount,
-    realHostPath: string,
-    originalPath: string
-  ): Promise<void> {
-    mount.realHostPath ??= realpath(mount.hostPath);
-    const realRoot = await mount.realHostPath;
-    if (!hostPathIsInside(realRoot, realHostPath)) {
-      throw new Error(`Access denied: path resolves outside projected host mount: ${originalPath}`);
-    }
-  }
-
-  private async nearestExistingRealPath(hostPath: string): Promise<string> {
-    let candidate = hostPath;
-
-    for (;;) {
-      try {
-        return await realpath(candidate);
-      } catch (error) {
-        if (!isNotFoundError(error)) throw error;
-      }
-
-      const parent = dirname(candidate);
-      if (parent === candidate) {
-        throw new Error(`Path does not exist: ${hostPath}`);
-      }
-      candidate = parent;
-    }
-  }
-
-  async requireExistingPath(path: RuntimePath): Promise<string> {
-    const { mount, hostPath } = this.mountedHostPath(path);
-    const realHostPath = await realpath(hostPath);
-    await this.assertRealInside(mount, realHostPath, path.displayPath);
-    return hostPath;
-  }
-
-  async requireWritablePath(path: RuntimePath): Promise<string> {
-    const { mount, hostPath } = this.mountedHostPath(path);
-    if (mount.readonly) {
-      throw new Error(`Access denied: projected host mount is read-only: ${path.displayPath}`);
-    }
-
-    try {
-      const realTarget = await realpath(hostPath);
-      await this.assertRealInside(mount, realTarget, path.displayPath);
-      return hostPath;
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-    }
-
-    try {
-      const targetStat = await lstat(hostPath);
-      if (targetStat.isSymbolicLink()) {
-        throw new Error(
-          `Access denied: path resolves outside projected host mount: ${path.displayPath}`
-        );
-      }
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-    }
-
-    const realParent = await this.nearestExistingRealPath(dirname(hostPath));
-    await this.assertRealInside(mount, realParent, path.displayPath);
-    return hostPath;
-  }
-
-  async requireCreatableDirectory(path: RuntimePath): Promise<string> {
-    const { mount, hostPath } = this.mountedHostPath(path);
-    if (mount.readonly) {
-      throw new Error(`Access denied: projected host mount is read-only: ${path.displayPath}`);
-    }
-
-    try {
-      const realTarget = await realpath(hostPath);
-      await this.assertRealInside(mount, realTarget, path.displayPath);
-      return hostPath;
-    } catch (error) {
-      if (!isNotFoundError(error)) throw error;
-    }
-
-    const realAncestor = await this.nearestExistingRealPath(dirname(hostPath));
-    await this.assertRealInside(mount, realAncestor, path.displayPath);
-    return hostPath;
-  }
 }
 
 class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
@@ -688,15 +321,8 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
     }
 
     const materialized = (async () => {
-      const materialization = await containerSpecFromDescriptor(
-        this.descriptor,
-        this.secretContext
-      );
-      if (materialization.hooks) {
-        await this.containerManager.materialize(materialization.spec, materialization.hooks);
-      } else {
-        await this.containerManager.materialize(materialization.spec);
-      }
+      const spec = await containerSpecFromDescriptor(this.descriptor, this.secretContext);
+      await this.containerManager.materialize(spec);
     })();
     this.materialized = materialized;
 
@@ -775,100 +401,6 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
   }
 }
 
-class ProjectedContainerNetworkClient implements RuntimeNetworkClient {
-  constructor(private readonly helper: ProjectedContainerRuntimeHelper) {}
-
-  async fetch(url: string, opts: RuntimeFetchOptions = {}): Promise<RuntimeFetchResult> {
-    return parseFetchValue(
-      await this.helper.request(
-        {
-          op: 'fetch',
-          url,
-          method: opts.method,
-          headers: opts.headers,
-          body: opts.body,
-          redirect: opts.redirect,
-          maxBytes: opts.maxBytes,
-        },
-        opts.signal
-      )
-    );
-  }
-}
-
-const DEFAULT_HELPER_REQUEST_TIMEOUT_MS = 30_000;
-
-class ProjectedContainerRuntimeHelper {
-  constructor(
-    private readonly descriptor: ProjectedContainerToolRuntimeDescriptor,
-    private readonly processRunner: RuntimeProcessRunner
-  ) {}
-
-  async request(request: HelperRequest, signal?: AbortSignal): Promise<unknown> {
-    const helper = this.descriptor.helper;
-    if (!helper) {
-      helperUnavailable();
-    }
-
-    const timeoutController = new AbortController();
-    const timeout = setTimeout(
-      () => timeoutController.abort(new Error('Projected runtime helper request timed out')),
-      DEFAULT_HELPER_REQUEST_TIMEOUT_MS
-    );
-    timeout.unref?.();
-    const effectiveSignal = signal ?? timeoutController.signal;
-
-    try {
-      const handle = await this.processRunner.start(helper.command, {
-        cwd: this.descriptor.cwd,
-        signal: effectiveSignal,
-      });
-      if (!handle.stdin || !handle.stdout) {
-        handle.kill();
-        throw new Error('Projected runtime helper stream unavailable');
-      }
-
-      const stdout = streamToString(handle.stdout);
-      const stderr = streamToString(handle.stderr);
-      await writeStreamAndClose(handle.stdin, encodeHelperRequest(request));
-
-      // Prevent unhandled rejection if the race resolves to the data side
-      // before this rejection is awaited.
-      const timeoutRejection = new Promise<never>((_, reject) => {
-        const onAbort = () => {
-          handle.kill('SIGKILL');
-          reject(timeoutController.signal.reason as Error);
-        };
-        if (timeoutController.signal.aborted) {
-          onAbort();
-          return;
-        }
-        timeoutController.signal.addEventListener('abort', onAbort, { once: true });
-      });
-      timeoutRejection.catch(() => undefined);
-
-      const [stdoutOutput, stderrOutput, completion] = await Promise.race([
-        Promise.all([stdout, stderr, handle.completion]),
-        timeoutRejection,
-      ]);
-
-      if (completion.exitCode !== 0) {
-        const message =
-          stderrOutput.trim() || `Projected runtime helper exited ${completion.exitCode}`;
-        throw new Error(message);
-      }
-
-      const response = decodeHelperResponse(firstResponseLine(stdoutOutput));
-      if (!response.ok) {
-        throw new Error(response.error.message);
-      }
-      return response.value;
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-}
-
 export class ProjectedContainerToolRuntime implements ToolRuntime {
   readonly kind = 'container' as const;
   readonly label = 'Projected Container';
@@ -900,15 +432,8 @@ export class ProjectedContainerToolRuntime implements ToolRuntime {
         secretResolver: input.secretResolver,
       }
     );
-    const helper = new ProjectedContainerRuntimeHelper(
-      { ...input.descriptor, cwd: this.cwd },
-      this.process
-    );
-    this.fs = new ProjectedContainerFileSystem(
-      helper,
-      new ProjectedContainerHostAccess(input.descriptor.spec.mounts)
-    );
-    this.network = new ProjectedContainerNetworkClient(helper);
+    this.fs = new ContainerExecFileSystem(this.process);
+    this.network = new ContainerExecNetworkClient(this.process);
   }
 
   readonly id: string;
