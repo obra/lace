@@ -2065,6 +2065,10 @@ const SessionUpdateJobFinishedSchema = z
     parentJobId: NonEmptyStringSchema.optional(),
     exitCode: z.number().optional(),
     outcome: z.enum(['completed', 'failed', 'cancelled']),
+    // The finished delegation's child session id. Present only for delegate
+    // jobs (a subagent ran its own session); absent for bash jobs. Consumers
+    // use it to scope per-delegation cleanup to exactly that delegation.
+    subagentSessionId: NonEmptyStringSchema.optional(),
   })
   .strict();
 

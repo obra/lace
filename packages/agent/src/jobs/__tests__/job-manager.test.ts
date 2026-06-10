@@ -620,6 +620,54 @@ describe('JobManager', () => {
     });
   });
 
+  describe('finalizeJob subagentSessionId', () => {
+    it('includes subagentSessionId on a delegate job_finished update', async () => {
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ emitUpdate });
+      const manager = new JobManager(deps);
+      const job: JobState = {
+        jobId: 'job_deleg',
+        type: 'delegate',
+        status: 'completed',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: () => {},
+        subagentSessionId: 'sess_child_42',
+      };
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+      const finished = emitUpdate.mock.calls.map(([u]) => u).find((u) => u.type === 'job_finished');
+      expect(finished).toMatchObject({
+        type: 'job_finished',
+        jobId: 'job_deleg',
+        subagentSessionId: 'sess_child_42',
+      });
+    });
+
+    it('omits subagentSessionId on a bash job_finished update', async () => {
+      const emitUpdate = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ emitUpdate });
+      const manager = new JobManager(deps);
+      const job: JobState = {
+        jobId: 'job_bash',
+        type: 'bash',
+        status: 'completed',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/job.log',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: () => {},
+      };
+      manager.addJob(job);
+      await manager.finalizeJob(job);
+      const finished = emitUpdate.mock.calls.map(([u]) => u).find((u) => u.type === 'job_finished');
+      expect(finished).toBeDefined();
+      expect('subagentSessionId' in (finished as object)).toBe(false);
+    });
+  });
+
   describe('cancelJob', () => {
     it('sets job status to cancelled and finalizes', async () => {
       const persistEvent = vi.fn().mockResolvedValue(undefined);

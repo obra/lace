@@ -359,6 +359,7 @@ export class JobManager {
       ...(job.parentJobId ? { parentJobId: job.parentJobId } : {}),
       outcome: job.status,
       ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+      ...(job.subagentSessionId ? { subagentSessionId: job.subagentSessionId } : {}),
     });
 
     job.resolveCompletion?.();
