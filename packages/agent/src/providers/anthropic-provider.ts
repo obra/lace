@@ -37,6 +37,7 @@ import {
   type CacheControlOptions,
 } from './cache-control';
 import { getBetasForRequest } from './anthropic/betas';
+import { sanitizeLoneSurrogates } from './anthropic/well-formed-json';
 
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -309,7 +310,12 @@ export class AnthropicProvider extends AIProvider {
       providerName: this.providerName,
     });
 
-    return payload;
+    // Final send-boundary guard: a lone UTF-16 surrogate anywhere in the request
+    // (e.g. left by history compaction truncating mid-emoji) makes the body
+    // invalid JSON for the Anthropic parser and fails the turn non-retryably.
+    // Replace any lone surrogate with U+FFFD so a corrupted history can't wedge
+    // the session. Clean payloads are returned unchanged (cache identity intact).
+    return sanitizeLoneSurrogates(payload);
   }
 
   /**
