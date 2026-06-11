@@ -8,6 +8,7 @@ import { getRecallIndex } from '../../storage/recall/index-db';
 import { redact, redactSnippet } from '../../storage/recall/redact';
 import { eventToRow, type RecallRow } from '../../storage/recall/event-to-row';
 import { readAllSessionEventLines } from '../../storage/event-log';
+import { stripTrailingLoneSurrogate } from '../../compaction/toolkit';
 import { getSessionDir, readSessionMeta } from '../../storage/session-store';
 import type { TypedDurableEvent } from '../../storage/event-types';
 
@@ -379,7 +380,7 @@ function applyTruncation(
   const cap = full || isTarget || !isToolCall ? BASE_CONTENT_CAP : CONTEXT_TOOL_CALL_CAP;
   if (content.length > cap) {
     const overflow = content.length - cap;
-    content = `${content.slice(0, cap)}... [truncated, ${overflow} more chars]`;
+    content = `${stripTrailingLoneSurrogate(content.slice(0, cap))}... [truncated, ${overflow} more chars]`;
   }
   return { ...row, content };
 }

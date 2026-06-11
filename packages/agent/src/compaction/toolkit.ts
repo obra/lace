@@ -232,9 +232,21 @@ function extractText(e: TypedDurableEvent): string {
   return '';
 }
 
+/**
+ * Drop a trailing high surrogate left dangling by a length-based slice. A
+ * left-anchored `slice(0, n)` can cut a surrogate pair (e.g. an emoji) in half,
+ * leaving a lone high surrogate; persisting that into compacted history makes
+ * later Anthropic request bodies invalid JSON ("no low surrogate in string").
+ * Only the trailing-high case is possible for a slice from index 0.
+ */
+export function stripTrailingLoneSurrogate(s: string): string {
+  const last = s.charCodeAt(s.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? s.slice(0, -1) : s;
+}
+
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
-  return s.slice(0, max - 1) + '…';
+  return stripTrailingLoneSurrogate(s.slice(0, max - 1)) + '…';
 }
 
 function statusGlyph(outcome: string): string {
