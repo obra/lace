@@ -401,6 +401,37 @@ describe('PlaneRuntime', () => {
     expect(handle.stderr).toBe(fake.stderr);
   });
 
+  it('execStream adds --long-lived for long-lived streams so the shim skips one-shot budgets', async () => {
+    const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
+      stdout: 'sen-x-ll\n',
+      stderr: '',
+      exitCode: 0,
+    });
+    const rt = new PlaneRuntime('/bin/sen-docker-client', { run });
+    const id = await rt.create(spawnRequest());
+    const fake = makeFakeChild();
+    spawnMock.mockReturnValue(fake.child);
+    setImmediate(() => fake.emit('spawn'));
+
+    await rt.execStream(id, {
+      command: ['node', '/opt/superpowers-chrome/mcp/dist/index.js'],
+      longLived: true,
+    });
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      '/bin/sen-docker-client',
+      [
+        'exec-stream',
+        '-i',
+        '--long-lived',
+        id,
+        'node',
+        '/opt/superpowers-chrome/mcp/dist/index.js',
+      ],
+      { stdio: ['pipe', 'pipe', 'pipe'] }
+    );
+  });
+
   it('execStream wraps replace-mode commands with env -i instead of plane env flags', async () => {
     const run = vi.fn<PlaneRunner['run']>().mockResolvedValue({
       stdout: 'sen-x-replace\n',

@@ -284,6 +284,9 @@ export class PlaneRuntime implements ContainerRuntime {
     }
 
     const args: string[] = ['exec-stream', '-i'];
+    if (options.longLived) {
+      args.push('--long-lived');
+    }
     if (options.workingDirectory) {
       args.push('-w', options.workingDirectory);
     }

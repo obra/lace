@@ -112,6 +112,13 @@ export interface RuntimeProcessOptions {
   envMode?: 'inherit' | 'replace';
   detached?: boolean;
   signal?: AbortSignal;
+  /**
+   * Long-lived service process (an MCP server) rather than a one-shot command.
+   * For container runtimes this propagates to the brokering shim, which then
+   * exempts the stream from the one-shot budgets that would SIGKILL a persistent
+   * server. Ignored by the host runtime.
+   */
+  longLived?: boolean;
 }
 
 export interface RuntimeProcessResult {

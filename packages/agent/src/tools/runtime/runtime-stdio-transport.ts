@@ -59,6 +59,10 @@ export class RuntimeStdioClientTransport implements Transport {
             ...(this.options.env ?? {}),
           },
           envMode: environmentModeForRuntime(this.options.runtime),
+          // An MCP server runs for the whole session — mark it long-lived so a
+          // brokering container runtime exempts it from the one-shot stream
+          // budgets that would otherwise SIGKILL it mid-session.
+          longLived: true,
         }
       );
       this.process = handle;

@@ -97,6 +97,25 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  it('threads longLived through to the container manager exec stream options', async () => {
+    const manager = createFakeContainerManager();
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    await runtime.process.start(['node', '/opt/superpowers-chrome/mcp/dist/index.js'], {
+      cwd: runtime.cwd,
+      longLived: true,
+    });
+
+    expect(manager.execStream).toHaveBeenCalledWith(
+      'projected-runtime',
+      expect.objectContaining({ longLived: true })
+    );
+  });
+
   it('materializes the generic descriptor spec before process start with docker authority fields', async () => {
     const manager = createFakeContainerManager();
     const projectedDescriptor = descriptor();

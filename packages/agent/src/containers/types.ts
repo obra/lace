@@ -135,6 +135,14 @@ export interface ExecStreamOptions {
   workingDirectory?: string;
   environment?: Record<string, string>;
   environmentMode?: ExecEnvironmentMode;
+  /**
+   * Mark this as a long-lived service stream (an in-container MCP server) rather
+   * than a one-shot brokered exec. The plane shim then skips the one-shot stream
+   * budgets (wall-clock lifetime, cumulative output, stdin idle timeout) that
+   * would otherwise SIGKILL a persistent server mid-session. Ignored by runtimes
+   * without a brokering shim.
+   */
+  longLived?: boolean;
 }
 
 export interface ExecStreamHandle {

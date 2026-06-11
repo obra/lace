@@ -311,6 +311,7 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       ),
       environment: definedEnvironment(baseEnvironment, opts.env),
       environmentMode: opts.envMode ?? 'inherit',
+      longLived: opts.longLived,
     };
   }
 

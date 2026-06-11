@@ -69,6 +69,7 @@ describe('RuntimeStdioClientTransport', () => {
       cwd: '/runtime',
       env: { HOME: '/host-home', PATH: '/host-bin', DECLARED: 'visible' },
       envMode: 'replace',
+      longLived: true,
     });
   });
 
@@ -87,6 +88,7 @@ describe('RuntimeStdioClientTransport', () => {
       cwd: '/runtime',
       env: { DECLARED: 'visible' },
       envMode: 'inherit',
+      longLived: true,
     });
   });
 
