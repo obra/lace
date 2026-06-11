@@ -63,6 +63,169 @@ describe('MCPServerManager', () => {
     ]);
   });
 
+  it('auto-reconnects a desired server after an unexpected transport drop', async () => {
+    vi.useFakeTimers();
+    try {
+      const reconnected: string[] = [];
+      manager.on('server-reconnected', (serverId: string) => reconnected.push(serverId));
+
+      const config: MCPServerConfig = {
+        command: 'node',
+        args: ['s.js'],
+        enabled: true,
+        tools: {},
+      };
+      await manager.startServer({
+        serverId: 'srv',
+        config,
+        runtime: createFakeRuntime(),
+        hostCwd: '/p',
+      });
+      const dropped = manager.getServer('srv');
+      expect(dropped?.status).toBe('running');
+
+      // Simulate an unexpected stdio drop (the docker-exec pipe closing).
+      dropped?.transport?.onclose?.();
+      expect(manager.getServer('srv')?.status).toBe('stopped');
+
+      // First backoff is 1s; advancing past it fires the reconnect.
+      await vi.advanceTimersByTimeAsync(1100);
+
+      expect(manager.getServer('srv')?.status).toBe('running');
+      expect(reconnected).toEqual(['srv']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not reconnect after an intentional stop (cancels a pending reconnect)', async () => {
+    vi.useFakeTimers();
+    try {
+      const reconnected: string[] = [];
+      manager.on('server-reconnected', (serverId: string) => reconnected.push(serverId));
+
+      const config: MCPServerConfig = {
+        command: 'node',
+        args: ['s.js'],
+        enabled: true,
+        tools: {},
+      };
+      await manager.startServer({
+        serverId: 'srv',
+        config,
+        runtime: createFakeRuntime(),
+        hostCwd: '/p',
+      });
+
+      // Drop schedules a reconnect...
+      manager.getServer('srv')?.transport?.onclose?.();
+      // ...then an intentional stop must cancel it.
+      await manager.stopServer('srv');
+
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(reconnected).toEqual([]);
+      expect(manager.getServer('srv')?.status).toBe('stopped');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('auto-reconnects via the real drop path (onerror first, then a no-op onclose)', async () => {
+    vi.useFakeTimers();
+    try {
+      const reconnected: string[] = [];
+      manager.on('server-reconnected', (serverId: string) => reconnected.push(serverId));
+
+      const config: MCPServerConfig = {
+        command: 'node',
+        args: ['s.js'],
+        enabled: true,
+        tools: {},
+      };
+      await manager.startServer({
+        serverId: 'srv',
+        config,
+        runtime: createFakeRuntime(),
+        hostCwd: '/p',
+      });
+      const conn = manager.getServer('srv');
+
+      // Production drop order: the pipe errors first (status → failed), then the
+      // close fires — by which point the onclose 'running' guard is false, so the
+      // reconnect is driven entirely by the onerror branch.
+      conn?.transport?.onerror?.(new Error('docker exec pipe closed'));
+      conn?.transport?.onclose?.();
+      expect(manager.getServer('srv')?.status).toBe('failed');
+
+      await vi.advanceTimersByTimeAsync(1100);
+
+      expect(manager.getServer('srv')?.status).toBe('running');
+      expect(reconnected).toEqual(['srv']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('abandons (does not resurrect) a reconnect that a stop races during connect', async () => {
+    vi.useFakeTimers();
+    try {
+      const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+      const reconnected: string[] = [];
+      manager.on('server-reconnected', (serverId: string) => reconnected.push(serverId));
+
+      const config: MCPServerConfig = {
+        command: 'node',
+        args: ['s.js'],
+        enabled: true,
+        tools: {},
+      };
+      await manager.startServer({
+        serverId: 'srv',
+        config,
+        runtime: createFakeRuntime(),
+        hostCwd: '/p',
+      });
+      const conn = manager.getServer('srv');
+
+      // Make the NEXT client (the reconnect's) hang inside connect until released.
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const reconnectClose = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(Client).mockImplementationOnce(
+        () =>
+          ({
+            connect: vi.fn(async (transport?: { start?: () => Promise<void> }) => {
+              await transport?.start?.();
+              await gate;
+            }),
+            close: reconnectClose,
+          }) as unknown as InstanceType<typeof Client>
+      );
+
+      // Drop → schedule reconnect → fire it; the reconnect now hangs mid-connect.
+      conn?.transport?.onclose?.();
+      await vi.advanceTimersByTimeAsync(1100);
+
+      // Intentional stop races in WHILE the reconnect is suspended in connect().
+      await manager.stopServer('srv');
+
+      // Let the hung connect resolve and flush continuations.
+      release();
+      await vi.advanceTimersByTimeAsync(1);
+
+      // The raced connection must be abandoned, not resurrected to 'running' with
+      // a torn-down client. Its freshly-built client was closed; no reconnect event.
+      expect(manager.getServer('srv')?.status).toBe('stopped');
+      expect(reconnected).toEqual([]);
+      expect(reconnectClose).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should create client and transport instances', async () => {
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');

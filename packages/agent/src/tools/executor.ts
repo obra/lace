@@ -154,6 +154,21 @@ export class ToolExecutor {
         // Continue with whatever tools we have
       }
     }
+    // Surface (don't silently swallow) enabled servers that are DOWN, so a schema
+    // shipped without an expected MCP tool is diagnosable rather than a mystery.
+    // Only flag terminal-bad states (failed/stopped) — 'starting' is the normal
+    // transient cold-start state and would be per-turn noise. The manager
+    // auto-reconnects these; this records what's missing right now.
+    const down = (this.mcpServerManager?.getAllServers() ?? []).filter(
+      (server) =>
+        server.config.enabled !== false &&
+        (server.status === 'failed' || server.status === 'stopped')
+    );
+    if (down.length > 0) {
+      logger.warn('MCP tool schema is incomplete: enabled server(s) down', {
+        servers: down.map((server) => ({ id: server.id, status: server.status })),
+      });
+    }
   }
 
   private getNativeTools(): Tool[] {

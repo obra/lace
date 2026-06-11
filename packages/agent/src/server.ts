@@ -330,6 +330,14 @@ export function invalidateSessionToolExecutor(cache: ToolExecutorCache, sessionI
 }
 
 export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerState): void {
+  // When a dropped in-container MCP server reconnects, its tools were lost from
+  // every cached executor (discovery only registers 'running' servers). Clear
+  // the cache so the next turn rebuilds and re-discovers the recovered tools —
+  // e.g. browser-user's use_browser after a mid-session stdio drop.
+  state.mcpServerManager.on('server-reconnected', () => {
+    state.toolExecutorCache.clear();
+  });
+
   const runExclusive = async <T>(work: () => Promise<T> | T): Promise<T> => {
     const previous = state.sessionMutex;
     let release!: () => void;

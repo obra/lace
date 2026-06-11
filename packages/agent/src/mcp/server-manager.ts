@@ -83,15 +83,39 @@ async function resolveMcpEnvironment(input: {
   };
 }
 
+// Auto-reconnect bookkeeping for a desired (started, not intentionally stopped)
+// connection. When an in-container MCP's stdio transport drops mid-session
+// (docker-exec pipe close), the manager re-establishes it with bounded
+// exponential backoff so its tools (e.g. use_browser) come back instead of
+// silently vanishing for the rest of the session.
+interface ReconnectState {
+  input: StartMCPServerInput;
+  attempts: number;
+  timer?: ReturnType<typeof setTimeout>;
+  desired: boolean;
+}
+
+const RECONNECT_MAX_ATTEMPTS = 10;
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 30000;
+
+async function closeQuietly(closable?: { close: () => unknown }): Promise<void> {
+  try {
+    await closable?.close();
+  } catch {
+    // Best-effort cleanup — a close failure must never mask the original outcome.
+  }
+}
+
 export class MCPServerManager extends EventEmitter {
   private servers = new Map<string, MCPServerConnection>();
+  private reconnects = new Map<string, ReconnectState>();
 
   /**
    * Start a server if it's not already running
    */
   async startServer(input: StartMCPServerInput): Promise<void> {
-    const { serverId, config, runtime, hostCwd, sessionId, secretResolver } = input;
-    const placement = config.placement ?? 'host';
+    const { serverId, config, runtime, hostCwd } = input;
     const transportKind = config.transport ?? 'stdio';
     const connectionKey = mcpConnectionKey({
       serverId,
@@ -109,15 +133,49 @@ export class MCPServerManager extends EventEmitter {
       throw new Error(`Unsupported MCP transport for stdio start: ${transportKind}`);
     }
 
+    // Record the inputs needed to auto-reconnect this connection after an
+    // unexpected drop. Marked desired until an intentional stop/remove/shutdown.
+    this.reconnects.set(connectionKey, { input, attempts: 0, desired: true });
+
+    await this.establishConnection(connectionKey, input);
+  }
+
+  /**
+   * Create the transport + client, wire drop handlers, and connect. Shared by
+   * the initial startServer and by auto-reconnect. Throws on connection failure
+   * (after emitting 'failed'); the caller decides whether to retry.
+   */
+  private async establishConnection(
+    connectionKey: string,
+    input: StartMCPServerInput
+  ): Promise<void> {
+    const { serverId, config, runtime, hostCwd, sessionId, secretResolver } = input;
+    const placement = config.placement ?? 'host';
+
+    // Replace any prior connection for this key (e.g. the dropped one we're
+    // re-establishing). Install the new connection in the map FIRST so the prior
+    // transport's stale handlers — which guard on identity — become no-ops, then
+    // close the prior transport/client so its subprocess isn't leaked.
+    const prior = this.servers.get(connectionKey);
     const connection: MCPServerConnection = {
       id: serverId,
       connectionKey,
       config,
       status: 'starting',
     };
-
     this.servers.set(connectionKey, connection);
     this.emit('server-status-changed', serverId, 'starting', connectionKey);
+    if (prior && prior !== connection) {
+      await closeQuietly(prior.transport);
+      await closeQuietly(prior.client);
+    }
+
+    // True only while THIS connection is still the live entry for its key. A
+    // racing stop (stopServer nulls client/transport + sets 'stopped' in place)
+    // or a newer establishConnection (replaces the map entry) must not let a
+    // stale handler — or this connect resolving late — resurrect a dead connection.
+    const isLive = (): boolean =>
+      this.servers.get(connectionKey) === connection && connection.status === 'starting';
 
     try {
       const env = await resolveMcpEnvironment({
@@ -152,23 +210,38 @@ export class MCPServerManager extends EventEmitter {
       connection.transport = transport;
       connection.client = client;
 
-      // Set up error handling before connecting
+      // Set up error handling before connecting. Both handlers no-op once this
+      // connection is no longer the live entry, so a dropped pipe's late error
+      // can't mutate or reconnect a healthy replacement on the same key.
       transport.onerror = (error) => {
+        if (this.servers.get(connectionKey) !== connection) return;
         connection.status = 'failed';
         connection.lastError = error.message;
         this.emit('server-status-changed', serverId, 'failed', connectionKey);
         this.emit('server-error', serverId, error.message, connectionKey);
+        this.maybeScheduleReconnect(connectionKey);
       };
 
       transport.onclose = () => {
-        if (connection.status === 'running') {
-          connection.status = 'stopped';
-          this.emit('server-status-changed', serverId, 'stopped', connectionKey);
+        if (this.servers.get(connectionKey) !== connection || connection.status !== 'running') {
+          return;
         }
+        connection.status = 'stopped';
+        this.emit('server-status-changed', serverId, 'stopped', connectionKey);
+        this.maybeScheduleReconnect(connectionKey);
       };
 
       // Connect client to server
       await client.connect(transport);
+
+      // A stop or a newer (re)connect may have raced in during connect. Don't
+      // resurrect a connection that's been torn down or replaced — close the
+      // freshly-built transport/client and bail.
+      if (!isLive()) {
+        await closeQuietly(transport);
+        await closeQuietly(client);
+        return;
+      }
 
       connection.status = 'running';
       connection.connectedAt = new Date();
@@ -176,19 +249,85 @@ export class MCPServerManager extends EventEmitter {
     } catch (error) {
       // Clean up transport and client on connection failure
       if (connection.transport) {
-        await connection.transport.close();
+        await closeQuietly(connection.transport);
         connection.transport = undefined;
       }
       if (connection.client) {
-        await connection.client.close();
+        await closeQuietly(connection.client);
         connection.client = undefined;
       }
 
-      connection.status = 'failed';
-      connection.lastError = error instanceof Error ? error.message : 'Unknown error';
-      this.emit('server-status-changed', serverId, 'failed', connectionKey);
-      this.emit('server-error', serverId, connection.lastError, connectionKey);
+      // Only claim the failure if we're still the live connection; a racing
+      // stop/replace owns the status otherwise.
+      if (this.servers.get(connectionKey) === connection) {
+        connection.status = 'failed';
+        connection.lastError = error instanceof Error ? error.message : 'Unknown error';
+        this.emit('server-status-changed', serverId, 'failed', connectionKey);
+        this.emit('server-error', serverId, connection.lastError, connectionKey);
+      }
       throw error;
+    }
+  }
+
+  /**
+   * Schedule a backoff reconnect for a desired connection after an unexpected
+   * drop. No-op if the connection was intentionally stopped, is disabled, a
+   * reconnect is already pending, or the attempt budget is exhausted.
+   */
+  private maybeScheduleReconnect(connectionKey: string): void {
+    const state = this.reconnects.get(connectionKey);
+    if (!state || !state.desired) return;
+    if (state.input.config.enabled === false) return;
+    if (state.timer) return;
+    // Backstop: never reconnect a connection that's already healthy (e.g. a
+    // stale handler that slipped past its identity guard).
+    if (this.servers.get(connectionKey)?.status === 'running') return;
+    if (state.attempts >= RECONNECT_MAX_ATTEMPTS) {
+      logger.error(
+        `MCP server ${state.input.serverId} dropped and did not recover after ` +
+          `${RECONNECT_MAX_ATTEMPTS} reconnect attempts — its tools are unavailable`,
+        { serverId: state.input.serverId, connectionKey }
+      );
+      return;
+    }
+    const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** state.attempts, RECONNECT_MAX_DELAY_MS);
+    state.timer = setTimeout(() => {
+      state.timer = undefined;
+      void this.attemptReconnect(connectionKey);
+    }, delay);
+    // Don't let a pending reconnect keep the process alive.
+    state.timer.unref?.();
+  }
+
+  private async attemptReconnect(connectionKey: string): Promise<void> {
+    const state = this.reconnects.get(connectionKey);
+    if (!state || !state.desired) return;
+    state.attempts += 1;
+    const { serverId } = state.input;
+    logger.warn(
+      `MCP server ${serverId} dropped; reconnect attempt ${state.attempts}/${RECONNECT_MAX_ATTEMPTS}`,
+      { serverId, connectionKey }
+    );
+    try {
+      await this.establishConnection(connectionKey, state.input);
+      // Re-check: an intentional stop may have raced in during connect.
+      if (!state.desired) return;
+      state.attempts = 0;
+      logger.info(`MCP server ${serverId} reconnected after drop`, { serverId, connectionKey });
+      this.emit('server-reconnected', serverId, connectionKey);
+    } catch {
+      // establishConnection already emitted 'failed'; back off and retry.
+      this.maybeScheduleReconnect(connectionKey);
+    }
+  }
+
+  private cancelReconnect(connectionKey: string): void {
+    const state = this.reconnects.get(connectionKey);
+    if (!state) return;
+    state.desired = false;
+    if (state.timer) {
+      clearTimeout(state.timer);
+      state.timer = undefined;
     }
   }
 
@@ -229,6 +368,9 @@ export class MCPServerManager extends EventEmitter {
     }
 
     for (const connection of connections) {
+      // Mark not-desired + cancel any pending reconnect BEFORE closing, so the
+      // transport's onclose handler treats this as an intentional stop.
+      this.cancelReconnect(connection.connectionKey);
       try {
         // Close client connection (which closes transport)
         if (connection.client) {
@@ -259,6 +401,7 @@ export class MCPServerManager extends EventEmitter {
     for (const connection of connections) {
       await this.stopServer(connection.connectionKey);
       this.servers.delete(connection.connectionKey);
+      this.reconnects.delete(connection.connectionKey);
     }
   }
 
@@ -339,9 +482,14 @@ export class MCPServerManager extends EventEmitter {
    * Cleanup all servers on shutdown
    */
   async shutdown(): Promise<void> {
+    // Cancel all pending reconnects up front so nothing re-establishes mid-shutdown.
+    for (const connectionKey of this.reconnects.keys()) {
+      this.cancelReconnect(connectionKey);
+    }
     const stopPromises = Array.from(this.servers.keys()).map((id) => this.stopServer(id));
     await Promise.allSettled(stopPromises); // Use allSettled to handle errors gracefully
     this.servers.clear();
+    this.reconnects.clear();
   }
 
   private resolveConnections(serverIdOrConnectionKey: string): MCPServerConnection[] {
