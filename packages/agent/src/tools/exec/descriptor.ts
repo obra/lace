@@ -32,5 +32,13 @@ export function parseExecToolDescriptor(raw: string): ExecToolDescriptor {
   }
   const r = schema.safeParse(json);
   if (!r.success) throw new ExecToolDescriptorError(`invalid descriptor: ${r.error.message}`);
+  const inputSchema = r.data.inputSchema as Record<string, unknown>;
+  for (const key of ['oneOf', 'allOf', 'anyOf', 'if']) {
+    if (Object.prototype.hasOwnProperty.call(inputSchema, key)) {
+      throw new ExecToolDescriptorError(
+        `inputSchema must not use top-level oneOf/allOf/anyOf/if (the Anthropic tool API rejects them; express per-variant requirements in field descriptions): found ${key}`
+      );
+    }
+  }
   return r.data as ExecToolDescriptor;
 }
