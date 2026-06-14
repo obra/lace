@@ -697,8 +697,8 @@ Persona with track-based compaction strategy.`
       const delegate = executor.getTool('delegate');
       expect(delegate).toBeDefined();
 
-      // Use background:true so the tool returns immediately after createJob
-      // without waiting for job completion.
+      // delegate is async-only: it returns immediately after createJob without
+      // waiting for job completion.
       const mockJobManager: JobManager = {
         createJob: vi.fn().mockResolvedValue({
           jobId: 'job_pri1911',
@@ -706,8 +706,8 @@ Persona with track-based compaction strategy.`
             jobId: 'job_pri1911',
             type: 'delegate' as const,
             status: 'running' as const,
-            // Never-resolving completion is safe: background:true returns
-            // immediately on createJob and the test never awaits this promise.
+            // Never-resolving completion is safe: delegate returns immediately
+            // on createJob and the test never awaits this promise.
             completion: new Promise<void>(() => {}),
           } as unknown as JobState,
         }),
@@ -715,7 +715,7 @@ Persona with track-based compaction strategy.`
       } as unknown as JobManager;
 
       const result = await delegate!.execute(
-        { prompt: 'hello', persona: customPersonaName, background: true },
+        { prompt: 'hello', persona: customPersonaName },
         { signal: new AbortController().signal, jobManager: mockJobManager }
       );
 

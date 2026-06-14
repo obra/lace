@@ -107,7 +107,7 @@ describe('delegate workspace lifecycle', () => {
       environmentRegistry: perInvocationEnvRegistry(),
     });
     const result = await tool.execute(
-      { prompt: 'work', background: true, persona: 'inv' },
+      { prompt: 'work', persona: 'inv' },
       ctx(jobManager, parentId)
     );
     return JSON.parse(result.content[0].text) as { subagentSessionId: string; workspace: string };
@@ -127,10 +127,7 @@ describe('delegate workspace lifecycle', () => {
       personaRegistry: perInvocationRegistry(),
       environmentRegistry: perInvocationEnvRegistry(),
     });
-    const third = await tool.execute(
-      { prompt: 'work', background: true, persona: 'inv' },
-      ctx(jobManager, parentId)
-    );
+    const third = await tool.execute({ prompt: 'work', persona: 'inv' }, ctx(jobManager, parentId));
     expect(third.status).toBe('failed');
     expect(third.content[0].text).toContain('job_kill');
     expect(third.content[0].text).toContain('2 workspaces retained');
@@ -160,7 +157,7 @@ describe('delegate workspace lifecycle', () => {
       environmentRegistry: perInvocationEnvRegistry(),
     });
     const result = await tool.execute(
-      { prompt: 'continue', background: true, persona: 'inv', resume: 'job_done' },
+      { prompt: 'continue', persona: 'inv', resume: 'job_done' },
       ctx(jobManager, parentId)
     );
     expect(result.status).toBe('failed');
@@ -184,7 +181,7 @@ describe('delegate workspace lifecycle', () => {
       environmentRegistry: perInvocationEnvRegistry(),
     });
     const result = await tool.execute(
-      { prompt: 'continue', background: true, persona: 'inv', resume: 'job_crash' },
+      { prompt: 'continue', persona: 'inv', resume: 'job_crash' },
       ctx(jobManager, parentId)
     );
     expect(result.status).toBe('failed');

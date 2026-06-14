@@ -106,6 +106,8 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       'delegate job completion'
     );
 
+    // Delegation is async-only: the tool returns the started-shape immediately,
+    // not the subagent's inline output.
     const result = (delegateToolCompleted?.result as any) ?? {};
     const content = Array.isArray(result.content) ? result.content : [];
     const text = content
@@ -113,9 +115,11 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       .map((c: any) => c.text)
       .join('\n');
 
-    expect(text).toContain(`delegate jobId=${delegateJobId}`);
-    expect(text).toContain('No tool result found');
+    const started = JSON.parse(text) as { jobId: string; status: string };
+    expect(started.jobId).toBe(delegateJobId);
+    expect(started.status).toBe('started');
 
+    // The subagent's output is read from the durable job record after it finishes.
     const output = (await withTimeout(
       ctx.agent.peer.request('ent/job/output', { jobId: delegateJobId }),
       2_000,
@@ -178,6 +182,13 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         'session/prompt'
       );
 
+      // Under async-only delegation a subagent is single-turn: the outer
+      // subagent dispatches the inner delegate (which is flattened onto the root
+      // with the correct parentJobId), returns the started-shape, and is torn
+      // down — it has no future turn to await the inner job. So we verify the
+      // flattening from job_started events and the OUTER job's completion; the
+      // inner job's terminal delivery is not part of this contract (nested
+      // inline delegation is intentionally unsupported).
       const { outerJobId, innerJobId } = await withTimeout(
         new Promise<{ outerJobId: string; innerJobId: string }>((resolve) => {
           const interval = setInterval(() => {
@@ -191,14 +202,13 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
             if (!inner) return;
 
             if (!finished.has(outerJobId)) return;
-            if (!finished.has(inner.jobId)) return;
 
             clearInterval(interval);
             resolve({ outerJobId, innerJobId: inner.jobId });
           }, 10);
         }),
         10_000,
-        'nested job completion'
+        'nested job flattening'
       );
 
       expect(outerJobId).not.toBe(innerJobId);

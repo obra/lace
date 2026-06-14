@@ -214,19 +214,20 @@ describe('ConversationRunner threads personaRegistry into deps.createToolExecuto
     const delegate = executor.getTool('delegate');
     expect(delegate).toBeDefined();
 
-    // delegate runs in background to avoid waiting on job completion. If
-    // wiring is broken, this falls back to defaultPersonaRegistry which
-    // does not see our tempdir → status: 'failed' with PersonaNotFoundError.
+    // delegate is async-only: it returns immediately on createJob without
+    // waiting on job completion. If wiring is broken, this falls back to
+    // defaultPersonaRegistry which does not see our tempdir → status: 'failed'
+    // with PersonaNotFoundError.
     const mockJobManager = makeMockJobManager({
       createJob: vi.fn().mockResolvedValue({
         jobId: 'job_test',
-        // Never-resolving completion is safe: background:true returns
-        // immediately on createJob and the test never awaits this promise.
+        // Never-resolving completion is safe: delegate returns immediately on
+        // createJob and the test never awaits this promise.
         job: { completion: new Promise(() => {}) },
       }),
     });
     const result = await delegate!.execute(
-      { prompt: 'go', persona: 'test-shell', background: true },
+      { prompt: 'go', persona: 'test-shell' },
       {
         signal: new AbortController().signal,
         jobManager: mockJobManager,

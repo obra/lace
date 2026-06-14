@@ -28,7 +28,6 @@ const delegateSchema = z
   .object({
     prompt: NonEmptyString,
     description: z.string().optional(),
-    background: z.boolean().default(false),
     resume: z.string().optional(),
     progressIntervalMs: z.number().int().min(5000).max(600000).optional(),
     connectionId: z.string().optional(),
@@ -84,24 +83,19 @@ A delegate **job** is one round (one \`delegate(prompt=...)\` call → one assis
 A delegate **session** is the whole conversation, persisted on disk, surviving across rounds and restarts.
 Every \`delegate(prompt=...)\` creates a NEW job. With \`resume=<prior jobId>\`, that new job runs under the prior job's session (the subagent sees its full history); without \`resume\`, a fresh session is created. There is no "the delegate job" — each round has its own jobId.
 
-**The async pattern (canonical usage).**
-1. \`delegate(prompt=..., background=true)\` → returns \`{ jobId, status: "started" }\` immediately.
-2. \`job_notify(jobId)\` → subscribe so lace wakes you when this job finishes.
-3. **Return to the user.** Don't poll. Don't sit in \`job_output(block=true)\`. Do something else, answer the user, take another tool call. When this job transitions to \`completed\`/\`failed\`/\`cancelled\`, a \`<notification kind="job-completed"|"job-failed"|"job-cancelled" job-id="...">\` block is injected into your next-turn prompt.
-4. Inspect the result (\`job_output(jobId)\` for full text, or read the notification's preview). **You** decide what's next: act on the output, \`delegate(resume=jobId, prompt=...)\` to continue the conversation in another round, or move on.
-
-**Sync mode** (\`background=false\`, the default): the tool call blocks until the subagent finishes and returns its output prefixed with \`delegate jobId=<id>\`. Convenient for cheap, fast subagents. Brings the parent to a halt for the duration — DON'T use sync mode for anything that might take more than a few seconds; use background + \`job_notify\` instead.
+**Delegation is async. This is the only flow.**
+1. \`delegate(prompt=...)\` → returns \`{ jobId, status: "started" }\` immediately. Your turn does NOT pause; the subagent runs on its own.
+2. **Return to the user.** Answer them, do other work, take another tool call. You stay responsive while the subagent runs. \`job_notify(jobId)\` is optional (it adds progress + selective coverage); you don't need it just to learn the job finished.
+3. When the job reaches a terminal state, a \`<notification kind="job-completed"|"job-failed"|"job-cancelled" job-id="...">\` block is injected into a later-turn prompt — automatically, even if you never called \`job_notify\`.
+4. Read the result with \`job_output(jobId)\` (a snapshot of the subagent's output). **You** decide what's next: act on it, \`delegate(resume=jobId, prompt=...)\` to continue the conversation in another round, or move on.
 
 Parameters:
 - \`prompt\` (required): the task or follow-up message for the subagent.
 - \`description\`: label shown in job listings.
-- \`background\` (default false): return immediately with \`{ jobId, status: "started" }\` and run async. Strongly preferred for anything non-trivial; pair with \`job_notify(jobId)\`.
-- \`resume\`: jobId of a previous delegate job. The new job binds to that job's session and the subagent sees its full conversation history. \`resume\` works whether the prior job was sync or background, completed or cancelled — sessions persist.
+- \`resume\`: jobId of a previous delegate job. The new job binds to that job's session and the subagent sees its full conversation history. \`resume\` works whether the prior job completed or was cancelled — sessions persist.
 - \`progressIntervalMs\`: 5000–600000 ms. Operator-controlled cadence for periodic \`progress\` notifications on this job. **Default is off** — leave unset unless you specifically want this job to emit progress on a fixed cadence regardless of who's listening. Subscribing via \`job_notify(on=['progress'], ...)\` arms the timer on its own at the default cadence; you only need this parameter to override that or to opt in without a subscriber.
 - \`connectionId\`, \`modelId\`: provider/model overrides for the subagent. Default to the parent session's values (or the persona's defaults if a \`persona\` is set).
-- \`persona\`: a persona bundle name (e.g. \`"librarian"\`). Frontmatter sets defaults; body is the subagent's system prompt template.
-
-**Common anti-pattern: do not** call \`delegate(background=true)\` and then immediately \`job_output(block=true)\` — that's polling. Use \`job_notify\` and return to the user.`;
+- \`persona\`: a persona bundle name (e.g. \`"librarian"\`). Frontmatter sets defaults; body is the subagent's system prompt template.`;
   schema = delegateSchema;
   annotations: ToolAnnotations = {
     title: 'Delegate',
@@ -132,16 +126,8 @@ Parameters:
       };
     }
 
-    const {
-      prompt,
-      description,
-      background,
-      resume,
-      progressIntervalMs,
-      connectionId,
-      modelId,
-      persona,
-    } = args;
+    const { prompt, description, resume, progressIntervalMs, connectionId, modelId, persona } =
+      args;
 
     // --- Step 1: Resolve childSessionId BEFORE building the persona binding ---
     //
@@ -344,7 +330,7 @@ Parameters:
     const effectiveRuntimeBinding = projectedRuntimeBinding ?? inheritedRuntimeBinding;
 
     // Create the job
-    const { jobId, job } = await jobManager.createJob('delegate', {
+    const { jobId } = await jobManager.createJob('delegate', {
       prompt,
       description,
       progressIntervalMs,
@@ -371,60 +357,22 @@ Parameters:
       ...(containerSpecName ? { containerSpecName } : {}),
     });
 
-    // Background mode - return immediately
-    if (background) {
-      const responseObj: Record<string, unknown> = { jobId, status: 'started' };
-      if (containerSharing === 'per_invocation' && scratchDirHostPath) {
-        responseObj.subagentSessionId = childSessionId;
-        // The workspace IS the result. Return its path (replacing the bare
-        // scratchDir) plus framing so the parent treats it as untrusted +
-        // possibly-incomplete and knows how to reclaim it.
-        responseObj.workspace = scratchDirHostPath;
-        responseObj.workspaceNote = workspaceFraming(scratchDirHostPath, jobId, {
-          possiblyIncomplete: true,
-        });
-      }
-      return {
-        status: 'completed',
-        content: [{ type: 'text', text: JSON.stringify(responseObj) }],
-      };
-    }
-
-    // Sync mode - wait for completion
-    const abortPromise = new Promise<never>((_, reject) => {
-      context.signal.addEventListener('abort', () => reject(new Error('cancelled')), {
-        once: true,
+    // Dispatch is async-only: the job runs in the background and the parent is
+    // woken by a terminal notification on a later turn. Return immediately.
+    const responseObj: Record<string, unknown> = { jobId, status: 'started' };
+    if (containerSharing === 'per_invocation' && scratchDirHostPath) {
+      responseObj.subagentSessionId = childSessionId;
+      // The workspace IS the result. Return its path (replacing the bare
+      // scratchDir) plus framing so the parent treats it as untrusted +
+      // possibly-incomplete and knows how to reclaim it.
+      responseObj.workspace = scratchDirHostPath;
+      responseObj.workspaceNote = workspaceFraming(scratchDirHostPath, jobId, {
+        possiblyIncomplete: true,
       });
-    });
-
-    try {
-      await Promise.race([job.completion, abortPromise]);
-    } catch {
-      job.status = 'cancelled';
-      await jobManager.finalizeJob(job);
     }
-
-    // Read output
-    const output = jobManager.getJobOutput(jobId);
-
-    // The sync job has completed, so its workspace is complete — frame it as
-    // untrusted (not possibly-incomplete) with the release hint.
-    const preamble =
-      containerSharing === 'per_invocation' && scratchDirHostPath
-        ? `delegate jobId=${jobId}\n` +
-          workspaceFraming(scratchDirHostPath, jobId, { possiblyIncomplete: false }) +
-          `\n\n`
-        : `delegate jobId=${jobId}\n\n`;
-
-    const status = job.status ?? 'failed';
     return {
-      status: status === 'completed' ? 'completed' : status === 'cancelled' ? 'aborted' : 'failed',
-      content: [
-        {
-          type: 'text',
-          text: preamble + (output.trim().length > 0 ? output.trim() : '(no output)'),
-        },
-      ],
+      status: 'completed',
+      content: [{ type: 'text', text: JSON.stringify(responseObj) }],
     };
   }
 }

@@ -58,7 +58,7 @@ describe('persistent-box is never reaped', () => {
     } as unknown as RuntimeExecutionBinding;
 
     const result = await tool.execute(
-      { prompt: 'work', background: true, persona: 'box-shell' },
+      { prompt: 'work', persona: 'box-shell' },
       {
         signal: new AbortController().signal,
         jobManager,

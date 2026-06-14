@@ -61,7 +61,7 @@ describe('ToolExecutor.registerAllAvailableTools threads PersonaRegistry into De
     } as unknown as JobManager;
 
     const result = await delegate!.execute(
-      { prompt: 'find TODOs', persona: 'librarian', background: true },
+      { prompt: 'find TODOs', persona: 'librarian' },
       { signal: new AbortController().signal, jobManager }
     );
 
@@ -87,7 +87,7 @@ describe('ToolExecutor.registerAllAvailableTools threads PersonaRegistry into De
     } as unknown as JobManager;
 
     const result = await delegate!.execute(
-      { prompt: 'find TODOs', persona: 'librarian', background: true },
+      { prompt: 'find TODOs', persona: 'librarian' },
       { signal: new AbortController().signal, jobManager }
     );
 

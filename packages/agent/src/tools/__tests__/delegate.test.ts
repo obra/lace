@@ -1,10 +1,10 @@
-// ABOUTME: Tests for DelegateTool schema validation, including background support
+// ABOUTME: Tests for DelegateTool schema validation (async-only)
 
 import { describe, expect, it } from 'vitest';
 import { DelegateTool } from '../implementations/delegate';
 
 describe('DelegateTool schema', () => {
-  it('accepts background parameter', () => {
+  it('rejects the removed background parameter', () => {
     const tool = new DelegateTool();
     const schema = tool.schema;
 
@@ -13,13 +13,10 @@ describe('DelegateTool schema', () => {
       background: true,
     });
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.background).toBe(true);
-    }
+    expect(result.success).toBe(false);
   });
 
-  it('defaults background to false', () => {
+  it('accepts a bare prompt (delegation is always async)', () => {
     const tool = new DelegateTool();
     const schema = tool.schema;
 
@@ -28,9 +25,6 @@ describe('DelegateTool schema', () => {
     });
 
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.background).toBe(false);
-    }
   });
 
   it('accepts description parameter', () => {

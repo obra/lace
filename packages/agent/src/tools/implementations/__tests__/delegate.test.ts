@@ -89,31 +89,20 @@ describe('DelegateTool', () => {
     expect(result.content[0].text).toContain('jobManager');
   });
 
-  it('creates delegate job and waits for completion (sync mode)', async () => {
+  it('creates a delegate job and returns the async started-shape', async () => {
     const tool = new DelegateTool();
-
-    let resolveJob!: () => void;
-    const completion = new Promise<void>((r) => {
-      resolveJob = r;
-    });
 
     const mockJob = {
       jobId: 'job_123',
       type: 'delegate' as const,
-      status: 'completed' as const,
-      completion,
-      resolveCompletion: () => resolveJob(),
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
     } as unknown as JobState;
 
     const jobManager = {
       createJob: vi.fn().mockResolvedValue({ jobId: 'job_123', job: mockJob }),
       listJobs: vi.fn().mockReturnValue([]),
-      getJobOutput: vi.fn().mockReturnValue('subagent output here'),
-      finalizeJob: vi.fn(),
     } as unknown as JobManager;
-
-    // Resolve job completion immediately
-    setTimeout(() => resolveJob(), 10);
 
     const result = await tool.execute(
       { prompt: 'do something' },
@@ -127,17 +116,35 @@ describe('DelegateTool', () => {
       })
     );
     expect(result.status).toBe('completed');
-    expect(result.content[0].text).toContain('job_123');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.jobId).toBe('job_123');
+    expect(body.status).toBe('started');
   });
 
-  it('returns immediately in background mode', async () => {
+  it('rejects an unknown background parameter (schema is async-only)', () => {
     const tool = new DelegateTool();
+    const result = tool.schema.safeParse({ prompt: 'do something', background: true });
+    expect(result.success).toBe(false);
+  });
+
+  it('returns the async started-shape immediately without awaiting completion', async () => {
+    const tool = new DelegateTool();
+
+    let jobCompleted = false;
+    const completion = new Promise<void>((resolve) => {
+      // Resolve the job's completion only after a macrotask. If delegate awaited
+      // it, the tool call would not resolve before this flips the flag.
+      setTimeout(() => {
+        jobCompleted = true;
+        resolve();
+      }, 50);
+    });
 
     const mockJob = {
       jobId: 'job_456',
       type: 'delegate' as const,
       status: 'running' as const,
-      completion: new Promise<void>(() => {}), // Never resolves
+      completion,
     } as unknown as JobState;
 
     const jobManager = {
@@ -146,37 +153,31 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     const result = await tool.execute(
-      { prompt: 'do something', background: true },
+      { prompt: 'do something' },
       { signal: new AbortController().signal, jobManager }
     );
 
+    // The tool returned before the job's completion promise resolved.
+    expect(jobCompleted).toBe(false);
     expect(result.status).toBe('completed');
-    expect(result.content[0].text).toContain('job_456');
-    expect(result.content[0].text).toContain('started');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.jobId).toBe('job_456');
+    expect(body.status).toBe('started');
   });
 
   it('resumes previous job session', async () => {
     const tool = new DelegateTool();
 
-    let resolveJob!: () => void;
-    const completion = new Promise<void>((r) => {
-      resolveJob = r;
-    });
     const mockJob = {
       jobId: 'job_789',
-      status: 'completed' as const,
-      completion,
-      resolveCompletion: () => resolveJob(),
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
     } as unknown as JobState;
 
     const jobManager = {
       createJob: vi.fn().mockResolvedValue({ jobId: 'job_789', job: mockJob }),
       listJobs: vi.fn().mockReturnValue([{ jobId: 'job_prev', subagentSessionId: 'sess_sub_abc' }]),
-      getJobOutput: vi.fn().mockReturnValue('resumed output'),
-      finalizeJob: vi.fn(),
     } as unknown as JobManager;
-
-    setTimeout(() => resolveJob(), 10);
 
     const result = await tool.execute(
       { prompt: 'continue', resume: 'job_prev' },
@@ -210,7 +211,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     await tool.execute(
-      { prompt: 'do something', background: true },
+      { prompt: 'do something' },
       { signal: new AbortController().signal, jobManager, runtimeBinding }
     );
 
@@ -252,7 +253,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     await tool.execute(
-      { prompt: 'do something', background: true, persona: 'persistent-box-worker' },
+      { prompt: 'do something', persona: 'persistent-box-worker' },
       { signal: new AbortController().signal, jobManager, runtimeBinding }
     );
 
@@ -300,7 +301,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     await tool.execute(
-      { prompt: 'do something', background: true, persona: 'container-persona' },
+      { prompt: 'do something', persona: 'container-persona' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -343,7 +344,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     await tool.execute(
-      { prompt: 'do something', background: true, persona: 'tag-only' },
+      { prompt: 'do something', persona: 'tag-only' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -389,7 +390,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     await tool.execute(
-      { prompt: 'do something', background: true, persona: 'box-shell' },
+      { prompt: 'do something', persona: 'box-shell' },
       { signal: new AbortController().signal, jobManager, runtimeBinding }
     );
 
@@ -433,7 +434,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     await tool.execute(
-      { prompt: 'do something', background: true, persona: 'mounts-persona' },
+      { prompt: 'do something', persona: 'mounts-persona' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -480,24 +481,16 @@ describe('DelegateTool', () => {
   it('includes turn context when provided', async () => {
     const tool = new DelegateTool();
 
-    let resolveJob!: () => void;
-    const completion = new Promise<void>((r) => {
-      resolveJob = r;
-    });
-
     const mockJob = {
       jobId: 'job_turn',
-      status: 'completed' as const,
-      completion,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
     } as unknown as JobState;
 
     const jobManager = {
       createJob: vi.fn().mockResolvedValue({ jobId: 'job_turn', job: mockJob }),
       listJobs: vi.fn().mockReturnValue([]),
-      getJobOutput: vi.fn().mockReturnValue(''),
     } as unknown as JobManager;
-
-    setTimeout(() => resolveJob(), 10);
 
     await tool.execute(
       { prompt: 'task' },
@@ -515,24 +508,16 @@ describe('DelegateTool', () => {
   it('passes connectionId and modelId to createJob', async () => {
     const tool = new DelegateTool();
 
-    let resolveJob!: () => void;
-    const completion = new Promise<void>((r) => {
-      resolveJob = r;
-    });
-
     const mockJob = {
       jobId: 'job_model',
-      status: 'completed' as const,
-      completion,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
     } as unknown as JobState;
 
     const jobManager = {
       createJob: vi.fn().mockResolvedValue({ jobId: 'job_model', job: mockJob }),
       listJobs: vi.fn().mockReturnValue([]),
-      getJobOutput: vi.fn().mockReturnValue(''),
     } as unknown as JobManager;
-
-    setTimeout(() => resolveJob(), 10);
 
     await tool.execute(
       { prompt: 'task', connectionId: 'conn_123', modelId: 'gpt-4' },
@@ -571,7 +556,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     const result = await tool.execute(
-      { prompt: 'work', background: true, persona: 'inv-persona' },
+      { prompt: 'work', persona: 'inv-persona' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -602,29 +587,22 @@ describe('DelegateTool', () => {
     // computes the host path for the result + tracking.
   });
 
-  it('sync per_invocation preamble includes scratchDir', async () => {
+  it('per_invocation started-shape frames the workspace as untrusted', async () => {
     const personaRegistry = fakePersonaRegistry('inv-persona');
     const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
     const tool = new DelegateTool({ personaRegistry, environmentRegistry });
 
-    let resolveJob!: () => void;
-    const completion = new Promise<void>((r) => {
-      resolveJob = r;
-    });
     const mockJob = {
-      jobId: 'job_sync_inv',
+      jobId: 'job_async_inv',
       type: 'delegate' as const,
-      status: 'completed' as const,
-      completion,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
     } as unknown as JobState;
-    setTimeout(() => resolveJob(), 10);
 
-    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_sync_inv', job: mockJob });
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_async_inv', job: mockJob });
     const jobManager = {
       createJob,
       listJobs: vi.fn().mockReturnValue([]),
-      getJobOutput: vi.fn().mockReturnValue('subagent output'),
-      finalizeJob: vi.fn(),
     } as unknown as JobManager;
 
     const result = await tool.execute(
@@ -638,11 +616,13 @@ describe('DelegateTool', () => {
     );
 
     expect(result.status).toBe('completed');
-    const text = result.content[0].text;
-    expect(text).toMatch(/^delegate jobId=job_sync_inv/);
-    expect(text).toContain('Subagent workspace:');
-    expect(text).toContain('UNTRUSTED');
-    expect(text).toContain('job_kill');
+    const body = JSON.parse(result.content[0].text) as Record<string, unknown>;
+    expect(body.jobId).toBe('job_async_inv');
+    expect(body.status).toBe('started');
+    expect(typeof body.workspace).toBe('string');
+    expect(body.workspaceNote).toContain('Subagent workspace:');
+    expect(body.workspaceNote).toContain('UNTRUSTED');
+    expect(body.workspaceNote).toContain('job_kill');
   });
 
   it('resume reuses prior subagent session id and scratch dir for per_invocation', async () => {
@@ -665,7 +645,7 @@ describe('DelegateTool', () => {
 
     // First invocation
     const firstResult = await tool.execute(
-      { prompt: 'first task', background: true, persona: 'inv-persona' },
+      { prompt: 'first task', persona: 'inv-persona' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -698,7 +678,7 @@ describe('DelegateTool', () => {
       .mockReturnValue([{ jobId: 'job_first', subagentSessionId: mintedSessionId }]);
 
     const secondResult = await tool.execute(
-      { prompt: 'continue', background: true, persona: 'inv-persona', resume: 'job_first' },
+      { prompt: 'continue', persona: 'inv-persona', resume: 'job_first' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -739,7 +719,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     const result = await tool.execute(
-      { prompt: 'work', background: true, persona: 'box-shell' },
+      { prompt: 'work', persona: 'box-shell' },
       { signal: new AbortController().signal, jobManager, runtimeBinding }
     );
 
@@ -776,7 +756,7 @@ describe('DelegateTool', () => {
     fs.writeFileSync(path.join(priorWs, 'out.txt'), 'prior output');
 
     await tool.execute(
-      { prompt: 'resume work', background: true, persona: 'inv-persona', resume: 'job_prev_inv' },
+      { prompt: 'resume work', persona: 'inv-persona', resume: 'job_prev_inv' },
       {
         signal: new AbortController().signal,
         jobManager,
@@ -812,7 +792,7 @@ describe('DelegateTool', () => {
     } as unknown as JobManager;
 
     const result = await tool.execute(
-      { prompt: 'work', background: true, persona: 'inv-persona' },
+      { prompt: 'work', persona: 'inv-persona' },
       {
         signal: new AbortController().signal,
         jobManager,

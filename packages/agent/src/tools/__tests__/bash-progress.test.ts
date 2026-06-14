@@ -95,7 +95,6 @@ describe('DelegateTool progressIntervalMs schema', () => {
   it('accepts valid progressIntervalMs values', () => {
     const result = tool.schema.safeParse({
       prompt: 'Do something',
-      background: true,
       progressIntervalMs: 60000,
     });
 
@@ -108,7 +107,6 @@ describe('DelegateTool progressIntervalMs schema', () => {
   it('accepts minimum progressIntervalMs (5000ms)', () => {
     const result = tool.schema.safeParse({
       prompt: 'Do something',
-      background: true,
       progressIntervalMs: 5000,
     });
 
@@ -118,7 +116,6 @@ describe('DelegateTool progressIntervalMs schema', () => {
   it('accepts maximum progressIntervalMs (600000ms)', () => {
     const result = tool.schema.safeParse({
       prompt: 'Do something',
-      background: true,
       progressIntervalMs: 600000,
     });
 
@@ -128,7 +125,6 @@ describe('DelegateTool progressIntervalMs schema', () => {
   it('rejects progressIntervalMs below minimum', () => {
     const result = tool.schema.safeParse({
       prompt: 'Do something',
-      background: true,
       progressIntervalMs: 4999,
     });
 
@@ -138,7 +134,6 @@ describe('DelegateTool progressIntervalMs schema', () => {
   it('rejects progressIntervalMs above maximum', () => {
     const result = tool.schema.safeParse({
       prompt: 'Do something',
-      background: true,
       progressIntervalMs: 600001,
     });
 
@@ -148,7 +143,6 @@ describe('DelegateTool progressIntervalMs schema', () => {
   it('allows omitting progressIntervalMs', () => {
     const result = tool.schema.safeParse({
       prompt: 'Do something',
-      background: true,
     });
 
     expect(result.success).toBe(true);
@@ -190,7 +184,6 @@ describe('DelegateTool connectionId/modelId schema', () => {
       prompt: 'Do something',
       connectionId: 'conn_12345',
       modelId: 'claude-3-sonnet',
-      background: true,
     });
 
     expect(result.success).toBe(true);
