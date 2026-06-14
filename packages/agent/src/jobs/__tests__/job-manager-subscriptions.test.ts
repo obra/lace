@@ -92,6 +92,32 @@ describe('JobManager subscriptions', () => {
       expect(inject).toHaveBeenCalledTimes(1);
     });
 
+    // Regression guard for async-only delegation: `delegate(prompt=...)`
+    // returns immediately and the parent may NEVER call `job_notify`. The
+    // always-on inject-fallback is the only thing that wakes such a parent
+    // when its job finalizes. If this ever regresses, an unsubscribed parent
+    // would block forever on a job it can't be notified about.
+    it('async-only fallback: a terminal fanout for a never-subscribed job wakes the parent exactly once', () => {
+      const manager = makeManager();
+      const inject = vi.fn();
+      manager.fanoutToInject('job_never_subscribed', 'completed', {}, inject);
+      expect(inject).toHaveBeenCalledTimes(1);
+    });
+
+    // The inverse half of the contract: the fallback is suppressed the moment
+    // ANY subscription exists, even one that does not cover this kind. A
+    // `failed`-only subscriber watching a successful completion gets nothing —
+    // "silence is not success" — so the fallback must NOT fire here.
+    it('async-only fallback: a non-matching subscription suppresses the fallback (silence is not success)', () => {
+      const manager = makeManager();
+      manager.subscribe({ jobId: 'job_partial', on: ['failed'] });
+
+      const inject = vi.fn();
+      manager.fanoutToInject('job_partial', 'completed', {}, inject);
+
+      expect(inject).not.toHaveBeenCalled();
+    });
+
     it('fanout to a different jobId does not match other subscriptions', () => {
       const manager = makeManager();
       manager.subscribe({ jobId: 'job_A', on: ['completed'] });
