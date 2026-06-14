@@ -41,6 +41,39 @@ import {
 } from './handoff-idempotency';
 
 /**
+ * Schedule a follow-up internal turn if an immediate-priority `context_injected`
+ * event landed during the just-ended turn (eventSeq > `watermark`) but was not
+ * consumed before the turn exited.
+ *
+ * Under async-only delegation a job-completion `<notification>` (an immediate
+ * `context_injected` durable event) is the ONLY way a parent learns a subagent
+ * finished, so an inject that races the turn boundary must still wake the parent.
+ * This runs on every turn-exit path (success, abort, slash, error); each passes
+ * the watermark appropriate to what it consumed.
+ *
+ * The re-entrancy guard is load-bearing: the wake is deferred to a `setImmediate`
+ * and re-checks `!state.activeTurn` inside it so we never start a second turn
+ * while one is already running, and `state.activeSession` may have changed.
+ */
+function scheduleImmediateInjectDrain(
+  state: AgentServerState,
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null },
+  watermark: number
+): void {
+  if (!state.activeSession) return;
+  if (
+    hasPendingImmediateInjects(state.activeSession.dir, watermark) &&
+    runPromptInternalRef.current
+  ) {
+    setImmediate(() => {
+      if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
+        void runPromptInternalRef.current([]);
+      }
+    });
+  }
+}
+
+/**
  * Register the session/prompt RPC handler.
  */
 export function registerPromptHandler(
@@ -153,6 +186,22 @@ export function registerPromptHandler(
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
     let ownsActiveTurn = true;
 
+    // Immediate-inject drain watermark for the NON-success exit paths (abort,
+    // slash, error). These paths consume no injects of their own — the abort
+    // and slash early-returns never run the conversation loop, and an error can
+    // throw before the runner consumes anything. So the correct watermark for
+    // them is the one this turn STARTED from: the last turn_end that existed
+    // before this turn_start. Any immediate inject newer than that is unconsumed
+    // and must wake a follow-up turn. (The success path uses a different, higher
+    // watermark — the turn_end the runner just wrote — because the runner
+    // already folded in every inject up to that point.) Captured before
+    // turn_start is written so the about-to-be-written turn_end of THIS turn
+    // does not raise the watermark and strand an inject that landed during the
+    // turn.
+    const preTurnInjectWatermark = state.activeSession
+      ? (findLastTurnEndEventSeq(state.activeSession.dir) ?? 0)
+      : 0;
+
     // Hoisted outside the try so the catch handler (fallback turn_end) can
     // reuse the same write path to synthesize a turn_end. The turnSeq counter
     // is intentionally local to this handler invocation; the runner has its
@@ -222,6 +271,11 @@ export function registerPromptHandler(
         );
         state.activeSession = loadSession(state.activeSession.meta.sessionId);
         state.activeTurn = null;
+        ownsActiveTurn = false;
+        // The aborted turn consumed no injects, so drain anything newer than the
+        // watermark this turn started from (NOT the cancelled turn_end we just
+        // wrote, which would strand an inject that landed during the turn).
+        scheduleImmediateInjectDrain(state, runPromptInternalRef, preTurnInjectWatermark);
         return result;
       }
 
@@ -250,6 +304,13 @@ export function registerPromptHandler(
         );
         if (slashResult) {
           state.activeTurn = null;
+          ownsActiveTurn = false;
+          // A slash command does not run the conversation loop, so it consumes
+          // no injects. Drain anything newer than the watermark this turn
+          // started from. (For /clear, state.activeSession is now the NEW
+          // session whose fresh transcript has no pending injects, so this
+          // correctly no-ops there.)
+          scheduleImmediateInjectDrain(state, runPromptInternalRef, preTurnInjectWatermark);
           return slashResult;
         }
 
@@ -468,20 +529,14 @@ export function registerPromptHandler(
       // triggerInternalTurn callback can no-op if it observes state.activeTurn=true
       // before the turn ends, then the turn ends with the event unprocessed.
       // We re-scan here, after activeTurn is cleared, and fire a synthetic
-      // internal turn if anything is waiting.
-      if (state.activeSession) {
-        const lastTurnEnd = findLastTurnEndEventSeq(state.activeSession.dir) ?? 0;
-        if (
-          hasPendingImmediateInjects(state.activeSession.dir, lastTurnEnd) &&
-          runPromptInternalRef.current
-        ) {
-          setImmediate(() => {
-            if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-              void runPromptInternalRef.current([]);
-            }
-          });
-        }
-      }
+      // internal turn if anything is waiting. The runner already consumed every
+      // inject up to the turn_end it just wrote, so the watermark is that
+      // turn_end's eventSeq.
+      scheduleImmediateInjectDrain(
+        state,
+        runPromptInternalRef,
+        state.activeSession ? (findLastTurnEndEventSeq(state.activeSession.dir) ?? 0) : 0
+      );
 
       // RPC response uses the protocol-shaped usage.
       return {
@@ -519,8 +574,18 @@ export function registerPromptHandler(
       }
       throw err;
     } finally {
-      if (ownsActiveTurn && state.activeTurn?.turnId === turnId) {
-        state.activeTurn = null;
+      // Only the error/throw exit still owns the active turn here: the success,
+      // abort, and slash paths each cleared it and set ownsActiveTurn=false
+      // before returning. We clear it and run the inject drain so an immediate
+      // inject that landed as the turn threw still wakes a follow-up turn. The
+      // erroring turn may have thrown before the runner consumed anything, so we
+      // use the watermark this turn started from (never strands; over-firing on a
+      // turn that did consume is bounded and self-corrects on the next turn).
+      if (ownsActiveTurn) {
+        if (state.activeTurn?.turnId === turnId) {
+          state.activeTurn = null;
+        }
+        scheduleImmediateInjectDrain(state, runPromptInternalRef, preTurnInjectWatermark);
       }
     }
   };
