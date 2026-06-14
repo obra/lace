@@ -35,7 +35,7 @@ describe('JobOutputTool', () => {
     } as unknown as JobManager;
 
     const result = await tool.execute(
-      { jobId: 'job_123', block: false },
+      { jobId: 'job_123' },
       { signal: new AbortController().signal, jobManager }
     );
 
@@ -45,42 +45,32 @@ describe('JobOutputTool', () => {
     expect(result.content[0].text).toContain('exitCode');
   });
 
-  it('waits for job completion in blocking mode', async () => {
+  it('returns a snapshot for a running job without waiting', async () => {
     const tool = new JobOutputTool();
 
-    let resolveJob!: () => void;
-    const completion = new Promise<void>((r) => {
-      resolveJob = r;
+    const completion = new Promise<void>(() => {
+      /* never resolves */
     });
 
     const mockJob = {
-      jobId: 'job_blocking',
+      jobId: 'job_running',
       status: 'running' as const,
       completion,
     } as unknown as JobState;
 
     const jobManager = {
-      getJob: vi.fn().mockImplementation(() => {
-        // Return running status until resolved
-        if (mockJob.status === 'running') return mockJob;
-        return { ...mockJob, status: 'completed' };
-      }),
-      getJobOutput: vi.fn().mockReturnValue('output after completion'),
+      getJob: vi.fn().mockReturnValue(mockJob),
+      getJobOutput: vi.fn().mockReturnValue('partial output'),
     } as unknown as JobManager;
 
-    // Resolve job after short delay
-    setTimeout(() => {
-      mockJob.status = 'completed' as const;
-      resolveJob();
-    }, 50);
-
     const result = await tool.execute(
-      { jobId: 'job_blocking', block: true, timeoutMs: 5000 },
+      { jobId: 'job_running' },
       { signal: new AbortController().signal, jobManager }
     );
 
     expect(result.status).toBe('completed');
-    expect(result.content[0].text).toContain('output after completion');
+    expect(result.content[0].text).toContain('running');
+    expect(result.content[0].text).toContain('partial output');
   });
 
   it('returns not found for unknown job', async () => {
