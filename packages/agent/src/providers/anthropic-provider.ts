@@ -11,6 +11,7 @@ import type {
   BetaTextBlock,
   BetaToolUseBlock,
   BetaMessageParam,
+  BetaOutputConfig,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { BetaCacheMissReason } from './anthropic/cache-miss';
 import type { AnthropicBeta } from '@anthropic-ai/sdk/resources/beta/beta';
@@ -273,7 +274,29 @@ export class AnthropicProvider extends AIProvider {
     const effectiveBetas = outputFormat
       ? [...betas, 'structured-outputs-2025-12-15' as AnthropicBeta]
       : betas;
-    const outputConfigField = outputFormat ? { output_config: { format: outputFormat } } : {};
+
+    // Reasoning effort. The level comes from the catalog
+    // (default_reasoning_effort) or the LACE_REASONING_EFFORT override, gated on
+    // the model actually supporting effort levels: a model flagged
+    // `has_reasoning_effort: false` (e.g. the compaction haiku) never receives an
+    // effort, even when an override is set. Effort rides in the same output_config
+    // object as any structured-output format.
+    //
+    // We deliberately do NOT enable adaptive thinking here. Effort is independent
+    // of thinking (the API accepts effort with thinking disabled/omitted), and
+    // lace's message history does not round-trip thinking blocks — enabling
+    // thinking would drop the blocks on tool-use continuations and 400.
+    const catalogModel = this._catalogData?.models.find((m) => m.id === model);
+    const reasoningEffort =
+      catalogModel?.has_reasoning_effort === false
+        ? undefined
+        : this.getModelReasoningEffort(model);
+    const outputConfig: BetaOutputConfig = {
+      ...(outputFormat ? { format: outputFormat } : {}),
+      ...(reasoningEffort ? { effort: reasoningEffort as BetaOutputConfig['effort'] } : {}),
+    };
+    const outputConfigField =
+      Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {};
 
     // The beta endpoint param shape is structurally compatible with the
     // base MessageParam (same `role` + `content` fields), but the SDK's
