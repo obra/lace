@@ -1183,7 +1183,7 @@ export class ConversationRunner {
           );
           const result = validatePreserved(raw);
           if (!('noop' in result)) {
-            await this.deps.runExclusive(() => {
+            await this.deps.runExclusive(async () => {
               const sessionState = readSessionState(sessionDir);
               const { nextState } = appendDurableEvent(sessionDir, sessionState, {
                 type: 'context_compacted',
@@ -1192,6 +1192,9 @@ export class ConversationRunner {
                 data: result.compactionEvent.data as Record<string, unknown>,
               });
               writeSessionState(sessionDir, nextState);
+              // Re-render the persona (model + system prompt) from the current
+              // persona file so the compacted session reflects the live persona.
+              await this.deps.rerenderPersonaAfterCompaction?.();
             });
           }
         }

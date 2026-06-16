@@ -70,6 +70,14 @@ export interface RunnerDependencies {
   /** Function to run code exclusively (mutex) to prevent race conditions */
   runExclusive: <T>(fn: () => T | Promise<T>) => Promise<T>;
 
+  /**
+   * Re-render the session's persona (model + system prompt) from the current
+   * persona file after a compaction. Built at the handler layer where the
+   * persona-rendering machinery lives; absent in contexts that don't render
+   * personas (the runner then skips it).
+   */
+  rerenderPersonaAfterCompaction?: () => Promise<void>;
+
   /** Request permission from the client for tool use */
   requestPermission: (request: {
     sessionId: string;

@@ -23,6 +23,7 @@ import type {
 } from '@lace/agent/server-types';
 import { throwInvalidParams, assertInitialized, toNonEmptyString } from '@lace/agent/rpc/utils';
 import { handleSlashCommand } from '@lace/agent/conversation/slash-commands';
+import { rerenderPersonaForSession } from '@lace/agent/rpc/handlers/session';
 import { createProviderForTurn, getModelPricing } from '@lace/agent/conversation/provider-factory';
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
@@ -423,6 +424,17 @@ export function registerPromptHandler(
       const deps: RunnerDependencies = {
         onUpdate: emitUpdate,
         runExclusive,
+        rerenderPersonaAfterCompaction: async () => {
+          if (!state.activeSession) return;
+          await rerenderPersonaForSession({
+            sessionDir: state.activeSession.dir,
+            persona: state.activeSession.meta.persona ?? 'lace',
+            cwd: state.activeSession.meta.workDir,
+            state,
+            createToolExecutorForMode,
+          });
+          state.activeSession = loadSession(state.activeSession.meta.sessionId);
+        },
         requestPermission: requestPermissionFromClient,
         createToolExecutor: cachedCreateToolExecutor,
         createProvider: () =>

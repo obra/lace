@@ -25,6 +25,7 @@ import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from
 import type { ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
+import { rerenderPersonaForSession } from './session';
 import type { Tool } from '../../tools/tool';
 import {
   assertInitialized,
@@ -533,6 +534,18 @@ export function registerSessionOperationHandlers(
       });
       sessionState = nextState;
       writeSessionState(sessionDir, sessionState);
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      // Re-establish the persona (model + system prompt) from the current persona
+      // file so the compacted session tracks edits instead of its creation-time
+      // snapshot.
+      await rerenderPersonaForSession({
+        sessionDir,
+        persona: state.activeSession!.meta.persona ?? 'lace',
+        cwd: state.activeSession!.meta.workDir,
+        state,
+        createToolExecutorForMode,
+      });
       state.activeSession = loadSession(state.activeSession!.meta.sessionId);
 
       const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);

@@ -432,6 +432,46 @@ export async function composeAndWriteSystemPromptSet(params: {
 }
 
 /**
+ * Re-establish a live session's persona from the current persona file: re-apply
+ * the persona's model to the session config and append a fresh system_prompt_set
+ * rendered from the current persona (prompt, tools, skills). Used after compaction
+ * so a long-lived session tracks edits to its persona instead of keeping its
+ * creation-time snapshot forever. Persists the updated state and returns it.
+ */
+export async function rerenderPersonaForSession(params: {
+  sessionDir: string;
+  persona: string;
+  cwd: string;
+  state: AgentServerState;
+  createToolExecutorForMode: CreateToolExecutorFn;
+}): Promise<SessionState> {
+  const { sessionDir, persona, cwd, state, createToolExecutorForMode } = params;
+
+  // Re-apply the persona's model so the persona file stays the source of truth.
+  let sessionState = readSessionState(sessionDir);
+  const { config: personaConfig } = state.personaRegistry.parsePersona(persona);
+  if (personaConfig.model) {
+    sessionState = {
+      ...sessionState,
+      config: { ...sessionState.config, modelId: personaConfig.model },
+    };
+  }
+
+  // Append a fresh system_prompt_set rendered from the current persona; this
+  // becomes the latest one the history rebuild recovers.
+  sessionState = await composeAndWriteSystemPromptSet({
+    sessionDir,
+    sessionState,
+    persona,
+    cwd,
+    state,
+    createToolExecutorForMode,
+  });
+  writeSessionState(sessionDir, sessionState);
+  return sessionState;
+}
+
+/**
  * Register session lifecycle handlers with the peer.
  * - session/new: Create a new session
  * - session/list: List all available sessions

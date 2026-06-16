@@ -11,6 +11,7 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../../../server';
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
 import { getSessionDir } from '@lace/agent/storage/session-store';
+import { readDurableEvents } from '@lace/agent/storage/event-log';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -157,6 +158,38 @@ describe('ent/session/compact — track-based strategy', () => {
       // may be slightly higher than previousTokens due to compaction header overhead.
       // Verify the token counts are in the same ballpark (within 10% of each other).
       expect(result.currentTokens).toBeLessThan(result.previousTokens * 1.1);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('re-renders the system prompt from the current persona after compaction', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const newResult = (await client.request('session/new', { cwd: workDir, mcpServers: [] })) as {
+        sessionId: string;
+      };
+
+      const sessionDir = getSessionDir(newResult.sessionId);
+      writeMinimalConversation(sessionDir);
+
+      await client.request('ent/session/compact', { strategy: 'track-based' });
+
+      const events = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER })
+        .events as Array<{ type: string; data?: { text?: string } }>;
+
+      const compactIdx = events.findIndex((e) => e.type === 'context_compacted');
+      expect(compactIdx).toBeGreaterThanOrEqual(0);
+
+      // A fresh system_prompt_set is appended AFTER the compaction event, and it
+      // is the re-rendered persona — not the stale one the conversation carried.
+      const sysAfter = events.slice(compactIdx).filter((e) => e.type === 'system_prompt_set');
+      expect(sysAfter.length).toBeGreaterThan(0);
+      expect(sysAfter.at(-1)?.data?.text).not.toBe('You are a test assistant.');
     } finally {
       client.close();
       server.close();
