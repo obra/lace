@@ -56,6 +56,14 @@ const RECALL_DESCRIPTION = [
   '',
   'Actions: `search`, `read`.',
   '',
+  'Query syntax: `search.query` is a SQLite FTS5 match expression, not a plain string.',
+  'Plain words and phrases work best (terms are implicitly ANDed). Punctuation is',
+  'operator syntax — `:` selects a column, a leading `-` excludes, `*` is a prefix',
+  'marker, `"` opens a phrase, and the barewords AND/OR/NOT/NEAR are operators. A term',
+  'that contains punctuation (e.g. a hyphenated id like `github-token` or a `key:value`)',
+  'will be misread as an operator and error. Wrap any such term in double quotes to',
+  'search it literally: `capture committed "github-token" slot policy`.',
+  '',
   '`search.order` defaults to `relevance` (FTS rank). Pass `order: "recent"` when you want',
   'the most recent mentions of a term (e.g. "what\'s the last thing I said about compaction?").',
 ].join('\n');
@@ -188,12 +196,21 @@ export class RecallTool extends Tool {
       // as a zero-hit envelope with a hint so the conversation turn doesn't
       // crash. (User-supplied strings get redacted here too — see I1.)
       const message = err instanceof Error ? err.message : String(err);
+      // "no such column: X" is FTS5's opaque way of saying a term with
+      // punctuation (a hyphen, or `key:value`) was parsed as column syntax —
+      // the single most common recall footgun. Lead with the concrete fix.
+      const columnHint = /no such column/i.test(message)
+        ? `A term with punctuation (e.g. a hyphen or 'key:value') was read as FTS5 column ` +
+          `syntax. Wrap any term containing punctuation in double quotes to search it ` +
+          `literally, e.g. capture committed "github-token" slot policy. `
+        : '';
       return this.createResult({
         hits: [],
         hint:
           `FTS5 syntax error on query=${JSON.stringify(redact(args.query))}: ${redact(message)}. ` +
-          `Try removing quotes, parentheses, leading '-', '*' or ':', or operator keywords ` +
-          `(AND/OR/NOT/NEAR). Plain words and phrases work best.`,
+          columnHint +
+          `Plain words and phrases work best; ':' selects a column, a leading '-' excludes, ` +
+          `'*' is a prefix marker, '"' opens a phrase, and AND/OR/NOT/NEAR are operators.`,
       });
     }
     // Use redactSnippet (strict + prefix-only) on previews because FTS5's
