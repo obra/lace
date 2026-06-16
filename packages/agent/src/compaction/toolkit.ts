@@ -3,7 +3,7 @@
 
 import { isEventOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
-import type { ContentBlock } from '@lace/agent/providers/base-provider';
+import type { ContentBlock, ThinkingBlock } from '@lace/agent/providers/base-provider';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import type { ToolResult as ProtocolToolResult } from '@lace/ent-protocol';
 
@@ -396,6 +396,7 @@ type PreservedMessage = {
   content: string | ContentBlock[];
   toolCalls?: CoreToolCall[];
   toolResults?: CoreToolResult[];
+  thinkingBlocks?: ThinkingBlock[];
 };
 
 /**
@@ -430,8 +431,18 @@ export function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessag
     }
 
     if (isEventOfType(e, 'message')) {
-      // Pass through the original content to preserve any image blocks.
-      result.push({ role: 'assistant', content: e.data.content ?? '' });
+      // Pass through the original content to preserve any image blocks, plus any
+      // thinking blocks so the verbatim tail can replay them before this turn's
+      // tool_use (Anthropic adaptive thinking).
+      const thinkingBlocks =
+        Array.isArray(e.data.thinkingBlocks) && e.data.thinkingBlocks.length > 0
+          ? e.data.thinkingBlocks
+          : undefined;
+      result.push({
+        role: 'assistant',
+        content: e.data.content ?? '',
+        ...(thinkingBlocks ? { thinkingBlocks } : {}),
+      });
       continue;
     }
 

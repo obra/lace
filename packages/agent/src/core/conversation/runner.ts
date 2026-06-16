@@ -42,6 +42,7 @@ import type {
   BetaCacheMissReason,
   LaceStopDetails,
   RequestOptions,
+  ThinkingBlock,
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
@@ -469,6 +470,10 @@ export class ConversationRunner {
     // completion with the full concatenated text. `pauseResumeCount` enforces
     // MAX_PAUSE_RESUMES and is reset on every non-pause iteration.
     let partialAssistantText = '';
+    // Thinking blocks accumulate across pause_turn iterations alongside the text,
+    // so the single durable 'message' event carries the full reasoning for the
+    // logical turn. Reset on every non-pause iteration (mirrors partialAssistantText).
+    let partialThinkingBlocks: ThinkingBlock[] = [];
     let pauseResumeCount = 0;
 
     // Per-turn compaction request cell. compact_session mutates this during
@@ -686,6 +691,14 @@ export class ConversationRunner {
         const concatenatedAssistantText = partialAssistantText + assistantText;
         finalAssistantContent = concatenatedAssistantText;
 
+        // Accumulate this iteration's thinking blocks with any carried over from
+        // prior pause_turn iterations. Persisted on the single 'message' event so
+        // the next turn can replay them before the turn's text/tool_use.
+        const iterationThinkingBlocks = Array.isArray(response.thinkingBlocks)
+          ? response.thinkingBlocks
+          : [];
+        const concatenatedThinkingBlocks = [...partialThinkingBlocks, ...iterationThinkingBlocks];
+
         // Defer the durable 'message' event when the provider is asking us to
         // auto-resume (pause_turn). Writing the partial would surface mid-turn
         // text fragments as durable events and break the invariant of one
@@ -701,8 +714,21 @@ export class ConversationRunner {
           const contentBlocks = concatenatedAssistantText
             ? [{ type: 'text', text: concatenatedAssistantText }]
             : [];
-          if (contentBlocks.length > 0) {
-            await writeAndAdvance({ type: 'message', data: { content: contentBlocks } });
+          // Persist the turn when it has text OR thinking blocks. A tool-only
+          // turn (no text) still needs its 'message' event when thinking is
+          // present, so the rebuilt assistant message carries the thinking that
+          // must precede its tool_use blocks. A turn with neither is skipped (an
+          // empty {role:'assistant'} would create consecutive same-role messages).
+          if (contentBlocks.length > 0 || concatenatedThinkingBlocks.length > 0) {
+            await writeAndAdvance({
+              type: 'message',
+              data: {
+                content: contentBlocks,
+                ...(concatenatedThinkingBlocks.length > 0
+                  ? { thinkingBlocks: concatenatedThinkingBlocks }
+                  : {}),
+              },
+            });
           }
         }
 
@@ -793,6 +819,7 @@ export class ConversationRunner {
               };
             }
             partialAssistantText = concatenatedAssistantText;
+            partialThinkingBlocks = concatenatedThinkingBlocks;
             // Anthropic rejects consecutive same-role messages. On the FIRST
             // pause of a logical turn we append a new assistant message; on
             // subsequent pauses we MERGE by replacing the last assistant
@@ -800,10 +827,15 @@ export class ConversationRunner {
             // intentionally DROP toolCalls because pause iterations execute
             // no tools — emitting tool_use blocks with no following
             // tool_result would cause Anthropic to 400 on the next request.
+            // Thinking blocks are carried through so the resumed turn keeps its
+            // own partial reasoning (replayed verbatim before any text).
             const last = providerMessages[providerMessages.length - 1];
             const mergedAssistant = {
               role: 'assistant' as const,
               content: concatenatedAssistantText,
+              ...(concatenatedThinkingBlocks.length > 0
+                ? { thinkingBlocks: concatenatedThinkingBlocks }
+                : {}),
             };
             providerMessages =
               last?.role === 'assistant'
@@ -829,6 +861,7 @@ export class ConversationRunner {
             // logical turn for pause-tracking purposes.
             pauseResumeCount = 0;
             partialAssistantText = '';
+            partialThinkingBlocks = [];
             break;
           default:
             // A future provider may invent a new stopReason. Don't fall through

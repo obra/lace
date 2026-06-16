@@ -7,6 +7,7 @@ import type {
   LaceStopReason,
   LaceStopDetails,
   BetaCacheMissReason,
+  ThinkingBlock,
 } from '@lace/agent/providers/base-provider';
 
 // Content block types used in prompts and messages
@@ -31,6 +32,12 @@ export type PromptEventData = {
 export type MessageEventData = {
   type: 'message';
   content: ContentBlock[] | string;
+  /**
+   * Reasoning blocks for this assistant turn, persisted verbatim so the history
+   * rebuild can replay them before the turn's text/tool_use (Anthropic adaptive
+   * thinking). Absent on turns with no thinking and on legacy events.
+   */
+  thinkingBlocks?: ThinkingBlock[];
 };
 
 export type ToolUseEventData = {

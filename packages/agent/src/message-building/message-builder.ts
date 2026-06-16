@@ -1,7 +1,7 @@
 // ABOUTME: Message building utilities for converting durable events to provider messages
 
 import type { ToolResult } from '@lace/ent-protocol';
-import type { ContentBlock, ProviderMessage } from '../providers/base-provider';
+import type { ContentBlock, ProviderMessage, ThinkingBlock } from '../providers/base-provider';
 import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
 import { appendOrMergeUser } from './append-or-merge';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
@@ -15,13 +15,14 @@ type ContentBlockShape = { type?: unknown; text?: unknown };
 type ContextInjectedData = { content?: unknown[] };
 type ContextCompactedData = { preserved?: unknown[] };
 type SystemPromptSetData = { text?: unknown };
-type MessageData = { content?: string | unknown[] };
+type MessageData = { content?: string | unknown[]; thinkingBlocks?: ThinkingBlock[] };
 type ToolUseData = { toolCallId?: unknown; name?: unknown; input?: unknown; result?: ToolResult };
 type PreservedMessage = {
   role?: unknown;
   content?: unknown;
   toolCalls?: CoreToolCall[];
   toolResults?: CoreToolResult[];
+  thinkingBlocks?: ThinkingBlock[];
 };
 
 /**
@@ -312,12 +313,16 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
 
         const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
         const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
+        const thinkingBlocks = Array.isArray(msgObj.thinkingBlocks)
+          ? msgObj.thinkingBlocks
+          : undefined;
 
         messages.push({
           role,
           content,
           ...(toolCalls ? { toolCalls } : {}),
           ...(toolResults ? { toolResults } : {}),
+          ...(thinkingBlocks && thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
         });
       }
 
@@ -332,7 +337,17 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
         typeof eventData.content === 'string'
           ? eventData.content
           : extractTextFromContentBlocks(Array.isArray(eventData.content) ? eventData.content : []);
-      messages.push({ role: 'assistant', content: content ?? '' });
+      const thinkingBlocks = Array.isArray(eventData.thinkingBlocks)
+        ? eventData.thinkingBlocks
+        : undefined;
+      messages.push({
+        role: 'assistant',
+        content: content ?? '',
+        // Carry thinking blocks onto the assistant message so subsequent tool_use
+        // events append to this same message and the converter replays the
+        // thinking before the tool_use blocks.
+        ...(thinkingBlocks && thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
+      });
       continue;
     }
 
