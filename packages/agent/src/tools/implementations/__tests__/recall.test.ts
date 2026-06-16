@@ -429,6 +429,22 @@ describe('RecallTool search', () => {
     expect(parsed.hint as string).toContain('<REDACTED:aws-access-key>');
   });
 
+  it('explains the double-quote fix when a punctuated term trips FTS5 column syntax', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'something');
+
+    // A hyphenated id is parsed by FTS5 as `github-token` → column syntax →
+    // "no such column: token". The hint should lead with the literal-quote fix.
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'capture committed github-token slot policy' },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.hits).toEqual([]);
+    expect(parsed.hint as string).toContain('double quotes');
+    expect(parsed.hint as string).toContain('"github-token"');
+  });
+
   it('does not echo secrets verbatim in the zero-hit hint (I1)', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'unrelated');
