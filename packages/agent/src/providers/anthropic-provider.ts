@@ -22,6 +22,7 @@ import {
   ProviderConfig,
   ProviderInfo,
   RequestOptions,
+  type ThinkingBlock,
 } from './base-provider';
 import { normalizeAnthropicStop } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
@@ -275,17 +276,14 @@ export class AnthropicProvider extends AIProvider {
       ? [...betas, 'structured-outputs-2025-12-15' as AnthropicBeta]
       : betas;
 
-    // Reasoning effort. The level comes from the catalog
-    // (default_reasoning_effort) or the LACE_REASONING_EFFORT override, gated on
-    // the model actually supporting effort levels: a model flagged
-    // `has_reasoning_effort: false` (e.g. the compaction haiku) never receives an
-    // effort, even when an override is set. Effort rides in the same output_config
-    // object as any structured-output format.
-    //
-    // We deliberately do NOT enable adaptive thinking here. Effort is independent
-    // of thinking (the API accepts effort with thinking disabled/omitted), and
-    // lace's message history does not round-trip thinking blocks — enabling
-    // thinking would drop the blocks on tool-use continuations and 400.
+    // Reasoning effort + adaptive thinking. The effort level comes from the
+    // catalog (default_reasoning_effort) or the LACE_REASONING_EFFORT override,
+    // gated on the model actually supporting effort levels: a model flagged
+    // `has_reasoning_effort: false` (e.g. the compaction haiku) receives neither
+    // effort nor thinking, even under a global override. Effort rides in the same
+    // output_config object as any structured-output format; adaptive thinking is
+    // enabled alongside it (the model's thinking blocks are round-tripped through
+    // the event log and replayed verbatim on subsequent turns — see ThinkingBlock).
     const catalogModel = this._catalogData?.models.find((m) => m.id === model);
     const reasoningEffort =
       catalogModel?.has_reasoning_effort === false
@@ -297,6 +295,9 @@ export class AnthropicProvider extends AIProvider {
     };
     const outputConfigField =
       Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {};
+    const thinkingField = reasoningEffort
+      ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const } }
+      : {};
 
     // The beta endpoint param shape is structurally compatible with the
     // base MessageParam (same `role` + `content` fields), but the SDK's
@@ -312,6 +313,7 @@ export class AnthropicProvider extends AIProvider {
       betas: effectiveBetas,
       ...diagnosticsField,
       ...outputConfigField,
+      ...thinkingField,
     };
 
     // Comprehensive debug logging of request metadata (excluding message content)
@@ -348,6 +350,27 @@ export class AnthropicProvider extends AIProvider {
    * contract — we log and return undefined so consumers fail-closed rather than
    * acting on garbage.
    */
+  /**
+   * Pull thinking + redacted_thinking blocks out of a response's content array,
+   * preserving wire order, so the runner can persist them and the next turn can
+   * replay them verbatim (Anthropic adaptive thinking). Returns undefined when
+   * the model produced no reasoning blocks, so the field stays absent on the
+   * common no-thinking response.
+   */
+  private _extractThinkingBlocks(
+    content: BetaMessage['content'] | undefined
+  ): ThinkingBlock[] | undefined {
+    const blocks: ThinkingBlock[] = [];
+    for (const block of content || []) {
+      if (block.type === 'thinking') {
+        blocks.push({ type: 'thinking', thinking: block.thinking, signature: block.signature });
+      } else if (block.type === 'redacted_thinking') {
+        blocks.push({ type: 'redacted_thinking', data: block.data });
+      }
+    }
+    return blocks.length > 0 ? blocks : undefined;
+  }
+
   private _extractStructuredOutput(textContent: string, options?: RequestOptions): unknown {
     if (!options?.outputFormat) return undefined;
     try {
@@ -443,6 +466,7 @@ export class AnthropicProvider extends AIProvider {
         return {
           content: textContent,
           toolCalls,
+          thinkingBlocks: this._extractThinkingBlocks(response.content),
           stopReason,
           stopDetails,
           usage: normalizedUsage,
@@ -619,6 +643,7 @@ export class AnthropicProvider extends AIProvider {
           const response = {
             content: textContent,
             toolCalls,
+            thinkingBlocks: this._extractThinkingBlocks(finalMessage.content),
             stopReason,
             stopDetails,
             usage: finalMessage.usage

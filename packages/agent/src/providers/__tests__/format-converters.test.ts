@@ -244,6 +244,51 @@ describe('Format Converters', () => {
       expect(result[0].role).toBe('assistant');
       expect(result[0].content).toBe('Here is my response.');
     });
+
+    it('emits thinking blocks first, before text and tool_use, on an assistant turn', () => {
+      const messages: ProviderMessage[] = [
+        {
+          role: 'assistant',
+          content: 'doing the thing',
+          thinkingBlocks: [
+            { type: 'thinking', thinking: 'reasoning here', signature: 'sig-1' },
+            { type: 'redacted_thinking', data: 'blob' },
+          ],
+          toolCalls: [{ id: 'tc_1', name: 'do_thing', arguments: { a: 1 } }],
+        },
+      ];
+
+      const result = convertToAnthropicFormat(messages);
+
+      const content = result[0].content as Array<Record<string, unknown>>;
+      // [thinking, redacted_thinking, text, tool_use]
+      expect(content).toHaveLength(4);
+      expect(content[0]).toEqual({
+        type: 'thinking',
+        thinking: 'reasoning here',
+        signature: 'sig-1',
+      });
+      expect(content[1]).toEqual({ type: 'redacted_thinking', data: 'blob' });
+      expect(content[2]).toEqual({ type: 'text', text: 'doing the thing' });
+      expect(content[3]).toHaveProperty('type', 'tool_use');
+    });
+
+    it('emits thinking blocks before text on a tool-free assistant turn', () => {
+      const messages: ProviderMessage[] = [
+        {
+          role: 'assistant',
+          content: 'final text',
+          thinkingBlocks: [{ type: 'thinking', thinking: 'mulling', signature: 'sig-2' }],
+        },
+      ];
+
+      const result = convertToAnthropicFormat(messages);
+
+      const content = result[0].content as Array<Record<string, unknown>>;
+      expect(content).toHaveLength(2);
+      expect(content[0]).toEqual({ type: 'thinking', thinking: 'mulling', signature: 'sig-2' });
+      expect(content[1]).toEqual({ type: 'text', text: 'final text' });
+    });
   });
 
   describe('convertToOpenAIFormat', () => {

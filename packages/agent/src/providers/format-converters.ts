@@ -1,11 +1,26 @@
 // ABOUTME: Provider-specific format conversion functions for enhanced ProviderMessage format
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
-import { ProviderMessage, ContentBlock } from './base-provider';
+import { ProviderMessage, ContentBlock, type ThinkingBlock } from './base-provider';
 import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
+
+/**
+ * Convert stored ThinkingBlocks into Anthropic content-block params. Anthropic
+ * requires these replayed verbatim (signature included) and placed before text
+ * and tool_use on the assistant turn, or the request 400s.
+ */
+function toAnthropicThinkingBlocks(
+  blocks: ThinkingBlock[] | undefined
+): (Anthropic.ThinkingBlockParam | Anthropic.RedactedThinkingBlockParam)[] {
+  return (blocks ?? []).map((b) =>
+    b.type === 'thinking'
+      ? { type: 'thinking', thinking: b.thinking, signature: b.signature }
+      : { type: 'redacted_thinking', data: b.data }
+  );
+}
 
 /**
  * Helper to convert our ContentBlock to Anthropic's content block format
@@ -120,10 +135,18 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
           }
         }
       } else if (msg.role === 'assistant') {
-        // Assistant messages can have tool calls
+        // Assistant messages can have tool calls. Thinking blocks, when present,
+        // must lead the content array (before text and tool_use) and be replayed
+        // verbatim — Anthropic adaptive thinking round-tripping.
         const textContent = getTextContent(msg.content);
+        const thinkingBlocks = toAnthropicThinkingBlocks(msg.thinkingBlocks);
         if (msg.toolCalls && msg.toolCalls.length > 0) {
-          const content: (Anthropic.TextBlockParam | Anthropic.ToolUseBlockParam)[] = [];
+          const content: (
+            | Anthropic.ThinkingBlockParam
+            | Anthropic.RedactedThinkingBlockParam
+            | Anthropic.TextBlockParam
+            | Anthropic.ToolUseBlockParam
+          )[] = [...thinkingBlocks];
 
           // Add text content if present
           if (textContent.trim()) {
@@ -145,14 +168,27 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             content,
           };
         } else {
-          // Pure text assistant message. If there is no text content at all,
-          // this turn is semantically empty — upstream code that produces such
-          // a turn is a bug. Returning null signals "drop this message" so it
-          // never pollutes the cached prefix with a placeholder the model will
-          // learn to mimic.
+          // Pure text assistant message. If there is no text content at all and
+          // no thinking blocks, this turn is semantically empty — upstream code
+          // that produces such a turn is a bug. Returning null signals "drop this
+          // message" so it never pollutes the cached prefix with a placeholder
+          // the model will learn to mimic.
           const trimmed = textContent.trim();
-          if (trimmed.length === 0) {
+          if (trimmed.length === 0 && thinkingBlocks.length === 0) {
             return null;
+          }
+          // Thinking present: emit an array with the thinking blocks first, then
+          // the text (if any). Without thinking, keep the simple string form.
+          if (thinkingBlocks.length > 0) {
+            const content: (
+              | Anthropic.ThinkingBlockParam
+              | Anthropic.RedactedThinkingBlockParam
+              | Anthropic.TextBlockParam
+            )[] = [...thinkingBlocks];
+            if (trimmed.length > 0) {
+              content.push({ type: 'text', text: trimmed });
+            }
+            return { role: 'assistant', content };
           }
           return {
             role: 'assistant',

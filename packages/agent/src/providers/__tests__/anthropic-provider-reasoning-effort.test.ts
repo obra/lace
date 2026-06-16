@@ -102,7 +102,7 @@ describe('AnthropicProvider reasoning effort', () => {
     delete process.env.LACE_REASONING_EFFORT;
   });
 
-  it('sends output_config.effort for an effort-capable model, without enabling thinking', async () => {
+  it('sends output_config.effort for an effort-capable model', async () => {
     mockCreateResponse.mockResolvedValue({
       content: [{ type: 'text', text: 'ok' }],
       usage: { input_tokens: 1, output_tokens: 1 },
@@ -113,7 +113,10 @@ describe('AnthropicProvider reasoning effort', () => {
 
     const payload = mockCreateResponse.mock.calls[0]![0] as EffortPayload;
     expect(payload.output_config?.effort).toBe('medium');
-    expect(payload.thinking).toBeUndefined();
+    // Adaptive thinking rides alongside effort; its exact shape is asserted in
+    // anthropic-provider-thinking-roundtrip.test.ts. Here we only confirm effort
+    // does not suppress it.
+    expect(payload.thinking).toBeDefined();
   });
 
   it('respects the LACE_REASONING_EFFORT override for an effort-capable model', async () => {
@@ -202,6 +205,6 @@ describe('AnthropicProvider reasoning effort', () => {
 
     const payload = mockStream.mock.calls[0]![0] as EffortPayload;
     expect(payload.output_config?.effort).toBe('medium');
-    expect(payload.thinking).toBeUndefined();
+    expect(payload.thinking).toBeDefined();
   });
 });

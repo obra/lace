@@ -45,9 +45,26 @@ export interface ProviderConfig {
   [key: string]: unknown; // Allow provider-specific config
 }
 
+/**
+ * A reasoning ("thinking") block returned by a provider and replayed verbatim on
+ * the next turn. Anthropic requires the block — including its opaque `signature` —
+ * to be preserved unmodified on the assistant turn that produced tool_use blocks,
+ * or the request 400s. `redacted_thinking` is the encrypted variant the API may
+ * return; it carries `data` instead of readable text and is likewise replayed as-is.
+ */
+export type ThinkingBlock =
+  | { type: 'thinking'; thinking: string; signature: string }
+  | { type: 'redacted_thinking'; data: string };
+
 export interface ProviderResponse {
   content: string;
   toolCalls: ToolCall[];
+  /**
+   * Reasoning blocks emitted by the model this turn, in wire order. Captured so
+   * the runner can persist them and the history rebuild can replay them verbatim
+   * (Anthropic adaptive thinking). Empty/undefined when the model produced none.
+   */
+  thinkingBlocks?: ThinkingBlock[];
   /**
    * Canonical stop reason normalized from the provider's raw stop surface via
    * the shared per-provider normalizers in `./stop-reason`. Optional because
@@ -910,4 +927,7 @@ export interface ProviderMessage {
   content: string | ContentBlock[];
   toolCalls?: ToolCall[]; // For assistant messages with tool calls
   toolResults?: ToolResult[]; // For user messages with tool results - using our internal type
+  // Reasoning blocks for an assistant turn, replayed verbatim before text/tool_use
+  // when present (Anthropic adaptive thinking round-tripping).
+  thinkingBlocks?: ThinkingBlock[];
 }
