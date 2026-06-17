@@ -31,6 +31,8 @@ import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { appendOrMergeUser } from '@lace/agent/message-building/append-or-merge';
 import { bashSchema } from '@lace/agent/tools/implementations/bash';
+import { digestToolResultText } from '@lace/agent/tools/result-digest';
+import { writeToolResultSidecar } from '@lace/agent/storage/tool-result-store';
 import {
   toNonEmptyString,
   toolKindFromName,
@@ -256,6 +258,56 @@ function extractInjectedText(content: unknown): string {
     if (b.type === 'text' && typeof b.text === 'string') parts.push(b.text);
   }
   return parts.join('\n');
+}
+
+/**
+ * Cap an oversized tool result in place. The text content blocks are concatenated
+ * and digested; if anything was elided, the full payload is spilled to a per-session
+ * sidecar (when a sessionId is available) and the text blocks are replaced with a
+ * single digest block. Non-text blocks (images, resources) are preserved and never
+ * measured. Results at or below the ride-whole budget are left untouched.
+ *
+ * `read_tool_result`'s own output is excluded: it is already bounded by its args,
+ * and digesting it would defeat paging through the sidecar.
+ */
+function capToolResult(params: {
+  coreResult: CoreToolResult;
+  toolName: string;
+  toolCallId: string;
+  sessionId: string;
+}): void {
+  const { coreResult, toolName, toolCallId, sessionId } = params;
+  if (toolName === 'read_tool_result') return;
+
+  const content = coreResult.content;
+  if (!Array.isArray(content) || content.length === 0) return;
+
+  const textBlocks = content.filter((b) => b.type === 'text' && typeof b.text === 'string');
+  if (textBlocks.length === 0) return;
+
+  const fullText = textBlocks.map((b) => b.text ?? '').join('');
+  const digest = digestToolResultText(fullText, toolCallId);
+  if (digest.elidedBytes === 0) return;
+
+  // Spill the full payload to the sidecar so read_tool_result can page it back.
+  // Without a sessionId we can't place the sidecar; still inline-truncate so the
+  // cap holds, but skip writing a stray file.
+  if (sessionId) {
+    try {
+      writeToolResultSidecar(sessionId, toolCallId, fullText);
+    } catch (err) {
+      logger.error('runner: failed to write tool-result sidecar', {
+        err: err instanceof Error ? err.message : String(err),
+        toolName,
+        toolCallId,
+      });
+    }
+  }
+
+  // Replace the run of text blocks with a single digest block, preserving any
+  // non-text blocks (and their relative order against the digest's position).
+  const nonTextBlocks = content.filter((b) => !(b.type === 'text' && typeof b.text === 'string'));
+  coreResult.content = [{ type: 'text', text: digest.text }, ...nonTextBlocks];
 }
 
 /**
@@ -1631,6 +1683,14 @@ export class ConversationRunner {
       runtimeBinding,
       compactionRequest,
     });
+
+    // Cap how much a single tool result contributes to the live context AND the
+    // durable transcript. Mutating coreResult here covers both downstream
+    // consumers: the durable tool_use event (built from protocolToolResultFromCore
+    // below) and the providerMessages append in the main loop. read_tool_result is
+    // excluded — its output is already bounded by its args and digesting it would
+    // defeat paging.
+    capToolResult({ coreResult, toolName, toolCallId, sessionId });
 
     const protocolResult = protocolToolResultFromCore(coreResult);
     type TerminalStatus = 'completed' | 'denied' | 'cancelled' | 'failed';
