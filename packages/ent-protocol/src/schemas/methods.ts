@@ -813,6 +813,8 @@ const EntSessionCompactResultSchema = z
     previousTokens: z.number(),
     currentTokens: z.number(),
     messagesCompacted: z.number(),
+    /** The compaction strategy lace actually resolved and ran (session/persona-configured when no strategy was requested). */
+    strategy: z.string().min(1).optional(),
   })
   .strict();
 

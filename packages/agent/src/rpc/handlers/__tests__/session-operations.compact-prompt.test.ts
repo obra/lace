@@ -147,11 +147,18 @@ describe('ent/session/compact — track-based strategy', () => {
 
       const result = (await client.request('ent/session/compact', {
         strategy: 'track-based',
-      })) as { previousTokens: number; currentTokens: number; messagesCompacted: number };
+      })) as {
+        previousTokens: number;
+        currentTokens: number;
+        messagesCompacted: number;
+        strategy?: string;
+      };
 
       expect(typeof result.previousTokens).toBe('number');
       expect(typeof result.currentTokens).toBe('number');
       expect(typeof result.messagesCompacted).toBe('number');
+      // The result echoes the strategy lace actually resolved and ran.
+      expect(result.strategy).toBe('track-based');
       // Compaction should have folded the 10 earlier turns (20 total - 10 tail)
       expect(result.messagesCompacted).toBeGreaterThan(0);
       // Untracked content is re-rendered verbatim in the prefix, so currentTokens
@@ -209,11 +216,15 @@ describe('ent/session/compact — track-based strategy', () => {
         previousTokens: number;
         currentTokens: number;
         messagesCompacted: number;
+        strategy?: string;
       };
 
       expect(typeof result.previousTokens).toBe('number');
       expect(typeof result.currentTokens).toBe('number');
       expect(typeof result.messagesCompacted).toBe('number');
+      // With no strategy requested, lace resolves the session-configured strategy
+      // and reports it back — never empty, never invented.
+      expect(result.strategy).toBe('track-based');
     } finally {
       client.close();
       server.close();
