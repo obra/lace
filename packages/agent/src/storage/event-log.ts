@@ -147,6 +147,28 @@ export function readAllSessionEventLines(sessionDir: string): string[] {
   return lines;
 }
 
+/**
+ * Return the `text` of the most recent `system_prompt_set` event in this
+ * session's durable log, or `undefined` if none exists. Used by the
+ * compose-and-write path to skip appending a byte-identical system_prompt_set
+ * (the common case when a persona re-renders unchanged across compactions),
+ * keeping the log from accumulating one such event per compaction.
+ */
+export function latestSystemPromptSetText(sessionDir: string): string | undefined {
+  let latest: string | undefined;
+  for (const line of readAllSessionEventLines(sessionDir)) {
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'system_prompt_set') continue;
+      const text = (parsed.data as { text?: unknown } | undefined)?.text;
+      if (typeof text === 'string') latest = text;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return latest;
+}
+
 export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
   let maxSeq: number | undefined;
   for (const line of readAllSessionEventLines(sessionDir)) {

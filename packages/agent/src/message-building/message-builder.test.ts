@@ -908,6 +908,81 @@ describe('buildProviderMessagesFromDurableEvents — system_prompt_set and conte
       );
       expect(multiWarnCall).toBeDefined();
     });
+
+    it('does NOT warn when a context_compacted separates two system_prompt_set events', () => {
+      // The post-compaction rerender legitimately supersedes the earlier prompt.
+      // Counting from the start of time is wrong; the count resets at the
+      // compaction, so only ONE system_prompt_set follows it → no warning.
+      writeEvents(tempDir, [
+        {
+          eventSeq: 1,
+          type: 'system_prompt_set',
+          data: { text: 'Original prompt.' },
+        },
+        {
+          eventSeq: 2,
+          type: 'context_compacted',
+          data: { summary: 'Earlier conversation summary.', preserved: [] },
+        },
+        {
+          eventSeq: 3,
+          type: 'system_prompt_set',
+          data: { text: 'Re-rendered prompt.' },
+        },
+        {
+          eventSeq: 4,
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'hi' }] },
+        },
+      ]);
+
+      const { systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
+
+      // Last-wins VALUE logic is unchanged: the final system_prompt_set wins.
+      expect(systemPrompt).toBe('Re-rendered prompt.');
+
+      const multiWarnCall = warnSpy.mock.calls.find(
+        (args) => typeof args[0] === 'string' && args[0].includes('system_prompt_set')
+      );
+      expect(multiWarnCall).toBeUndefined();
+    });
+
+    it('warns when two system_prompt_set events appear within one compaction era', () => {
+      // Two system_prompt_set events AFTER the same context_compacted (with none
+      // between them) is a genuine anomaly — the warning should still fire.
+      writeEvents(tempDir, [
+        {
+          eventSeq: 1,
+          type: 'context_compacted',
+          data: { summary: 'Summary.', preserved: [] },
+        },
+        {
+          eventSeq: 2,
+          type: 'system_prompt_set',
+          data: { text: 'First after compaction.' },
+        },
+        {
+          eventSeq: 3,
+          type: 'system_prompt_set',
+          data: { text: 'Second after compaction.' },
+        },
+        {
+          eventSeq: 4,
+          type: 'prompt',
+          data: { content: [{ type: 'text', text: 'hi' }] },
+        },
+      ]);
+
+      const { systemPrompt } = buildProviderMessagesFromDurableEvents(tempDir);
+
+      // Last-wins VALUE logic is unchanged.
+      expect(systemPrompt).toBe('Second after compaction.');
+
+      const multiWarnCall = warnSpy.mock.calls.find(
+        (args) => typeof args[0] === 'string' && args[0].includes('system_prompt_set')
+      );
+      expect(multiWarnCall).toBeDefined();
+    });
   });
 });
 

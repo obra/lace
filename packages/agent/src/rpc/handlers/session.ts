@@ -32,6 +32,7 @@ import {
 import { SessionStorageError } from '../../errors/agent-errors';
 import {
   appendDurableEvent,
+  latestSystemPromptSetText,
   readDurableEvents,
   summarizeDurableEvents,
 } from '../../storage/event-log';
@@ -423,6 +424,15 @@ export async function composeAndWriteSystemPromptSet(params: {
   const fullSystemPrompt = promptConfig.userInstructions.trim()
     ? `${promptConfig.systemPrompt}\n\n${promptConfig.userInstructions}`
     : promptConfig.systemPrompt;
+
+  // Skip the append when the rendered prompt is byte-identical to the most
+  // recent system_prompt_set already in the log. This is the common case for
+  // the rerender-on-compaction path (persona unchanged across compactions) and
+  // keeps the log from accumulating one such event per compaction. New/fork/
+  // clear paths operate on empty or reset logs (no prior → they write).
+  if (latestSystemPromptSetText(sessionDir) === fullSystemPrompt) {
+    return sessionState;
+  }
 
   const { nextState } = appendDurableEvent(sessionDir, sessionState, {
     type: 'system_prompt_set',

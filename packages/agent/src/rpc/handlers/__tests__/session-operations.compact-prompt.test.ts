@@ -192,11 +192,14 @@ describe('ent/session/compact — track-based strategy', () => {
       const compactIdx = events.findIndex((e) => e.type === 'context_compacted');
       expect(compactIdx).toBeGreaterThanOrEqual(0);
 
-      // A fresh system_prompt_set is appended AFTER the compaction event, and it
-      // is the re-rendered persona — not the stale one the conversation carried.
-      const sysAfter = events.slice(compactIdx).filter((e) => e.type === 'system_prompt_set');
-      expect(sysAfter.length).toBeGreaterThan(0);
-      expect(sysAfter.at(-1)?.data?.text).not.toBe('You are a test assistant.');
+      // The effective system prompt is the re-rendered persona — not the stale
+      // "You are a test assistant." snapshot the test conversation carried.
+      // (The rerender appends a fresh system_prompt_set only when it differs
+      // from the latest one in the log; either way the latest must be the
+      // re-rendered persona, which it tracks across compactions.)
+      const allSys = events.filter((e) => e.type === 'system_prompt_set');
+      expect(allSys.length).toBeGreaterThan(0);
+      expect(allSys.at(-1)?.data?.text).not.toBe('You are a test assistant.');
     } finally {
       client.close();
       server.close();

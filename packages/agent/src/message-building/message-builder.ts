@@ -231,9 +231,18 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
   }
 
   // Pass 1: determine systemPrompt from system_prompt_set events (last one wins).
+  // The VALUE is last-wins over ALL events. The warning COUNT, however, is scoped
+  // to the current compaction era: a post-compaction rerender legitimately
+  // supersedes earlier prompts, so we reset the count at each context_compacted
+  // event. Multiple system_prompt_set events within one era (since the last
+  // compaction) is the genuine anomaly worth surfacing.
   let systemPrompt = '';
   let systemPromptSetCount = 0;
   for (const e of parsedEvents) {
+    if (e.type === 'context_compacted') {
+      systemPromptSetCount = 0;
+      continue;
+    }
     if (e.type === 'system_prompt_set') {
       const eventData = e.data as SystemPromptSetData;
       if (typeof eventData.text === 'string') {
@@ -243,9 +252,10 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     }
   }
   if (systemPromptSetCount > 1) {
-    // The system_prompt_set invariant ("written once at session creation") has
-    // been violated. We still use the last value (defensive last-wins), but we
-    // surface the violation so it can be investigated.
+    // More than one system_prompt_set since the last compaction (or session
+    // start). The "written once" invariant has been violated within this era.
+    // We still use the last value (defensive last-wins), but we surface the
+    // violation so it can be investigated.
     logger.warn('Multiple system_prompt_set events found in session — invariant violation', {
       sessionDir,
       count: systemPromptSetCount,
