@@ -1,7 +1,7 @@
 // ABOUTME: Tests for track-based compaction — demux, salience, render, orchestrator
 // ABOUTME: Pure-function tests over synthetic TypedDurableEvent[] fixtures
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   buildTurnToTrackMap,
   groupEarlierEventsByTrack,
@@ -9,9 +9,12 @@ import {
   salienceForTrack,
   compact,
   splitAtTailBoundary,
+  trimTailToTokenBudget,
+  estimateTailTokens,
   UNTRACKED,
 } from '../track-compaction';
 import { demuxByTrack } from '../toolkit';
+import { logger } from '@lace/agent/utils/logger';
 import type { CompactionContext } from '../types';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
 
@@ -626,6 +629,107 @@ describe('compact()', () => {
     const blocks = promptEntry!.content as Array<{ type: string }>;
     expect(blocks.some((b) => b.type === 'image')).toBe(true);
     expect(blocks.some((b) => b.type === 'text')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Token-budgeting the preserved tail
+// ---------------------------------------------------------------------------
+// splitAtTailBoundary is turn-count-blind: 10 large recent turns can preserve a
+// tail bigger than the model's context window. trimTailToTokenBudget peels the
+// oldest tail turns back into `earlier` (compressed into the prefix) until the
+// verbatim tail fits a token budget, always keeping ≥1 (the in-flight) turn.
+
+describe('trimTailToTokenBudget', () => {
+  // A turn whose assistant message carries `chars` characters of text.
+  const sizedTurn = (startSeq: number, t: number, chars: number): TypedDurableEvent[] => {
+    const turnId = `turn_${t}`;
+    return [
+      event(startSeq, 'prompt', {
+        content: [{ type: 'text', text: `msg ${t}` }],
+        track: `ext:T${t}`,
+      }),
+      turnStart(startSeq + 1, turnId),
+      event(startSeq + 2, 'message', { content: 'x'.repeat(chars) }, turnId),
+      turnEnd(startSeq + 3, turnId),
+    ];
+  };
+
+  const buildSession = (turnSizes: number[]): TypedDurableEvent[] => {
+    const events: TypedDurableEvent[] = [];
+    let seq = 1;
+    turnSizes.forEach((chars, t) => {
+      events.push(...sizedTurn(seq, t, chars));
+      seq += 4;
+    });
+    return events;
+  };
+
+  it('leaves the full turn split untouched when the tail is under budget', () => {
+    // 12 small turns, generous budget → keeps the 10-turn tail (behavior unchanged).
+    const events = buildSession(Array(12).fill(40));
+    const baseline = splitAtTailBoundary(events, 10);
+    const trimmed = trimTailToTokenBudget(events, 10, 300_000);
+    expect(trimmed.tail.map((e) => e.eventSeq)).toEqual(baseline.tail.map((e) => e.eventSeq));
+    expect(trimmed.earlier.map((e) => e.eventSeq)).toEqual(baseline.earlier.map((e) => e.eventSeq));
+    expect(estimateTailTokens(trimmed.tail)).toBeLessThanOrEqual(300_000);
+  });
+
+  it('trims oldest tail turns into earlier when the tail exceeds budget', () => {
+    // 12 turns; each tail message ~5000 tokens (20000 chars). 10-turn tail ≈ 50k.
+    // A 12000-token budget should keep only the most recent 2 turns in the tail.
+    const events = buildSession(Array(12).fill(20_000));
+    const baseline = splitAtTailBoundary(events, 10);
+    const trimmed = trimTailToTokenBudget(events, 10, 12_000);
+
+    // Tail shrank.
+    expect(trimmed.tail.length).toBeLessThan(baseline.tail.length);
+    // The trimmed turns moved into earlier (will be compressed into the prefix).
+    expect(trimmed.earlier.length).toBeGreaterThan(baseline.earlier.length);
+    // The result fits the budget.
+    expect(estimateTailTokens(trimmed.tail)).toBeLessThanOrEqual(12_000);
+    // At least one turn (4 events) preserved.
+    expect(trimmed.tail.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('preserves at least the most recent turn even when it alone exceeds budget, and warns', () => {
+    const events = buildSession([40, 40, 1_000_000]); // last turn ≈ 250k tokens
+    const warnSpy = vi.spyOn(logger, 'warn');
+    try {
+      const trimmed = trimTailToTokenBudget(events, 10, 12_000);
+      // The single most-recent turn is preserved despite blowing the budget.
+      expect(estimateTailTokens(trimmed.tail)).toBeGreaterThan(12_000);
+      // Exactly one turn (4 events) kept; the rest moved to earlier.
+      expect(trimmed.tail.length).toBe(4);
+      expect(trimmed.earlier.length).toBe(8);
+      // A clear warning was logged for the residual oversize-single-turn case.
+      expect(warnSpy).toHaveBeenCalled();
+      const msg = warnSpy.mock.calls[0][0];
+      expect(msg).toMatch(/token budget/i);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('is deterministic: same input → same split', () => {
+    const events = buildSession(Array(12).fill(20_000));
+    const a = trimTailToTokenBudget(events, 10, 12_000);
+    const b = trimTailToTokenBudget(events, 10, 12_000);
+    expect(a.tail.map((e) => e.eventSeq)).toEqual(b.tail.map((e) => e.eventSeq));
+    expect(a.earlier.map((e) => e.eventSeq)).toEqual(b.earlier.map((e) => e.eventSeq));
+  });
+
+  it('compact() compresses extra turns when the 10-turn tail overflows the budget', async () => {
+    // 12 huge turns: the turn-count split would preserve all 10, but they exceed
+    // 300K tokens. compact() must move the oldest tail turns into the compressed
+    // prefix so messagesCompacted exceeds the plain 2-turn earlier count.
+    const events = buildSession(Array(12).fill(200_000)); // 50k tokens/turn
+    const ctx: CompactionContext = { threadId: 'sess_budget' };
+    const result = await compact(events, ctx);
+    expect('compactionEvent' in result).toBe(true);
+    if (!('compactionEvent' in result)) return;
+    // Plain turn-count split would compact only the first 2 turns (8 events).
+    expect(result.compactionEvent.data.messagesCompacted).toBeGreaterThan(8);
   });
 });
 
