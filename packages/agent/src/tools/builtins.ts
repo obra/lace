@@ -19,6 +19,7 @@ import { TodoReadTool } from './implementations/todo_read';
 import { TodoWriteTool } from './implementations/todo_write';
 import { ManageRemindersTool } from './implementations/manage_reminders';
 import { CompactSessionTool } from './implementations/compact_session';
+import { ReadToolResultTool } from './implementations/read_tool_result';
 
 /** The per-session option-taking built-ins; the executor owns their names.
  *  'request_credential' is a host-only sen-core exec-tool, NOT a lace builtin. It is
@@ -56,6 +57,7 @@ export function registerBuiltinTools(): void {
     new TodoWriteTool(),
     new ManageRemindersTool(),
     new CompactSessionTool(),
+    new ReadToolResultTool(),
   ]) {
     registries.tools.register(t.name, t, 'builtin');
   }

@@ -56,6 +56,7 @@ export const LACE_BUILTIN_TOOL_NAMES = [
   'todo_write',
   'manage_reminders',
   'compact_session',
+  'read_tool_result',
   'use_skill',
 ] as const;
 
