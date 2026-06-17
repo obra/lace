@@ -88,6 +88,33 @@ describe('storage/session-store', () => {
     expect(roundTrip.config).toMatchObject({ approvalMode: 'ask' });
   });
 
+  it('throws on a corrupt state.json instead of silently returning a config-less default', () => {
+    // An existing-but-unparseable state.json must NOT collapse to the
+    // new-session default. If it did, a subsequent loadSession write would
+    // persist that config-less state over the real one — dropping modelId /
+    // connectionId and wedging every future turn (the failure can only call
+    // the provider once those are present). Fail loud so the caller stops
+    // rather than clobbering recoverable state.
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    // Seed a real, rich state first so we can assert it would otherwise be lost.
+    writeSessionState(sessionDir, {
+      nextEventSeq: 42,
+      nextStreamSeq: 5,
+      config: { modelId: 'claude-opus-4-8', connectionId: 'sen-anthropic' },
+    });
+    // Corrupt it (simulate a torn/garbled file).
+    writeFileSync(join(sessionDir, 'state.json'), '{ this is not valid json ', 'utf8');
+
+    expect(() => readSessionState(sessionDir)).toThrow(/corrupt|state\.json/i);
+  });
+
+  it('still defaults to a fresh state when state.json is genuinely absent (ENOENT)', () => {
+    // The new-session path must keep working: no state.json at all → defaults.
+    const sessionDir = getSessionDir('sess_550e8400-e29b-41d4-a716-446655440099');
+    mkdirSync(sessionDir, { recursive: true });
+    expect(readSessionState(sessionDir)).toEqual({ nextEventSeq: 1, nextStreamSeq: 1 });
+  });
+
   it('round-trips highestFiredBreakpointAt', () => {
     const sessionDir = getSessionDir(TEST_SESSION_ID);
 
