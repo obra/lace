@@ -84,6 +84,63 @@ describe('storage/tool-result-store', () => {
     expect(lines.length).toBeLessThan(2000); // capped to a default head
   });
 
+  it('windows grep matches inside a single very-long line instead of returning the whole line', () => {
+    // ~50KB single-line JSON payload with a unique needle in the middle.
+    const filler = 'x'.repeat(50 * 1024);
+    const head = filler.slice(0, filler.length / 2);
+    const tail = filler.slice(filler.length / 2);
+    const full = `{"items":["${head}","NEEDLE_abc123","${tail}"]}`;
+    expect(Buffer.byteLength(full, 'utf8')).toBeGreaterThan(50 * 1024);
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_longline', full);
+
+    const slice = readToolResultSidecar(TEST_SESSION_ID, 'tc_longline', { grep: 'NEEDLE_abc123' });
+    // The window contains the needle...
+    expect(slice.content).toContain('NEEDLE_abc123');
+    // ...but is far smaller than the whole 50KB line.
+    expect(slice.content.length).toBeLessThan(2000);
+    expect(slice.content.length).toBeLessThan(full.length / 10);
+    // Truncation is signalled with ellipses.
+    expect(slice.content).toContain('…');
+    expect(slice.matchedLines).toBe(1);
+    expect(slice.grepWindowed).toBe(true);
+  });
+
+  it('returns short matching lines whole (no windowing regression for logs)', () => {
+    const { full } = makePayload();
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_shortlines', full);
+
+    const slice = readToolResultSidecar(TEST_SESSION_ID, 'tc_shortlines', { grep: 'marker-0' });
+    const matchLines = slice.content.split('\n');
+    expect(matchLines.every((l) => l.includes('marker-0'))).toBe(true);
+    // Each whole short line is returned intact, no ellipsis windowing.
+    expect(matchLines[0]).toBe('line 0: padding padding padding padding marker-0');
+    expect(slice.grepWindowed).toBeUndefined();
+  });
+
+  it('returns the first N bytes via headBytes, UTF-8-safe at the boundary', () => {
+    // Place a 4-byte emoji straddling the requested byte boundary.
+    const prefix = 'a'.repeat(10);
+    const full = `${prefix}😀tail`;
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_headbytes', full);
+
+    // 12 bytes lands one byte into the 4-byte emoji (prefix=10 bytes + 2 of 4).
+    const slice = readToolResultSidecar(TEST_SESSION_ID, 'tc_headbytes', { headBytes: 12 });
+    // Output is valid UTF-8: re-encoding then decoding is lossless (no replacement char).
+    expect(slice.content).not.toContain('�');
+    expect(slice.content).toBe(prefix); // emoji dropped because it doesn't fit cleanly
+    expect(slice.totalBytes).toBe(Buffer.byteLength(full, 'utf8'));
+  });
+
+  it('returns the last N bytes via tailBytes, UTF-8-safe at the boundary', () => {
+    const full = `head😀${'z'.repeat(10)}`;
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_tailbytes', full);
+
+    // 12 bytes from the end lands inside the emoji; should advance to a clean boundary.
+    const slice = readToolResultSidecar(TEST_SESSION_ID, 'tc_tailbytes', { tailBytes: 12 });
+    expect(slice.content).not.toContain('�');
+    expect(slice.content).toBe('z'.repeat(10));
+  });
+
   it('throws a clear error when the sidecar is absent', () => {
     expect(() => readToolResultSidecar(TEST_SESSION_ID, 'tc_missing', { headLines: 5 })).toThrow(
       /tc_missing/

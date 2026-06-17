@@ -52,14 +52,14 @@ function isContinuationByte(b: number): boolean {
 }
 
 /** Move `index` left until it is not in the middle of a multibyte sequence. */
-function backOffToCodepointBoundary(buf: Buffer, index: number): number {
+export function backOffToCodepointBoundary(buf: Buffer, index: number): number {
   let i = index;
   while (i > 0 && i < buf.length && isContinuationByte(buf[i])) i--;
   return i;
 }
 
 /** Move `index` right until it is not in the middle of a multibyte sequence. */
-function advanceToCodepointBoundary(buf: Buffer, index: number): number {
+export function advanceToCodepointBoundary(buf: Buffer, index: number): number {
   let i = index;
   while (i < buf.length && isContinuationByte(buf[i])) i++;
   return i;

@@ -4,11 +4,23 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getSessionDir } from './session-store';
+import { advanceToCodepointBoundary, backOffToCodepointBoundary } from '../tools/result-digest';
 
 /** Cap grep output so a pathological pattern can't re-flood the context. */
 const GREP_MAX_LINES = 500;
 /** When no head/tail/grep is requested, return a modest head. */
 const DEFAULT_HEAD_LINES = 200;
+/**
+ * A matching line longer than this is windowed (±grepContextChars around each
+ * match) instead of returned whole. Below it, the whole line rides back — that's
+ * the right behavior for logs. Above it (e.g. a single-line JSON blob), the
+ * whole line is useless, so we isolate just the needle.
+ */
+const GREP_LONG_LINE_THRESHOLD = 2000;
+/** Default half-width (in chars) of the window kept around each match in a long line. */
+const DEFAULT_GREP_CONTEXT_CHARS = 200;
+/** Cap the number of windows emitted across all long-line matches. */
+const GREP_MAX_WINDOWS = 200;
 
 export interface SidecarSlice {
   content: string;
@@ -18,6 +30,8 @@ export interface SidecarSlice {
   matchedLines?: number;
   /** Present and true only when a grep result was truncated to GREP_MAX_LINES. */
   grepCapped?: boolean;
+  /** Present and true when at least one long matching line was windowed. */
+  grepWindowed?: boolean;
 }
 
 /**
@@ -56,7 +70,14 @@ export function writeToolResultSidecar(sessionId: string, toolCallId: string, fu
 export function readToolResultSidecar(
   sessionId: string,
   toolCallId: string,
-  opts: { headLines?: number; tailLines?: number; grep?: string }
+  opts: {
+    headLines?: number;
+    tailLines?: number;
+    grep?: string;
+    grepContextChars?: number;
+    headBytes?: number;
+    tailBytes?: number;
+  }
 ): SidecarSlice {
   const filePath = sidecarPath(sessionId, toolCallId);
   let full: string;
@@ -80,17 +101,44 @@ export function readToolResultSidecar(
   const lines = body.length === 0 ? [] : body.split('\n');
   const lineCount = lines.length;
 
+  // Byte-range paging: explicit head/tail by raw bytes, independent of line
+  // structure. UTF-8-safe — boundaries are pulled back/advanced off any partial
+  // codepoint so the returned text is always valid.
+  if (opts.headBytes !== undefined || opts.tailBytes !== undefined) {
+    const buf = Buffer.from(full, 'utf8');
+    const parts: string[] = [];
+    if (opts.headBytes !== undefined && opts.headBytes > 0) {
+      const end = backOffToCodepointBoundary(buf, Math.min(opts.headBytes, buf.length));
+      parts.push(buf.subarray(0, end).toString('utf8'));
+    }
+    if (opts.tailBytes !== undefined && opts.tailBytes > 0) {
+      const start = advanceToCodepointBoundary(buf, Math.max(0, buf.length - opts.tailBytes));
+      parts.push(buf.subarray(start).toString('utf8'));
+    }
+    return { content: parts.join('\n'), totalBytes, lineCount };
+  }
+
   if (opts.grep !== undefined && opts.grep !== '') {
     const needle = opts.grep;
+    const contextChars = opts.grepContextChars ?? DEFAULT_GREP_CONTEXT_CHARS;
     const matches = lines.filter((l) => l.includes(needle));
     const capped = matches.length > GREP_MAX_LINES;
     const returned = capped ? matches.slice(0, GREP_MAX_LINES) : matches;
+
+    let windowed = false;
+    const rendered = returned.map((line) => {
+      if (line.length <= GREP_LONG_LINE_THRESHOLD) return line;
+      windowed = true;
+      return windowLine(line, needle, contextChars);
+    });
+
     return {
-      content: returned.join('\n'),
+      content: rendered.join('\n'),
       totalBytes,
       lineCount,
       matchedLines: returned.length,
       ...(capped ? { grepCapped: true } : {}),
+      ...(windowed ? { grepWindowed: true } : {}),
     };
   }
 
@@ -116,4 +164,43 @@ export function readToolResultSidecar(
     totalBytes,
     lineCount,
   };
+}
+
+/**
+ * Isolate the needle inside a single very-long line: emit a ±`contextChars`
+ * window around each match occurrence, joined with a `…` separator. The result
+ * is prefixed/suffixed with `…` when content was dropped at that edge.
+ * Windows are capped at GREP_MAX_WINDOWS; further matches are summarized.
+ */
+function windowLine(line: string, needle: string, contextChars: number): string {
+  const offsets: number[] = [];
+  let from = 0;
+  for (;;) {
+    const at = line.indexOf(needle, from);
+    if (at === -1) break;
+    offsets.push(at);
+    from = at + needle.length;
+    if (offsets.length >= GREP_MAX_WINDOWS) break;
+  }
+
+  // Build [start, end) windows around each match, then merge any that overlap
+  // or touch so an emitted segment is contiguous text from the line.
+  const ranges: Array<[number, number]> = [];
+  for (const at of offsets) {
+    const start = Math.max(0, at - contextChars);
+    const end = Math.min(line.length, at + needle.length + contextChars);
+    const last = ranges[ranges.length - 1];
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
+    else ranges.push([start, end]);
+  }
+
+  const leadingTruncated = ranges[0][0] > 0;
+  const trailingTruncated = ranges[ranges.length - 1][1] < line.length;
+  let out = ranges.map(([s, e]) => line.slice(s, e)).join(' … ');
+  if (leadingTruncated) out = `…${out}`;
+  if (trailingTruncated) out = `${out}…`;
+  if (offsets.length >= GREP_MAX_WINDOWS) {
+    out = `${out}\n…[${GREP_MAX_WINDOWS}+ matches in this line, windows capped]`;
+  }
+  return out;
 }

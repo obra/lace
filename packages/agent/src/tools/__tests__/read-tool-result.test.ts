@@ -85,6 +85,46 @@ describe('tools/read_tool_result', () => {
     expect(text).not.toContain('keyword-1');
   });
 
+  it('windows grep matches inside a single very-long line', async () => {
+    const filler = 'x'.repeat(50 * 1024);
+    const full = `{"a":"${filler.slice(0, 25000)}","needle":"FIND_ME_xyz","b":"${filler.slice(25000)}"}`;
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_window', full);
+
+    const result = await tool.execute(
+      { tool_call_id: 'tc_window', grep: 'FIND_ME_xyz' },
+      makeContext({ activeSessionId: TEST_SESSION_ID })
+    );
+    const text = textOf(result);
+    expect(text).toContain('FIND_ME_xyz');
+    // Much smaller than the whole payload.
+    expect(text.length).toBeLessThan(2000);
+    expect(text).toContain('windowed');
+  });
+
+  it('pages by raw bytes via head_bytes', async () => {
+    const full = 'abcdefghijklmnop';
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_hb', full);
+    const result = await tool.execute(
+      { tool_call_id: 'tc_hb', head_bytes: 5 },
+      makeContext({ activeSessionId: TEST_SESSION_ID })
+    );
+    const text = textOf(result);
+    expect(text).toContain('abcde');
+    expect(text).not.toContain('fghij');
+  });
+
+  it('pages by raw bytes via tail_bytes', async () => {
+    const full = 'abcdefghijklmnop';
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_tb', full);
+    const result = await tool.execute(
+      { tool_call_id: 'tc_tb', tail_bytes: 5 },
+      makeContext({ activeSessionId: TEST_SESSION_ID })
+    );
+    const text = textOf(result);
+    expect(text).toContain('lmnop');
+    expect(text).not.toContain('abcde');
+  });
+
   it('fails clearly (status:failed, no throw) when activeSessionId is absent', async () => {
     seed('tc_nosess');
     const result = await tool.execute({ tool_call_id: 'tc_nosess', head_lines: 1 }, makeContext());
