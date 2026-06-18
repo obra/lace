@@ -1,7 +1,7 @@
 // ABOUTME: Pins that the message shape the runner SENDS for a parallel-tool turn
-// equals the shape rebuilt from the durable events for the same turn. They differ
-// today (the cache break this step fixes); this test is RED until the reducer and
-// the runner emit the one canonical shape.
+// equals the shape rebuilt from the durable events for the same turn. The rebuild
+// now folds via foldEvent into the canonical one-assistant/one-user shape, so the
+// two match — closing the cache break this step fixes.
 import { describe, it, expect } from 'vitest';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
@@ -32,9 +32,11 @@ function liveShape() {
 }
 
 describe('sent shape equals rebuilt shape for a parallel-tool turn', () => {
-  // it.fails: PASSES while the assertion below fails — pins the known cache break.
-  // Task 5 flips this to a plain it(...) once the reducer + runner are unified.
-  it.fails('runner-sent messages match the rebuild from durable events', () => {
+  // The rebuild now folds via foldEvent and emits the canonical parallel-tool
+  // shape (one assistant with all calls, one user with all results), which equals
+  // the live shape the runner sends — so this is genuinely GREEN. (Task 5 still
+  // aligns the actual runner code; the rebuild side alone closes it for this fixture.)
+  it('runner-sent messages match the rebuild from durable events', () => {
     const dir = mkdtempSync(join(tmpdir(), 'lace-svr-'));
     try {
       const events = [

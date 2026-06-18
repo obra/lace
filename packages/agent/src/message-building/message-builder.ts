@@ -2,8 +2,8 @@
 
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage, ThinkingBlock } from '../providers/base-provider';
-import { toNonEmptyString, coreToolResultFromProtocol } from '../rpc/utils';
 import { appendOrMergeUser } from './append-or-merge';
+import { foldEvent, initialFoldState } from './fold-event';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
@@ -262,8 +262,17 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     });
   }
 
-  // Pass 2: build the messages array.
-  const messages: ProviderMessage[] = [];
+  // Pass 2: fold the events into the canonical ProviderMessage[] shape.
+  //
+  // `prompt`/`message`/`tool_use` are folded by the shared reducer (foldEvent),
+  // which produces the Anthropic parallel-tool form: one assistant carrying all
+  // of a turn's tool_use blocks, then one user carrying all of that turn's
+  // tool_result blocks. The rebuild-only concerns — the empty-`prompt` drop,
+  // image-preserving `prompt` extraction, the `context_injected` text-merge, and
+  // the `context_compacted` reset + orphan cleanup — are layered here, around the
+  // reducer. Those special events close the open tool batch (state.batch = null)
+  // so a following tool_use starts a fresh turn rather than coalescing across them.
+  let state = initialFoldState();
 
   for (const e of parsedEvents) {
     const { type, data } = e;
@@ -277,7 +286,12 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
       const content = extractContentBlocks((data as Record<string, unknown>).content);
       // Check if content is non-empty (string or array with items)
       const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
-      if (hasContent) messages.push({ role: 'user', content });
+      // Image-preserving extraction (NOT text-flatten); drop empty prompts. Feed
+      // the already-extracted content through the reducer verbatim so the empty
+      // drop and image preservation stay rebuild-only concerns.
+      if (hasContent) {
+        state = foldEvent(state, { type: 'prompt', data: { content } });
+      }
       continue;
     }
 
@@ -291,9 +305,11 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
       const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
       const content = extractTextFromContentBlocks(contentArr);
       if (content.trim()) {
-        const merged = appendOrMergeUser(messages, content);
-        messages.length = 0;
-        messages.push(...merged);
+        const merged = appendOrMergeUser(state.messages, content);
+        state = { messages: merged, batch: null };
+      } else {
+        // Even an empty injection closes the open tool batch.
+        state = { messages: state.messages, batch: null };
       }
       continue;
     }
@@ -306,7 +322,7 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
       // The summary (if any) lives as the first entry in preserved — placed there
       // by the compaction strategy. Do not read a separate data.summary field;
       // no writer produces that shape and doing so would duplicate the summary.
-      messages.length = 0;
+      const messages: ProviderMessage[] = [];
 
       for (const msg of preserved) {
         if (!msg || typeof msg !== 'object') continue;
@@ -338,67 +354,44 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
 
       dropOrphanedToolBlocks(messages);
 
+      // The reset replaces the whole conversation and closes the open tool batch.
+      state = { messages, batch: null };
       continue;
     }
 
     if (type === 'message') {
       const eventData = data as MessageData;
-      const content =
-        typeof eventData.content === 'string'
-          ? eventData.content
-          : extractTextFromContentBlocks(Array.isArray(eventData.content) ? eventData.content : []);
-      const thinkingBlocks = Array.isArray(eventData.thinkingBlocks)
-        ? eventData.thinkingBlocks
-        : undefined;
-      messages.push({
-        role: 'assistant',
-        content: content ?? '',
-        // Carry thinking blocks onto the assistant message so subsequent tool_use
-        // events append to this same message and the converter replays the
-        // thinking before the tool_use blocks.
-        ...(thinkingBlocks && thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
+      // Verbatim content (string or ContentBlock[]) — the reducer never flattens
+      // images. For the common text-only assistant turn the converter extracts the
+      // same text either way, so this is shape-preserving for the wire.
+      state = foldEvent(state, {
+        type: 'message',
+        data: {
+          content: eventData.content,
+          ...(Array.isArray(eventData.thinkingBlocks)
+            ? { thinkingBlocks: eventData.thinkingBlocks }
+            : {}),
+        },
       });
       continue;
     }
 
     if (type === 'tool_use') {
       const eventData = data as ToolUseData;
-      const toolCallId = toNonEmptyString(eventData.toolCallId);
-      const name = toNonEmptyString(eventData.name);
-      const input = eventData.input;
-      const result = eventData.result;
-      if (!toolCallId || !name) continue;
-
-      const toolCall: CoreToolCall = {
-        id: toolCallId,
-        name,
-        arguments: typeof input === 'object' && input ? (input as Record<string, unknown>) : {},
-      };
-
-      if (messages.length === 0 || messages[messages.length - 1]!.role !== 'assistant') {
-        messages.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-      } else {
-        const last = messages[messages.length - 1]!;
-        last.toolCalls = [...(last.toolCalls || []), toolCall];
-      }
-
-      if (result) {
-        const coreResult = coreToolResultFromProtocol(result, toolCallId);
-        const last = messages[messages.length - 1];
-        const canAppendToUser =
-          last && last.role === 'user' && last.toolResults && last.toolResults.length > 0;
-        if (canAppendToUser) {
-          last.toolResults!.push(coreResult);
-        } else {
-          messages.push({ role: 'user', content: '', toolResults: [coreResult] });
-        }
-      }
-
+      state = foldEvent(state, {
+        type: 'tool_use',
+        data: {
+          toolCallId: eventData.toolCallId,
+          name: eventData.name,
+          input: eventData.input,
+          result: eventData.result,
+        },
+      });
       continue;
     }
   }
 
-  return { messages, systemPrompt };
+  return { messages: state.messages, systemPrompt };
 }
 
 /**

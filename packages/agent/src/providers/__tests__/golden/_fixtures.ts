@@ -78,6 +78,32 @@ export const FIXTURES: GoldenFixture[] = [
     ],
   },
   {
+    name: 'tool-call-parallel-two',
+    systemPrompt: SYSTEM,
+    tools: [new EchoTool()],
+    // The canonical parallel-tool form: one assistant carrying both tool_use
+    // blocks for the turn, followed by one user carrying both tool_result blocks.
+    messages: [
+      { role: 'user', content: 'do two things' },
+      {
+        role: 'assistant',
+        content: 'doing two things',
+        toolCalls: [
+          { id: 'call_a', name: 'echo', arguments: { v: 'a' } },
+          { id: 'call_b', name: 'echo', arguments: { v: 'b' } },
+        ],
+      },
+      {
+        role: 'user',
+        content: '',
+        toolResults: [
+          { id: 'call_a', content: [{ type: 'text', text: 'a' }], status: 'completed' },
+          { id: 'call_b', content: [{ type: 'text', text: 'b' }], status: 'completed' },
+        ],
+      },
+    ],
+  },
+  {
     name: 'unicode-and-surrogates',
     systemPrompt: SYSTEM,
     tools: [new EchoTool()],
