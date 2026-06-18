@@ -27,6 +27,7 @@ import {
 } from '@lace/agent/storage/event-log';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
+import { projectTurnEntry } from '@lace/agent/message-building/incremental-projection';
 import { appendOrMergeUser } from '@lace/agent/message-building/append-or-merge';
 import { bashSchema } from '@lace/agent/tools/implementations/bash';
 import { digestToolResultText } from '@lace/agent/tools/result-digest';
@@ -366,6 +367,22 @@ export class ConversationRunner {
   }
 
   /**
+   * Whether to run the projection divergence canary this turn. The canary
+   * re-derives the full projection and compares it against the cached one — it
+   * is O(events), so it must be SAMPLED, never every turn. Gated by
+   * LACE_PROJECTION_CANARY: 'always' (every turn — Ada validation pass), a
+   * positive integer N (1-in-N sampling), or unset/off (default: never).
+   */
+  private shouldRunProjectionCanary(): boolean {
+    const setting = process.env.LACE_PROJECTION_CANARY;
+    if (!setting) return false;
+    if (setting === 'always') return true;
+    const n = Number(setting);
+    if (Number.isInteger(n) && n > 0) return Math.floor(Math.random() * n) === 0;
+    return false;
+  }
+
+  /**
    * Run a prompt through the agentic loop.
    *
    * This will:
@@ -399,10 +416,31 @@ export class ConversationRunner {
     } = this.config;
 
     const runtimeBinding = this.resolveActiveRuntimeBinding(cwd);
-    // Read and parse the durable event log ONCE at turn entry, deriving the
-    // provider message prefix + system prompt, the files-read set, and the
-    // last turn_end seq (the inject watermark) from that single parse.
-    const turnEntry = loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+    // Derive the turn-entry projection — the provider message prefix + system
+    // prompt, the files-read set, and the last turn_end seq (the inject
+    // watermark). With the server's per-process projection cache, this folds
+    // only the events appended since the cached .seq head (O(tail)); without it
+    // (or on a cold start) it falls back to a full re-parse via
+    // loadTurnEntryProjection. A sampled divergence canary re-derives the full
+    // projection and compares, dropping the cache entry on mismatch.
+    const projectionCache = this.deps.projectionCache;
+    const turnEntry = projectionCache
+      ? projectTurnEntry(sessionDir, runtimeBinding.toolRuntime.cwd, projectionCache, sessionId)
+      : loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+
+    if (projectionCache && this.shouldRunProjectionCanary()) {
+      const full = loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+      if (JSON.stringify(turnEntry.messages) !== JSON.stringify(full.messages)) {
+        logger.error('projection divergence', {
+          sessionId,
+          cachedMessageCount: turnEntry.messages.length,
+          fullMessageCount: full.messages.length,
+        });
+        // Drop the stale cache entry so the next turn cold-rebuilds from the log.
+        projectionCache.delete(sessionId);
+      }
+    }
+
     const filesRead = turnEntry.filesRead;
     const runtimeFileAccessTracker = await this.createFileAccessTracker(filesRead, runtimeBinding);
 

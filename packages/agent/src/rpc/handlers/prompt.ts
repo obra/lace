@@ -455,6 +455,7 @@ export function registerPromptHandler(
         ...(state.reminderScheduler ? { reminderScheduler: state.reminderScheduler } : {}),
         ...(state.activeSession ? { activeSessionId: state.activeSession.meta.sessionId } : {}),
         workspaceReaper: state.workspaceReaper,
+        projectionCache: state.projectionCache,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {
             state.activeTurn = null;

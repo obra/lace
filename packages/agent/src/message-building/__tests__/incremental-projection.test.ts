@@ -149,6 +149,7 @@ function assertIncrementalEqualsFull(events: ParsedSessionEvent[]): void {
 
 describe('foldTailIntoProjection', () => {
   it('incremental fold (any split) equals full rebuild — across the corpus', () => {
+    expect(CORPUS.length).toBeGreaterThan(0);
     for (const events of CORPUS) assertIncrementalEqualsFull(events);
   });
 
