@@ -155,9 +155,9 @@ export const FIXTURES: GoldenFixture[] = [
       {
         role: 'assistant',
         content: '',
-        toolCalls: [{ id: 'call_1', name: 'echo', input: { v: 'x', count: 3, flag: true, nested: { a: 1 } } }],
+        toolCalls: [{ id: 'call_1', name: 'echo', arguments: { v: 'x', count: 3, flag: true, nested: { a: 1 } } }],
       },
-      { role: 'user', content: '', toolResults: [{ id: 'call_1', content: [{ type: 'text', text: 'x' }], isError: false }] },
+      { role: 'user', content: '', toolResults: [{ id: 'call_1', content: [{ type: 'text', text: 'x' }], status: 'completed' }] },
     ],
   },
   {
@@ -172,7 +172,13 @@ export const FIXTURES: GoldenFixture[] = [
 ];
 ```
 
-> NOTE on exact shapes: `ToolCall` and `ToolResult` field names (`id`/`name`/`input`, `id`/`content`/`isError`) must match the definitions in `base-provider.ts`. **Open `base-provider.ts` and confirm the exact field names before finalizing** — if they differ, use the real ones. The image / compaction-era / orphaned-tool / post-compaction fixtures are added in Task 4 once the harness is proven; this task keeps the corpus small to validate the harness end-to-end.
+> **CONFIRMED FROM SOURCE (`packages/agent/src/tools/types.ts`) — use these exact shapes everywhere in this plan:**
+> - `ToolCall` = `{ id: string; name: string; arguments: Record<string, unknown> }` (the field is **`arguments`**, NOT `input`; the converters read `toolCall.arguments`).
+> - `ToolResult` = `{ id?: string; content: ContentBlock[]; status: ToolResultStatus; metadata?; tokenUsage? }`. There is **no `isError`** — use `status: 'completed'` for success (the Anthropic converter derives `is_error` from `status !== 'completed'`).
+> - `ThinkingBlock` = `{ type: 'thinking'; thinking: string; signature: string }` (matches).
+> - `ToolResult.content` uses the **tools/types.ts** `ContentBlock` (`{ type: 'text'; text: string }`). A **message-level** image block uses the **base-provider.ts** `ContentBlock` (`{ type: 'image'; source: { type: 'base64'; media_type; data } }`) — different union, used in Task 4's image fixture.
+>
+> The image / compaction-era / orphaned-tool / post-compaction fixtures are added in Task 4 once the harness is proven; this task keeps the corpus small to validate the harness end-to-end.
 
 - [ ] **Step 2: Write the capture helper (Anthropic)**
 
@@ -463,7 +469,7 @@ Append to `FIXTURES`. These cover the spec's required corpus: image block, a com
   tools: [new EchoTool()],
   messages: [
     { role: 'user', content: 'go' },
-    { role: 'assistant', content: '', toolCalls: [{ id: 'call_orphan', name: 'echo', input: { v: 'y' } }] },
+    { role: 'assistant', content: '', toolCalls: [{ id: 'call_orphan', name: 'echo', arguments: { v: 'y' } }] },
     // no matching tool_result — the converter/guard must handle this deterministically
     { role: 'user', content: 'next question' },
   ],
@@ -771,8 +777,8 @@ describe('converter determinism: each converter is a pure function of its input'
   it('Gemini converter is deterministic given a persisted tool-call id (no re-minting)', () => {
     const messages = [
       { role: 'user' as const, content: 'go' },
-      { role: 'assistant' as const, content: '', toolCalls: [{ id: 'gemini_echo_1700000000000_abc123', name: 'echo', input: { v: 'z' } }] },
-      { role: 'user' as const, content: '', toolResults: [{ id: 'gemini_echo_1700000000000_abc123', content: [{ type: 'text', text: 'z' }], isError: false }] },
+      { role: 'assistant' as const, content: '', toolCalls: [{ id: 'gemini_echo_1700000000000_abc123', name: 'echo', arguments: { v: 'z' } }] },
+      { role: 'user' as const, content: '', toolResults: [{ id: 'gemini_echo_1700000000000_abc123', content: [{ type: 'text', text: 'z' }], status: 'completed' }] },
     ];
     expect(JSON.stringify(convertToGeminiFormat(messages))).toBe(JSON.stringify(convertToGeminiFormat(messages)));
   });
