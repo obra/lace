@@ -8,9 +8,12 @@
 // rebuild semantics.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { transcriptDir } from '@lace/agent/storage/transcript-paths';
+import { getSessionDir } from '@lace/agent/storage/session-store';
 import type { ParsedSessionEvent } from '@lace/agent/message-building/parsed-events';
 import * as pe from '@lace/agent/message-building/parsed-events';
 import { buildProviderMessagesFromParsedEvents } from '@lace/agent/message-building/message-builder';
@@ -246,15 +249,14 @@ describe('projectTurnEntry', () => {
     // re-parses, which would inflate the spy count).
     const expectedMessages = JSON.stringify(loadTurnEntryProjection(dir, '/work').messages);
 
-    // Second call → incremental tail-fold (no full re-parse on the hot path).
+    // Second call → incremental BYTE-OFFSET tail-fold. It reads only the bytes
+    // appended since the seeded offsets and NEVER calls readParsedSessionEvents
+    // (the O(tail) proof — a full re-parse of the whole log would call it).
     const spy = vi.spyOn(pe, 'readParsedSessionEvents');
     const p2 = projectTurnEntry(dir, '/work', cache, SID);
     expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
     expect(p2.lastTurnEndSeq).toBe(7);
-    // The hot path tail-reads via readParsedSessionEvents filtered by seq exactly
-    // ONCE; it does NOT take the full-rebuild path (which would call it again via
-    // loadTurnEntryProjection inside projectTurnEntry).
-    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('picks up a cross-process inject appended between calls', () => {
@@ -288,9 +290,48 @@ describe('projectTurnEntry', () => {
     const p1 = projectTurnEntry(dir, '/work', cache, SID);
     const head1 = cache.get(SID)!.headSeq;
 
+    // The offset seed after the full build is EXACTLY the consumed bytes, so the
+    // second call's incremental tail-read sees zero new bytes: a true no-op that
+    // never re-parses the whole log.
+    const spy = vi.spyOn(pe, 'readParsedSessionEvents');
     const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(spy).not.toHaveBeenCalled();
     expect(JSON.stringify(p2.messages)).toBe(JSON.stringify(p1.messages));
     expect(cache.get(SID)!.headSeq).toBe(head1);
+  });
+
+  it('a partial trailing line is held back, then folded once when completed', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+      line(4, 'turn_end', { stopReason: 'end_turn' }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+    projectTurnEntry(dir, '/work', cache, SID);
+
+    // A concurrent writer appends a line WITHOUT its trailing newline, then bumps
+    // .seq (as appendDurableEvent reserves the seq before the line lands). The
+    // incremental read must hold back the partial line — not mis-parse it.
+    const partial = line(5, 'prompt', { content: [{ type: 'text', text: 'again' }] });
+    appendFileSync(join(dir, 'events.jsonl'), partial, 'utf8'); // no '\n'
+    writeFileSync(join(dir, '.seq'), '6', 'utf8');
+
+    const pMid = projectTurnEntry(dir, '/work', cache, SID);
+    // Seq 5's content is not yet visible (its line is incomplete).
+    expect(JSON.stringify(pMid.messages)).not.toContain('again');
+
+    // The writer completes the line and appends the next event.
+    appendFileSync(join(dir, 'events.jsonl'), '\n', 'utf8');
+    appendLine(line(6, 'message', { content: [{ type: 'text', text: 'again-reply' }] }));
+
+    const pDone = projectTurnEntry(dir, '/work', cache, SID);
+    // Seq 5 folded EXACTLY once (not dropped, not doubled) and matches a full rebuild.
+    expect(JSON.stringify(pDone.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+    expect(JSON.stringify(pDone.messages)).toContain('again');
+    expect(JSON.stringify(pDone.messages)).toContain('again-reply');
   });
 
   it('falls back to a full build when there is no .seq head', () => {
@@ -308,6 +349,135 @@ describe('projectTurnEntry', () => {
     const p1 = projectTurnEntry(dir, '/work', cache, SID);
     expect(JSON.stringify(p1.messages)).toBe(
       JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+  });
+});
+
+// The byte-offset incremental path must equal a fresh full rebuild even when new
+// events land in a BRAND-NEW shard (a new UTC date / persona bucket) — exercising
+// the new-layout discovery + cross-shard sort-by-eventSeq before folding.
+describe('projectTurnEntry — cross-shard byte-offset incremental', () => {
+  const persona = 'ada';
+  const day1 = new Date('2026-06-18T12:00:00.000Z');
+  const day2 = new Date('2026-06-19T12:00:00.000Z');
+  let laceDir: string;
+  let sessionId: string;
+  let sessionDir: string;
+  let prevLaceDir: string | undefined;
+  let prevSessionDir: string | undefined;
+
+  beforeEach(() => {
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-proj-shard-'));
+    sessionId = `sess_${randomUUID()}`;
+    prevLaceDir = process.env.LACE_DIR;
+    prevSessionDir = process.env.LACE_SESSION_DIR;
+    process.env.LACE_DIR = laceDir;
+    // getSessionDir resolves the legacy events.jsonl dir; .seq lives there too.
+    process.env.LACE_SESSION_DIR = join(laceDir, 'agent-sessions');
+    sessionDir = getSessionDir(sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (prevLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = prevLaceDir;
+    if (prevSessionDir === undefined) delete process.env.LACE_SESSION_DIR;
+    else process.env.LACE_SESSION_DIR = prevSessionDir;
+    rmSync(laceDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  const shardLine = (eventSeq: number, type: string, data: Record<string, unknown>): string =>
+    JSON.stringify({ eventSeq, timestamp: 't', type, data });
+
+  function shardFile(date: Date): string {
+    const d = transcriptDir({ laceDir, persona, date });
+    mkdirSync(d, { recursive: true });
+    return join(d, `${sessionId}.jsonl`);
+  }
+
+  function setSeq(seq: number): void {
+    writeFileSync(join(sessionDir, '.seq'), String(seq + 1), 'utf8');
+  }
+
+  it('folds a brand-new-date shard appended between calls, equal to a full rebuild', () => {
+    // Day-1 shard: a complete first turn.
+    writeFileSync(
+      shardFile(day1),
+      [
+        shardLine(1, 'system_prompt_set', { text: 'sys' }),
+        shardLine(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+        shardLine(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+        shardLine(4, 'turn_end', { stopReason: 'end_turn' }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    setSeq(4);
+
+    const cache = new Map<string, CachedProjection>();
+    const p1 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
+    expect(JSON.stringify(p1.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(sessionDir, '/work').messages)
+    );
+
+    // A new turn lands in a brand-new DAY-2 shard (a file absent at seed time →
+    // read from byte 0 on the incremental pass).
+    appendFileSync(
+      shardFile(day2),
+      [
+        shardLine(5, 'prompt', { content: [{ type: 'text', text: 'next day' }] }),
+        shardLine(6, 'message', { content: [{ type: 'text', text: 'day-2 reply' }] }),
+        shardLine(7, 'turn_end', { stopReason: 'end_turn' }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    setSeq(7);
+
+    const expectedMessages = JSON.stringify(loadTurnEntryProjection(sessionDir, '/work').messages);
+
+    const spy = vi.spyOn(pe, 'readParsedSessionEvents');
+    const p2 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
+    expect(spy).not.toHaveBeenCalled(); // O(tail): never re-parses the whole log
+    expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
+    expect(p2.lastTurnEndSeq).toBe(7);
+    expect(JSON.stringify(p2.messages)).toContain('day-2 reply');
+  });
+
+  it('cross-shard new events are sorted by eventSeq before folding', () => {
+    // Day-1 shard seeded; .seq tip past it.
+    writeFileSync(
+      shardFile(day1),
+      [
+        shardLine(1, 'system_prompt_set', { text: 'sys' }),
+        shardLine(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+        shardLine(3, 'message', { content: [{ type: 'text', text: 'r1' }] }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    setSeq(3);
+    const cache = new Map<string, CachedProjection>();
+    projectTurnEntry(sessionDir, '/work', cache, sessionId);
+
+    // New events split across BOTH shards out of file-enumeration order: a later
+    // event (5) is appended to the existing day-1 shard while an earlier event (4)
+    // lands in the new day-2 shard. Discovery yields day-1 before day-2, so
+    // without the sort-by-eventSeq the fold would see 5 before 4. A full rebuild
+    // (globally sorted) is the oracle.
+    appendFileSync(
+      shardFile(day1),
+      shardLine(5, 'message', { content: [{ type: 'text', text: 'r2' }] }) + '\n',
+      'utf8'
+    );
+    writeFileSync(
+      shardFile(day2),
+      shardLine(4, 'prompt', { content: [{ type: 'text', text: 'q2' }] }) + '\n',
+      'utf8'
+    );
+    setSeq(5);
+
+    const p2 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
+    expect(JSON.stringify(p2.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(sessionDir, '/work').messages)
     );
   });
 });

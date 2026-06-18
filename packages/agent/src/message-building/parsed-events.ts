@@ -11,21 +11,31 @@ export type ParsedSessionEvent = {
   data: Record<string, unknown>;
 };
 
+/**
+ * Parse a single JSONL line into a ParsedSessionEvent, or `null` for a
+ * blank/malformed line. The byte-offset tail reader uses this so a tail-parsed
+ * event is field-for-field identical to one from `readParsedSessionEvents`.
+ */
+export function parseSessionEventLine(line: string): ParsedSessionEvent | null {
+  if (!line) return null;
+  try {
+    const p = JSON.parse(line) as { eventSeq?: unknown; type?: unknown; data?: unknown };
+    return {
+      eventSeq: typeof p.eventSeq === 'number' ? p.eventSeq : 0,
+      type: typeof p.type === 'string' ? p.type : '',
+      data: typeof p.data === 'object' && p.data ? (p.data as Record<string, unknown>) : {},
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function readParsedSessionEvents(sessionDir: string): ParsedSessionEvent[] {
   const lines = readAllSessionEventLines(sessionDir); // already shard+legacy aware, sorted
   const events: ParsedSessionEvent[] = [];
   for (const line of lines) {
-    if (!line) continue;
-    try {
-      const p = JSON.parse(line) as { eventSeq?: unknown; type?: unknown; data?: unknown };
-      events.push({
-        eventSeq: typeof p.eventSeq === 'number' ? p.eventSeq : 0,
-        type: typeof p.type === 'string' ? p.type : '',
-        data: typeof p.data === 'object' && p.data ? (p.data as Record<string, unknown>) : {},
-      });
-    } catch {
-      // skip malformed
-    }
+    const parsed = parseSessionEventLine(line);
+    if (parsed) events.push(parsed);
   }
   return events;
 }

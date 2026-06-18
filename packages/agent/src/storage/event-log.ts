@@ -90,6 +90,25 @@ export function personaForSessionDir(sessionDir: string): string | null {
 }
 
 /**
+ * The exact shard file set `readAllSessionEventLines` reads for a session: the
+ * legacy `<sessionDir>/events.jsonl` (when present) followed by the new-layout
+ * `<laceDir>/transcripts/<persona>/<date>/<session>.jsonl` shards. Exposed so a
+ * byte-offset tail reader can read precisely the files the full scan does, with
+ * the same legacy path the full scan derives from `sessionDir` (NOT getSessionDir).
+ */
+export function sessionShardFiles(sessionDir: string): string[] {
+  const sessionId = path.basename(sessionDir);
+  let newFiles: string[] = [];
+  try {
+    newFiles = listTranscriptFiles(getLaceDir(), sessionId);
+  } catch {
+    newFiles = [];
+  }
+  const legacyPath = path.join(sessionDir, 'events.jsonl');
+  return fs.existsSync(legacyPath) ? [legacyPath, ...newFiles] : newFiles;
+}
+
+/**
  * Return every JSONL line that belongs to this session, in eventSeq-emit order.
  *
  * The legacy <sessionDir>/events.jsonl path is read alongside the new
@@ -102,15 +121,7 @@ export function personaForSessionDir(sessionDir: string): string | null {
  * file lines are in append order, which is also eventSeq order.
  */
 export function readAllSessionEventLines(sessionDir: string): string[] {
-  const sessionId = path.basename(sessionDir);
-  let newFiles: string[] = [];
-  try {
-    newFiles = listTranscriptFiles(getLaceDir(), sessionId);
-  } catch {
-    newFiles = [];
-  }
-  const legacyPath = path.join(sessionDir, 'events.jsonl');
-  const files = fs.existsSync(legacyPath) ? [legacyPath, ...newFiles] : newFiles;
+  const files = sessionShardFiles(sessionDir);
 
   const lines: string[] = [];
   for (const file of files) {
