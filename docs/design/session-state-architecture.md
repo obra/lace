@@ -98,26 +98,44 @@ hot path" — it's O(1), not O(events), and it's what makes Step 6 safe. The seq
 *authority* stays the disk tail-read, never a best-effort index (a missing index
 row returns a plausible-but-low number that "bypass on corruption" can't catch).
 
-### Layer 3 — Context assembly (stable inputs, watched bytes)
+### Layer 3 — Context assembly (provider-neutral stable inputs, watched bytes)
 
-A turn's request object is `[prefix from the conversation projection] + [live
-tail]`. The prefix is stable across turns because the events that produce it are
-immutable and the reducer is deterministic; the system prompt and tool set are
-*separate* stable segments (their own cache breakpoints), not part of the message
-prefix. We let the existing path serialize the object (the SDK's `JSON.stringify`)
-and let `attachMessageCacheBreakpoints` place the rolling-tail and anchor markers
-each turn as it does today — the markers move; that's fine, the cache matches on
-content, not markers. What we add is not a byte-splicer; it is:
+The conversation projection is **provider-neutral**: it produces lace's internal
+`ProviderMessage[]` prefix, which feeds every provider's converter
+(`convertToAnthropicFormat`, `convertToOpenAIFormat`, `convertToGeminiFormat`,
+text-only). A turn's request object is `[converted prefix] + [live tail]`. The
+*neutral* prefix is stable across turns because the events that produce it are
+immutable and the reducer is deterministic — and that stability is what every
+provider's caching wants, even though the mechanism differs:
 
-- **A determinism invariant (below) on the inputs**, so the stable object really
-  is stable.
-- **A golden-bytes test** that captures the literal serialized body and fails on
-  any prefix drift.
-- **A runtime cache-health signal** (cache read/write per turn) so drift in prod
-  is visible immediately.
+- **Anthropic / Bedrock**: explicit `cache_control` markers
+  (`attachMessageCacheBreakpoints` places a rolling-tail + anchor each turn). The
+  markers move; that's fine — the cache matches on content, not markers. Drift in
+  the prefix is the worst case: an explicit ~5× re-bill of the cached tokens.
+- **OpenAI**: automatic server-side prefix caching; lace places no markers. A
+  stable prefix earns the automatic discount; drift just *loses* the discount —
+  gentler than Anthropic, same principle.
+- **Gemini / local (ollama, lmstudio)**: lace manages no explicit cache today; a
+  stable prefix still helps wherever the backend reuses prefix/KV state. We do not
+  assume a mechanism lace doesn't have.
 
-So byte-identity is *enforced and watched*, not *constructed by freezing bytes*.
-This is the honest correction to revision 1.
+So the architecture's job is the **stable neutral prefix + a deterministic
+per-provider conversion**; the cache *mechanism* lives in each provider adapter.
+A session can even switch providers (`modelId`/`connectionId` change) without
+invalidating the projection — the neutral prefix is the durable thing; the
+converted+cached form is derived per request, per provider.
+
+What we add is not a byte-splicer; it is:
+
+- **A determinism invariant (below)** on the inputs (and on each converter), so
+  the prefix really is stable.
+- **A golden-bytes test, run per provider**, that captures each provider's literal
+  serialized body and fails on any prefix drift.
+- **A runtime cache-health signal** (provider-reported cache read/write per turn,
+  for providers that report it) so drift in prod is visible immediately.
+
+So byte-identity is *enforced and watched, per provider* — not *constructed by
+freezing bytes*. This is the honest correction to revision 1.
 
 ### The rule — compaction seals the message era
 
@@ -149,12 +167,17 @@ O(tail-since-compaction), not O(events-ever). Be precise about the win:
    incremental update are the same function. The conversation projection models
    the persisted prefix only; the runner's non-persisted live-tail mutations are
    outside it.
-4. Byte-identity of the cached prefix is enforced by a golden-bytes test and
-   watched by a prod cache-health signal — not asserted "by construction." The
-   reducer guarantees the message *array*; the test guarantees the *bytes*.
-5. Persona, tools, skills, and system-prompt rendering are **byte-deterministic**
-   (no timestamps, no nondeterministic ordering, stable cwd handling). This is
-   load-bearing — the whole cache rests on it — and it must be tested directly.
+4. Byte-identity of the cached prefix is enforced **per provider** by a golden-
+   bytes test and watched by a prod cache-health signal — not asserted "by
+   construction." The reducer guarantees the neutral message *array*; each
+   provider's golden test guarantees *that provider's* serialized bytes. The win
+   (a stable, cheaply-produced prefix) is provider-neutral; the stakes of drift
+   differ (Anthropic/Bedrock ~5× re-bill; OpenAI loses an automatic discount;
+   local loses KV reuse).
+5. Persona, tools, skills, and system-prompt rendering — **and each provider's
+   message converter** — are **byte-deterministic** (no timestamps, no
+   nondeterministic ordering, stable cwd handling). This is load-bearing — every
+   provider's cache rests on it — and it must be tested directly, per converter.
 6. Any derived store can be bypassed. Divergence must be *detected* (the tip-check
    and a prod divergence guard, not only a dev/CI check), then fall back to a full
    rebuild. No derived store is ever load-bearing for correctness, and a
@@ -233,10 +256,11 @@ serializer. Byte stability comes from stable inputs + the gate, per Layer 3.)
 
 ## How we know it's right (the test contract)
 
-- **Golden-bytes** (Step 0): the request body is byte-identical across the
+- **Golden-bytes, per provider** (Step 0): for each converter (Anthropic, OpenAI,
+  Gemini, Bedrock), the serialized request body is byte-identical across the
   refactor and across turns for an unchanged prefix. The non-negotiable gate.
-- **Render-determinism** (Step 0): system + tools render to identical bytes
-  regardless of wall-clock/cwd/enumeration (Invariant 5).
+- **Render-determinism** (Step 0): system + tools + each provider's converter
+  render to identical bytes regardless of wall-clock/cwd/enumeration (Invariant 5).
 - **Reducer equivalence** (Step 1): incremental fold equals batch fold, fuzzed.
 - **Snapshot round-trip** (Step 4): rebuild-from-snapshot equals rebuild-from-
   post-recovery-log, byte-for-byte.
@@ -251,9 +275,13 @@ serializer. Byte stability comes from stable inputs + the gate, per Layer 3.)
 - The on-disk log format does not change. Old sessions cold-build their
   projections on first load; nothing to migrate, no backward-compat shims.
 - The recall FTS index is not touched. It serves search; it stays lossy/separate.
-- We do **not** take over body serialization from the Anthropic SDK. We control
-  the request *object* and make its prefix stable; the SDK still serializes and
-  owns transport, auth, retries, and streaming.
+- We do **not** take over body serialization from any provider SDK (Anthropic,
+  OpenAI, Gemini, …). We control the request *object* and make its prefix stable;
+  each SDK still serializes and owns transport, auth, retries, and streaming.
+- The log, projections, compaction, and the O(N²) fix are **provider-neutral** —
+  they operate on neutral events and the neutral `ProviderMessage[]`. Only the
+  converters and per-provider cache mechanisms are provider-specific, and they
+  live behind the provider adapter, not in the core.
 
 ## What review changed (revision 1 → 2)
 
