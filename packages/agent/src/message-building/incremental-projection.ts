@@ -4,17 +4,24 @@
 // folds ONLY a new tail of events into it (O(tail)), applying the SAME per-event
 // handling the full rebuild uses (applyEventToProjection in message-builder),
 // so an incremental fold is byte-identical to a full rebuild over the same
-// events — proven by the split-at-every-K differential test.
+// events — proven by the split-at-every-K differential test. projectTurnEntry
+// is the cache-aware turn-entry point: an O(1) .seq tip-check picks the
+// incremental tail-fold when a projection is cached, else falls back to the
+// full loadTurnEntryProjection.
 
 import { isAbsolute as isAbsolutePath, resolve as resolvePath } from 'node:path';
 import type { ProviderMessage } from '../providers/base-provider';
 import type { FoldState } from './fold-event';
 import {
   applyEventToProjection,
+  finalizeProjectionWarnings,
   newProjectionAccumulator,
   type ProjectionAccumulator,
 } from './message-builder';
 import type { ParsedSessionEvent } from './parsed-events';
+import * as pe from './parsed-events';
+import { readHead } from '@lace/agent/storage/seq-head';
+import { loadTurnEntryProjection, type TurnEntryProjection } from './turn-entry-projection';
 
 /**
  * The conversation projection cached in memory across turns. It is the
@@ -118,4 +125,74 @@ export function foldTailIntoProjection(
     cwd: proj.cwd,
   };
   return { ...next, messages: next.foldState.messages };
+}
+
+/**
+ * Seed a CachedProjection from a full turn-entry projection (cache-miss path).
+ * The full build already parsed every event; we re-derive the FoldState by
+ * folding the same parse so the incremental head is byte-identical to a full
+ * rebuild from here on. `tip` is the .seq next-free seq (the head for the next
+ * tail-read); when absent we fall back to (max eventSeq) + 1.
+ */
+function seedCachedProjection(
+  events: ParsedSessionEvent[],
+  full: TurnEntryProjection,
+  cwd: string,
+  tip: number | undefined
+): CachedProjection {
+  const acc = newProjectionAccumulator();
+  for (const e of events) applyEventToProjection(acc, e.type, e.data);
+  finalizeProjectionWarnings(acc);
+  const maxSeq = events.length > 0 ? Math.max(...events.map((e) => e.eventSeq)) : 0;
+  return {
+    foldState: acc.state,
+    systemPrompt: full.systemPrompt,
+    systemPromptCount: acc.systemPromptCount,
+    filesRead: full.filesRead,
+    lastTurnEndSeq: full.lastTurnEndSeq,
+    headSeq: tip ?? maxSeq + 1,
+    cwd,
+  };
+}
+
+/**
+ * Cache-aware turn entry. Reads the O(1) .seq tip; on a cache hit with no
+ * backward tip movement, tail-reads only events with `eventSeq >= cached.headSeq`
+ * and folds them in (O(tail)). On a cold start / cache miss / inconsistency,
+ * falls back to the full loadTurnEntryProjection and seeds the cache.
+ *
+ * The cache is keyed by sessionId, so a session switch simply uses a different
+ * entry; a fork copies into a NEW sessionId, so a stale cache can never serve a
+ * replaced log.
+ */
+export function projectTurnEntry(
+  sessionDir: string,
+  cwd: string,
+  cache: Map<string, CachedProjection>,
+  sessionId: string
+): TurnEntryProjection {
+  const tip = readHead(sessionDir);
+  const cached = cache.get(sessionId);
+
+  if (cached !== undefined && tip !== undefined && cached.headSeq <= tip) {
+    // Incremental tail-fold: only the events appended since the cached head.
+    // `headSeq` is the next-seq-to-fold, so `eventSeq >= headSeq` is precisely
+    // the new tail and an already-folded event is never double-applied.
+    const allEvents = pe.readParsedSessionEvents(sessionDir);
+    const tailEvents = allEvents.filter((e) => e.eventSeq >= cached.headSeq);
+    const folded = foldTailIntoProjection(cached, tailEvents);
+    cache.set(sessionId, folded);
+    return {
+      messages: folded.messages,
+      systemPrompt: folded.systemPrompt,
+      filesRead: folded.filesRead,
+      lastTurnEndSeq: folded.lastTurnEndSeq,
+    };
+  }
+
+  // Cold / cache miss / tip moved backward: full rebuild + seed the cache.
+  const events = pe.readParsedSessionEvents(sessionDir);
+  const full = loadTurnEntryProjection(sessionDir, cwd);
+  cache.set(sessionId, seedCachedProjection(events, full, cwd, tip));
+  return full;
 }

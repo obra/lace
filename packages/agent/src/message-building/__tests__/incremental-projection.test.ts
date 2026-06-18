@@ -7,12 +7,19 @@
 // independent — the same property the foldEvent fuzz proved, here for the FULL
 // rebuild semantics.
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ParsedSessionEvent } from '@lace/agent/message-building/parsed-events';
+import * as pe from '@lace/agent/message-building/parsed-events';
 import { buildProviderMessagesFromParsedEvents } from '@lace/agent/message-building/message-builder';
+import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
 import {
   initialCachedProjection,
   foldTailIntoProjection,
+  projectTurnEntry,
+  type CachedProjection,
 } from '@lace/agent/message-building/incremental-projection';
 
 function ev(eventSeq: number, type: string, data: Record<string, unknown>): ParsedSessionEvent {
@@ -180,5 +187,126 @@ describe('foldTailIntoProjection', () => {
       lastTurnEndSeq: proj.lastTurnEndSeq,
     });
     expect(after).toBe(before);
+  });
+});
+
+describe('projectTurnEntry', () => {
+  let dir: string;
+  const SID = 'sess-1';
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'lace-proj-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  // Write the durable log + the .seq head (next-free seq = max seq + 1) so
+  // readHead returns the tip exactly as the runtime would.
+  function writeLog(lines: string[]): void {
+    writeFileSync(join(dir, 'events.jsonl'), lines.join('\n') + '\n', 'utf8');
+    const maxSeq = lines.length
+      ? Math.max(...lines.map((l) => (JSON.parse(l) as { eventSeq: number }).eventSeq))
+      : 0;
+    writeFileSync(join(dir, '.seq'), String(maxSeq + 1), 'utf8');
+  }
+
+  function appendLine(line: string): void {
+    appendFileSync(join(dir, 'events.jsonl'), line + '\n', 'utf8');
+    const seq = (JSON.parse(line) as { eventSeq: number }).eventSeq;
+    writeFileSync(join(dir, '.seq'), String(seq + 1), 'utf8');
+  }
+
+  const line = (eventSeq: number, type: string, data: Record<string, unknown>): string =>
+    JSON.stringify({ eventSeq, timestamp: 't', type, data });
+
+  it('cold-builds once, then tail-folds incrementally and matches a full rebuild', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+      line(4, 'turn_end', { stopReason: 'end_turn' }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+
+    // First call → cold full build.
+    const p1 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p1.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+
+    // Append a turn's worth of events + a cross-process inject.
+    appendLine(line(5, 'prompt', { content: [{ type: 'text', text: 'again' }] }));
+    appendLine(line(6, 'message', { content: [{ type: 'text', text: 'again-reply' }] }));
+    appendLine(line(7, 'turn_end', { stopReason: 'end_turn' }));
+
+    // Capture the expected full rebuild BEFORE spying (the comparison itself
+    // re-parses, which would inflate the spy count).
+    const expectedMessages = JSON.stringify(loadTurnEntryProjection(dir, '/work').messages);
+
+    // Second call → incremental tail-fold (no full re-parse on the hot path).
+    const spy = vi.spyOn(pe, 'readParsedSessionEvents');
+    const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
+    expect(p2.lastTurnEndSeq).toBe(7);
+    // The hot path tail-reads via readParsedSessionEvents filtered by seq exactly
+    // ONCE; it does NOT take the full-rebuild path (which would call it again via
+    // loadTurnEntryProjection inside projectTurnEntry).
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('picks up a cross-process inject appended between calls', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'go' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'ok' }] }),
+      line(4, 'turn_end', { stopReason: 'end_turn' }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+    projectTurnEntry(dir, '/work', cache, SID);
+
+    // A different process injects runtime context (advances .seq).
+    appendLine(line(5, 'context_injected', { content: [{ type: 'text', text: 'INJECT' }] }));
+
+    const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p2.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+    const flat = JSON.stringify(p2.messages);
+    expect(flat).toContain('INJECT');
+  });
+
+  it('re-calling with NO new events is a no-op (cache reused, same messages)', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+    const p1 = projectTurnEntry(dir, '/work', cache, SID);
+    const head1 = cache.get(SID)!.headSeq;
+
+    const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p2.messages)).toBe(JSON.stringify(p1.messages));
+    expect(cache.get(SID)!.headSeq).toBe(head1);
+  });
+
+  it('falls back to a full build when there is no .seq head', () => {
+    // No .seq written: readHead → undefined → full rebuild + seed.
+    writeFileSync(
+      join(dir, 'events.jsonl'),
+      [
+        line(1, 'system_prompt_set', { text: 'sys' }),
+        line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+        line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    const cache = new Map<string, CachedProjection>();
+    const p1 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p1.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
   });
 });
