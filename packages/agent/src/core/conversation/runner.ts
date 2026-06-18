@@ -983,6 +983,9 @@ export class ConversationRunner {
           {
             role: 'assistant' as const,
             content: assistantText,
+            ...(concatenatedThinkingBlocks.length > 0
+              ? { thinkingBlocks: concatenatedThinkingBlocks }
+              : {}),
             toolCalls: toolCalls.map((tc: { id: string; name: string; arguments: unknown }) => ({
               id: tc.id,
               name: tc.name,
