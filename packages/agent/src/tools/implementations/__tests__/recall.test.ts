@@ -623,6 +623,57 @@ describe('RecallTool read', () => {
     ]);
   });
 
+  it('returns the verbatim event (full data) from event_journal, not the lossy render', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'before');
+    appendToolCall(fx, 'mytool', 'the result text');
+    appendPrompt(fx, 'after');
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${fx.sessionId}:2`, context: 1 },
+      makeCtx()
+    );
+    const events = parseResult(result).events as Array<{
+      event_id: string;
+      verbatim?: { type: string; eventSeq: number; data: Record<string, unknown> };
+    }>;
+    const target = events.find((e) => e.event_id === `${fx.sessionId}:2`);
+    expect(target).toBeDefined();
+    // The journal supplies the original event, NOT the `tool=…\ninput=…` render:
+    // full data with the structured input/result preserved.
+    expect(target!.verbatim).toBeDefined();
+    expect(target!.verbatim!.type).toBe('tool_use');
+    expect(target!.verbatim!.eventSeq).toBe(2);
+    const data = target!.verbatim!.data as {
+      name: string;
+      input: Record<string, unknown>;
+      result: { content: Array<{ type: string; text: string }> };
+    };
+    expect(data.name).toBe('mytool');
+    expect(data.input).toEqual({ arg: 'value' });
+    expect(data.result.content[0].text).toBe('the result text');
+  });
+
+  it('redacts secrets inside the verbatim event before returning it', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE leaked');
+    appendPrompt(fx, 'after');
+
+    const result = await new RecallTool().execute(
+      { action: 'read', event_id: `${fx.sessionId}:1`, context: 1 },
+      makeCtx()
+    );
+    const events = parseResult(result).events as Array<{
+      event_id: string;
+      verbatim?: { data: { content: Array<{ type: string; text: string }> } };
+    }>;
+    const target = events.find((e) => e.event_id === `${fx.sessionId}:1`);
+    expect(target!.verbatim).toBeDefined();
+    const text = JSON.stringify(target!.verbatim);
+    expect(text).toContain('<REDACTED:aws-access-key>');
+    expect(text).not.toContain('AKIAIOSFODNN7EXAMPLE');
+  });
+
   it('defaults context to 5 when unspecified', async () => {
     const fx = makeSession(laceDir, 'ada');
     for (let i = 0; i < 20; i++) appendPrompt(fx, `msg ${i}`);
