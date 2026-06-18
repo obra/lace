@@ -18,7 +18,8 @@ export type { Db };
 // History:
 //   1 — initial schema (event_id, session_id, ts, persona, kind, content)
 //   2 — added track UNINDEXED column (Task 9, 2026-06-03)
-export const SCHEMA_VERSION = 2;
+//   3 — added the event_journal verbatim-line store (2026-06-18)
+export const SCHEMA_VERSION = 3;
 
 const EVENTS_SCHEMA = `
 CREATE VIRTUAL TABLE events USING fts5(
@@ -31,6 +32,25 @@ CREATE VIRTUAL TABLE events USING fts5(
   track UNINDEXED,
   tokenize = 'porter unicode61'
 );
+`;
+
+// One row per durable event, storing the VERBATIM JSONL line. Unlike the FTS
+// `events` table this captures EVERY event type (not just the 5 indexed kinds),
+// so /recall can return original event bytes instead of the lossy FTS render.
+// It is a plain table (not a virtual FTS table), so it survives a version bump
+// without being dropped — created unconditionally with CREATE IF NOT EXISTS so
+// existing DBs gain it on the next open. Best-effort + backfill-repaired like
+// the FTS index; never on a correctness path.
+const EVENT_JOURNAL_SCHEMA = `
+CREATE TABLE IF NOT EXISTS event_journal (
+  session_id TEXT    NOT NULL,
+  event_seq  INTEGER NOT NULL,
+  type       TEXT    NOT NULL,
+  ts         TEXT    NOT NULL,
+  line       TEXT    NOT NULL,
+  PRIMARY KEY (session_id, event_seq)
+);
+CREATE INDEX IF NOT EXISTS ej_session ON event_journal(session_id, event_seq);
 `;
 
 function ensureWalMode(db: Db): void {
@@ -121,6 +141,12 @@ function applySchema(db: Db): void {
       value TEXT NOT NULL
     );
   `);
+
+  // The journal is a plain table (not FTS5), so it can be created additively
+  // every open without dropping data. Run it unconditionally — independent of
+  // the FTS version gate below — so existing DBs gain the table without losing
+  // their FTS index, and so a brand-new DB has it before any write-through.
+  db.exec(EVENT_JOURNAL_SCHEMA);
 
   const metaRow = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).get() as
     | { value: string }
