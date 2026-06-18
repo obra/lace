@@ -80,6 +80,32 @@ describe('seq-head', () => {
     expect(reserveSeq(dir, () => 10)).toBe(11);
   });
 
+  it('treats an empty head file (torn write truncation) as corrupt → undefined', () => {
+    // A torn writeFileSync truncates to 0 bytes first; Number('') === 0 would
+    // otherwise read as a VALID 0, defeating the torn-head reseed.
+    writeFileSync(join(dir, '.seq'), '', { encoding: 'utf8' });
+    expect(readHead(dir)).toBeUndefined();
+    // Reseed against JSONL max=10 → first reserved seq is 11, not 0.
+    expect(reserveSeq(dir, () => 10)).toBe(11);
+  });
+
+  it('treats a whitespace-only head file as corrupt → undefined', () => {
+    writeFileSync(join(dir, '.seq'), '   \n', { encoding: 'utf8' });
+    expect(readHead(dir)).toBeUndefined();
+  });
+
+  it('treats a negative head value as corrupt → undefined', () => {
+    writeFileSync(join(dir, '.seq'), '-5', { encoding: 'utf8' });
+    expect(readHead(dir)).toBeUndefined();
+  });
+
+  it('still parses a valid non-negative integer head', () => {
+    writeFileSync(join(dir, '.seq'), '0', { encoding: 'utf8' });
+    expect(readHead(dir)).toBe(0);
+    writeFileSync(join(dir, '.seq'), '42', { encoding: 'utf8' });
+    expect(readHead(dir)).toBe(42);
+  });
+
   it('persists the head file on disk as a single integer string', () => {
     reserveSeq(dir, () => 0);
     expect(existsSync(join(dir, '.seq'))).toBe(true);

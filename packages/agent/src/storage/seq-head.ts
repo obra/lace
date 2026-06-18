@@ -15,8 +15,14 @@ function headPath(sessionDir: string): string {
 
 /**
  * Read the stored next-free seq, or `undefined` if the head file is absent or
- * its contents are not a valid integer (a corrupt/torn head reseeds via the
- * caller's reconcile/seed against the JSONL).
+ * its contents are not a valid non-negative integer (a corrupt/torn head reseeds
+ * via the caller's reconcile/seed against the JSONL).
+ *
+ * An empty or whitespace-only file is treated as corrupt: a torn `writeFileSync`
+ * truncates the head to 0 bytes first, and `Number('') === 0` would otherwise
+ * read that torn state as a VALID head of 0 — handing out seqs from 0 and
+ * defeating the torn-head reseed. A negative value is likewise rejected (a head
+ * is a next-free seq and is never negative).
  */
 export function readHead(sessionDir: string): number | undefined {
   let raw: string;
@@ -25,8 +31,10 @@ export function readHead(sessionDir: string): number | undefined {
   } catch {
     return undefined;
   }
-  const n = Number(raw.trim());
-  if (!Number.isInteger(n)) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === '') return undefined;
+  const n = Number(trimmed);
+  if (!Number.isInteger(n) || n < 0) return undefined;
   return n;
 }
 
