@@ -3,7 +3,7 @@
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage, ThinkingBlock } from '../providers/base-provider';
 import { appendOrMergeUser } from './append-or-merge';
-import { foldEvent, initialFoldState } from './fold-event';
+import { foldEvent, initialFoldState, type FoldState } from './fold-event';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
@@ -214,174 +214,194 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
 }
 
 /**
- * Pure core of buildProviderMessagesFromDurableEvents: derives the provider
- * message prefix + system prompt from an already-parsed, sorted event array.
- * No I/O — the durable log is read and parsed once by the caller.
+ * The mutable accumulator shared by the full rebuild and the incremental
+ * projection fold. It carries the FoldState plus the system-prompt last-wins
+ * value and the era-scoped system_prompt_set count. ONE per-event handler
+ * (applyEventToProjection) mutates it, so the full builder and the incremental
+ * tail-fold cannot diverge.
  */
-export function buildProviderMessagesFromParsedEvents(
-  parsedEvents: ParsedSessionEvent[]
-): BuiltProviderMessages {
-  // Pass 1: determine systemPrompt from system_prompt_set events (last one wins).
-  // The VALUE is last-wins over ALL events. The warning COUNT, however, is scoped
-  // to the current compaction era: a post-compaction rerender legitimately
-  // supersedes earlier prompts, so we reset the count at each context_compacted
-  // event. Multiple system_prompt_set events within one era (since the last
-  // compaction) is the genuine anomaly worth surfacing.
-  let systemPrompt = '';
-  let systemPromptSetCount = 0;
-  for (const e of parsedEvents) {
-    if (e.type === 'context_compacted') {
-      systemPromptSetCount = 0;
-      continue;
+export type ProjectionAccumulator = {
+  state: FoldState;
+  systemPrompt: string;
+  // system_prompt_set count scoped to the current compaction era; reset to 0 at
+  // each context_compacted (a post-compaction rerender legitimately supersedes
+  // earlier prompts). >1 within one era is the invariant violation worth surfacing.
+  systemPromptCount: number;
+};
+
+export function newProjectionAccumulator(): ProjectionAccumulator {
+  return { state: initialFoldState(), systemPrompt: '', systemPromptCount: 0 };
+}
+
+/**
+ * Apply ONE durable event to the projection accumulator. This is the single
+ * per-event handler used by BOTH buildProviderMessagesFromParsedEvents (full
+ * rebuild) and foldTailIntoProjection (incremental tail). It folds
+ * `prompt`/`message`/`tool_use` through the shared reducer (foldEvent) — the
+ * Anthropic parallel-tool form — and layers the rebuild-only concerns:
+ * system-prompt last-wins + era count (with reset on compaction), the empty-
+ * `prompt` drop + image-preserving extraction, the `context_injected`
+ * text-merge, and the `context_compacted` reset to `preserved[]` + orphan
+ * cleanup. Those special events close the open tool batch (batch = null) so a
+ * following tool_use starts a fresh turn rather than coalescing across them.
+ */
+export function applyEventToProjection(
+  acc: ProjectionAccumulator,
+  type: string,
+  data: Record<string, unknown>
+): void {
+  if (type === 'system_prompt_set') {
+    const eventData = data as SystemPromptSetData;
+    if (typeof eventData.text === 'string') {
+      acc.systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
+      acc.systemPromptCount++;
     }
-    if (e.type === 'system_prompt_set') {
-      const eventData = e.data as SystemPromptSetData;
-      if (typeof eventData.text === 'string') {
-        systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
-        systemPromptSetCount++;
-      }
-    }
+    return;
   }
-  if (systemPromptSetCount > 1) {
+
+  if (type === 'prompt') {
+    const content = extractContentBlocks((data as Record<string, unknown>).content);
+    // Check if content is non-empty (string or array with items)
+    const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
+    // Image-preserving extraction (NOT text-flatten); drop empty prompts. Feed
+    // the already-extracted content through the reducer verbatim so the empty
+    // drop and image preservation stay rebuild-only concerns.
+    if (hasContent) {
+      acc.state = foldEvent(acc.state, { type: 'prompt', data: { content } });
+    }
+    return;
+  }
+
+  if (type === 'context_injected') {
+    // Emit as role:user so runtime context is visible to the model in the
+    // messages array while remaining distinct from the stable system prompt.
+    // Use appendOrMergeUser to avoid consecutive role:user messages when the
+    // prior entry is a user[toolResults] turn — Anthropic combines consecutive
+    // same-role messages in implementation-defined ways and it disrupts cache reach.
+    const eventData = data as ContextInjectedData;
+    const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
+    const content = extractTextFromContentBlocks(contentArr);
+    if (content.trim()) {
+      const merged = appendOrMergeUser(acc.state.messages, content);
+      acc.state = { messages: merged, batch: null };
+    } else {
+      // Even an empty injection closes the open tool batch.
+      acc.state = { messages: acc.state.messages, batch: null };
+    }
+    return;
+  }
+
+  if (type === 'context_compacted') {
+    const eventData = data as ContextCompactedData;
+    const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
+
+    // A compaction starts a new era: the warning count resets so a post-
+    // compaction rerender of the system prompt is not flagged as a violation.
+    acc.systemPromptCount = 0;
+
+    // Reset messages: the preserved array is the complete rebuilt conversation.
+    // The summary (if any) lives as the first entry in preserved — placed there
+    // by the compaction strategy. Do not read a separate data.summary field;
+    // no writer produces that shape and doing so would duplicate the summary.
+    const messages: ProviderMessage[] = [];
+
+    for (const msg of preserved) {
+      if (!msg || typeof msg !== 'object') continue;
+      const msgObj = msg as PreservedMessage;
+      const role = msgObj.role;
+      const rawContent = msgObj.content;
+      if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
+      // Accept string or ContentBlock[] — images in tail preserved messages
+      // must be passed through without being flattened to text.
+      if (typeof rawContent !== 'string' && !Array.isArray(rawContent)) continue;
+      const content: string | ContentBlock[] = Array.isArray(rawContent)
+        ? (rawContent as ContentBlock[])
+        : rawContent;
+
+      const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
+      const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
+      const thinkingBlocks = Array.isArray(msgObj.thinkingBlocks)
+        ? msgObj.thinkingBlocks
+        : undefined;
+
+      messages.push({
+        role,
+        content,
+        ...(toolCalls ? { toolCalls } : {}),
+        ...(toolResults ? { toolResults } : {}),
+        ...(thinkingBlocks && thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
+      });
+    }
+
+    dropOrphanedToolBlocks(messages);
+
+    // The reset replaces the whole conversation and closes the open tool batch.
+    acc.state = { messages, batch: null };
+    return;
+  }
+
+  if (type === 'message') {
+    const eventData = data as MessageData;
+    // Verbatim content (string or ContentBlock[]) — the reducer never flattens
+    // images. For the common text-only assistant turn the converter extracts the
+    // same text either way, so this is shape-preserving for the wire.
+    acc.state = foldEvent(acc.state, {
+      type: 'message',
+      data: {
+        content: eventData.content,
+        ...(Array.isArray(eventData.thinkingBlocks)
+          ? { thinkingBlocks: eventData.thinkingBlocks }
+          : {}),
+      },
+    });
+    return;
+  }
+
+  if (type === 'tool_use') {
+    const eventData = data as ToolUseData;
+    acc.state = foldEvent(acc.state, {
+      type: 'tool_use',
+      data: {
+        toolCallId: eventData.toolCallId,
+        name: eventData.name,
+        input: eventData.input,
+        result: eventData.result,
+      },
+    });
+    return;
+  }
+}
+
+/**
+ * Surface the system_prompt_set invariant violation (more than one in the
+ * current compaction era). Called once after a whole-log build/seed examines
+ * every event; NOT called on the incremental tail-fold hot path.
+ */
+export function finalizeProjectionWarnings(acc: ProjectionAccumulator): void {
+  if (acc.systemPromptCount > 1) {
     // More than one system_prompt_set since the last compaction (or session
     // start). The "written once" invariant has been violated within this era.
     // We still use the last value (defensive last-wins), but we surface the
     // violation so it can be investigated.
     logger.warn('Multiple system_prompt_set events found in session — invariant violation', {
-      count: systemPromptSetCount,
+      count: acc.systemPromptCount,
     });
   }
+}
 
-  // Pass 2: fold the events into the canonical ProviderMessage[] shape.
-  //
-  // `prompt`/`message`/`tool_use` are folded by the shared reducer (foldEvent),
-  // which produces the Anthropic parallel-tool form: one assistant carrying all
-  // of a turn's tool_use blocks, then one user carrying all of that turn's
-  // tool_result blocks. The rebuild-only concerns — the empty-`prompt` drop,
-  // image-preserving `prompt` extraction, the `context_injected` text-merge, and
-  // the `context_compacted` reset + orphan cleanup — are layered here, around the
-  // reducer. Those special events close the open tool batch (state.batch = null)
-  // so a following tool_use starts a fresh turn rather than coalescing across them.
-  let state = initialFoldState();
-
-  for (const e of parsedEvents) {
-    const { type, data } = e;
-
-    if (type === 'system_prompt_set') {
-      // Already consumed in Pass 1 — skip here.
-      continue;
-    }
-
-    if (type === 'prompt') {
-      const content = extractContentBlocks((data as Record<string, unknown>).content);
-      // Check if content is non-empty (string or array with items)
-      const hasContent = typeof content === 'string' ? content.trim() : content.length > 0;
-      // Image-preserving extraction (NOT text-flatten); drop empty prompts. Feed
-      // the already-extracted content through the reducer verbatim so the empty
-      // drop and image preservation stay rebuild-only concerns.
-      if (hasContent) {
-        state = foldEvent(state, { type: 'prompt', data: { content } });
-      }
-      continue;
-    }
-
-    if (type === 'context_injected') {
-      // Emit as role:user so runtime context is visible to the model in the
-      // messages array while remaining distinct from the stable system prompt.
-      // Use appendOrMergeUser to avoid consecutive role:user messages when the
-      // prior entry is a user[toolResults] turn — Anthropic combines consecutive
-      // same-role messages in implementation-defined ways and it disrupts cache reach.
-      const eventData = data as ContextInjectedData;
-      const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
-      const content = extractTextFromContentBlocks(contentArr);
-      if (content.trim()) {
-        const merged = appendOrMergeUser(state.messages, content);
-        state = { messages: merged, batch: null };
-      } else {
-        // Even an empty injection closes the open tool batch.
-        state = { messages: state.messages, batch: null };
-      }
-      continue;
-    }
-
-    if (type === 'context_compacted') {
-      const eventData = data as ContextCompactedData;
-      const preserved = Array.isArray(eventData.preserved) ? eventData.preserved : [];
-
-      // Reset messages: the preserved array is the complete rebuilt conversation.
-      // The summary (if any) lives as the first entry in preserved — placed there
-      // by the compaction strategy. Do not read a separate data.summary field;
-      // no writer produces that shape and doing so would duplicate the summary.
-      const messages: ProviderMessage[] = [];
-
-      for (const msg of preserved) {
-        if (!msg || typeof msg !== 'object') continue;
-        const msgObj = msg as PreservedMessage;
-        const role = msgObj.role;
-        const rawContent = msgObj.content;
-        if (role !== 'user' && role !== 'assistant' && role !== 'system') continue;
-        // Accept string or ContentBlock[] — images in tail preserved messages
-        // must be passed through without being flattened to text.
-        if (typeof rawContent !== 'string' && !Array.isArray(rawContent)) continue;
-        const content: string | ContentBlock[] = Array.isArray(rawContent)
-          ? (rawContent as ContentBlock[])
-          : rawContent;
-
-        const toolCalls = Array.isArray(msgObj.toolCalls) ? msgObj.toolCalls : undefined;
-        const toolResults = Array.isArray(msgObj.toolResults) ? msgObj.toolResults : undefined;
-        const thinkingBlocks = Array.isArray(msgObj.thinkingBlocks)
-          ? msgObj.thinkingBlocks
-          : undefined;
-
-        messages.push({
-          role,
-          content,
-          ...(toolCalls ? { toolCalls } : {}),
-          ...(toolResults ? { toolResults } : {}),
-          ...(thinkingBlocks && thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
-        });
-      }
-
-      dropOrphanedToolBlocks(messages);
-
-      // The reset replaces the whole conversation and closes the open tool batch.
-      state = { messages, batch: null };
-      continue;
-    }
-
-    if (type === 'message') {
-      const eventData = data as MessageData;
-      // Verbatim content (string or ContentBlock[]) — the reducer never flattens
-      // images. For the common text-only assistant turn the converter extracts the
-      // same text either way, so this is shape-preserving for the wire.
-      state = foldEvent(state, {
-        type: 'message',
-        data: {
-          content: eventData.content,
-          ...(Array.isArray(eventData.thinkingBlocks)
-            ? { thinkingBlocks: eventData.thinkingBlocks }
-            : {}),
-        },
-      });
-      continue;
-    }
-
-    if (type === 'tool_use') {
-      const eventData = data as ToolUseData;
-      state = foldEvent(state, {
-        type: 'tool_use',
-        data: {
-          toolCallId: eventData.toolCallId,
-          name: eventData.name,
-          input: eventData.input,
-          result: eventData.result,
-        },
-      });
-      continue;
-    }
-  }
-
-  return { messages: state.messages, systemPrompt };
+/**
+ * Pure core of buildProviderMessagesFromDurableEvents: derives the provider
+ * message prefix + system prompt from an already-parsed, sorted event array.
+ * No I/O — the durable log is read and parsed once by the caller. Folds every
+ * event through the shared applyEventToProjection handler.
+ */
+export function buildProviderMessagesFromParsedEvents(
+  parsedEvents: ParsedSessionEvent[]
+): BuiltProviderMessages {
+  const acc = newProjectionAccumulator();
+  for (const e of parsedEvents) applyEventToProjection(acc, e.type, e.data);
+  finalizeProjectionWarnings(acc);
+  return { messages: acc.state.messages, systemPrompt: acc.systemPrompt };
 }
 
 /**
