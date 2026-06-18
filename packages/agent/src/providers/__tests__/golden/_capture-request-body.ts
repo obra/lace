@@ -49,3 +49,50 @@ export async function captureAnthropicBody(fixture: GoldenFixture): Promise<stri
     await new Promise<void>((res, rej) => server.close((e) => (e ? rej(e) : res())));
   }
 }
+
+// Drives two successive turns where the second only appends a longer tail, so the
+// shared message prefix must stay byte-stable for the prompt cache to hold. Returns
+// both captured literal request bodies for prefix comparison.
+export async function captureAnthropicTwoTurn(): Promise<[string, string]> {
+  const { server, baseURL, captured } = await startServer((_b, n) =>
+    JSON.stringify({
+      id: `msg_${n}`,
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-sonnet-4-20250514',
+      content: [{ type: 'text', text: 'ok' }],
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+  );
+  try {
+    const provider = new AnthropicProvider({ apiKey: 'sk-test', baseURL });
+    provider.setSystemPrompt('You are Lace. Cached system block.');
+    const base = [
+      { role: 'user' as const, content: 'q1' },
+      { role: 'assistant' as const, content: 'a1' },
+      { role: 'user' as const, content: 'q2' },
+      { role: 'assistant' as const, content: 'a2' },
+    ];
+    await provider.createResponse(
+      [...base, { role: 'user', content: 'NEW1' }],
+      [],
+      'claude-sonnet-4-20250514'
+    );
+    await provider.createResponse(
+      [
+        ...base,
+        { role: 'user', content: 'NEW1' },
+        { role: 'assistant', content: 'NEWA1' },
+        { role: 'user', content: 'NEW2' },
+      ],
+      [],
+      'claude-sonnet-4-20250514'
+    );
+    if (captured.length !== 2) throw new Error(`expected 2 requests, got ${captured.length}`);
+    return [captured[0]!, captured[1]!];
+  } finally {
+    await new Promise<void>((res, rej) => server.close((e) => (e ? rej(e) : res())));
+  }
+}
