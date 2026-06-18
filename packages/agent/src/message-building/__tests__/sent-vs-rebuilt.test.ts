@@ -8,8 +8,9 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// The live shape the runner produces for a 2-call turn (assistant text + 2 calls,
-// then one user per result). Mirror runner.ts:981-992 + 1041-1044 exactly.
+// The live shape the runner produces for a 2-call turn: one assistant carrying
+// both calls, then one user carrying both results (the canonical parallel-tool
+// shape). Mirror the runner's tool loop exactly.
 function liveShape() {
   return [
     {
@@ -32,10 +33,10 @@ function liveShape() {
 }
 
 describe('sent shape equals rebuilt shape for a parallel-tool turn', () => {
-  // The rebuild now folds via foldEvent and emits the canonical parallel-tool
-  // shape (one assistant with all calls, one user with all results), which equals
-  // the live shape the runner sends — so this is genuinely GREEN. (Task 5 still
-  // aligns the actual runner code; the rebuild side alone closes it for this fixture.)
+  // Both paths now fold to the canonical parallel-tool shape (one assistant with
+  // all calls, one user with all results): the rebuild via foldEvent and the
+  // runner's live tail, which accumulates a batch's results into one user
+  // message. Sent == rebuilt — the cache break is closed.
   it('runner-sent messages match the rebuild from durable events', () => {
     const dir = mkdtempSync(join(tmpdir(), 'lace-svr-'));
     try {

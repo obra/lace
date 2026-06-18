@@ -993,6 +993,17 @@ export class ConversationRunner {
 
         let shouldContinue = true;
 
+        // Accumulate every tool result of this batch into ONE trailing user
+        // message (the canonical Anthropic parallel-tool shape: one assistant
+        // carrying all tool_use blocks — pushed above — followed by one user
+        // carrying all tool_result blocks). This is exactly what foldEvent
+        // rebuilds from the durable tool_use events, so the shape sent on turn N
+        // equals the shape rebuilt on turn N+1. The user message is only emitted
+        // once at least one result has accumulated — matching foldEvent, which
+        // adds no user message for a tool_use that has no result (and no user
+        // message at all for an empty batch).
+        const batchResults: CoreToolResult[] = [];
+
         // Load-bearing safety check: execute tool calls ONLY when the provider's
         // canonical stop reason explicitly says so. Refusal / context_exceeded /
         // max_output_tokens / stop_sequence have already exited the loop above,
@@ -1038,10 +1049,7 @@ export class ConversationRunner {
             }
 
             streamTurnSeq = result.streamTurnSeq;
-            providerMessages = [
-              ...providerMessages,
-              { role: 'user', content: '', toolResults: [result.coreResult] },
-            ];
+            batchResults.push(result.coreResult);
 
             if (!result.shouldContinue) {
               shouldContinue = false;
@@ -1056,6 +1064,18 @@ export class ConversationRunner {
               }
             }
           }
+        }
+
+        // Emit the batch's single canonical user message (all tool_result
+        // blocks). Only when at least one result accumulated — an empty batch
+        // produces no user message, matching the foldEvent rebuild. A batch that
+        // stopped early (shouldContinue=false mid-loop) carries its partial
+        // result set here, which is the same partial shape a rebuild produces.
+        if (batchResults.length > 0) {
+          providerMessages = [
+            ...providerMessages,
+            { role: 'user', content: '', toolResults: batchResults },
+          ];
         }
 
         if (!shouldContinue) {
