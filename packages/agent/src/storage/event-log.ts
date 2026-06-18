@@ -14,7 +14,7 @@ import {
 } from './transcript-paths';
 import { eventToRow } from './recall/event-to-row';
 import { getRecallIndex } from './recall/index-db';
-import { insertRow } from './recall/index-writer';
+import { insertRow, insertJournalRow } from './recall/index-writer';
 import { PROCESS_DIED_STOP_REASON, type TypedDurableEvent } from './event-types';
 import { logger } from '@lace/agent/utils/logger';
 
@@ -519,6 +519,23 @@ export function appendDurableEvent(
     if (row) insertRow(getRecallIndex(), row);
   } catch (err) {
     console.error('recall indexer write failed:', err);
+  }
+
+  // Verbatim journal write-through: store the EXACT bytes appended to the JSONL
+  // (`JSON.stringify(written)`, minus the trailing newline) for EVERY event
+  // type, so /recall can return original event bytes instead of the lossy FTS
+  // render. Its own try/catch: a journal failure must NEVER fail an append —
+  // JSONL is the source of truth and the startup backfill repairs any miss.
+  try {
+    insertJournalRow(getRecallIndex(), {
+      session_id: sessionId,
+      event_seq: written.eventSeq,
+      type: written.type,
+      ts: written.timestamp,
+      line: JSON.stringify(written),
+    });
+  } catch (err) {
+    console.error('event_journal write failed:', err);
   }
 
   return {

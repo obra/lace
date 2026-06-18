@@ -7,7 +7,7 @@ import { isSessionId } from '@lace/ent-protocol';
 import type { Db } from './index-db';
 import { listTranscriptFiles, transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '../transcript-paths';
 import { eventToRow } from './event-to-row';
-import { insertRow } from './index-writer';
+import { insertRow, insertJournalRow } from './index-writer';
 import { agentSessionsDir, readSessionMeta } from '../session-store';
 import type { TypedDurableEvent } from '../event-types';
 import type { DurableEvent } from '../event-log';
@@ -167,13 +167,30 @@ function newLayoutPersonaForSession(laceDir: string, sessionId: string): string 
 }
 
 function catchUpFile(db: Db, pass: SessionPass, have: Set<string>, stats: BackfillStats): void {
-  for (const ev of readEvents(pass.filePath)) {
+  for (const { line, event: ev } of readEvents(pass.filePath)) {
     stats.scanned++;
     if (typeof ev.eventSeq !== 'number') {
       stats.skipped++;
       continue;
     }
     const eventId = `${pass.sessionId}:${ev.eventSeq}`;
+
+    // Journal EVERY scanned event (not just the FTS-indexed kinds), storing the
+    // raw JSONL line verbatim. The PK dedups, so re-running backfill is safe and
+    // a journal write here is independent of the FTS `have` watermark below.
+    // Failures here must not poison the session's FTS catch-up; per-row guard.
+    try {
+      insertJournalRow(db, {
+        session_id: pass.sessionId,
+        event_seq: ev.eventSeq,
+        type: typeof ev.type === 'string' ? ev.type : 'unknown',
+        ts: typeof ev.timestamp === 'string' ? ev.timestamp : '',
+        line,
+      });
+    } catch (err) {
+      console.error(`recall backfill: insertJournalRow failed for ${eventId}:`, err);
+    }
+
     if (have.has(eventId)) {
       stats.skipped++;
       continue;
@@ -228,7 +245,7 @@ function readPersonaSafe(sessionDir: string): string | null {
   }
 }
 
-function* readEvents(filePath: string): Generator<DurableEvent> {
+function* readEvents(filePath: string): Generator<{ line: string; event: DurableEvent }> {
   let raw = '';
   try {
     raw = fs.readFileSync(filePath, 'utf8');
@@ -237,10 +254,15 @@ function* readEvents(filePath: string): Generator<DurableEvent> {
   }
   for (const line of raw.split('\n')) {
     if (!line) continue;
+    let event: DurableEvent;
     try {
-      yield JSON.parse(line) as DurableEvent;
+      event = JSON.parse(line) as DurableEvent;
     } catch {
       // skip malformed line (e.g. partial write)
+      continue;
     }
+    // Yield the raw line verbatim so the journal stores byte-identical bytes to
+    // what is on disk (the same string a JSONL line read returns).
+    yield { line, event };
   }
 }
