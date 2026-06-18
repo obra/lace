@@ -22,13 +22,11 @@ import {
 } from '@lace/agent/storage/session-store';
 import {
   appendDurableEvent,
-  findLastTurnEndEventSeq,
   readDurableEvents,
   type DurableEvent,
 } from '@lace/agent/storage/event-log';
-import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
-import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
 import { appendOrMergeUser } from '@lace/agent/message-building/append-or-merge';
 import { bashSchema } from '@lace/agent/tools/implementations/bash';
 import { digestToolResultText } from '@lace/agent/tools/result-digest';
@@ -410,7 +408,11 @@ export class ConversationRunner {
     } = this.config;
 
     const runtimeBinding = this.resolveActiveRuntimeBinding(cwd);
-    const filesRead = deriveFilesReadFromDurableEvents(sessionDir, runtimeBinding.toolRuntime.cwd);
+    // Read and parse the durable event log ONCE at turn entry, deriving the
+    // provider message prefix + system prompt, the files-read set, and the
+    // last turn_end seq (the inject watermark) from that single parse.
+    const turnEntry = loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+    const filesRead = turnEntry.filesRead;
     const runtimeFileAccessTracker = await this.createFileAccessTracker(filesRead, runtimeBinding);
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
@@ -427,8 +429,8 @@ export class ConversationRunner {
     // constructing the provider. If we threw after createProvider() but outside
     // the try/finally that calls provider.cleanup(), the provider would leak
     // EventEmitter listeners and open HTTP sockets.
-    const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
-      buildProviderMessagesFromDurableEvents(sessionDir);
+    const rebuiltMessages = turnEntry.messages;
+    const frozenSystemPrompt = turnEntry.systemPrompt;
     let providerMessages = rebuiltMessages;
 
     // The system prompt is invariant for the session lifetime and is written
@@ -487,7 +489,7 @@ export class ConversationRunner {
     // any context_injected events written between turns (after turn_end but
     // before run() was called) are picked up on the first iteration, not
     // silently skipped.
-    let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
+    let lastSeenEventSeq = turnEntry.lastTurnEndSeq ?? 0;
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;

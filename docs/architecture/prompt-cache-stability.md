@@ -95,6 +95,15 @@ only: system-prompt extraction; the `context_compacted` reset to the preserved a
 followed by `dropOrphanedToolBlocks` (the orphan-pair guard); and the
 `context_injected` text-merge into a trailing user message.
 
+## One read at turn entry
+
+Turn entry reads and parses the durable event log **once**, via
+`loadTurnEntryProjection` (`message-building/turn-entry-projection.ts`). That single
+parsed event array feeds three pure derivers: the provider message prefix + system
+prompt (the batch reducer above), the files-read set, and the last `turn_end` seq
+(the inject watermark). The per-append seq scan and the per-iteration inject read
+remain — those are addressed by the durable index, not by this read-coalescing.
+
 ## The gates
 
 All gates live under `packages/agent/src/providers/__tests__/golden/` and
