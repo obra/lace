@@ -44,3 +44,46 @@ function insertRowInner(db: Db, row: RecallRow): void {
     `INSERT INTO events (event_id, session_id, ts, persona, kind, content, track) VALUES (?, ?, ?, ?, ?, ?, ?)`
   ).run(row.event_id, row.session_id, row.ts, row.persona, row.kind, row.content, row.track);
 }
+
+/**
+ * One row for the verbatim-line journal: every event type (NOT the FTS
+ * `eventToRow` filter), `line` is the exact JSONL bytes for the event.
+ */
+export type JournalRow = {
+  session_id: string;
+  event_seq: number;
+  type: string;
+  ts: string;
+  line: string;
+};
+
+/**
+ * Insert one event into the verbatim `event_journal`, idempotent on the
+ * (session_id, event_seq) primary key. Mirrors insertRow's transaction
+ * discipline: skip BEGIN/COMMIT when the caller already holds a transaction
+ * (the backfill batches per-session under its own IMMEDIATE transaction), else
+ * acquire the write lock upfront with BEGIN IMMEDIATE so the dedup is
+ * serialized across the processes that share index.sqlite. The PK makes the
+ * dedup atomic via INSERT OR IGNORE — no separate existence check needed.
+ */
+export function insertJournalRow(db: Db, row: JournalRow): void {
+  if (db.inTransaction) {
+    insertJournalRowInner(db, row);
+    return;
+  }
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    insertJournalRowInner(db, row);
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+function insertJournalRowInner(db: Db, row: JournalRow): void {
+  db.prepare(
+    `INSERT OR IGNORE INTO event_journal (session_id, event_seq, type, ts, line) VALUES (?, ?, ?, ?, ?)`
+  ).run(row.session_id, row.event_seq, row.type, row.ts, row.line);
+}
