@@ -48,6 +48,7 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
+import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
 import { computePressure, evaluateBreakpoints } from './compaction-trigger';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import {
@@ -1139,6 +1140,19 @@ export class ConversationRunner {
           stopReason,
         });
       }
+
+      logger.info(
+        'cache-health: turn complete',
+        buildCacheHealthLog({
+          turnId,
+          model: modelId ?? 'unknown-model',
+          inputTokens: totalInputTokens,
+          cacheCreationInputTokens: totalCacheCreationInputTokens,
+          cacheReadInputTokens: totalCacheReadInputTokens,
+          outputTokens: totalOutputTokens,
+          cacheMissReason: lastCacheMissReason?.type ?? null,
+        })
+      );
 
       // Compaction trigger. Runs synchronously in the runner's finally block
       // after the turn_end write. Uses the raw appendDurableEvent +
