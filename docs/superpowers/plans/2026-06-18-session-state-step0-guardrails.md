@@ -953,15 +953,24 @@ Expected: clean.
 Run: `cd packages/agent && npx vitest run`
 Expected: PASS (pre-existing unrelated reds, if any — e.g. apple-container on Linux — are noted in MEMORY as expected; everything this plan added/touched is green).
 
-- [ ] **Step 3: Record a baseline measurement note**
+- [ ] **Step 3: Write the evergreen architecture doc for the guardrails**
 
-Create `docs/design/step0-baseline.md` with: the date, the golden corpus size (count of `golden/*.json`), and a one-paragraph statement that the byte-identity gates and the cache-health signal are now in place, so Steps 1-5 can be verified byte-for-byte against `packages/agent/src/providers/__tests__/golden/`. This is the "measured before the next step" gate from the spec's build order.
+Create `docs/architecture/prompt-cache-stability.md` — an **evergreen** doc (present tense, describes the system as it *is*; **no ticket numbers, no spec/plan references, no "we added"/"this used to be" history**; match the tone of the existing `docs/architecture/*.md` files like `jobs.md`). It documents, for the next engineer:
+- **What lace guarantees and why:** the request prefix sent each turn must be byte-stable across turns so the provider prompt cache holds (Anthropic explicit `cache_control` markers — drift = ~5× re-bill; OpenAI server-side prefix cache — drift loses the discount; Gemini/local — drift loses KV reuse). The neutral `ProviderMessage[]` prefix is the stable thing; each provider converter turns it into that provider's wire shape.
+- **The golden-bytes gates** (`packages/agent/src/providers/__tests__/golden/`): the per-provider request snapshots pin the serialized request so any future change that alters the bytes shows up as a snapshot diff. Document the per-provider capture strategy (Anthropic = literal post-SDK bytes via a mock HTTP server; OpenAI/Gemini = the request object via an SDK module mock) and **how to add a fixture and regenerate** (`npx vitest run -u src/providers/__tests__/golden/`), and that a regeneration diff must be reviewed as a deliberate wire change.
+- **The cross-turn cache-stability gate:** turn N vs N+1 share a byte-identical prefix (Anthropic compared with `cache_control` markers stripped because the rolling anchor moves inside the prefix; OpenAI/Gemini compared whole).
+- **The determinism invariant** (`Invariant 5`): system-prompt + tools + each converter render to identical bytes regardless of wall-clock, cwd echo, or directory-read order. Note the concrete rules this enforces in code: project-tree entries are sorted byte-stably; the session date is date-only; tool order is byte-stable-sorted; Gemini tool-call ids are persisted, never re-minted, when rebuilding history.
+- **The production cache-health signal:** every turn logs `cache-health: turn complete` with the cache read/creation/uncached-input token split, the derived cache-read rate, and the cache-miss reason — so a prefix-cache regression in production is visible immediately. Document where it is emitted and how to read it (`LACE_LOG_LEVEL`).
+
+Add a one-line pointer to this doc from `docs/architecture/CODE-MAP.md` if that file has a docs index section (check; if it doesn't, skip).
+
+> This doc is the Step-0 slice of the eventual evergreen `docs/architecture/session-state.md`, which grows as the later layers (single reducer, index projection, conversation projection/snapshots) land. Keep this file focused on the cache-stability guardrails; the broader session-state model doc comes with those steps.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/design/step0-baseline.md
-git commit -m "docs(session-state): Step 0 baseline — guardrails in place, gates green"
+git add docs/architecture/prompt-cache-stability.md docs/architecture/CODE-MAP.md
+git commit -m "docs(architecture): prompt-cache stability guardrails (golden gates, determinism invariant, cache-health signal)"
 ```
 
 ---
