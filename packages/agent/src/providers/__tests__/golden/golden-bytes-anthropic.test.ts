@@ -8,6 +8,8 @@ import { describe, it, expect } from 'vitest';
 import { captureAnthropicBody } from './_capture-request-body';
 import { FIXTURES } from './_fixtures';
 
+// Pinned behavior: an orphaned tool_use (no matching tool_result) is emitted
+// verbatim — the current code does NOT synthesize a paired tool_result for it.
 describe('golden-bytes: Anthropic request body is pinned', () => {
   for (const fixture of FIXTURES) {
     it(`pins the Anthropic body for "${fixture.name}"`, async () => {

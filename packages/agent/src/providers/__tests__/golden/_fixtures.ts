@@ -86,4 +86,47 @@ export const FIXTURES: GoldenFixture[] = [
       { role: 'assistant', content: 'ok' },
     ],
   },
+  {
+    name: 'image-block',
+    systemPrompt: SYSTEM,
+    tools: [new EchoTool()],
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'what is this' },
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' },
+          },
+        ],
+      },
+      { role: 'assistant', content: 'an image' },
+    ],
+  },
+  {
+    name: 'orphaned-tool-block',
+    systemPrompt: SYSTEM,
+    tools: [new EchoTool()],
+    messages: [
+      { role: 'user', content: 'go' },
+      {
+        role: 'assistant',
+        content: '',
+        toolCalls: [{ id: 'call_orphan', name: 'echo', arguments: { v: 'y' } }],
+      },
+      // no matching tool_result — the converter/guard must handle this deterministically
+      { role: 'user', content: 'next question' },
+    ],
+  },
+  {
+    name: 'post-compaction-double-system',
+    systemPrompt: SYSTEM,
+    tools: [new EchoTool()],
+    messages: [
+      { role: 'user', content: 'summary of prior era' },
+      { role: 'assistant', content: 'acknowledged' },
+      { role: 'user', content: 'new turn after compaction' },
+    ],
+  },
 ];
