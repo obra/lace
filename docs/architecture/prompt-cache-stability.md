@@ -61,6 +61,40 @@ Just before the Anthropic request is serialized, `sanitizeLoneSurrogates`
 surrogates with U+FFFD so the body is valid JSON. It returns the same object when
 nothing changes, so it never perturbs a clean prefix.
 
+## One reducer
+
+Events become messages through a single pure reducer,
+`packages/agent/src/message-building/fold-event.ts` (`foldEvent(state, event)` and
+the `foldEvents(events)` batch wrapper). A turn's parallel tool calls fold into the
+canonical Anthropic parallel-tool form: **one assistant message carrying all
+`tool_use` blocks, followed by one user message carrying all `tool_result` blocks.**
+The reducer keeps message content verbatim (it never drops image blocks); a single
+`tool_use` event carries both the call and its result, so the reducer tracks the open
+tool batch to append a second parallel call to the same assistant and a second result
+to the same user.
+
+Three paths share this reducer, which is what makes the shape sent on one turn equal
+the shape rebuilt on the next:
+
+- `buildProviderMessagesFromDurableEvents` (`message-builder.ts`) — the batch rebuild
+  of the whole log.
+- `buildPreservedTail` (`compaction/toolkit.ts`) — the post-compaction tail folded
+  into a `context_compacted` event's `preserved` array.
+- The runner's live tail (`core/conversation/runner.ts`) — as a turn's tools execute,
+  results accumulate into one user message, matching the canonical shape.
+
+Because all three agree, an assistant turn with parallel tool calls serializes the
+same whether it was just sent or later rebuilt from the log, so the cached prefix
+holds across it. (Assistant text reaching a converter as a plain string and as a
+single-`text`-block array convert to byte-identical wire output — pinned by
+`assistant-content-normalization.test.ts` — so the rebuild's verbatim `ContentBlock[]`
+and the runner's string content are cache-equivalent.)
+
+A few concerns stay **outside** the reducer, layered around it by the batch rebuild
+only: system-prompt extraction; the `context_compacted` reset to the preserved array
+followed by `dropOrphanedToolBlocks` (the orphan-pair guard); and the
+`context_injected` text-merge into a trailing user message.
+
 ## The gates
 
 All gates live under `packages/agent/src/providers/__tests__/golden/` and

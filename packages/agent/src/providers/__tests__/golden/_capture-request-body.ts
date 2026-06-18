@@ -96,3 +96,73 @@ export async function captureAnthropicTwoTurn(): Promise<[string, string]> {
     await new Promise<void>((res, rej) => server.close((e) => (e ? rej(e) : res())));
   }
 }
+
+// Two consecutive turns whose shared history contains a PARALLEL-tool exchange in
+// the canonical shape (one assistant carrying both tool_use, one user carrying both
+// tool_result). Turn 2 only appends a longer tail, so turn 1's whole request is a
+// byte-prefix of turn 2's. Pins that the parallel-tool exchange serializes stably
+// across turns — the case that drifted before the event reducer was unified.
+export async function captureAnthropicTwoTurnParallel(): Promise<[string, string]> {
+  const { server, baseURL, captured } = await startServer((_b, n) =>
+    JSON.stringify({
+      id: `msg_${n}`,
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-sonnet-4-20250514',
+      content: [{ type: 'text', text: 'ok' }],
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: { input_tokens: 1, output_tokens: 1 },
+    })
+  );
+  try {
+    const provider = new AnthropicProvider({ apiKey: 'sk-test', baseURL });
+    provider.setSystemPrompt('You are Lace. Cached system block.');
+    const base = [
+      { role: 'user' as const, content: 'do two things' },
+      {
+        role: 'assistant' as const,
+        content: 'doing two things',
+        toolCalls: [
+          { id: 'c1', name: 'echo', arguments: { v: 'a' } },
+          { id: 'c2', name: 'echo', arguments: { v: 'b' } },
+        ],
+      },
+      {
+        role: 'user' as const,
+        content: '',
+        toolResults: [
+          {
+            id: 'c1',
+            content: [{ type: 'text' as const, text: 'a' }],
+            status: 'completed' as const,
+          },
+          {
+            id: 'c2',
+            content: [{ type: 'text' as const, text: 'b' }],
+            status: 'completed' as const,
+          },
+        ],
+      },
+    ];
+    await provider.createResponse(
+      [...base, { role: 'user', content: 'NEW1' }],
+      [],
+      'claude-sonnet-4-20250514'
+    );
+    await provider.createResponse(
+      [
+        ...base,
+        { role: 'user', content: 'NEW1' },
+        { role: 'assistant', content: 'NEWA1' },
+        { role: 'user', content: 'NEW2' },
+      ],
+      [],
+      'claude-sonnet-4-20250514'
+    );
+    if (captured.length !== 2) throw new Error(`expected 2 requests, got ${captured.length}`);
+    return [captured[0]!, captured[1]!];
+  } finally {
+    await new Promise<void>((res, rej) => server.close((e) => (e ? rej(e) : res())));
+  }
+}

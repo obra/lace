@@ -25,7 +25,7 @@ vi.mock('@google/genai', () => ({
 
 import { OpenAIProvider } from '@lace/agent/providers/openai-provider';
 import { GeminiProvider } from '@lace/agent/providers/gemini-provider';
-import { captureAnthropicTwoTurn } from './_capture-request-body';
+import { captureAnthropicTwoTurn, captureAnthropicTwoTurnParallel } from './_capture-request-body';
 
 const stripCacheControl = (s: string) => s.replace(/,?"cache_control":\{[^}]*\}/g, '');
 
@@ -98,5 +98,95 @@ describe('cross-turn cache stability: shared prefix is byte-stable', () => {
     expect(prefixFromObject(o1, 'contents', BASE.length)).toBe(
       prefixFromObject(o2, 'contents', BASE.length)
     );
+  });
+});
+
+// A parallel-tool exchange in the shared history must stay byte-stable across turns.
+// Before the event reducer was unified, the rebuilt shape (split assistant/user per
+// call) differed from the sent shape (one assistant + one user), so this prefix
+// drifted on every parallel-tool turn. Now both are the canonical shape, so turn 1's
+// whole request is a byte-prefix of turn 2's.
+const PARALLEL_BASE = [
+  { role: 'user' as const, content: 'do two things' },
+  {
+    role: 'assistant' as const,
+    content: 'doing two things',
+    toolCalls: [
+      { id: 'c1', name: 'echo', arguments: { v: 'a' } },
+      { id: 'c2', name: 'echo', arguments: { v: 'b' } },
+    ],
+  },
+  {
+    role: 'user' as const,
+    content: '',
+    toolResults: [
+      { id: 'c1', content: [{ type: 'text' as const, text: 'a' }], status: 'completed' as const },
+      { id: 'c2', content: [{ type: 'text' as const, text: 'b' }], status: 'completed' as const },
+    ],
+  },
+];
+const P_TURN1 = [...PARALLEL_BASE, { role: 'user' as const, content: 'NEW1' }];
+const P_TURN2 = [
+  ...PARALLEL_BASE,
+  { role: 'user' as const, content: 'NEW1' },
+  { role: 'assistant' as const, content: 'NEWA1' },
+  { role: 'user' as const, content: 'NEW2' },
+];
+
+// turn 1's SHARED HISTORY must be a byte-prefix of turn 2's request. We drop turn 1's
+// final message (the new user prompt) because that is the moving tail: Anthropic wraps
+// the tail's string content into a [{type:text,…}] block to attach a cache marker, so
+// the tail message is never part of the stable cached prefix — only the history before
+// it is. (The Step-0 cross-turn test sidesteps this the same way, comparing only the
+// deep base.) Here that history includes the parallel-tool exchange we are pinning.
+function assertPrefixOf(
+  turn1: unknown[],
+  turn2: unknown[],
+  normalize: (s: string) => string = (s) => s
+) {
+  const sharedHistory = turn1.slice(0, -1);
+  expect(normalize(JSON.stringify(turn2.slice(0, sharedHistory.length)))).toBe(
+    normalize(JSON.stringify(sharedHistory))
+  );
+}
+
+describe('cross-turn cache stability: a parallel-tool exchange stays byte-stable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreate.mockResolvedValue({
+      choices: [{ message: { content: 'ok', tool_calls: undefined }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+    });
+    mockGenerateContent.mockResolvedValue({
+      candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1, totalTokenCount: 2 },
+    });
+  });
+
+  it('Anthropic: turn 1 messages are a byte-prefix of turn 2 (markers stripped)', async () => {
+    const [t1, t2] = await captureAnthropicTwoTurnParallel();
+    const m1 = (JSON.parse(t1) as { messages: unknown[] }).messages;
+    const m2 = (JSON.parse(t2) as { messages: unknown[] }).messages;
+    assertPrefixOf(m1, m2, stripCacheControl);
+  });
+
+  it('OpenAI: turn 1 messages are a byte-prefix of turn 2', async () => {
+    const p = new OpenAIProvider({ apiKey: 'test-key', baseURL: 'http://localhost:8080/v1' });
+    p.setSystemPrompt('You are Lace. Cached system block.');
+    await p.createResponse(P_TURN1, [], 'gpt-4o');
+    const o1 = mockCreate.mock.calls.at(-1)![0] as { messages: unknown[] };
+    await p.createResponse(P_TURN2, [], 'gpt-4o');
+    const o2 = mockCreate.mock.calls.at(-1)![0] as { messages: unknown[] };
+    assertPrefixOf(o1.messages, o2.messages);
+  });
+
+  it('Gemini: turn 1 contents are a byte-prefix of turn 2', async () => {
+    const p = new GeminiProvider({ apiKey: 'test-api-key' });
+    p.setSystemPrompt('You are Lace. Cached system block.');
+    await p.createResponse(P_TURN1, [], 'gemini-2.5-flash');
+    const o1 = mockGenerateContent.mock.calls.at(-1)![0] as { contents: unknown[] };
+    await p.createResponse(P_TURN2, [], 'gemini-2.5-flash');
+    const o2 = mockGenerateContent.mock.calls.at(-1)![0] as { contents: unknown[] };
+    assertPrefixOf(o1.contents, o2.contents);
   });
 });
