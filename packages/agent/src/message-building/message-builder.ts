@@ -7,7 +7,7 @@ import { foldEvent, initialFoldState } from './fold-event';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
-import { readAllSessionEventLines } from '../storage/event-log';
+import { readParsedSessionEvents, type ParsedSessionEvent } from './parsed-events';
 
 // Typed shapes for parsing event data
 type TextBlock = { type: 'text'; text: string };
@@ -210,26 +210,17 @@ export type BuiltProviderMessages = {
  * event return systemPrompt: ''.
  */
 export function buildProviderMessagesFromDurableEvents(sessionDir: string): BuiltProviderMessages {
-  const lines = readAllSessionEventLines(sessionDir);
-  if (lines.length === 0) {
-    return { messages: [], systemPrompt: '' };
-  }
+  return buildProviderMessagesFromParsedEvents(readParsedSessionEvents(sessionDir));
+}
 
-  // Parse all lines once and reuse in both passes.
-  type ParsedEvent = { type: string; data: Record<string, unknown> };
-  const parsedEvents: ParsedEvent[] = [];
-  for (const line of lines) {
-    if (!line) continue;
-    try {
-      const parsed = JSON.parse(line) as { type?: string; data?: Record<string, unknown> };
-      const type = typeof parsed.type === 'string' ? parsed.type : '';
-      const data = typeof parsed.data === 'object' && parsed.data ? parsed.data : {};
-      parsedEvents.push({ type, data });
-    } catch {
-      // Ignore malformed lines.
-    }
-  }
-
+/**
+ * Pure core of buildProviderMessagesFromDurableEvents: derives the provider
+ * message prefix + system prompt from an already-parsed, sorted event array.
+ * No I/O — the durable log is read and parsed once by the caller.
+ */
+export function buildProviderMessagesFromParsedEvents(
+  parsedEvents: ParsedSessionEvent[]
+): BuiltProviderMessages {
   // Pass 1: determine systemPrompt from system_prompt_set events (last one wins).
   // The VALUE is last-wins over ALL events. The warning COUNT, however, is scoped
   // to the current compaction era: a post-compaction rerender legitimately
@@ -257,7 +248,6 @@ export function buildProviderMessagesFromDurableEvents(sessionDir: string): Buil
     // We still use the last value (defensive last-wins), but we surface the
     // violation so it can be investigated.
     logger.warn('Multiple system_prompt_set events found in session — invariant violation', {
-      sessionDir,
       count: systemPromptSetCount,
     });
   }

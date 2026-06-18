@@ -377,6 +377,22 @@ export function findLastTurnEndEventSeq(sessionDir: string): number | null {
   return last;
 }
 
+/**
+ * Pure core of findLastTurnEndEventSeq over an already-parsed event array.
+ * Takes an array so it needs no import — keeping event-log.ts free of any
+ * dependency on parsed-events.ts (which imports readAllSessionEventLines from
+ * here). Events are sorted ascending, so the last matching `turn_end` wins.
+ */
+export function findLastTurnEndSeqFromParsedEvents(
+  parsedEvents: { eventSeq: number; type: string }[]
+): number | null {
+  let last: number | null = null;
+  for (const e of parsedEvents) {
+    if (e.type === 'turn_end') last = e.eventSeq;
+  }
+  return last;
+}
+
 export type DurableEvent = {
   eventSeq: number;
   timestamp: string;
