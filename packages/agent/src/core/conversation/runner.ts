@@ -56,6 +56,8 @@ import {
 import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { injectNotification } from '@lace/agent/notifications/inject-notification';
+import { createInjectTailer, extractInjectedText } from '@lace/agent/storage/inject-tailer';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
 
 /**
  * Non-enumerable sentinel applied to errors thrown out of `executeToolCall`.
@@ -242,21 +244,6 @@ const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
 function hasFutureTenseIntent(text: string): boolean {
   if (!text) return false;
   return FUTURE_TENSE_INTENT_PATTERN.test(text);
-}
-
-/**
- * Extract concatenated text from a context_injected event's content blocks.
- * Mirrors message-builder.ts's handling: only text blocks contribute.
- */
-function extractInjectedText(content: unknown): string {
-  if (!Array.isArray(content)) return '';
-  const parts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== 'object') continue;
-    const b = block as { type?: unknown; text?: unknown };
-    if (b.type === 'text' && typeof b.text === 'string') parts.push(b.text);
-  }
-  return parts.join('\n');
 }
 
 /**
