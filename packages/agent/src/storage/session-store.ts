@@ -4,11 +4,13 @@ import * as os from 'node:os';
 import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
 import {
-  deriveNextEventSeqFromEventLog,
+  deriveNextEventSeqAcrossSessionFiles,
   invalidatePersonaCache,
   repairOrphanTurnStarts,
   summarizeDurableEvents,
 } from './event-log';
+import { withSessionLock } from './session-lock';
+import { reconcileHead } from './seq-head';
 import { atomicWriteJson } from './atomic-write';
 import { SessionStorageError } from '../errors/agent-errors';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
@@ -280,12 +282,23 @@ export function loadSession(sessionId: string, options?: LoadSessionOptions): Lo
   let state = readSessionState(sessionDir);
   ensureSessionFiles(sessionDir);
 
-  // events.jsonl is the durable source of truth; repair state.nextEventSeq on load.
-  const repairedNextEventSeq = deriveNextEventSeqFromEventLog(sessionDir);
-  if (state.nextEventSeq !== repairedNextEventSeq) {
-    state.nextEventSeq = repairedNextEventSeq;
-    writeSessionState(sessionDir, state);
-  }
+  // The per-session head file (<sessionDir>/.seq) is the seq authority. On open
+  // reconcile it monotonically against the JSONL: head = MAX(readHead()|0,
+  // MAX(JSONL)+1). This can only move the head UP, so a stale or lost head can
+  // never hand out a seq <= an existing JSONL seq. We do this under the
+  // per-session lock so a concurrent appender cannot land between the MAX(JSONL)
+  // scan and the head write. `state.nextEventSeq` is advisory/derived only —
+  // it no longer drives seq assignment and we do NOT rewrite state.json merely
+  // to "repair" it (which, once gaps exist, would rewrite on every open).
+  const canonicalSessionId = path.basename(sessionDir);
+  const laceDir = getLaceDir();
+  const reconciledHead = withSessionLock(sessionDir, () =>
+    reconcileHead(
+      sessionDir,
+      () => deriveNextEventSeqAcrossSessionFiles(laceDir, canonicalSessionId) - 1
+    )
+  );
+  state.nextEventSeq = reconciledHead;
 
   if (options?.repairOrphanTurnStarts) {
     // Crash recovery: if the prior process died between turn_start and turn_end

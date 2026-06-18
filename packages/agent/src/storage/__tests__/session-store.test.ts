@@ -22,6 +22,7 @@ import {
   writeSessionState,
 } from '../session-store';
 import { deriveNextEventSeqFromEventLog } from '../event-log';
+import { readHead } from '../seq-head';
 import { fsOps } from '../atomic-write';
 
 // Valid session ID format: sess_<uuid>
@@ -326,6 +327,79 @@ describe('storage/session-store', () => {
 
     const read = readSessionMeta(sessionDir);
     expect(read.persona).toBeUndefined();
+  });
+
+  it('does NOT rewrite state.json on load when the seq head/JSONL have a gap', () => {
+    // The head file is the seq authority. A burned reserve (crash between
+    // reserve-before-append) leaves the head ABOVE MAX(JSONL)+1, and the JSONL
+    // carries a gap. The old loadSession repair compared state.nextEventSeq to
+    // MAX(JSONL)+1 and rewrote state.json on every mismatch — perpetually
+    // rewriting once gaps exist. loadSession must now reconcile the head
+    // (monotonic-up) and NOT rewrite state.json just to "repair" nextEventSeq.
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    writeSessionMeta(sessionDir, {
+      sessionId: TEST_SESSION_ID,
+      workDir: '/tmp',
+      created: '2026-01-04T00:00:00Z',
+    });
+    ensureSessionFiles(sessionDir);
+
+    // JSONL with a gap at seq 3 (MAX=4 → deriveNextEventSeqFromEventLog=5).
+    const eventsPath = join(sessionDir, 'events.jsonl');
+    const lines = [1, 2, 4].map((seq) => ({
+      eventSeq: seq,
+      timestamp: '2026-01-04T00:00:0' + seq + 'Z',
+      type: 'message',
+      data: { content: 'x' },
+    }));
+    writeFileSync(eventsPath, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`, 'utf8');
+
+    // Head is ahead of MAX(JSONL)+1 because a later reserve was burned.
+    writeFileSync(join(sessionDir, '.seq'), '6', 'utf8');
+    // state.json carries a nextEventSeq that does NOT equal MAX(JSONL)+1 — the
+    // exact condition that triggered the old repair-rewrite.
+    writeSessionState(sessionDir, { nextEventSeq: 6, nextStreamSeq: 1 });
+
+    // Spy on the atomic rename so any state.json rewrite is caught.
+    const statePath = join(sessionDir, 'state.json');
+    const renames: string[] = [];
+    const originalRenameSync = fsOps.renameSync;
+    vi.spyOn(fsOps, 'renameSync').mockImplementation((from, to) => {
+      renames.push(String(to));
+      return (originalRenameSync as any)(from as any, to as any);
+    });
+
+    loadSession(TEST_SESSION_ID);
+
+    // No state.json rewrite happened on load.
+    expect(renames.some((p) => path.resolve(p) === path.resolve(statePath))).toBe(false);
+    // The head reconciled monotonic-up: stays at 6 (above MAX(JSONL)+1 = 5).
+    expect(readHead(sessionDir)).toBe(6);
+  });
+
+  it('reconciles the head up to MAX(JSONL)+1 on load when the stored head is stale/low', () => {
+    // A lost/un-fsync'd head write (or a session that never had a head) must be
+    // floored at MAX(JSONL)+1 so it can never hand out a seq <= an existing one.
+    const sessionDir = getSessionDir(TEST_SESSION_ID);
+    writeSessionMeta(sessionDir, {
+      sessionId: TEST_SESSION_ID,
+      workDir: '/tmp',
+      created: '2026-01-04T00:00:00Z',
+    });
+    ensureSessionFiles(sessionDir);
+
+    const eventsPath = join(sessionDir, 'events.jsonl');
+    const lines = [1, 2, 3].map((seq) => ({
+      eventSeq: seq,
+      timestamp: '2026-01-04T00:00:0' + seq + 'Z',
+      type: 'message',
+      data: { content: 'x' },
+    }));
+    writeFileSync(eventsPath, `${lines.map((l) => JSON.stringify(l)).join('\n')}\n`, 'utf8');
+    // No .seq file at all → reconcile must seed it to MAX(JSONL)+1 = 4.
+
+    loadSession(TEST_SESSION_ID);
+    expect(readHead(sessionDir)).toBe(4);
   });
 
   it('derives nextEventSeq from durable event log even when final JSONL line is truncated', () => {
