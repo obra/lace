@@ -73,12 +73,15 @@ forward as events are appended — never rebuilt by rescanning. We have three:
     and the runner's inline `tool_result` construction). Step 1 *unifies* them.
     Until they're unified, "the batch rebuild and the incremental update are the
     same function" is not yet true — that's work, not a given.
-- **Index projection** → the cheap discriminators a turn needs: next event seq,
-  last `turn_end` seq, idempotency keys, pending immediate injects, turn_end
-  dedup. **Full history, not windowed** — dedup and idempotency must see turnIds
-  and keys from *before* the last compaction, even though the conversation
-  projection is windowed to the current era. Stored cross-process (SQLite/WAL),
-  so it is also the coherence point between processes.
+- **Index projection** → discriminators + the verbatim event line. The
+  discriminators (next seq, last `turn_end` seq, idempotency keys, pending
+  immediate injects, turn_end dedup) answer most queries with a column lookup —
+  but idempotency compares the full prompt *content* (`classifyPromptHandoff`
+  does a deep-equal on the prompt body), so the index must also carry the
+  verbatim event line, not just columns. **Full history, not windowed** — dedup
+  and idempotency must see turnIds and content from *before* the last compaction,
+  even though the conversation projection is windowed to the current era. Stored
+  cross-process (SQLite/WAL).
 - **Recall projection** → full-text search. Already exists; stays separate;
   allowed to be lossy/redacted because it is not on the context path.
 
@@ -91,12 +94,24 @@ detectors below, because a wrong-but-well-formed projection is the dangerous cas
 **Cross-process coherence.** The in-memory projection is valid only while this
 process both holds the lock *and* the log tip hasn't advanced under it. Subagents
 and peers append to the same log from other processes (injects are a live path).
-So the read path keeps **one O(1) check**: read the last event seq (the tail of
-the newest shard, or the index's max), and if it's beyond what the projection has
-applied, rebuild. This is the deliberate exception to "never read the log on the
-hot path" — it's O(1), not O(events), and it's what makes Step 6 safe. The seq
-*authority* stays the disk tail-read, never a best-effort index (a missing index
-row returns a plausible-but-low number that "bypass on corruption" can't catch).
+So the read path keeps **one cheap check**: read the session's current max event
+seq, and if it's beyond what the projection has applied, rebuild.
+
+Getting that check actually cheap is an unsolved detail today, not a settled
+property — and the spec should say so. Events are sharded across
+`persona/date/` files with filesystem-dependent ordering, so "read the tail of
+the newest shard" is wrong (a cross-midnight or other-persona append lands the
+max seq elsewhere), and no seek-from-end reader exists yet, so today's derive is
+O(events). The fix is a design decision to make explicitly, not hand-wave: a
+per-session **monotonic head** (a tiny pointer holding the max seq, updated and
+fsync'd with every append, read O(1)), or the lock-consistent index's `MAX(seq)`,
+or de-sharding to one append log per session. Whatever we pick must be
+cross-process authoritative for *assigning* the next seq (the current
+disk-derive is correct precisely because it sees every process's appends; a
+per-process in-memory counter or a best-effort index is not — it can hand out a
+duplicate/low seq and corrupt the log). Resolve this before building Step 3/6;
+it is the linchpin of cross-process safety, and it is the part most likely to be
+wrong if rushed.
 
 ### Layer 3 — Context assembly (provider-neutral stable inputs, watched bytes)
 
@@ -121,16 +136,32 @@ provider's caching wants, even though the mechanism differs:
 
 So the architecture's job is the **stable neutral prefix + a deterministic
 per-provider conversion**; the cache *mechanism* lives in each provider adapter.
-A session can even switch providers (`modelId`/`connectionId` change) without
-invalidating the projection — the neutral prefix is the durable thing; the
-converted+cached form is derived per request, per provider.
+A session that switches providers (`modelId`/`connectionId` change) keeps its
+**projection** but loses its **cache**: each provider serializes a different
+prefix shape (Anthropic uses a `system` field, OpenAI prepends a `system` chat
+message, Gemini uses `systemInstruction`; tool schemas differ too) into a
+different cache namespace, so a switch cold-starts caching. The projection
+surviving is what makes the switch cheap to *assemble*; it does not preserve the
+cache.
 
 What we add is not a byte-splicer; it is:
 
 - **A determinism invariant (below)** on the inputs (and on each converter), so
   the prefix really is stable.
-- **A golden-bytes test, run per provider**, that captures each provider's literal
-  serialized body and fails on any prefix drift.
+- **Two golden-bytes gates, per provider** — because "byte-identical" means two
+  different things and the literal body legitimately changes turn-to-turn for the
+  marker providers:
+  - *refactor-equivalence*: the old full-scan path and the new projection path
+    produce the **same** serialized body for the same inputs — full
+    `Buffer.equals`, markers and all. This is the gate that proves the refactor
+    is safe.
+  - *cross-turn cache-stability*: turn N and turn N+1 with an unchanged prefix
+    produce the same prefix bytes **after stripping `cache_control` markers**.
+    For Anthropic/Bedrock the roving anchor marker moves *inside* the prefix every
+    turn (so a raw `Buffer.equals` over the literal body would fail every turn,
+    falsely); the existing `cache-control-byte-stable` test already strips markers
+    for exactly this reason. OpenAI has no markers, so its prefix compares whole.
+    Drift here — after stripping — is the real cache regression.
 - **A runtime cache-health signal** (provider-reported cache read/write per turn,
   for providers that report it) so drift in prod is visible immediately.
 
@@ -161,8 +192,10 @@ O(tail-since-compaction), not O(events-ever). Be precise about the win:
 1. The log is the only durable truth. Projections, snapshots, and indexes are
    derived and rebuildable.
 2. Nothing reads the full log on the hot path. The only per-turn log touch is the
-   O(1) tip-check for cross-process coherence. Full scans exist for cold rebuild
-   and as the test oracle.
+   cheap max-seq tip-check for cross-process coherence (see Layer 2 — making it
+   actually cheap is an open design item). Full scans (the O(events) re-derive)
+   are for cold rebuild, the sampled canary (Invariant 6), and the test oracle —
+   never per turn.
 3. One reducer for events → the message prefix. The batch rebuild and the
    incremental update are the same function. The conversation projection models
    the persisted prefix only; the runner's non-persisted live-tail mutations are
@@ -178,14 +211,30 @@ O(tail-since-compaction), not O(events-ever). Be precise about the win:
    message converter** — are **byte-deterministic** (no timestamps, no
    nondeterministic ordering, stable cwd handling). This is load-bearing — every
    provider's cache rests on it — and it must be tested directly, per converter.
-6. Any derived store can be bypassed. Divergence must be *detected* (the tip-check
-   and a prod divergence guard, not only a dev/CI check), then fall back to a full
-   rebuild. No derived store is ever load-bearing for correctness, and a
-   wrong-but-well-formed projection must not reach the wire silently.
+   One known landmine: the Gemini converter decodes a tool name from an id minted
+   with `Date.now()/Math.random()`; it is deterministic *only* because that id is
+   persisted verbatim in the event and never regenerated. Any path that re-mints
+   it breaks the prefix. The per-converter determinism test must cover this.
+6. Any derived store can be bypassed. There are **two distinct detectors**, and
+   conflating them is a mistake: (a) *cross-process staleness* — the cheap max-seq
+   tip-check; if the tip advanced past what the projection applied, rebuild. This
+   is the frequent case (every cross-process inject) and must stay cheap. (b)
+   *reducer divergence* — the rare bug where the incremental fold disagrees with
+   the batch fold; caught by a **sampled canary** that does a full re-derive and
+   compares, infrequently (a timer or 1-in-N turns), accepting its O(events) cost
+   precisely because it is rare. Do **not** trigger the full re-derive on every
+   tip-change — that reintroduces the O(events) cost on the hot path. A wrong-but-
+   well-formed projection must not reach the wire silently; the canary plus the
+   prod cache-health signal are what catch it where fixtures can't.
 7. Seq derivation is disk-authoritative (tail-read), never a best-effort index.
 8. Snapshots are written under the per-session lock, consistent with the log
-   append. Crash recovery may *append* synthesized `turn_end` events, so
-   "snapshot == log" is defined against the post-recovery log.
+   append. Crash recovery may *append* synthesized `turn_end` events
+   (`repairOrphanTurnStarts`), so "snapshot == log" is defined against the
+   post-recovery log — and recovery must run to completion within the cold-open
+   lock *before* any snapshot is trusted or compared. This matters for the
+   **index** projection (turn_end dedup/watermark change when a turn_end is
+   appended); the conversation projection happens to be unaffected only because
+   it has no `turn_end` case — don't rely on that coincidence for the index.
 9. Multi-process is first-class: the log is the cross-process truth, the index
    (full-history, WAL) is the cross-process queryable projection and coherence
    point, in-memory state is per-process and validated by the tip-check.
@@ -205,16 +254,31 @@ shippable, and measured before the next. Do not skip and do not reorder.
   wall-clock, cwd echo, skill enumeration) and assert byte-equality (Invariant 5).
 - **Prod cache-health signal**: log actual cache read/write tokens per turn on
   Ada, so a prefix regression is visible immediately instead of three weeks later.
-  (Do *not* bother pinning `countTokensExplicit` — it has no production caller;
-  the compaction-pressure path uses real Anthropic usage numbers.)
+  (Correction to rev2: `countTokensExplicit` is **not** dead — it is live on the
+  OpenAI no-usage fallback path (`openai-provider.ts` calls `_countTokensImpl`
+  directly), where it independently re-serializes the wire shape. So it *is* in
+  the determinism net for OpenAI-compatible providers and the per-converter
+  golden test must cover it; it is unused for Anthropic. The earlier "dead code"
+  claim was an Anthropic-only fact wrongly generalized — twice now; don't.)
 This step is the gate every later step passes through.
 
-**Step 1 — One reducer.** Unify the three event→message coalescers into a single
-pure `foldEvent` over the persisted events. Prove `fold-incremental ==
-fold-batch` with a differential test and a fuzz harness; expect it to surface
-real shape differences (e.g. one coalesced user message vs. N) that the
-unification must resolve. Zero behavior change on the wire; fully covered by
-Step 0.
+**Step 1 — One reducer.** Unify the three event→message coalescers
+(`message-builder.ts`, `compaction/toolkit.ts buildPreservedTail`, and the
+runner's inline `tool_result` construction) into a single pure `foldEvent`. Prove
+`fold-incremental == fold-batch` with a differential test and a fuzz harness.
+
+This is **not** a zero-behavior-change refactor, and the spec was wrong to call
+it one: today the runner emits *one user message per tool result* on a
+parallel-tool turn, while the batch rebuild *coalesces* them into one user
+message with N `tool_result` blocks — a genuinely different wire shape. Unifying
+picks one canonical shape, which changes the live-tail bytes for those turns
+(it's in the tail, not the cached prefix, so it doesn't bust the prefix cache —
+but it *is* a wire change, gated by the refactor-equivalence golden test as a
+deliberate change). Worth flagging the deeper smell this exposes: because sent
+shape (N) and rebuilt shape (1) already differ today, the prefix a later turn
+rebuilds may not match what was actually sent on the parallel-tool turn —
+i.e. there may already be a latent cache break at those boundaries. Investigate
+that while unifying.
 
 **Step 2 — Buy time (surgical).** Not the architecture — the thing that makes Ada
 usable in days. Replace the per-write full-scan seq derive with a tail-read (the
@@ -256,17 +320,19 @@ serializer. Byte stability comes from stable inputs + the gate, per Layer 3.)
 
 ## How we know it's right (the test contract)
 
-- **Golden-bytes, per provider** (Step 0): for each converter (Anthropic, OpenAI,
-  Gemini, Bedrock), the serialized request body is byte-identical across the
-  refactor and across turns for an unchanged prefix. The non-negotiable gate.
+- **Golden-bytes, per provider, two gates** (Step 0): for each converter,
+  (a) refactor-equivalence — old path vs new path, same inputs, full
+  `Buffer.equals`; and (b) cross-turn cache-stability — turn N vs N+1,
+  markers stripped (Anthropic/Bedrock) or whole (OpenAI). The non-negotiable gate.
 - **Render-determinism** (Step 0): system + tools + each provider's converter
   render to identical bytes regardless of wall-clock/cwd/enumeration (Invariant 5).
 - **Reducer equivalence** (Step 1): incremental fold equals batch fold, fuzzed.
 - **Snapshot round-trip** (Step 4): rebuild-from-snapshot equals rebuild-from-
   post-recovery-log, byte-for-byte.
-- **Prod divergence guard** (Step 4): re-derive vs. in-memory on tip-change or a
-  sample, in production, alarm on mismatch. Catches the divergence a fixture
-  can't.
+- **Sampled canary** (Step 4): a *rare* full re-derive vs. the in-memory
+  projection, in production, alarm on mismatch — catches a reducer bug a fixture
+  can't. Rare on purpose (it's O(events)); it is **not** the cross-process
+  staleness check (that's the cheap tip-check, run every turn).
 - **Prod cache-health signal** (Step 0): cache read rate and per-turn read cost
   graphed; a regression shows up immediately.
 
@@ -283,7 +349,30 @@ serializer. Byte stability comes from stable inputs + the gate, per Layer 3.)
   converters and per-provider cache mechanisms are provider-specific, and they
   live behind the provider adapter, not in the core.
 
-## What review changed (revision 1 → 2)
+## What review changed
+
+**Revision 2 → 3** (second adversarial round, on the rev2 changes): the recurring
+fault was over-claiming, and the reviewers caught it every time. Fixed: the
+"O(1) tip-check / tail of the newest shard" was wrong (events are sharded across
+persona/date with filesystem-dependent order; no seek-from-end reader exists) —
+now framed as an explicit open design item (a per-session monotonic head, or the
+lock-consistent index max, or de-sharding). The `Buffer.equals` golden gate over
+"the literal body" is unimplementable for the marker providers (the anchor marker
+moves inside the prefix every turn) — split into *refactor-equivalence* (full
+bytes) and *cross-turn stability* (markers stripped). `countTokensExplicit` is
+**live** on the OpenAI no-usage path — the rev2 "dead code" claim was wrong
+(an Anthropic-only fact generalized; the second time that bit, now logged). Step 1
+is **not** a zero-wire-change refactor — unifying the three coalescers changes the
+parallel-tool-turn shape (N user messages vs 1) and may expose a pre-existing
+sent-vs-rebuilt cache break. The divergence guard split into a cheap per-turn
+staleness tip-check vs a rare sampled reducer-bug canary (re-deriving on every
+tip-change reintroduced O(events)). Plus: provider switch keeps the projection
+but loses the cache; the index carries the verbatim line (idempotency deep-equals
+content); recovery must finish before any snapshot compare (matters for the index);
+and the Gemini converter's `Date.now()/Math.random()` tool-id is a named
+determinism landmine.
+
+**Revision 1 → 2** (first adversarial round)
 
 Two competing adversarial reviews found, and the code confirmed: (1) the old
 Step 5 "seal pre-serialized prefix bytes + concatenate" is unbuildable against an
@@ -301,8 +390,8 @@ coalescers; and `countTokensExplicit` is dead code, dropped from the threat mode
 
 ## The one-line summary
 
-The log is the truth and is read on the hot path only as an O(1) tip-check;
-everything a turn needs is a projection kept current as events append; compaction
+The log is the truth and is read on the hot path only as a cheap max-seq
+tip-check; everything a turn needs is a projection kept current as events append; compaction
 seals the message era so per-turn rebuild cost is O(tail-since-compaction) and
 resets; and byte-identity of the cached prefix is held by deterministic inputs, a
 golden test, and a production cache-health guard — not by freezing bytes.
