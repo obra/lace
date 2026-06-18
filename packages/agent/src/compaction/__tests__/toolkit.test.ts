@@ -324,15 +324,10 @@ describe('buildPreservedTail', () => {
     expect(tail[0].role).toBe('user');
   });
 
-  it('coalesces consecutive tool_use events: appends toolCalls to prev assistant, toolResults to prev user', () => {
-    // Two consecutive tool_use events with results:
-    // tc1 → [assistant(tc1), user(tc1-result)]
-    // tc2 → last is user (with results), so new assistant created; result coalesces
-    //   into prior user-with-results → [assistant(tc1), user(tc1+tc2 results), assistant(tc2)]
-    // Actually: tc2 sees last=user-with-results, creates new assistant. Then tc2's result
-    // sees last=assistant (no results), so new user entry: [ast(tc1), usr(tc1-result), ast(tc2), usr(tc2-result)]
-    // The key behavior: tool_use coalesces toolCall into prev assistant, toolResult into
-    // prev user-with-results (if any). With interleaved results, each pair is separate.
+  it('coalesces consecutive tool_use events into the canonical parallel-tool shape', () => {
+    // Canonical parallel-tool shape: a turn's calls fold into ONE assistant carrying
+    // all tool_use blocks, followed by ONE user carrying all tool_result blocks (the
+    // Anthropic form the runner now sends, so the preserved tail matches it).
     const events: TypedDurableEvent[] = [
       event(
         1,
@@ -358,15 +353,12 @@ describe('buildPreservedTail', () => {
       ),
     ];
     const tail = buildPreservedTail(events);
-    // Each tool_use with a result produces: assistant(toolCall) + user(toolResult)
-    // The second tool_use sees last=user-with-results so creates new assistant.
-    // Result: [assistant(tc1), user(tc1-result), assistant(tc2), user(tc2-result)]
-    const assistants = tail.filter((e) => e.role === 'assistant');
-    const users = tail.filter((e) => e.role === 'user' && Array.isArray(e.toolResults));
-    expect(assistants.length).toBe(2);
-    expect(users.length).toBe(2);
-    expect(assistants[0].toolCalls?.[0]).toMatchObject({ id: 'tc1', name: 'bash' });
-    expect(assistants[1].toolCalls?.[0]).toMatchObject({ id: 'tc2', name: 'bash' });
+    // One assistant with both calls, one user with both results.
+    expect(tail.length).toBe(2);
+    expect(tail[0].role).toBe('assistant');
+    expect(tail[0].toolCalls?.map((c) => c.id)).toEqual(['tc1', 'tc2']);
+    expect(tail[1].role).toBe('user');
+    expect(tail[1].toolResults?.map((r) => r.id)).toEqual(['tc1', 'tc2']);
   });
 
   it('coalesces multiple tool_calls into one assistant entry when no results interleave', () => {
