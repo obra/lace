@@ -139,15 +139,18 @@ const P_TURN2 = [
 // the tail message is never part of the stable cached prefix — only the history before
 // it is. (The Step-0 cross-turn test sidesteps this the same way, comparing only the
 // deep base.) Here that history includes the parallel-tool exchange we are pinning.
-function assertPrefixOf(
+// Returns [turn2-prefix, turn1-shared-history] for a byte-equality assertion in the
+// test body (keeping `expect` in the test satisfies vitest/expect-expect).
+function sharedHistoryPair(
   turn1: unknown[],
   turn2: unknown[],
   normalize: (s: string) => string = (s) => s
-) {
+): [string, string] {
   const sharedHistory = turn1.slice(0, -1);
-  expect(normalize(JSON.stringify(turn2.slice(0, sharedHistory.length)))).toBe(
-    normalize(JSON.stringify(sharedHistory))
-  );
+  return [
+    normalize(JSON.stringify(turn2.slice(0, sharedHistory.length))),
+    normalize(JSON.stringify(sharedHistory)),
+  ];
 }
 
 describe('cross-turn cache stability: a parallel-tool exchange stays byte-stable', () => {
@@ -167,7 +170,8 @@ describe('cross-turn cache stability: a parallel-tool exchange stays byte-stable
     const [t1, t2] = await captureAnthropicTwoTurnParallel();
     const m1 = (JSON.parse(t1) as { messages: unknown[] }).messages;
     const m2 = (JSON.parse(t2) as { messages: unknown[] }).messages;
-    assertPrefixOf(m1, m2, stripCacheControl);
+    const [got, want] = sharedHistoryPair(m1, m2, stripCacheControl);
+    expect(got).toBe(want);
   });
 
   it('OpenAI: turn 1 messages are a byte-prefix of turn 2', async () => {
@@ -177,7 +181,8 @@ describe('cross-turn cache stability: a parallel-tool exchange stays byte-stable
     const o1 = mockCreate.mock.calls.at(-1)![0] as { messages: unknown[] };
     await p.createResponse(P_TURN2, [], 'gpt-4o');
     const o2 = mockCreate.mock.calls.at(-1)![0] as { messages: unknown[] };
-    assertPrefixOf(o1.messages, o2.messages);
+    const [got, want] = sharedHistoryPair(o1.messages, o2.messages);
+    expect(got).toBe(want);
   });
 
   it('Gemini: turn 1 contents are a byte-prefix of turn 2', async () => {
@@ -187,6 +192,7 @@ describe('cross-turn cache stability: a parallel-tool exchange stays byte-stable
     const o1 = mockGenerateContent.mock.calls.at(-1)![0] as { contents: unknown[] };
     await p.createResponse(P_TURN2, [], 'gemini-2.5-flash');
     const o2 = mockGenerateContent.mock.calls.at(-1)![0] as { contents: unknown[] };
-    assertPrefixOf(o1.contents, o2.contents);
+    const [got, want] = sharedHistoryPair(o1.contents, o2.contents);
+    expect(got).toBe(want);
   });
 });
