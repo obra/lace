@@ -524,6 +524,7 @@ export function registerSessionOperationHandlers(
           previousTokens,
           currentTokens: previousTokens,
           messagesCompacted: 0,
+          strategy: name,
         };
       }
 
@@ -555,6 +556,7 @@ export function registerSessionOperationHandlers(
         previousTokens,
         currentTokens,
         messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
+        strategy: name,
       };
     });
   });

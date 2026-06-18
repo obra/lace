@@ -198,6 +198,7 @@ export class ProjectVariableProvider implements VariableProvider {
       const items = fs
         .readdirSync(dir, { withFileTypes: true })
         .filter((item) => !item.name.startsWith('.') && item.name !== 'node_modules')
+        .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
         .slice(0, 20); // Limit number of items
 
       const indent = '  '.repeat(currentDepth);

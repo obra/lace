@@ -24,6 +24,7 @@ import {
   readDurableEvents,
   summarizeDurableEvents,
 } from '../event-log';
+import { readHead } from '../seq-head';
 import { closeRecallIndex, getRecallIndex } from '../recall/index-db';
 import { writeSessionMeta } from '../session-store';
 
@@ -634,6 +635,77 @@ describe('storage/event-log', () => {
 
         expect(written.eventSeq).toBe(6); // disk-derived, correct
         expect(nextState.nextEventSeq).toBe(7); // must track disk, not state+1
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('seq parity: first append seeds the head to the value the old scan assigned', () => {
+      // The locked head reserve must hand out exactly the seq the old
+      // deriveNextEventSeqAcrossSessionFiles full-scan would have assigned, and
+      // leave the head file at next-free (reserved + 1).
+      const laceDir = mkdtempSync(join(tmpdir(), 'lace-seqparity-'));
+      process.env.LACE_DIR = laceDir;
+      const sessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', sessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({ sessionId, workDir: laceDir, created: 'x', persona: 'ada' })
+      );
+      invalidatePersonaCache(sessionDir);
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const transcriptDir = join(laceDir, 'transcripts', 'ada', today);
+        mkdirSync(transcriptDir, { recursive: true });
+        writeFileSync(
+          join(transcriptDir, `${sessionId}.jsonl`),
+          [1, 2, 3, 4, 5, 6, 7]
+            .map((seq) =>
+              JSON.stringify({
+                eventSeq: seq,
+                timestamp: 'x',
+                type: 'prompt',
+                data: { type: 'prompt', content: [] },
+              })
+            )
+            .join('\n') + '\n'
+        );
+
+        // What the OLD code would have assigned for the next append.
+        const oldAssigned = deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId);
+        expect(oldAssigned).toBe(8);
+
+        const { written } = appendDurableEvent(
+          sessionDir,
+          { nextEventSeq: 1, nextStreamSeq: 1 },
+          { type: 'message', data: {} }
+        );
+        // Parity: the new locked head reserve assigns exactly the old value.
+        expect(written.eventSeq).toBe(oldAssigned);
+        // Head file now at next-free.
+        expect(readHead(sessionDir)).toBe(oldAssigned + 1);
+      } finally {
+        rmSync(laceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('two sequential appends get strictly increasing seqs and the head ends at next-free', () => {
+      const { laceDir, sessionDir } = makeTestSessionDirs('ada');
+      process.env.LACE_DIR = laceDir;
+      invalidatePersonaCache();
+      try {
+        const a = appendDurableEvent(
+          sessionDir,
+          { nextEventSeq: 1, nextStreamSeq: 1 },
+          { type: 'prompt', data: {} }
+        );
+        const b = appendDurableEvent(sessionDir, a.nextState, { type: 'message', data: {} });
+        expect(a.written.eventSeq).toBe(1);
+        expect(b.written.eventSeq).toBe(2);
+        expect(b.written.eventSeq).toBeGreaterThan(a.written.eventSeq);
+        // Head is next-free after the last reserve.
+        expect(readHead(sessionDir)).toBe(3);
       } finally {
         rmSync(laceDir, { recursive: true, force: true });
       }

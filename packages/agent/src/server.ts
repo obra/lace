@@ -128,6 +128,7 @@ export function createAgentServerState(): AgentServerState {
     pendingPermissionRequests: new Map(),
     sessionMutex: Promise.resolve(),
     toolExecutorCache: new Map(),
+    projectionCache: new Map(),
     personaRegistry: defaultPersonaRegistry,
     environmentRegistry: defaultEnvironmentRegistry,
     containerMounts: {},

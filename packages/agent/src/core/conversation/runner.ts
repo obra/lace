@@ -3,7 +3,7 @@
 // calls, tool execution, permission handling, and event persistence.
 
 import { randomUUID } from 'node:crypto';
-import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
+import { join, basename, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
@@ -22,15 +22,16 @@ import {
 } from '@lace/agent/storage/session-store';
 import {
   appendDurableEvent,
-  findLastTurnEndEventSeq,
   readDurableEvents,
   type DurableEvent,
 } from '@lace/agent/storage/event-log';
-import { deriveFilesReadFromDurableEvents } from '@lace/agent/storage/files-from-events';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
-import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
+import { projectTurnEntry } from '@lace/agent/message-building/incremental-projection';
 import { appendOrMergeUser } from '@lace/agent/message-building/append-or-merge';
 import { bashSchema } from '@lace/agent/tools/implementations/bash';
+import { digestToolResultText } from '@lace/agent/tools/result-digest';
+import { writeToolResultSidecar } from '@lace/agent/storage/tool-result-store';
 import {
   toNonEmptyString,
   toolKindFromName,
@@ -46,6 +47,7 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
+import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
 import { computePressure, evaluateBreakpoints } from './compaction-trigger';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import {
@@ -55,6 +57,8 @@ import {
 import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { injectNotification } from '@lace/agent/notifications/inject-notification';
+import { createInjectTailer, extractInjectedText } from '@lace/agent/storage/inject-tailer';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
 
 /**
  * Non-enumerable sentinel applied to errors thrown out of `executeToolCall`.
@@ -244,18 +248,53 @@ function hasFutureTenseIntent(text: string): boolean {
 }
 
 /**
- * Extract concatenated text from a context_injected event's content blocks.
- * Mirrors message-builder.ts's handling: only text blocks contribute.
+ * Cap an oversized tool result in place. The text content blocks are concatenated
+ * and digested; if anything was elided, the full payload is spilled to a per-session
+ * sidecar (when a sessionId is available) and the text blocks are replaced with a
+ * single digest block. Non-text blocks (images, resources) are preserved and never
+ * measured. Results at or below the ride-whole budget are left untouched.
+ *
+ * `read_tool_result`'s own output is excluded: it is already bounded by its args,
+ * and digesting it would defeat paging through the sidecar.
  */
-function extractInjectedText(content: unknown): string {
-  if (!Array.isArray(content)) return '';
-  const parts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== 'object') continue;
-    const b = block as { type?: unknown; text?: unknown };
-    if (b.type === 'text' && typeof b.text === 'string') parts.push(b.text);
+function capToolResult(params: {
+  coreResult: CoreToolResult;
+  toolName: string;
+  toolCallId: string;
+  sessionId: string;
+}): void {
+  const { coreResult, toolName, toolCallId, sessionId } = params;
+  if (toolName === 'read_tool_result') return;
+
+  const content = coreResult.content;
+  if (!Array.isArray(content) || content.length === 0) return;
+
+  const textBlocks = content.filter((b) => b.type === 'text' && typeof b.text === 'string');
+  if (textBlocks.length === 0) return;
+
+  const fullText = textBlocks.map((b) => b.text ?? '').join('');
+  const digest = digestToolResultText(fullText, toolCallId);
+  if (digest.elidedBytes === 0) return;
+
+  // Spill the full payload to the sidecar so read_tool_result can page it back.
+  // Without a sessionId we can't place the sidecar; still inline-truncate so the
+  // cap holds, but skip writing a stray file.
+  if (sessionId) {
+    try {
+      writeToolResultSidecar(sessionId, toolCallId, fullText);
+    } catch (err) {
+      logger.error('runner: failed to write tool-result sidecar', {
+        err: err instanceof Error ? err.message : String(err),
+        toolName,
+        toolCallId,
+      });
+    }
   }
-  return parts.join('\n');
+
+  // Replace the run of text blocks with a single digest block, preserving any
+  // non-text blocks (and their relative order against the digest's position).
+  const nonTextBlocks = content.filter((b) => !(b.type === 'text' && typeof b.text === 'string'));
+  coreResult.content = [{ type: 'text', text: digest.text }, ...nonTextBlocks];
 }
 
 /**
@@ -266,8 +305,12 @@ function extractInjectedText(content: unknown): string {
  * calls ent/session/inject, which writes a context_injected event with
  * priority='immediate'. Without this re-read, the runner would only pick that
  * event up on the NEXT turn — functionally identical to queueing.
+ *
+ * The runner now reads immediate injects via the incremental InjectTailer; this
+ * full-scan reader is retained as the behavioral-equivalence oracle for the
+ * tailer's differential test.
  */
-function readImmediateInjectsSince(
+export function readImmediateInjectsSince(
   sessionDir: string,
   afterEventSeq: number
 ): { injections: string[]; newWatermark: number } {
@@ -324,6 +367,22 @@ export class ConversationRunner {
   }
 
   /**
+   * Whether to run the projection divergence canary this turn. The canary
+   * re-derives the full projection and compares it against the cached one — it
+   * is O(events), so it must be SAMPLED, never every turn. Gated by
+   * LACE_PROJECTION_CANARY: 'always' (every turn — Ada validation pass), a
+   * positive integer N (1-in-N sampling), or unset/off (default: never).
+   */
+  private shouldRunProjectionCanary(): boolean {
+    const setting = process.env.LACE_PROJECTION_CANARY;
+    if (!setting) return false;
+    if (setting === 'always') return true;
+    const n = Number(setting);
+    if (Number.isInteger(n) && n > 0) return Math.floor(Math.random() * n) === 0;
+    return false;
+  }
+
+  /**
    * Run a prompt through the agentic loop.
    *
    * This will:
@@ -357,7 +416,32 @@ export class ConversationRunner {
     } = this.config;
 
     const runtimeBinding = this.resolveActiveRuntimeBinding(cwd);
-    const filesRead = deriveFilesReadFromDurableEvents(sessionDir, runtimeBinding.toolRuntime.cwd);
+    // Derive the turn-entry projection — the provider message prefix + system
+    // prompt, the files-read set, and the last turn_end seq (the inject
+    // watermark). With the server's per-process projection cache, this folds
+    // only the events appended since the cached .seq head (O(tail)); without it
+    // (or on a cold start) it falls back to a full re-parse via
+    // loadTurnEntryProjection. A sampled divergence canary re-derives the full
+    // projection and compares, dropping the cache entry on mismatch.
+    const projectionCache = this.deps.projectionCache;
+    const turnEntry = projectionCache
+      ? projectTurnEntry(sessionDir, runtimeBinding.toolRuntime.cwd, projectionCache, sessionId)
+      : loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+
+    if (projectionCache && this.shouldRunProjectionCanary()) {
+      const full = loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+      if (JSON.stringify(turnEntry.messages) !== JSON.stringify(full.messages)) {
+        logger.error('projection divergence', {
+          sessionId,
+          cachedMessageCount: turnEntry.messages.length,
+          fullMessageCount: full.messages.length,
+        });
+        // Drop the stale cache entry so the next turn cold-rebuilds from the log.
+        projectionCache.delete(sessionId);
+      }
+    }
+
+    const filesRead = turnEntry.filesRead;
     const runtimeFileAccessTracker = await this.createFileAccessTracker(filesRead, runtimeBinding);
 
     const envOverlay = environment && typeof environment === 'object' ? environment : undefined;
@@ -374,8 +458,8 @@ export class ConversationRunner {
     // constructing the provider. If we threw after createProvider() but outside
     // the try/finally that calls provider.cleanup(), the provider would leak
     // EventEmitter listeners and open HTTP sockets.
-    const { messages: rebuiltMessages, systemPrompt: frozenSystemPrompt } =
-      buildProviderMessagesFromDurableEvents(sessionDir);
+    const rebuiltMessages = turnEntry.messages;
+    const frozenSystemPrompt = turnEntry.systemPrompt;
     let providerMessages = rebuiltMessages;
 
     // The system prompt is invariant for the session lifetime and is written
@@ -434,7 +518,15 @@ export class ConversationRunner {
     // any context_injected events written between turns (after turn_end but
     // before run() was called) are picked up on the first iteration, not
     // silently skipped.
-    let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;
+    let lastSeenEventSeq = turnEntry.lastTurnEndSeq ?? 0;
+    // One tail-reader per turn, seeded with the turn-entry watermark. Each
+    // readNew() reads only the JSONL bytes appended since the last call, so the
+    // per-iteration immediate-inject pickup is an incremental tail-read of the
+    // source of truth — not a full re-scan of every shard.
+    // Key the tailer off the on-disk session-id (the transcript shards' basename),
+    // which is what the durable log is written under — matching the full-scan
+    // reader, whose sessionDir basename drives shard discovery.
+    const injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
@@ -488,10 +580,7 @@ export class ConversationRunner {
         // that landed since we last looked. These come from ent/session/inject
         // RPCs fired by peers while this turn is in flight; without this
         // re-read they would not be visible until the next sessionPrompt.
-        const { injections, newWatermark } = readImmediateInjectsSince(
-          sessionDir,
-          lastSeenEventSeq
-        );
+        const { injections, newWatermark } = injectTailer.readNew();
         for (const content of injections) {
           providerMessages = appendOrMergeUser(providerMessages, content);
         }
@@ -930,6 +1019,9 @@ export class ConversationRunner {
           {
             role: 'assistant' as const,
             content: assistantText,
+            ...(concatenatedThinkingBlocks.length > 0
+              ? { thinkingBlocks: concatenatedThinkingBlocks }
+              : {}),
             toolCalls: toolCalls.map((tc: { id: string; name: string; arguments: unknown }) => ({
               id: tc.id,
               name: tc.name,
@@ -939,6 +1031,17 @@ export class ConversationRunner {
         ];
 
         let shouldContinue = true;
+
+        // Accumulate every tool result of this batch into ONE trailing user
+        // message (the canonical Anthropic parallel-tool shape: one assistant
+        // carrying all tool_use blocks — pushed above — followed by one user
+        // carrying all tool_result blocks). This is exactly what foldEvent
+        // rebuilds from the durable tool_use events, so the shape sent on turn N
+        // equals the shape rebuilt on turn N+1. The user message is only emitted
+        // once at least one result has accumulated — matching foldEvent, which
+        // adds no user message for a tool_use that has no result (and no user
+        // message at all for an empty batch).
+        const batchResults: CoreToolResult[] = [];
 
         // Load-bearing safety check: execute tool calls ONLY when the provider's
         // canonical stop reason explicitly says so. Refusal / context_exceeded /
@@ -985,10 +1088,7 @@ export class ConversationRunner {
             }
 
             streamTurnSeq = result.streamTurnSeq;
-            providerMessages = [
-              ...providerMessages,
-              { role: 'user', content: '', toolResults: [result.coreResult] },
-            ];
+            batchResults.push(result.coreResult);
 
             if (!result.shouldContinue) {
               shouldContinue = false;
@@ -1003,6 +1103,18 @@ export class ConversationRunner {
               }
             }
           }
+        }
+
+        // Emit the batch's single canonical user message (all tool_result
+        // blocks). Only when at least one result accumulated — an empty batch
+        // produces no user message, matching the foldEvent rebuild. A batch that
+        // stopped early (shouldContinue=false mid-loop) carries its partial
+        // result set here, which is the same partial shape a rebuild produces.
+        if (batchResults.length > 0) {
+          providerMessages = [
+            ...providerMessages,
+            { role: 'user', content: '', toolResults: batchResults },
+          ];
         }
 
         if (!shouldContinue) {
@@ -1087,6 +1199,19 @@ export class ConversationRunner {
           stopReason,
         });
       }
+
+      logger.info(
+        'cache-health: turn complete',
+        buildCacheHealthLog({
+          turnId,
+          model: modelId ?? 'unknown-model',
+          inputTokens: totalInputTokens,
+          cacheCreationInputTokens: totalCacheCreationInputTokens,
+          cacheReadInputTokens: totalCacheReadInputTokens,
+          outputTokens: totalOutputTokens,
+          cacheMissReason: lastCacheMissReason?.type ?? null,
+        })
+      );
 
       // Compaction trigger. Runs synchronously in the runner's finally block
       // after the turn_end write. Uses the raw appendDurableEvent +
@@ -1631,6 +1756,14 @@ export class ConversationRunner {
       runtimeBinding,
       compactionRequest,
     });
+
+    // Cap how much a single tool result contributes to the live context AND the
+    // durable transcript. Mutating coreResult here covers both downstream
+    // consumers: the durable tool_use event (built from protocolToolResultFromCore
+    // below) and the providerMessages append in the main loop. read_tool_result is
+    // excluded — its output is already bounded by its args and digesting it would
+    // defeat paging.
+    capToolResult({ coreResult, toolName, toolCallId, sessionId });
 
     const protocolResult = protocolToolResultFromCore(coreResult);
     type TerminalStatus = 'completed' | 'denied' | 'cancelled' | 'failed';

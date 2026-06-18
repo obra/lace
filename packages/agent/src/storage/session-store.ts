@@ -4,11 +4,13 @@ import * as os from 'node:os';
 import { getLaceDir } from '../config/lace-dir';
 import { asSessionId } from '@lace/ent-protocol';
 import {
-  deriveNextEventSeqFromEventLog,
+  deriveNextEventSeqAcrossSessionFiles,
   invalidatePersonaCache,
   repairOrphanTurnStarts,
   summarizeDurableEvents,
 } from './event-log';
+import { withSessionLock } from './session-lock';
+import { reconcileHead } from './seq-head';
 import { atomicWriteJson } from './atomic-write';
 import { SessionStorageError } from '../errors/agent-errors';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
@@ -150,31 +152,56 @@ export function writeSessionMeta(sessionDir: string, meta: SessionMeta): void {
 
 export function readSessionState(sessionDir: string): SessionState {
   const statePath = path.join(sessionDir, 'state.json');
+  let raw: string;
   try {
-    const parsed = JSON.parse(fs.readFileSync(statePath, 'utf8')) as Partial<SessionState>;
-    return {
-      nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
-      nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
-      sessionCostUsd: typeof parsed.sessionCostUsd === 'number' ? parsed.sessionCostUsd : undefined,
-      tokenUsage:
-        typeof parsed.tokenUsage === 'object' && parsed.tokenUsage
-          ? {
-              totalInputTokens: parsed.tokenUsage.totalInputTokens ?? 0,
-              totalOutputTokens: parsed.tokenUsage.totalOutputTokens ?? 0,
-            }
-          : undefined,
-      config:
-        typeof parsed.config === 'object' && parsed.config
-          ? (parsed.config as SessionState['config'])
-          : undefined,
-      highestFiredBreakpointAt:
-        typeof parsed.highestFiredBreakpointAt === 'number'
-          ? parsed.highestFiredBreakpointAt
-          : undefined,
-    };
-  } catch {
-    return { nextEventSeq: 1, nextStreamSeq: 1 };
+    raw = fs.readFileSync(statePath, 'utf8');
+  } catch (err) {
+    // ENOENT is the genuine new-session case: no state.json yet → defaults.
+    // ANY other read error (EACCES, EISDIR, I/O) means an EXISTING session's
+    // state is unreadable. Returning a config-less default here is dangerous:
+    // loadSession would derive nextEventSeq from the event log, see a mismatch,
+    // and write that default back over the real state — silently dropping
+    // modelId/connectionId and wedging every future turn. Fail loud instead.
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { nextEventSeq: 1, nextStreamSeq: 1 };
+    }
+    throw err;
   }
+  let parsed: Partial<SessionState>;
+  try {
+    parsed = JSON.parse(raw) as Partial<SessionState>;
+  } catch (err) {
+    // The file exists but is not valid JSON. Writes are atomic (temp + rename),
+    // so a torn read should not happen in normal operation; a parse failure
+    // means real corruption. Do NOT collapse to the new-session default — that
+    // would let a subsequent write clobber recoverable state. Surface it.
+    throw new SessionStorageError(
+      `state.json for session ${path.basename(sessionDir)} is corrupt and cannot be parsed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+      statePath
+    );
+  }
+  return {
+    nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
+    nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
+    sessionCostUsd: typeof parsed.sessionCostUsd === 'number' ? parsed.sessionCostUsd : undefined,
+    tokenUsage:
+      typeof parsed.tokenUsage === 'object' && parsed.tokenUsage
+        ? {
+            totalInputTokens: parsed.tokenUsage.totalInputTokens ?? 0,
+            totalOutputTokens: parsed.tokenUsage.totalOutputTokens ?? 0,
+          }
+        : undefined,
+    config:
+      typeof parsed.config === 'object' && parsed.config
+        ? (parsed.config as SessionState['config'])
+        : undefined,
+    highestFiredBreakpointAt:
+      typeof parsed.highestFiredBreakpointAt === 'number'
+        ? parsed.highestFiredBreakpointAt
+        : undefined,
+  };
 }
 
 export function writeSessionState(sessionDir: string, state: SessionState): void {
@@ -255,12 +282,23 @@ export function loadSession(sessionId: string, options?: LoadSessionOptions): Lo
   let state = readSessionState(sessionDir);
   ensureSessionFiles(sessionDir);
 
-  // events.jsonl is the durable source of truth; repair state.nextEventSeq on load.
-  const repairedNextEventSeq = deriveNextEventSeqFromEventLog(sessionDir);
-  if (state.nextEventSeq !== repairedNextEventSeq) {
-    state.nextEventSeq = repairedNextEventSeq;
-    writeSessionState(sessionDir, state);
-  }
+  // The per-session head file (<sessionDir>/.seq) is the seq authority. On open
+  // reconcile it monotonically against the JSONL: head = MAX(readHead()|0,
+  // MAX(JSONL)+1). This can only move the head UP, so a stale or lost head can
+  // never hand out a seq <= an existing JSONL seq. We do this under the
+  // per-session lock so a concurrent appender cannot land between the MAX(JSONL)
+  // scan and the head write. `state.nextEventSeq` is advisory/derived only —
+  // it no longer drives seq assignment and we do NOT rewrite state.json merely
+  // to "repair" it (which, once gaps exist, would rewrite on every open).
+  const canonicalSessionId = path.basename(sessionDir);
+  const laceDir = getLaceDir();
+  const reconciledHead = withSessionLock(sessionDir, () =>
+    reconcileHead(
+      sessionDir,
+      () => deriveNextEventSeqAcrossSessionFiles(laceDir, canonicalSessionId) - 1
+    )
+  );
+  state.nextEventSeq = reconciledHead;
 
   if (options?.repairOrphanTurnStarts) {
     // Crash recovery: if the prior process died between turn_start and turn_end

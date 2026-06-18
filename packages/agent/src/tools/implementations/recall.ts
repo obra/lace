@@ -336,12 +336,21 @@ export class RecallTool extends Tool {
     // Persona comes from meta.json; one read per request, no caching needed.
     const persona = readPersonaForSessionDir(sessionDir);
 
+    // The verbatim event_journal supplies the ORIGINAL event bytes (full data,
+    // every field — incl. types eventToRow drops) for the events in range. The
+    // FTS-rendered `content` is lossy (e.g. `tool=…\ninput=…`); the journal gives
+    // the agent the real structure. Fetch once per request, keyed by eventSeq.
+    // Missing rows (older sessions mid-backfill) fall back to no `verbatim`.
+    const verbatimBySeq = readVerbatimEvents(sessionId);
+
     const events = inRange.map((ev) => {
+      const verbatim = verbatimBySeq.get(ev.eventSeq);
       const row = eventToRow(ev, { sessionId, persona });
       if (!row) {
         // Non-indexable event inside the requested window (turn_start, job_*,
         // permission_*, etc.) — surface it minimally so the agent sees the
-        // boundary without crashing.
+        // boundary without crashing. The verbatim journal line (when present)
+        // still carries the full event for these types.
         return {
           event_id: `${sessionId}:${ev.eventSeq}`,
           session_id: sessionId,
@@ -349,9 +358,11 @@ export class RecallTool extends Tool {
           persona,
           kind: ev.type,
           content: '',
+          ...(verbatim !== undefined ? { verbatim } : {}),
         };
       }
-      return applyTruncation(row, ev.eventSeq, targetSeq, full);
+      const truncated = applyTruncation(row, ev.eventSeq, targetSeq, full);
+      return verbatim !== undefined ? { ...truncated, verbatim } : truncated;
     });
 
     return this.createResult({ events });
@@ -364,6 +375,40 @@ function readPersonaForSessionDir(sessionDir: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Load the verbatim event for every event in a session from `event_journal`,
+ * keyed by eventSeq. Each stored `line` is the exact JSONL bytes; we redact it
+ * (recall output must never carry an unredacted secret — same guarantee the
+ * rendered `content` path enforces) and parse the result so the caller receives
+ * the original event structure (full `data`, all fields).
+ *
+ * Best-effort: a missing table (older DB pre-journal), a query error, or a
+ * single malformed/unparseable line must never break a recall read — the
+ * rendered `content` is always present as the fallback. Returns an empty map on
+ * any failure; per-line parse failures simply omit that seq.
+ */
+function readVerbatimEvents(sessionId: string): Map<number, unknown> {
+  const out = new Map<number, unknown>();
+  let rows: Array<{ event_seq: number; line: string }>;
+  try {
+    const db = getRecallIndex();
+    rows = db
+      .prepare(`SELECT event_seq, line FROM event_journal WHERE session_id = ?`)
+      .all(sessionId) as Array<{ event_seq: number; line: string }>;
+  } catch {
+    return out;
+  }
+  for (const { event_seq, line } of rows) {
+    try {
+      out.set(event_seq, JSON.parse(redact(line)));
+    } catch {
+      // Skip a line that doesn't parse after redaction; the rendered content
+      // still covers this event.
+    }
+  }
+  return out;
 }
 
 function countFtsEventsForSession(sessionId: string): number {

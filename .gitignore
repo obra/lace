@@ -68,6 +68,8 @@ lace-memory.db
 # Model output files
 anthropic-*.txt
 anthropic-*.json
+# Golden-bytes snapshots are committed fixtures, not model output.
+!packages/agent/src/providers/__tests__/golden/anthropic-*.json
 packages/web/.next/
 
 # Next.js cache

@@ -6,6 +6,8 @@ import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import type { ContentBlock, ThinkingBlock } from '@lace/agent/providers/base-provider';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import type { ToolResult as ProtocolToolResult } from '@lace/ent-protocol';
+import { foldEvents } from '@lace/agent/message-building/fold-event';
+import type { FoldEventInput } from '@lace/agent/message-building/fold-event';
 
 // ---------------------------------------------------------------------------
 // Tiny pure helpers copied from rpc/utils — toolkit must not import rpc/utils
@@ -403,91 +405,51 @@ type PreservedMessage = {
  * Convert tail events into the PreservedMessage stream consumed by
  * message-builder.ts when replaying a context_compacted event.
  *
- * Mirrors the logic in message-builder.ts:buildProviderMessagesFromDurableEvents:
- * - `prompt`   → user entry
- * - `message`  → assistant entry
- * - `tool_use` → assistant entry (with toolCalls) + optional user entry (with toolResults)
+ * Delegates folding to the shared `foldEvents` reducer so the preserved tail has
+ * the same canonical shape as the batch rebuild and the runner's live tail: a
+ * turn's parallel tool calls fold into one assistant message carrying all
+ * `tool_use` blocks followed by one user message carrying all `tool_result`
+ * blocks (the Anthropic parallel-tool form). Content stays verbatim.
  *
- * Consecutive tool_use events for the same turn are coalesced: tool calls are
- * appended to the previous assistant entry; tool results are appended to the
- * previous user entry when it already holds results.
+ * The tail subset never contains `context_compacted`/`system_prompt_set`, and
+ * `context_injected` is a plain user push (no merge) — exactly what the reducer
+ * does. `PreservedMessage` is structurally identical to the reducer's
+ * `ProviderMessage`, so the reducer's messages are returned directly.
  */
 export function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
-  const result: PreservedMessage[] = [];
+  const foldInputs: FoldEventInput[] = [];
 
   for (const e of events) {
     if (isEventOfType(e, 'prompt')) {
-      // Pass through the original content (string or ContentBlock[]) so images
-      // in the tail are not discarded — extractText would drop image blocks.
-      result.push({ role: 'user', content: e.data.content });
+      foldInputs.push({ type: 'prompt', data: { content: e.data.content } });
       continue;
     }
-
     if (isEventOfType(e, 'context_injected')) {
-      // Mirror message-builder.ts: injected context becomes a user-role message.
-      // Pass through the original content to preserve any image blocks.
-      result.push({ role: 'user', content: e.data.content });
+      foldInputs.push({ type: 'context_injected', data: { content: e.data.content } });
       continue;
     }
-
     if (isEventOfType(e, 'message')) {
-      // Pass through the original content to preserve any image blocks, plus any
-      // thinking blocks so the verbatim tail can replay them before this turn's
-      // tool_use (Anthropic adaptive thinking).
-      const thinkingBlocks =
-        Array.isArray(e.data.thinkingBlocks) && e.data.thinkingBlocks.length > 0
-          ? e.data.thinkingBlocks
-          : undefined;
-      result.push({
-        role: 'assistant',
-        content: e.data.content ?? '',
-        ...(thinkingBlocks ? { thinkingBlocks } : {}),
+      foldInputs.push({
+        type: 'message',
+        data: { content: e.data.content, thinkingBlocks: e.data.thinkingBlocks },
       });
       continue;
     }
-
     if (isEventOfType(e, 'tool_use')) {
-      const toolCallId = toNonEmptyString(e.data.toolCallId);
-      const name = toNonEmptyString(e.data.name);
-      if (!toolCallId || !name) continue;
-
-      const toolCall: CoreToolCall = {
-        id: toolCallId,
-        name,
-        arguments:
-          typeof e.data.input === 'object' && e.data.input
-            ? (e.data.input as Record<string, unknown>)
-            : {},
-      };
-
-      // Coalesce into previous assistant entry if it exists, otherwise push new.
-      const last = result.length > 0 ? result[result.length - 1] : undefined;
-      if (last && last.role === 'assistant') {
-        last.toolCalls = [...(last.toolCalls ?? []), toolCall];
-      } else {
-        result.push({ role: 'assistant', content: '', toolCalls: [toolCall] });
-      }
-
-      if (e.data.result) {
-        const coreResult = coreToolResultFromProtocol(e.data.result, toolCallId);
-        // Coalesce into previous user entry if it already carries tool results.
-        const prev = result.length > 0 ? result[result.length - 1] : undefined;
-        const canAppend =
-          prev &&
-          prev.role === 'user' &&
-          Array.isArray(prev.toolResults) &&
-          prev.toolResults.length > 0;
-        if (canAppend && prev) {
-          prev.toolResults = [...(prev.toolResults ?? []), coreResult];
-        } else {
-          result.push({ role: 'user', content: '', toolResults: [coreResult] });
-        }
-      }
+      foldInputs.push({
+        type: 'tool_use',
+        data: {
+          toolCallId: e.data.toolCallId,
+          name: e.data.name,
+          input: e.data.input,
+          result: e.data.result,
+        },
+      });
       continue;
     }
   }
 
-  return result;
+  return foldEvents(foldInputs).messages;
 }
 
 /**

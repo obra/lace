@@ -14,7 +14,9 @@ import {
 } from './transcript-paths';
 import { eventToRow } from './recall/event-to-row';
 import { getRecallIndex } from './recall/index-db';
-import { insertRow } from './recall/index-writer';
+import { insertRow, insertJournalRow } from './recall/index-writer';
+import { withSessionLock } from './session-lock';
+import { reserveSeq } from './seq-head';
 import { PROCESS_DIED_STOP_REASON, type TypedDurableEvent } from './event-types';
 import { logger } from '@lace/agent/utils/logger';
 
@@ -88,6 +90,25 @@ export function personaForSessionDir(sessionDir: string): string | null {
 }
 
 /**
+ * The exact shard file set `readAllSessionEventLines` reads for a session: the
+ * legacy `<sessionDir>/events.jsonl` (when present) followed by the new-layout
+ * `<laceDir>/transcripts/<persona>/<date>/<session>.jsonl` shards. Exposed so a
+ * byte-offset tail reader can read precisely the files the full scan does, with
+ * the same legacy path the full scan derives from `sessionDir` (NOT getSessionDir).
+ */
+export function sessionShardFiles(sessionDir: string): string[] {
+  const sessionId = path.basename(sessionDir);
+  let newFiles: string[] = [];
+  try {
+    newFiles = listTranscriptFiles(getLaceDir(), sessionId);
+  } catch {
+    newFiles = [];
+  }
+  const legacyPath = path.join(sessionDir, 'events.jsonl');
+  return fs.existsSync(legacyPath) ? [legacyPath, ...newFiles] : newFiles;
+}
+
+/**
  * Return every JSONL line that belongs to this session, in eventSeq-emit order.
  *
  * The legacy <sessionDir>/events.jsonl path is read alongside the new
@@ -100,15 +121,7 @@ export function personaForSessionDir(sessionDir: string): string | null {
  * file lines are in append order, which is also eventSeq order.
  */
 export function readAllSessionEventLines(sessionDir: string): string[] {
-  const sessionId = path.basename(sessionDir);
-  let newFiles: string[] = [];
-  try {
-    newFiles = listTranscriptFiles(getLaceDir(), sessionId);
-  } catch {
-    newFiles = [];
-  }
-  const legacyPath = path.join(sessionDir, 'events.jsonl');
-  const files = fs.existsSync(legacyPath) ? [legacyPath, ...newFiles] : newFiles;
+  const files = sessionShardFiles(sessionDir);
 
   const lines: string[] = [];
   for (const file of files) {
@@ -145,6 +158,28 @@ export function readAllSessionEventLines(sessionDir: string): string[] {
   });
 
   return lines;
+}
+
+/**
+ * Return the `text` of the most recent `system_prompt_set` event in this
+ * session's durable log, or `undefined` if none exists. Used by the
+ * compose-and-write path to skip appending a byte-identical system_prompt_set
+ * (the common case when a persona re-renders unchanged across compactions),
+ * keeping the log from accumulating one such event per compaction.
+ */
+export function latestSystemPromptSetText(sessionDir: string): string | undefined {
+  let latest: string | undefined;
+  for (const line of readAllSessionEventLines(sessionDir)) {
+    try {
+      const parsed = JSON.parse(line) as Partial<DurableEvent>;
+      if (parsed.type !== 'system_prompt_set') continue;
+      const text = (parsed.data as { text?: unknown } | undefined)?.text;
+      if (typeof text === 'string') latest = text;
+    } catch {
+      // ignore malformed line
+    }
+  }
+  return latest;
 }
 
 export function deriveNextEventSeqFromEventLog(sessionDir: string): number {
@@ -355,6 +390,22 @@ export function findLastTurnEndEventSeq(sessionDir: string): number | null {
   return last;
 }
 
+/**
+ * Pure core of findLastTurnEndEventSeq over an already-parsed event array.
+ * Takes an array so it needs no import — keeping event-log.ts free of any
+ * dependency on parsed-events.ts (which imports readAllSessionEventLines from
+ * here). Events are sorted ascending, so the last matching `turn_end` wins.
+ */
+export function findLastTurnEndSeqFromParsedEvents(
+  parsedEvents: { eventSeq: number; type: string }[]
+): number | null {
+  let last: number | null = null;
+  for (const e of parsedEvents) {
+    if (e.type === 'turn_end') last = e.eventSeq;
+  }
+  return last;
+}
+
 export type DurableEvent = {
   eventSeq: number;
   timestamp: string;
@@ -398,78 +449,110 @@ export function appendDurableEvent(
   state: SessionState,
   event: Omit<DurableEvent, 'eventSeq' | 'timestamp'>
 ): { nextState: SessionState; written: DurableEvent } {
-  // Storage-layer invariant: at most one turn_end per turnId.
-  // The conversation runner closes turns on its happy path; the prompt.ts
-  // catch-handler also writes a fallback turn_end on errors. The runner runs
-  // first, so when both fire, the runner's write wins and the fallback is
-  // silently dropped here. Keyed on turnId — events without a turnId (which
-  // we don't expect in production turn_end writes) are not deduped, since
-  // there's no key to dedup against.
-  if (event.type === 'turn_end' && event.turnId !== undefined) {
-    const existing = findTurnEndEventByTurnId(sessionDir, event.turnId);
-    if (existing !== null) {
-      logger.warn('appendDurableEvent: dropping duplicate turn_end', {
-        turnId: event.turnId,
-        existingEventSeq: existing.eventSeq,
-        existingStopReason: (existing.data as { stopReason?: unknown } | undefined)?.stopReason,
-        attemptedStopReason: (event.data as { stopReason?: unknown } | undefined)?.stopReason,
-      });
-      return { nextState: state, written: existing };
-    }
-  }
-
   const sessionId = path.basename(sessionDir);
   const laceDir = getLaceDir();
   const persona = personaForSessionDir(sessionDir);
-  const eventsPath = transcriptFilePath({
-    laceDir,
-    persona,
-    date: new Date(),
-    sessionId,
-  });
-  fs.mkdirSync(path.dirname(eventsPath), { recursive: true, mode: SECURE_DIR_MODE });
 
-  // Derive from all transcript files (and the legacy events.jsonl) so seqs
-  // stay monotonic across day rollovers and across the legacy→new transition.
-  const eventSeq = deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId);
-
-  // Ensure we never accidentally join JSON objects when the previous write was
-  // truncated and did not end with a newline.
-  try {
-    const stat = fs.statSync(eventsPath);
-    if (stat.size > 0) {
-      const fd = fs.openSync(eventsPath, 'r');
-      try {
-        const buf = Buffer.alloc(1);
-        fs.readSync(fd, buf, 0, 1, stat.size - 1);
-        if (buf.toString('utf8') !== '\n') {
-          fs.appendFileSync(eventsPath, '\n', { encoding: 'utf8' });
+  // The seq assignment + JSONL append run under a per-session cross-process
+  // lock. Everything that decides a seq or appends a line is inside the lock,
+  // reading the JSONL (the source of truth): the turn_end dedup, the head
+  // reserve (reserve-before-append), and the append itself. The recall/journal
+  // write-through stays OUTSIDE the lock (best-effort, never on a correctness
+  // path). `lockResult` carries either the appended event or the existing
+  // turn_end that was deduped (so a duplicate turn_end neither reserves a seq
+  // nor appends).
+  const lockResult = withSessionLock(
+    sessionDir,
+    (): { written: DurableEvent; deduped: boolean } => {
+      // Storage-layer invariant: at most one turn_end per turnId.
+      // The conversation runner closes turns on its happy path; the prompt.ts
+      // catch-handler also writes a fallback turn_end on errors. The runner runs
+      // first, so when both fire, the runner's write wins and the fallback is
+      // silently dropped here. Keyed on turnId — events without a turnId (which
+      // we don't expect in production turn_end writes) are not deduped, since
+      // there's no key to dedup against. Read under the lock against the JSONL
+      // (the truth), BEFORE the reserve, so a duplicate turn_end burns no seq.
+      if (event.type === 'turn_end' && event.turnId !== undefined) {
+        const existing = findTurnEndEventByTurnId(sessionDir, event.turnId);
+        if (existing !== null) {
+          logger.warn('appendDurableEvent: dropping duplicate turn_end', {
+            turnId: event.turnId,
+            existingEventSeq: existing.eventSeq,
+            existingStopReason: (existing.data as { stopReason?: unknown } | undefined)?.stopReason,
+            attemptedStopReason: (event.data as { stopReason?: unknown } | undefined)?.stopReason,
+          });
+          return { written: existing, deduped: true };
         }
-      } finally {
-        fs.closeSync(fd);
       }
+
+      const eventsPath = transcriptFilePath({
+        laceDir,
+        persona,
+        date: new Date(),
+        sessionId,
+      });
+      fs.mkdirSync(path.dirname(eventsPath), { recursive: true, mode: SECURE_DIR_MODE });
+
+      // Reserve the next seq from the per-session head file. The head is seeded
+      // (on first use, when .seq is absent) from the same full-log scan the old
+      // code used (deriveNextEventSeqAcrossSessionFiles returns MAX(JSONL)+1, so
+      // MAX(JSONL) = that - 1); thereafter it is an O(1) head read/increment.
+      // reserveSeq writes head H+1 BEFORE returning H — reserve-before-append, so
+      // a crash before the append below burns H as a gap, never a duplicate.
+      const eventSeq = reserveSeq(
+        sessionDir,
+        () => deriveNextEventSeqAcrossSessionFiles(laceDir, sessionId) - 1
+      );
+
+      // Ensure we never accidentally join JSON objects when the previous write was
+      // truncated and did not end with a newline.
+      try {
+        const stat = fs.statSync(eventsPath);
+        if (stat.size > 0) {
+          const fd = fs.openSync(eventsPath, 'r');
+          try {
+            const buf = Buffer.alloc(1);
+            fs.readSync(fd, buf, 0, 1, stat.size - 1);
+            if (buf.toString('utf8') !== '\n') {
+              fs.appendFileSync(eventsPath, '\n', { encoding: 'utf8' });
+            }
+          } finally {
+            fs.closeSync(fd);
+          }
+        }
+      } catch {
+        // If the file doesn't exist or can't be read, we'll let appendFileSync below create it.
+      }
+
+      const written: DurableEvent = {
+        eventSeq,
+        timestamp: new Date().toISOString(),
+        ...event,
+      };
+
+      fs.appendFileSync(eventsPath, `${JSON.stringify(written)}\n`, { encoding: 'utf8' });
+
+      // Apply secure file mode if this was the first write (file didn't exist before).
+      // stat-check avoids chmod on every append.
+      try {
+        const stat = fs.statSync(eventsPath);
+        if ((stat.mode & 0o777) !== SECURE_FILE_MODE) {
+          fs.chmodSync(eventsPath, SECURE_FILE_MODE);
+        }
+      } catch {
+        // file doesn't exist somehow — write would have already failed; ignore
+      }
+
+      return { written, deduped: false };
     }
-  } catch {
-    // If the file doesn't exist or can't be read, we'll let appendFileSync below create it.
-  }
+  );
 
-  const written: DurableEvent = {
-    eventSeq,
-    timestamp: new Date().toISOString(),
-    ...event,
-  };
+  const written = lockResult.written;
 
-  fs.appendFileSync(eventsPath, `${JSON.stringify(written)}\n`, { encoding: 'utf8' });
-
-  // Apply secure file mode if this was the first write (file didn't exist before).
-  // stat-check avoids chmod on every append.
-  try {
-    const stat = fs.statSync(eventsPath);
-    if ((stat.mode & 0o777) !== SECURE_FILE_MODE) {
-      fs.chmodSync(eventsPath, SECURE_FILE_MODE);
-    }
-  } catch {
-    // file doesn't exist somehow — write would have already failed; ignore
+  // A deduped duplicate turn_end neither reserved a seq nor appended; return the
+  // existing event and leave caller state unchanged.
+  if (lockResult.deduped) {
+    return { nextState: state, written };
   }
 
   // Write-through indexing: mirror the event into the FTS index so /recall
@@ -481,6 +564,23 @@ export function appendDurableEvent(
     if (row) insertRow(getRecallIndex(), row);
   } catch (err) {
     console.error('recall indexer write failed:', err);
+  }
+
+  // Verbatim journal write-through: store the EXACT bytes appended to the JSONL
+  // (`JSON.stringify(written)`, minus the trailing newline) for EVERY event
+  // type, so /recall can return original event bytes instead of the lossy FTS
+  // render. Its own try/catch: a journal failure must NEVER fail an append —
+  // JSONL is the source of truth and the startup backfill repairs any miss.
+  try {
+    insertJournalRow(getRecallIndex(), {
+      session_id: sessionId,
+      event_seq: written.eventSeq,
+      type: written.type,
+      ts: written.timestamp,
+      line: JSON.stringify(written),
+    });
+  } catch (err) {
+    console.error('event_journal write failed:', err);
   }
 
   return {

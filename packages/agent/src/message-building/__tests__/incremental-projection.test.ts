@@ -1,0 +1,483 @@
+// ABOUTME: The correctness gate for the in-memory conversation projection:
+// folding a tail of events incrementally into a cached projection MUST equal a
+// full rebuild over the same events, at EVERY split point, across a corpus that
+// exercises every rebuild-only concern (system-prompt last-wins, parallel-tool,
+// thinking, context_injected merge, a context_compacted era + tail). The split-
+// at-every-K differential is what proves the incremental boundary is order-
+// independent — the same property the foldEvent fuzz proved, here for the FULL
+// rebuild semantics.
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { transcriptDir } from '@lace/agent/storage/transcript-paths';
+import { getSessionDir } from '@lace/agent/storage/session-store';
+import type { ParsedSessionEvent } from '@lace/agent/message-building/parsed-events';
+import * as pe from '@lace/agent/message-building/parsed-events';
+import { buildProviderMessagesFromParsedEvents } from '@lace/agent/message-building/message-builder';
+import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
+import {
+  initialCachedProjection,
+  foldTailIntoProjection,
+  projectTurnEntry,
+  type CachedProjection,
+} from '@lace/agent/message-building/incremental-projection';
+
+function ev(eventSeq: number, type: string, data: Record<string, unknown>): ParsedSessionEvent {
+  return { eventSeq, type, data };
+}
+
+// Corpus of event sequences, each a complete log prefix exercising one or more
+// rebuild-only concerns. Seqs are monotonic within each sequence.
+const CORPUS: ParsedSessionEvent[][] = [
+  // 1. plain prompt/message
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-a' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'hello' }] }),
+    ev(3, 'message', { content: [{ type: 'text', text: 'hi there' }] }),
+    ev(4, 'turn_end', { stopReason: 'end_turn' }),
+  ],
+  // 2. single tool_use turn (assistant tool_use + user tool_result)
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-b' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'read a file' }] }),
+    ev(3, 'tool_use', {
+      toolCallId: 'tc1',
+      name: 'file_read',
+      input: { path: '/work/a.txt' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'A' }] },
+    }),
+    ev(4, 'message', { content: [{ type: 'text', text: 'done' }] }),
+    ev(5, 'turn_end', { stopReason: 'end_turn' }),
+  ],
+  // 3. parallel-tool turn (two tool_use in one assistant batch)
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-c' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'read two' }] }),
+    ev(3, 'tool_use', {
+      toolCallId: 'tc1',
+      name: 'file_read',
+      input: { path: '/work/a.txt' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'A' }] },
+    }),
+    ev(4, 'tool_use', {
+      toolCallId: 'tc2',
+      name: 'file_read',
+      input: { path: '/work/b.txt' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'B' }] },
+    }),
+    ev(5, 'message', { content: [{ type: 'text', text: 'both read' }] }),
+    ev(6, 'turn_end', { stopReason: 'end_turn' }),
+  ],
+  // 4. thinking turn (message carries thinkingBlocks)
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-d' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'think' }] }),
+    ev(3, 'message', {
+      content: [{ type: 'text', text: 'pondered' }],
+      thinkingBlocks: [{ type: 'thinking', thinking: 'hmm', signature: 'sig' }],
+    }),
+    ev(4, 'turn_end', { stopReason: 'end_turn' }),
+  ],
+  // 5. system_prompt_set then a later one (last-wins)
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-first' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'one' }] }),
+    ev(3, 'message', { content: [{ type: 'text', text: 'r1' }] }),
+    ev(4, 'system_prompt_set', { text: 'sys-second' }),
+    ev(5, 'prompt', { content: [{ type: 'text', text: 'two' }] }),
+    ev(6, 'message', { content: [{ type: 'text', text: 'r2' }] }),
+  ],
+  // 6. context_injected (text-merge after a tool_result user turn)
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-e' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'go' }] }),
+    ev(3, 'tool_use', {
+      toolCallId: 'tc1',
+      name: 'bash',
+      input: { command: 'ls' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'files' }] },
+    }),
+    ev(4, 'context_injected', { content: [{ type: 'text', text: 'reminder: stay focused' }] }),
+    ev(5, 'message', { content: [{ type: 'text', text: 'ok' }] }),
+    ev(6, 'turn_end', { stopReason: 'end_turn' }),
+  ],
+  // 7. context_compacted with preserved[], then a post-compaction tail
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-f' }),
+    ev(2, 'prompt', { content: [{ type: 'text', text: 'old' }] }),
+    ev(3, 'message', { content: [{ type: 'text', text: 'old reply' }] }),
+    ev(4, 'context_compacted', {
+      preserved: [
+        { role: 'user', content: 'summary of earlier' },
+        { role: 'assistant', content: 'understood' },
+      ],
+    }),
+    ev(5, 'system_prompt_set', { text: 'sys-f-rerendered' }),
+    ev(6, 'prompt', { content: [{ type: 'text', text: 'new turn' }] }),
+    ev(7, 'message', { content: [{ type: 'text', text: 'new reply' }] }),
+    ev(8, 'turn_end', { stopReason: 'end_turn' }),
+  ],
+  // 8. compaction whose preserved carries an orphaned tool_use (dropOrphaned path)
+  [
+    ev(1, 'system_prompt_set', { text: 'sys-g' }),
+    ev(2, 'context_compacted', {
+      preserved: [
+        { role: 'user', content: 'q' },
+        {
+          role: 'assistant',
+          content: 'a',
+          toolCalls: [{ id: 'orphan', name: 'bash', arguments: {} }],
+        },
+      ],
+    }),
+    ev(3, 'prompt', { content: [{ type: 'text', text: 'after' }] }),
+    ev(4, 'message', { content: [{ type: 'text', text: 'fine' }] }),
+  ],
+];
+
+function assertIncrementalEqualsFull(events: ParsedSessionEvent[]): void {
+  const full = buildProviderMessagesFromParsedEvents(events);
+  for (let k = 0; k <= events.length; k++) {
+    let proj = initialCachedProjection();
+    proj = foldTailIntoProjection(proj, events.slice(0, k));
+    proj = foldTailIntoProjection(proj, events.slice(k));
+    expect(JSON.stringify({ messages: proj.messages, systemPrompt: proj.systemPrompt })).toBe(
+      JSON.stringify({ messages: full.messages, systemPrompt: full.systemPrompt })
+    );
+  }
+}
+
+describe('foldTailIntoProjection', () => {
+  it('incremental fold (any split) equals full rebuild — across the corpus', () => {
+    expect(CORPUS.length).toBeGreaterThan(0);
+    for (const events of CORPUS) assertIncrementalEqualsFull(events);
+  });
+
+  it('tracks filesRead and lastTurnEndSeq incrementally, matching the full derivers', () => {
+    const events = CORPUS[1]!; // single file_read + turn_end
+    let proj = initialCachedProjection('/work');
+    proj = foldTailIntoProjection(proj, events.slice(0, 3));
+    proj = foldTailIntoProjection(proj, events.slice(3));
+    expect([...proj.filesRead]).toEqual(['/work/a.txt']);
+    expect(proj.lastTurnEndSeq).toBe(5);
+  });
+
+  it('advances headSeq to next-seq-to-fold (lastFoldedSeq + 1)', () => {
+    const events = CORPUS[0]!;
+    let proj = initialCachedProjection();
+    proj = foldTailIntoProjection(proj, events);
+    // last event seq is 4, so the next seq to fold is 5
+    expect(proj.headSeq).toBe(5);
+  });
+
+  it('folding an empty tail is a no-op (headSeq unchanged)', () => {
+    const events = CORPUS[0]!;
+    let proj = initialCachedProjection();
+    proj = foldTailIntoProjection(proj, events);
+    const before = JSON.stringify({
+      messages: proj.messages,
+      systemPrompt: proj.systemPrompt,
+      headSeq: proj.headSeq,
+      lastTurnEndSeq: proj.lastTurnEndSeq,
+    });
+    proj = foldTailIntoProjection(proj, []);
+    const after = JSON.stringify({
+      messages: proj.messages,
+      systemPrompt: proj.systemPrompt,
+      headSeq: proj.headSeq,
+      lastTurnEndSeq: proj.lastTurnEndSeq,
+    });
+    expect(after).toBe(before);
+  });
+});
+
+describe('projectTurnEntry', () => {
+  let dir: string;
+  const SID = 'sess-1';
+
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'lace-proj-'));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  // Write the durable log + the .seq head (next-free seq = max seq + 1) so
+  // readHead returns the tip exactly as the runtime would.
+  function writeLog(lines: string[]): void {
+    writeFileSync(join(dir, 'events.jsonl'), lines.join('\n') + '\n', 'utf8');
+    const maxSeq = lines.length
+      ? Math.max(...lines.map((l) => (JSON.parse(l) as { eventSeq: number }).eventSeq))
+      : 0;
+    writeFileSync(join(dir, '.seq'), String(maxSeq + 1), 'utf8');
+  }
+
+  function appendLine(line: string): void {
+    appendFileSync(join(dir, 'events.jsonl'), line + '\n', 'utf8');
+    const seq = (JSON.parse(line) as { eventSeq: number }).eventSeq;
+    writeFileSync(join(dir, '.seq'), String(seq + 1), 'utf8');
+  }
+
+  const line = (eventSeq: number, type: string, data: Record<string, unknown>): string =>
+    JSON.stringify({ eventSeq, timestamp: 't', type, data });
+
+  it('cold-builds once, then tail-folds incrementally and matches a full rebuild', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+      line(4, 'turn_end', { stopReason: 'end_turn' }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+
+    // First call → cold full build.
+    const p1 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p1.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+
+    // Append a turn's worth of events + a cross-process inject.
+    appendLine(line(5, 'prompt', { content: [{ type: 'text', text: 'again' }] }));
+    appendLine(line(6, 'message', { content: [{ type: 'text', text: 'again-reply' }] }));
+    appendLine(line(7, 'turn_end', { stopReason: 'end_turn' }));
+
+    // Capture the expected full rebuild BEFORE spying (the comparison itself
+    // re-parses, which would inflate the spy count).
+    const expectedMessages = JSON.stringify(loadTurnEntryProjection(dir, '/work').messages);
+
+    // Second call → incremental BYTE-OFFSET tail-fold. It reads only the bytes
+    // appended since the seeded offsets and NEVER calls readParsedSessionEvents
+    // (the O(tail) proof — a full re-parse of the whole log would call it).
+    const spy = vi.spyOn(pe, 'readParsedSessionEvents');
+    const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
+    expect(p2.lastTurnEndSeq).toBe(7);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('picks up a cross-process inject appended between calls', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'go' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'ok' }] }),
+      line(4, 'turn_end', { stopReason: 'end_turn' }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+    projectTurnEntry(dir, '/work', cache, SID);
+
+    // A different process injects runtime context (advances .seq).
+    appendLine(line(5, 'context_injected', { content: [{ type: 'text', text: 'INJECT' }] }));
+
+    const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p2.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+    const flat = JSON.stringify(p2.messages);
+    expect(flat).toContain('INJECT');
+  });
+
+  it('re-calling with NO new events is a no-op (cache reused, same messages)', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+    const p1 = projectTurnEntry(dir, '/work', cache, SID);
+    const head1 = cache.get(SID)!.headSeq;
+
+    // The offset seed after the full build is EXACTLY the consumed bytes, so the
+    // second call's incremental tail-read sees zero new bytes: a true no-op that
+    // never re-parses the whole log.
+    const spy = vi.spyOn(pe, 'readParsedSessionEvents');
+    const p2 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(spy).not.toHaveBeenCalled();
+    expect(JSON.stringify(p2.messages)).toBe(JSON.stringify(p1.messages));
+    expect(cache.get(SID)!.headSeq).toBe(head1);
+  });
+
+  it('a partial trailing line is held back, then folded once when completed', () => {
+    writeLog([
+      line(1, 'system_prompt_set', { text: 'sys' }),
+      line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+      line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+      line(4, 'turn_end', { stopReason: 'end_turn' }),
+    ]);
+    const cache = new Map<string, CachedProjection>();
+    projectTurnEntry(dir, '/work', cache, SID);
+
+    // A concurrent writer appends a line WITHOUT its trailing newline, then bumps
+    // .seq (as appendDurableEvent reserves the seq before the line lands). The
+    // incremental read must hold back the partial line — not mis-parse it.
+    const partial = line(5, 'prompt', { content: [{ type: 'text', text: 'again' }] });
+    appendFileSync(join(dir, 'events.jsonl'), partial, 'utf8'); // no '\n'
+    writeFileSync(join(dir, '.seq'), '6', 'utf8');
+
+    const pMid = projectTurnEntry(dir, '/work', cache, SID);
+    // Seq 5's content is not yet visible (its line is incomplete).
+    expect(JSON.stringify(pMid.messages)).not.toContain('again');
+
+    // The writer completes the line and appends the next event.
+    appendFileSync(join(dir, 'events.jsonl'), '\n', 'utf8');
+    appendLine(line(6, 'message', { content: [{ type: 'text', text: 'again-reply' }] }));
+
+    const pDone = projectTurnEntry(dir, '/work', cache, SID);
+    // Seq 5 folded EXACTLY once (not dropped, not doubled) and matches a full rebuild.
+    expect(JSON.stringify(pDone.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+    expect(JSON.stringify(pDone.messages)).toContain('again');
+    expect(JSON.stringify(pDone.messages)).toContain('again-reply');
+  });
+
+  it('falls back to a full build when there is no .seq head', () => {
+    // No .seq written: readHead → undefined → full rebuild + seed.
+    writeFileSync(
+      join(dir, 'events.jsonl'),
+      [
+        line(1, 'system_prompt_set', { text: 'sys' }),
+        line(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+        line(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    const cache = new Map<string, CachedProjection>();
+    const p1 = projectTurnEntry(dir, '/work', cache, SID);
+    expect(JSON.stringify(p1.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(dir, '/work').messages)
+    );
+  });
+});
+
+// The byte-offset incremental path must equal a fresh full rebuild even when new
+// events land in a BRAND-NEW shard (a new UTC date / persona bucket) — exercising
+// the new-layout discovery + cross-shard sort-by-eventSeq before folding.
+describe('projectTurnEntry — cross-shard byte-offset incremental', () => {
+  const persona = 'ada';
+  const day1 = new Date('2026-06-18T12:00:00.000Z');
+  const day2 = new Date('2026-06-19T12:00:00.000Z');
+  let laceDir: string;
+  let sessionId: string;
+  let sessionDir: string;
+  let prevLaceDir: string | undefined;
+  let prevSessionDir: string | undefined;
+
+  beforeEach(() => {
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-proj-shard-'));
+    sessionId = `sess_${randomUUID()}`;
+    prevLaceDir = process.env.LACE_DIR;
+    prevSessionDir = process.env.LACE_SESSION_DIR;
+    process.env.LACE_DIR = laceDir;
+    // getSessionDir resolves the legacy events.jsonl dir; .seq lives there too.
+    process.env.LACE_SESSION_DIR = join(laceDir, 'agent-sessions');
+    sessionDir = getSessionDir(sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (prevLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = prevLaceDir;
+    if (prevSessionDir === undefined) delete process.env.LACE_SESSION_DIR;
+    else process.env.LACE_SESSION_DIR = prevSessionDir;
+    rmSync(laceDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  const shardLine = (eventSeq: number, type: string, data: Record<string, unknown>): string =>
+    JSON.stringify({ eventSeq, timestamp: 't', type, data });
+
+  function shardFile(date: Date): string {
+    const d = transcriptDir({ laceDir, persona, date });
+    mkdirSync(d, { recursive: true });
+    return join(d, `${sessionId}.jsonl`);
+  }
+
+  function setSeq(seq: number): void {
+    writeFileSync(join(sessionDir, '.seq'), String(seq + 1), 'utf8');
+  }
+
+  it('folds a brand-new-date shard appended between calls, equal to a full rebuild', () => {
+    // Day-1 shard: a complete first turn.
+    writeFileSync(
+      shardFile(day1),
+      [
+        shardLine(1, 'system_prompt_set', { text: 'sys' }),
+        shardLine(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+        shardLine(3, 'message', { content: [{ type: 'text', text: 'hello' }] }),
+        shardLine(4, 'turn_end', { stopReason: 'end_turn' }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    setSeq(4);
+
+    const cache = new Map<string, CachedProjection>();
+    const p1 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
+    expect(JSON.stringify(p1.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(sessionDir, '/work').messages)
+    );
+
+    // A new turn lands in a brand-new DAY-2 shard (a file absent at seed time →
+    // read from byte 0 on the incremental pass).
+    appendFileSync(
+      shardFile(day2),
+      [
+        shardLine(5, 'prompt', { content: [{ type: 'text', text: 'next day' }] }),
+        shardLine(6, 'message', { content: [{ type: 'text', text: 'day-2 reply' }] }),
+        shardLine(7, 'turn_end', { stopReason: 'end_turn' }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    setSeq(7);
+
+    const expectedMessages = JSON.stringify(loadTurnEntryProjection(sessionDir, '/work').messages);
+
+    const spy = vi.spyOn(pe, 'readParsedSessionEvents');
+    const p2 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
+    expect(spy).not.toHaveBeenCalled(); // O(tail): never re-parses the whole log
+    expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
+    expect(p2.lastTurnEndSeq).toBe(7);
+    expect(JSON.stringify(p2.messages)).toContain('day-2 reply');
+  });
+
+  it('cross-shard new events are sorted by eventSeq before folding', () => {
+    // Day-1 shard seeded; .seq tip past it.
+    writeFileSync(
+      shardFile(day1),
+      [
+        shardLine(1, 'system_prompt_set', { text: 'sys' }),
+        shardLine(2, 'prompt', { content: [{ type: 'text', text: 'hi' }] }),
+        shardLine(3, 'message', { content: [{ type: 'text', text: 'r1' }] }),
+      ].join('\n') + '\n',
+      'utf8'
+    );
+    setSeq(3);
+    const cache = new Map<string, CachedProjection>();
+    projectTurnEntry(sessionDir, '/work', cache, sessionId);
+
+    // New events split across BOTH shards out of file-enumeration order: a later
+    // event (5) is appended to the existing day-1 shard while an earlier event (4)
+    // lands in the new day-2 shard. Discovery yields day-1 before day-2, so
+    // without the sort-by-eventSeq the fold would see 5 before 4. A full rebuild
+    // (globally sorted) is the oracle.
+    appendFileSync(
+      shardFile(day1),
+      shardLine(5, 'message', { content: [{ type: 'text', text: 'r2' }] }) + '\n',
+      'utf8'
+    );
+    writeFileSync(
+      shardFile(day2),
+      shardLine(4, 'prompt', { content: [{ type: 'text', text: 'q2' }] }) + '\n',
+      'utf8'
+    );
+    setSeq(5);
+
+    const p2 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
+    expect(JSON.stringify(p2.messages)).toBe(
+      JSON.stringify(loadTurnEntryProjection(sessionDir, '/work').messages)
+    );
+  });
+});

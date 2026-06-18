@@ -19,6 +19,7 @@ import {
   writeSessionState,
 } from '@lace/agent/storage/session-store';
 import { PROMPT_HANDLER_CAUGHT_STOP_REASON } from '@lace/agent/storage/event-types';
+import { logger } from '@lace/agent/utils/logger';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -98,6 +99,40 @@ describe('prompt.ts fallback turn_end', () => {
       expect(turnEnds[0]?.data).toMatchObject({
         stopReason: PROMPT_HANDLER_CAUGHT_STOP_REASON,
       });
+
+      expect(runSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('logs the caught turn error so a swallowed failure is observable', async () => {
+    // A turn that throws is otherwise invisible: the fallback turn_end records
+    // only a generic stop reason, and an idempotency-keyed prompt re-raises
+    // tagged 'persisted-new', which the caller (sen-core) reports as delivered.
+    // Without an explicit log the failure repeats silently on every message.
+    const runSpy = vi
+      .spyOn(ConversationRunner.prototype, 'run')
+      .mockRejectedValue(new Error('synthetic runner failure ZQX'));
+    const errorSpy = vi.spyOn(logger, 'error');
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', { cwd: workDir, mcpServers: [] });
+
+      await expect(
+        client.request('session/prompt', { content: [{ type: 'text', text: 'hello' }] })
+      ).rejects.toBeDefined();
+
+      const turnFailureLog = errorSpy.mock.calls.find(
+        (call) => typeof call[0] === 'string' && call[0].includes('turn failed')
+      );
+      expect(turnFailureLog).toBeDefined();
+      expect(JSON.stringify(turnFailureLog?.[1])).toContain('synthetic runner failure ZQX');
 
       expect(runSpy).toHaveBeenCalledTimes(1);
     } finally {

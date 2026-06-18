@@ -13,6 +13,7 @@ import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import type { ProjectedContainerManager } from '@lace/agent/tools/runtime/projected-container';
 import type { RuntimeSecretResolver } from '@lace/agent/tools/runtime/secrets';
 import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
+import type { CachedProjection } from '@lace/agent/message-building/incremental-projection';
 
 /**
  * Approval mode for tool permissions.
@@ -197,6 +198,15 @@ export interface RunnerDependencies {
    * can dispose it (container destroyed before /work removal).
    */
   workspaceReaper?: WorkspaceReaper;
+
+  /**
+   * Per-process in-memory conversation projection cache (server-owned, keyed by
+   * sessionId). When supplied, turn entry folds only the new tail since the
+   * cached .seq head (O(tail)) instead of re-parsing the whole log. Absent in
+   * contexts that don't run the server (the runner then falls back to the full
+   * loadTurnEntryProjection every turn).
+   */
+  projectionCache?: Map<string, CachedProjection>;
 }
 
 /**

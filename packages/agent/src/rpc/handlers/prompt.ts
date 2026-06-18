@@ -455,6 +455,7 @@ export function registerPromptHandler(
         ...(state.reminderScheduler ? { reminderScheduler: state.reminderScheduler } : {}),
         ...(state.activeSession ? { activeSessionId: state.activeSession.meta.sessionId } : {}),
         workspaceReaper: state.workspaceReaper,
+        projectionCache: state.projectionCache,
         setActiveTurnStatus: (status, ac) => {
           if (status === null) {
             state.activeTurn = null;
@@ -562,6 +563,18 @@ export function registerPromptHandler(
         ...(idempotencyKey ? { durableHandoffStatus: 'persisted-new' as const } : {}),
       };
     } catch (err) {
+      // Surface the failure. A turn that throws here is otherwise invisible:
+      // the fallback turn_end below records only a generic stop reason, and an
+      // idempotency-keyed prompt re-raises tagged 'persisted-new' (the prompt
+      // durably landed), which the caller reports as delivered — no retry, no
+      // alert. Without this log a broken turn (e.g. a session missing modelId,
+      // which makes provider construction throw before any request) fails
+      // silently on every inbound message. Log first, then run the fallback.
+      logger.error('prompt handler: turn failed', {
+        turnId,
+        error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
       // Defense-in-depth fallback turn_end. The runner is supposed to always
       // write turn_end before throwing, but this catch backstops any path the
       // runner can't cover — throws between turn_start and runner.run() starting,

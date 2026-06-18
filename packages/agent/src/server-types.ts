@@ -22,6 +22,7 @@ import type { ReminderScheduler } from './reminders';
 import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
 import type { WorkspaceReaper } from './jobs/workspace-reaper';
+import type { CachedProjection } from './message-building/incremental-projection';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -169,6 +170,12 @@ export type AgentServerState = {
   // Key: `${sessionId}|${executionMode}`. Holds Promises so concurrent calls
   // for the same key share one in-flight build.
   toolExecutorCache: Map<string, Promise<{ executor: ToolExecutor; toolsForProvider: Tool[] }>>;
+  // Per-session in-memory conversation projection, keyed by sessionId. Holds the
+  // persisted-prefix FoldState + system prompt + files-read + last-turn-end +
+  // next-seq-to-fold head so each turn folds only the events appended since the
+  // cached .seq head (O(tail)) instead of re-parsing the whole log. Mirrors the
+  // toolExecutorCache cross-turn pattern; a session switch uses a different key.
+  projectionCache: Map<string, CachedProjection>;
   // Embedder-controlled persona resolver. Defaulted to the module singleton;
   // initialize handler replaces it when the client supplies userPersonasPaths.
   personaRegistry: PersonaRegistry;
