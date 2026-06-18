@@ -5,8 +5,11 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { readNewCompleteLines, createInjectTailer } from '@lace/agent/storage/inject-tailer';
 import { transcriptDir } from '@lace/agent/storage/transcript-paths';
+import { readImmediateInjectsSince } from '@lace/agent/core/conversation/runner';
+import { getSessionDir } from '@lace/agent/storage/session-store';
 
 type ShardEvent = {
   eventSeq: number;
@@ -146,5 +149,114 @@ describe('createInjectTailer', () => {
     const b = tailer.readNew();
     expect(b.injections).toEqual(['next-day inject']);
     expect(b.newWatermark).toBe(9);
+  });
+});
+
+describe('InjectTailer behavioral equivalence vs readImmediateInjectsSince oracle', () => {
+  const persona = 'ada';
+  const day1 = new Date('2026-06-18T12:00:00.000Z');
+  const day2 = new Date('2026-06-19T12:00:00.000Z');
+  let laceDir: string;
+  let sessionId: string;
+  let sessionDir: string;
+  let prevLaceDir: string | undefined;
+  let prevSessionDir: string | undefined;
+
+  beforeEach(() => {
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-injectdiff-'));
+    sessionId = `sess_${randomUUID()}`;
+    prevLaceDir = process.env.LACE_DIR;
+    prevSessionDir = process.env.LACE_SESSION_DIR;
+    process.env.LACE_DIR = laceDir;
+    process.env.LACE_SESSION_DIR = join(laceDir, 'agent-sessions');
+    // getSessionDir resolves the legacy events.jsonl dir; both the tailer and the
+    // oracle read the exact same file set rooted here.
+    sessionDir = getSessionDir(sessionId);
+  });
+
+  afterEach(() => {
+    if (prevLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = prevLaceDir;
+    if (prevSessionDir === undefined) delete process.env.LACE_SESSION_DIR;
+    else process.env.LACE_SESSION_DIR = prevSessionDir;
+    rmSync(laceDir, { recursive: true, force: true });
+  });
+
+  it('the union of readNew() over a sequence equals the full-scan oracle for the same watermark', () => {
+    const seed = 5;
+
+    // Initial day-1 shard: interleaved tool_use/message/turn events plus an
+    // immediate inject at the seed (<= watermark, must be ignored by both).
+    writeShard(
+      laceDir,
+      persona,
+      day1,
+      sessionId,
+      [
+        { eventSeq: 3, type: 'message', data: {} },
+        { eventSeq: 4, type: 'tool_use', data: {} },
+        immediateInject(5, 'pre-seed inject (ignored)'),
+      ],
+      'write'
+    );
+
+    const tailer = createInjectTailer(laceDir, sessionId, seed);
+
+    // First mid-turn batch: an immediate inject (6), interleaved turn_end (7).
+    writeShard(
+      laceDir,
+      persona,
+      day1,
+      sessionId,
+      [immediateInject(6, 'inject A'), { eventSeq: 7, type: 'turn_end', data: {} }],
+      'append'
+    );
+    const r1 = tailer.readNew();
+
+    // Cross-process inject appended BETWEEN two reads: a non-immediate inject (8)
+    // that both must ignore, then an immediate inject (9).
+    writeShard(
+      laceDir,
+      persona,
+      day1,
+      sessionId,
+      [
+        {
+          eventSeq: 8,
+          type: 'context_injected',
+          data: { priority: 'queued', content: [{ type: 'text', text: 'queued (ignored)' }] },
+        },
+        immediateInject(9, 'inject B (cross-process, mid-turn)'),
+      ],
+      'append'
+    );
+    const r2 = tailer.readNew();
+
+    // Cross-date shard: a brand-new day-2 file with an immediate inject (10).
+    writeShard(
+      laceDir,
+      persona,
+      day2,
+      sessionId,
+      [immediateInject(10, 'inject C (next day)')],
+      'write'
+    );
+    const r3 = tailer.readNew();
+
+    // The tailer's union over the whole sequence...
+    const tailerInjections = [...r1.injections, ...r2.injections, ...r3.injections];
+    const tailerWatermark = r3.newWatermark;
+
+    // ...must equal what the full-scan oracle returns for the same seed.
+    const oracle = readImmediateInjectsSince(sessionDir, seed);
+
+    expect(tailerInjections).toEqual(oracle.injections);
+    expect(tailerInjections).toEqual([
+      'inject A',
+      'inject B (cross-process, mid-turn)',
+      'inject C (next day)',
+    ]);
+    expect(tailerWatermark).toBe(oracle.newWatermark);
+    expect(tailerWatermark).toBe(10);
   });
 });

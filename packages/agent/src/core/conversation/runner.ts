@@ -3,7 +3,7 @@
 // calls, tool execution, permission handling, and event persistence.
 
 import { randomUUID } from 'node:crypto';
-import { join, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
+import { join, basename, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ToolResult as CoreToolResult, ToolCall, ToolContext } from '@lace/agent/tools/types';
 import type { Tool } from '@lace/agent/tools/tool';
@@ -304,8 +304,12 @@ function capToolResult(params: {
  * calls ent/session/inject, which writes a context_injected event with
  * priority='immediate'. Without this re-read, the runner would only pick that
  * event up on the NEXT turn — functionally identical to queueing.
+ *
+ * The runner now reads immediate injects via the incremental InjectTailer; this
+ * full-scan reader is retained as the behavioral-equivalence oracle for the
+ * tailer's differential test.
  */
-function readImmediateInjectsSince(
+export function readImmediateInjectsSince(
   sessionDir: string,
   afterEventSeq: number
 ): { injections: string[]; newWatermark: number } {
@@ -477,6 +481,14 @@ export class ConversationRunner {
     // before run() was called) are picked up on the first iteration, not
     // silently skipped.
     let lastSeenEventSeq = turnEntry.lastTurnEndSeq ?? 0;
+    // One tail-reader per turn, seeded with the turn-entry watermark. Each
+    // readNew() reads only the JSONL bytes appended since the last call, so the
+    // per-iteration immediate-inject pickup is an incremental tail-read of the
+    // source of truth — not a full re-scan of every shard.
+    // Key the tailer off the on-disk session-id (the transcript shards' basename),
+    // which is what the durable log is written under — matching the full-scan
+    // reader, whose sessionDir basename drives shard discovery.
+    const injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
@@ -530,10 +542,7 @@ export class ConversationRunner {
         // that landed since we last looked. These come from ent/session/inject
         // RPCs fired by peers while this turn is in flight; without this
         // re-read they would not be visible until the next sessionPrompt.
-        const { injections, newWatermark } = readImmediateInjectsSince(
-          sessionDir,
-          lastSeenEventSeq
-        );
+        const { injections, newWatermark } = injectTailer.readNew();
         for (const content of injections) {
           providerMessages = appendOrMergeUser(providerMessages, content);
         }
