@@ -11,6 +11,7 @@ import { readAllSessionEventLines } from '../../storage/event-log';
 import { stripTrailingLoneSurrogate } from '../../compaction/toolkit';
 import { getSessionDir, readSessionMeta } from '../../storage/session-store';
 import type { TypedDurableEvent } from '../../storage/event-types';
+import { resolveRecallExtractor } from './recall-extractor';
 
 // Flat schema with an `action` enum discriminator. Per-action required-field
 // checks happen at runtime in executeValidated. The flat shape is required
@@ -25,7 +26,7 @@ import type { TypedDurableEvent } from '../../storage/event-types';
 const personaElem = z.string().min(1, 'persona name must be non-empty');
 
 const recallSchema = z.object({
-  action: z.enum(['search', 'read']),
+  action: z.enum(['search', 'read', 'thread']),
   // search fields
   query: z.string().min(1).optional(),
   persona: z.union([personaElem, z.array(personaElem)]).optional(),
@@ -42,11 +43,15 @@ const recallSchema = z.object({
   event_id: z.string().min(1).optional(),
   context: z.number().int().nonnegative().max(50).optional(),
   full: z.boolean().optional(),
+  // thread field — an OPAQUE group key. The kernel never parses it; it goes
+  // straight to the registered membership extractor (sen-core owns its meaning).
+  groupKey: z.string().min(1, 'groupKey must be non-empty').optional(),
 });
 
 export type RecallInput = z.infer<typeof recallSchema>;
 export type RecallSearchInput = RecallInput & { action: 'search'; query: string };
 export type RecallReadInput = RecallInput & { action: 'read'; event_id: string };
+export type RecallThreadInput = RecallInput & { action: 'thread'; groupKey: string };
 
 const RECALL_DESCRIPTION = [
   'Search your own past lace session transcripts — your episodic memory.',
@@ -54,7 +59,13 @@ const RECALL_DESCRIPTION = [
   'into surrounding context. This is a record of what happened, not the current state of the',
   'world; re-check live for facts that can change.',
   '',
-  'Actions: `search`, `read`.',
+  'Actions: `search`, `read`, `thread`.',
+  '',
+  '`thread` reassembles a whole conversation thread from your CURRENT session by an',
+  'opaque `groupKey`: it returns every event belonging to that thread VERBATIM (both',
+  'sides), ordered oldest→newest. Results are budgeted — when a thread is long, the',
+  'newest events are kept and a `truncated` signal plus a `recall(action:"read", …)`',
+  'pointer let you page the rest.',
   '',
   'Query syntax: `search.query` is a SQLite FTS5 match expression, not a plain string.',
   'Plain words and phrases work best (terms are implicitly ANDed). Punctuation is',
@@ -71,6 +82,13 @@ const RECALL_DESCRIPTION = [
 // Truncation caps, calibrated for a 200k-token main context per spec §Truncation.
 const BASE_CONTENT_CAP = 10_000;
 const CONTEXT_TOOL_CALL_CAP = 500;
+
+// `thread` result budget. A thread reassembly returns whole events verbatim, so
+// it can balloon; cap both the event COUNT (newest-first selection) and each
+// event's verbatim byte size so the result stays within the main context.
+// Conservative on purpose — the agent can page the rest with recall(read).
+export const THREAD_MAX_EVENTS = 200;
+export const THREAD_VERBATIM_BYTE_CAP = 4_000;
 
 type SearchHitRow = {
   event_id: string;
@@ -102,6 +120,16 @@ export class RecallTool extends Tool {
         this.search({ ...args, action: 'search', query: args.query as string }, context)
       );
     }
+    if (args.action === 'thread') {
+      if (args.groupKey === undefined) {
+        return this.createResult({
+          error: '`thread` action requires a `groupKey` field (non-empty string).',
+        });
+      }
+      return this.withErrorEnvelope('thread', () =>
+        this.thread({ ...args, action: 'thread', groupKey: args.groupKey as string }, context)
+      );
+    }
     if (args.event_id === undefined) {
       return this.createResult({
         error: '`read` action requires an `event_id` field (format `<session_id>:<eventSeq>`).',
@@ -121,7 +149,7 @@ export class RecallTool extends Tool {
    * may have been interpolated into them and could carry leaked secrets.
    */
   private async withErrorEnvelope(
-    action: 'search' | 'read',
+    action: 'search' | 'read' | 'thread',
     fn: () => Promise<ToolResult>
   ): Promise<ToolResult> {
     try {
@@ -366,6 +394,88 @@ export class RecallTool extends Tool {
     });
 
     return this.createResult({ events });
+  }
+
+  /**
+   * Reassemble a whole conversation thread from the CURRENT session by an opaque
+   * `groupKey`. The kernel is Slack-blind: it never parses the key — it hands the
+   * session's verbatim events and the key straight to the registered membership
+   * extractor (a plugin, e.g. sen-core, owns the key's meaning) and returns the
+   * events the extractor selected, verbatim and ordered oldest→newest.
+   *
+   * No extractor registered → a LOUD not-registered envelope (never a silent
+   * empty result), so a misconfigured deploy is obvious instead of looking like
+   * "this thread has no events".
+   */
+  private async thread(args: RecallThreadInput, context: ToolContext): Promise<ToolResult> {
+    const extractor = resolveRecallExtractor();
+    if (!extractor) {
+      return this.createResult({
+        error:
+          'no membership extractor registered for `recall(action:"thread")`. ' +
+          'A plugin must register one via api.recall.register(...). Is its plugin loaded via LACE_PLUGINS?',
+      });
+    }
+
+    const sessionId = context.activeSessionId;
+    if (!sessionId) {
+      return this.createResult({
+        error: '`thread` action needs an active session, but none is bound to this context.',
+      });
+    }
+
+    // The verbatim journal supplies the ORIGINAL, already-redacted event bytes for
+    // the whole session, keyed by eventSeq. The extractor sees parsed events; the
+    // key is opaque to us.
+    const verbatimBySeq = readVerbatimEvents(sessionId);
+    const events = [...verbatimBySeq.values()];
+    const seqs = new Set(extractor(events, args.groupKey));
+
+    // Collect (seq, verbatim) for the selected events, ascending by seq.
+    const selected: Array<{ event_seq: number; verbatim: unknown }> = [];
+    for (const [seq, verbatim] of verbatimBySeq) {
+      if (seqs.has(seq)) selected.push({ event_seq: seq, verbatim });
+    }
+    selected.sort((a, b) => a.event_seq - b.event_seq);
+
+    // Budget — event COUNT: keep the NEWEST THREAD_MAX_EVENTS, then re-sort asc.
+    let droppedEvents = 0;
+    let kept = selected;
+    if (selected.length > THREAD_MAX_EVENTS) {
+      droppedEvents = selected.length - THREAD_MAX_EVENTS;
+      kept = selected.slice(selected.length - THREAD_MAX_EVENTS);
+    }
+
+    // Budget — per-event BYTES: cap each verbatim's serialized size. We truncate
+    // the JSON string form (the verbatim may be any shape) and surface the clip
+    // as a string so the agent sees the boundary and can page via recall(read).
+    let clippedBytes = 0;
+    const outEvents = kept.map(({ event_seq, verbatim }) => {
+      const event_id = `${sessionId}:${event_seq}`;
+      const json = JSON.stringify(verbatim) ?? 'null';
+      const size = Buffer.byteLength(json, 'utf8');
+      if (size <= THREAD_VERBATIM_BYTE_CAP) {
+        return { event_id, verbatim };
+      }
+      clippedBytes += size - THREAD_VERBATIM_BYTE_CAP;
+      const head = stripTrailingLoneSurrogate(json.slice(0, THREAD_VERBATIM_BYTE_CAP));
+      return {
+        event_id,
+        verbatim: `${head}... [truncated, read recall(action:"read", event_id:"${event_id}") for the full event]`,
+      };
+    });
+
+    if (droppedEvents > 0 || clippedBytes > 0) {
+      return this.createResult({
+        events: outEvents,
+        truncated: {
+          events: droppedEvents,
+          bytes: clippedBytes,
+          hint: `Thread budget applied. Page individual events with recall(action:"read", event_id:"${sessionId}:<eventSeq>").`,
+        },
+      });
+    }
+    return this.createResult({ events: outEvents });
   }
 }
 
