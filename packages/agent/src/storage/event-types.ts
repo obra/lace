@@ -136,6 +136,12 @@ export type ContextCompactedEventData = {
    * Optional because legacy events written before this field shipped lack it.
    */
   messagesCompacted?: number;
+  /**
+   * Optional per-group cache (producer-defined, opaque to the kernel): a memo a
+   * compaction strategy carries forward to avoid recomputing unchanged groups.
+   * Never a source of truth — reconstructable from the event log.
+   */
+  groupState?: Record<string, unknown>;
 };
 
 export type ContextInjectedEventData = {

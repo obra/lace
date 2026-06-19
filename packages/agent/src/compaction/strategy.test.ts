@@ -58,6 +58,24 @@ describe('validatePreserved', () => {
     );
     expect(validatePreserved(once)).toEqual(once);
   });
+
+  it('carries an optional groupState field verbatim', () => {
+    const gs = { coveredThroughSeq: 42, tracks: { 'slack:T:C/1': { summary: 'envelope' } } };
+    const result = validatePreserved({
+      compactionEvent: {
+        type: 'context_compacted',
+        data: {
+          type: 'context_compacted',
+          strategy: 'sen-multiconv',
+          messagesCompacted: 3,
+          preserved: [{ role: 'user', content: 'x' }],
+          groupState: gs,
+        },
+      },
+    });
+    if ('noop' in result) throw new Error('expected non-noop');
+    expect((result.compactionEvent.data as { groupState?: unknown }).groupState).toEqual(gs);
+  });
 });
 
 describe('resolveCompactionStrategy', () => {
