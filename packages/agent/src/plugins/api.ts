@@ -26,10 +26,15 @@ export interface PluginMeta {
   version: string;
 }
 
+/** Returns the event_seqs of events belonging to `key`. `events` = parsed verbatim
+ *  events of ONE session; `key` is opaque to the kernel (never parsed here). */
+export type RecallMembershipExtractor = (events: unknown[], key: string) => number[];
+
 export interface PluginRegistries {
   tools: Registry<Tool>;
   compaction: Registry<CompactionStrategy>;
   runtimes: Registry<ContainerRuntime>;
+  recall: Registry<RecallMembershipExtractor>;
 }
 export interface PluginRegistrar<T> {
   register(name: string, value: T): void;
@@ -41,6 +46,7 @@ export interface PluginApi {
   tools: PluginRegistrar<Tool> & { registerExecDir(dir: string): void };
   compaction: PluginRegistrar<CompactionStrategy>;
   runtimes: PluginRegistrar<ContainerRuntime>;
+  recall: PluginRegistrar<RecallMembershipExtractor>;
   personas: { addDir(dir: string): void };
   skills: { addDir(dir: string): void };
 }
@@ -65,6 +71,7 @@ export function makeRegistries(): PluginRegistries {
     tools: new Registry<Tool>('tools'),
     compaction: new Registry<CompactionStrategy>('compaction'),
     runtimes: new Registry<ContainerRuntime>('runtimes'),
+    recall: new Registry<RecallMembershipExtractor>('recall'),
   };
 }
 
@@ -91,6 +98,7 @@ export function createPluginApi(meta: PluginMeta, registries: PluginRegistries):
     },
     compaction: registrar(registries.compaction, meta.name),
     runtimes: registrar(registries.runtimes, meta.name),
+    recall: registrar(registries.recall, meta.name),
     personas: { addDir: (dir: string) => addPersonaDir(meta.namespace, dir) },
     skills: { addDir: (dir: string) => addSkillDir(meta.namespace, dir) },
   };
@@ -106,6 +114,7 @@ export function resetRegistriesForTest(): void {
   registries.tools.clear();
   registries.compaction.clear();
   registries.runtimes.clear();
+  registries.recall.clear();
   resetContributedDirsForTest();
   resetManifestsForTest();
 }
