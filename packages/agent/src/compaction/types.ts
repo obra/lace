@@ -15,6 +15,11 @@ export interface CompactionContext {
   /** Filesystem path to the session directory */
   sessionDir?: string;
   /**
+   * Reference 'now' (ISO) for recency/staleness — injectable for deterministic
+   * compaction; defaults to wall-clock now.
+   */
+  readonly referenceTimestamp?: string;
+  /**
    * One-shot LLM query bound by the call site to the session connection.
    * The binder converts {prompt} → messages and defaults `model` to
    * the session modelId. Strategies that don't need an LLM ignore it.

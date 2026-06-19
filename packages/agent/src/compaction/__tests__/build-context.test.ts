@@ -90,6 +90,20 @@ describe('buildCompactionContext', () => {
     expect(ctx.sessionDir).toBe('/tmp/session');
   });
 
+  it('ctx.referenceTimestamp defaults to a valid ISO date string', () => {
+    const ctx = buildCompactionContext(BASE_OPTS);
+    expect(typeof ctx.referenceTimestamp).toBe('string');
+    expect(Number.isNaN(Date.parse(ctx.referenceTimestamp!))).toBe(false);
+  });
+
+  it('ctx.referenceTimestamp is preserved when caller supplies it', () => {
+    const ctx = buildCompactionContext({
+      ...BASE_OPTS,
+      referenceTimestamp: '2026-06-19T00:00:00.000Z',
+    });
+    expect(ctx.referenceTimestamp).toBe('2026-06-19T00:00:00.000Z');
+  });
+
   it('ctx.query is absent when connectionId is falsy', () => {
     const ctx = buildCompactionContext({ ...BASE_OPTS, connectionId: undefined });
     expect(ctx.query).toBeUndefined();

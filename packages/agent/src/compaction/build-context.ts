@@ -37,6 +37,7 @@ export function buildCompactionContext(
     connectionId?: string;
     modelId?: string;
     guidance?: string;
+    referenceTimestamp?: string;
   },
   deps?: BuildContextDeps
 ): CompactionContext {
@@ -46,6 +47,7 @@ export function buildCompactionContext(
   const base: CompactionContext = {
     threadId: opts.threadId,
     sessionDir: opts.sessionDir,
+    referenceTimestamp: opts.referenceTimestamp ?? new Date().toISOString(),
     ...(opts.guidance !== undefined ? { guidance: opts.guidance } : {}),
   };
 
