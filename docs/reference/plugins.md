@@ -95,6 +95,7 @@ interface PluginApi {
   assertVersion(major: number): void; // throws PluginVersionError on major mismatch
   tools: PluginRegistrar<Tool> & { registerExecDir(dir: string): void };
   compaction: PluginRegistrar<CompactionStrategy>;
+  recall: PluginRegistrar<RecallMembershipExtractor>;
   runtimes: PluginRegistrar<ContainerRuntime>;
   personas: { addDir(dir: string): void };
   skills: { addDir(dir: string): void };
@@ -127,15 +128,16 @@ incompatible kernel fails loudly at load rather than misbehaving later.
 
 ## Registries
 
-Three typed registries, each a `Registry<T>` — a select-one-by-name table.
+Four typed registries, each a `Registry<T>` — a select-one-by-name table.
 Personas and skills are **not** registries; they are contributed via directories
 (see [Personas and Skills via directories](#personas-and-skills-via-directories)).
 
-| `api` field  | Value type           | Import the type from           | Consumed at                                                                                               |
-| ------------ | -------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `tools`      | `Tool`               | `@lace/agent/tools/tool`       | `ToolExecutor.registerAllAvailableTools()` draws every registered tool into each session executor.        |
-| `compaction` | `CompactionStrategy` | `@lace/agent/compaction/types` | `resolveCompactionStrategy(name)` selects a strategy by name (persona-configured, default `track-based`). |
-| `runtimes`   | `ContainerRuntime`   | `@lace/agent/containers/types` | `createDefaultContainerManager(platform, name)` selects a runtime by name.                                |
+| `api` field  | Value type                 | Import the type from           | Consumed at                                                                                               |
+| ------------ | -------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `tools`      | `Tool`                     | `@lace/agent/tools/tool`       | `ToolExecutor.registerAllAvailableTools()` draws every registered tool into each session executor.        |
+| `compaction` | `CompactionStrategy`       | `@lace/agent/compaction/types` | `resolveCompactionStrategy(name)` selects a strategy by name (persona-configured, default `track-based`). |
+| `recall`     | `RecallMembershipExtractor`| `@lace/agent/plugins/api`      | `recall(action:"thread", groupKey)` calls the registered extractor with an **opaque** key to select a conversation's events from the verbatim journal. The kernel never parses the key. |
+| `runtimes`   | `ContainerRuntime`         | `@lace/agent/containers/types` | `createDefaultContainerManager(platform, name)` selects a runtime by name.                                |
 
 ### Ownership and duplicates
 
@@ -162,8 +164,8 @@ class Registry<T> {
 ```
 
 The exported `registries` object exposes one of these per kind —
-`registries.tools`, `registries.compaction`, `registries.runtimes` — each with
-the full surface above. In a test you can assert ownership (e.g.
+`registries.tools`, `registries.compaction`, `registries.recall`,
+`registries.runtimes` — each with the full surface above. In a test you can assert ownership (e.g.
 `registries.compaction.owner('acme:strat')`).
 
 ## Personas and Skills via directories

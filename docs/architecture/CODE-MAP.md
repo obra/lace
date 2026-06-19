@@ -15,8 +15,8 @@
 - `packages/agent/src/index.ts`: agent package exports.
 - `packages/cli/src/main.ts`: CLI executable.
 - `packages/agent/src/plugins/`: the plugin system — one `LACE_PLUGINS` loader
-  feeding four registries (tools, compaction, runtimes, personas). Embedders
-  extend lace here. See [Writing Plugins](../writing-plugins.md) and the
+  feeding four typed registries (tools, compaction, recall, runtimes) plus the
+  persona/skill directory contributions. Embedders extend lace here. See [Writing Plugins](../writing-plugins.md) and the
   [Plugin System Reference](../reference/plugins.md). For external tools (exec
   binaries, MCP servers) see [External Tools](../external-tools.md).
 
