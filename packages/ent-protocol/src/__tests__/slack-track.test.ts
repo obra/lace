@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { formatSlackConvTrack, parseSlackConvTrack } from '../slack-track';
+import { deriveSendTrack, formatSlackConvTrack, parseSlackConvTrack } from '../slack-track';
 
 describe('formatSlackConvTrack', () => {
   it('formats a channel-level conversation (no threadTs)', () => {
@@ -169,5 +169,47 @@ describe('parseSlackConvTrack', () => {
   it('returns null for whitespace/garbage', () => {
     expect(parseSlackConvTrack('   ')).toBeNull();
     expect(parseSlackConvTrack('not-a-track')).toBeNull();
+  });
+});
+
+describe('deriveSendTrack', () => {
+  it('derives a channel-level track from channel + teamId', () => {
+    expect(deriveSendTrack({ channel: 'C0XYZ' }, 'T0ABC')).toBe('slack:T0ABC:C0XYZ');
+  });
+
+  it('derives a threaded track when thread_ts is present', () => {
+    expect(deriveSendTrack({ channel: 'C0XYZ', thread_ts: '1678886400.000200' }, 'T0ABC')).toBe(
+      'slack:T0ABC:C0XYZ/1678886400.000200'
+    );
+  });
+
+  it('returns null when channel is missing', () => {
+    expect(deriveSendTrack({ thread_ts: '1678886400.000200' }, 'T0ABC')).toBeNull();
+  });
+
+  it('returns null when channel is not a string', () => {
+    expect(deriveSendTrack({ channel: 123 }, 'T0ABC')).toBeNull();
+  });
+
+  it('returns null when teamId is undefined', () => {
+    expect(deriveSendTrack({ channel: 'C0XYZ' }, undefined)).toBeNull();
+  });
+
+  it('returns null when teamId is empty', () => {
+    expect(deriveSendTrack({ channel: 'C0XYZ' }, '')).toBeNull();
+  });
+
+  it('returns null when parts violate the grammar (channel contains "/")', () => {
+    expect(deriveSendTrack({ channel: 'C/BAD' }, 'T0ABC')).toBeNull();
+  });
+
+  it('ignores a non-string thread_ts (treats as channel-level)', () => {
+    expect(deriveSendTrack({ channel: 'C0XYZ', thread_ts: 42 }, 'T0ABC')).toBe('slack:T0ABC:C0XYZ');
+  });
+
+  it('treats an empty thread_ts as channel-level (derived track round-trips)', () => {
+    const track = deriveSendTrack({ channel: 'C0XYZ', thread_ts: '' }, 'T0ABC');
+    expect(track).toBe('slack:T0ABC:C0XYZ');
+    expect(parseSlackConvTrack(track as string)).toEqual({ teamId: 'T0ABC', channelId: 'C0XYZ' });
   });
 });

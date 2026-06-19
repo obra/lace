@@ -128,3 +128,39 @@ export function parseSlackConvTrack(track: string): SlackConvTrackParts | null {
 
   return { teamId, channelId, threadTs };
 }
+
+/** Minimal shape of a `slack/send_message` tool input, for track derivation. */
+export interface SlackSendInput {
+  channel?: unknown;
+  thread_ts?: unknown;
+}
+
+/**
+ * Derive the Slack conversation track for an outbound send.
+ *
+ * Returns `null` when the track cannot be derived: no string `channel`,
+ * no `teamId`, or parts that violate the track grammar. Callers decide what
+ * `null` means — sen-core compaction maps it to its `'untracked'` sentinel;
+ * the lace write seam leaves the event unstamped.
+ *
+ * This is the single shared derivation behind sen-core's compaction
+ * attributor, the lace runner write-seam closure, and the lace recall indexer.
+ */
+export function deriveSendTrack(input: SlackSendInput, teamId: string | undefined): string | null {
+  const channel = typeof input.channel === 'string' ? input.channel : null;
+  if (!channel) return null;
+  if (!teamId) return null;
+  // An empty thread_ts is not a thread — treat as channel-level so the derived
+  // track round-trips through parseSlackConvTrack (which rejects a trailing '/').
+  const threadTs =
+    typeof input.thread_ts === 'string' && input.thread_ts ? input.thread_ts : undefined;
+  try {
+    return formatSlackConvTrack(
+      threadTs !== undefined
+        ? { teamId, channelId: channel, threadTs }
+        : { teamId, channelId: channel }
+    );
+  } catch {
+    return null;
+  }
+}
