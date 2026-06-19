@@ -208,9 +208,65 @@ export type TrackBlock = {
   body: string;
   /** Rough token estimate (char/4). */
   estimatedTokens: number;
+  /** ISO timestamp of the track's newest event (last-touched, not created). */
+  lastActivityTs: string;
+  /** eventSeq of the track's newest event. */
+  lastSeq: number;
 };
 
 const estimate = (s: string) => Math.ceil(s.length / 4);
+
+/** Job-list eviction tunables: keep within 2 days OR the 10 most-recent. */
+const JOB_EVICT_HORIZON_MS = 2 * 24 * 60 * 60 * 1000;
+const JOB_EVICT_FLOOR_N = 10;
+
+/**
+ * Last-touched activity of a track: the timestamp + eventSeq of its newest
+ * event (highest eventSeq). Empty events → epoch / -1 (sorts oldest).
+ */
+function activityOf(events: TypedDurableEvent[]): { lastActivityTs: string; lastSeq: number } {
+  let lastSeq = -1;
+  let lastActivityTs = new Date(0).toISOString();
+  for (const e of events) {
+    if (e.eventSeq > lastSeq) {
+      lastSeq = e.eventSeq;
+      lastActivityTs = e.timestamp;
+    }
+  }
+  return { lastActivityTs, lastSeq };
+}
+
+/**
+ * Generic, domain-neutral recency keep-rule. Given `now`, an item is KEPT iff
+ * `now - getTs(item) <= horizonMs` (age within horizon) OR it is among the
+ * `floorN` items with the highest `getSeq` (recency floor). Returns the kept
+ * items in original order. `floorN <= 0` disables the floor; if there are no
+ * more than `floorN` items, all are kept.
+ */
+export function applyRecencyKeep<T>(
+  items: T[],
+  opts: {
+    now: string;
+    horizonMs: number;
+    floorN: number;
+    getTs: (item: T) => string;
+    getSeq: (item: T) => number;
+  }
+): T[] {
+  const { now, horizonMs, floorN, getTs, getSeq } = opts;
+  if (items.length <= floorN) return items.slice();
+  const nowMs = Date.parse(now);
+
+  const topSeqs = new Set<number>();
+  if (floorN > 0) {
+    const seqs = items.map(getSeq).sort((a, b) => b - a);
+    for (const s of seqs.slice(0, floorN)) topSeqs.add(s);
+  }
+
+  return items.filter(
+    (item) => nowMs - Date.parse(getTs(item)) <= horizonMs || topSeqs.has(getSeq(item))
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Generic salience helpers
@@ -274,7 +330,7 @@ export function jobSalience(trackId: string, events: TypedDurableEvent[]): Track
   }
   const status = outcome ? statusGlyph(outcome) : '⏳ in-flight';
   const body = `- ${trackId} ${description} → ${status}`;
-  return { trackId, body, estimatedTokens: estimate(body) };
+  return { trackId, body, estimatedTokens: estimate(body), ...activityOf(events) };
 }
 
 /**
@@ -296,7 +352,7 @@ export function untrackedSalience(trackId: string, events: TypedDurableEvent[]):
     }
   }
   const body = lines.length > 0 ? lines.join('\n') : '(empty)';
-  return { trackId, body, estimatedTokens: estimate(body) };
+  return { trackId, body, estimatedTokens: estimate(body), ...activityOf(events) };
 }
 
 /**
@@ -314,7 +370,7 @@ export function systemSalience(trackId: string, events: TypedDurableEvent[]): Tr
   }
   if (trackId === 'system:idle-errors') {
     const body = `${events.length} idle-error reports since last compaction.`;
-    return { trackId, body, estimatedTokens: estimate(body) };
+    return { trackId, body, estimatedTokens: estimate(body), ...activityOf(events) };
   }
   // Unknown system: track — drop
   return null;
@@ -332,6 +388,11 @@ export type SchedulerRollup = {
 export type GenericRenderInput = {
   blocks: TrackBlock[];
   scheduler: SchedulerRollup;
+  /**
+   * The compaction pass's "now". When set, the job list is aged against it
+   * (age+floor eviction). Absent → no eviction (backward-safe).
+   */
+  referenceTimestamp?: string;
 };
 
 const HEADER = '[Earlier conversation, compacted by track]';
@@ -348,7 +409,16 @@ const HEADER = '[Earlier conversation, compacted by track]';
  * through to ## Other.
  */
 export function renderGenericSections(input: GenericRenderInput, extraSections?: string): string {
-  const jobBlocks = input.blocks.filter((b) => b.trackId.startsWith('job:'));
+  let jobBlocks = input.blocks.filter((b) => b.trackId.startsWith('job:'));
+  if (input.referenceTimestamp) {
+    jobBlocks = applyRecencyKeep(jobBlocks, {
+      now: input.referenceTimestamp,
+      horizonMs: JOB_EVICT_HORIZON_MS,
+      floorN: JOB_EVICT_FLOOR_N,
+      getTs: (b) => b.lastActivityTs,
+      getSeq: (b) => b.lastSeq,
+    });
+  }
   const systemBlocks = input.blocks.filter(
     (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked'
   );

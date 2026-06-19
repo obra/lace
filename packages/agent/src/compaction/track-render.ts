@@ -10,6 +10,8 @@ export type { SchedulerRollup };
 export type RenderInput = {
   blocks: TrackBlock[];
   scheduler: SchedulerRollup;
+  /** Compaction pass's "now"; when set, enables job-list age+floor eviction. */
+  referenceTimestamp?: string;
 };
 
 /**
@@ -19,5 +21,9 @@ export type RenderInput = {
  * with an extraSections argument.
  */
 export function renderCompactionPrefix(input: RenderInput): string {
-  return renderGenericSections(input);
+  return renderGenericSections({
+    blocks: input.blocks,
+    scheduler: input.scheduler,
+    referenceTimestamp: input.referenceTimestamp,
+  });
 }
