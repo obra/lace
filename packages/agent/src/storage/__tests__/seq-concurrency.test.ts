@@ -99,4 +99,30 @@ describe('seq cross-process concurrency', () => {
       expect(sorted[i]).toBeGreaterThan(sorted[i - 1]);
     }
   }, 60_000);
+
+  it('N processes racing to break the SAME stale cross-boot lock elect a single winner (no dup)', async () => {
+    // The outage scenario, proven across REAL processes: a dead holder from a
+    // PREVIOUS boot left .seq.lock behind (fresh mtime, a "live"-looking pid, a
+    // foreign bootId). Every spawned process must break that stale lock and then
+    // serialize behind the mkdir gate. If the stale-break race let two winners
+    // through, we'd see a duplicate seq or a short count.
+    mkdirSync(join(sessionDir, '.seq.lock'), { recursive: true });
+    writeFileSync(
+      join(sessionDir, '.seq.lock', 'owner'),
+      JSON.stringify({
+        token: 'previous-boot-token',
+        pid: process.pid, // a live pid — must be ignored (pid-reuse hazard)
+        bootId: 'a-different-boot-00000000-0000-0000-0000-000000000000',
+        ts: Date.now(), // fresh: the mtime fallback would NOT clear this
+      })
+    );
+
+    const N = 4;
+    const M = 50;
+    await Promise.all(Array.from({ length: N }, () => runChild(laceDir, [sessionDir, String(M)])));
+
+    const seqs = eventSeqsAcrossShards(sessionDir);
+    expect(new Set(seqs).size).toBe(seqs.length); // no duplicate from a double-break
+    expect(seqs.length).toBe(N * M); // no lost append
+  }, 60_000);
 });

@@ -130,8 +130,16 @@ export function withSessionLock<T>(
  *        the waiter keeps spinning until its own timeout. This is the fix for
  *        the duplicate-seq window where two processes entered the critical
  *        section because a frozen mtime falsely declared a live holder stale.
- *  - bootId null or from a DIFFERENT boot → a pid on this host is meaningless →
- *    fall back to the mtime rule (generous threshold).
+ *  - Owner record from a DIFFERENT boot (both bootIds non-null, mismatched) →
+ *    the holder's boot is over, so the holder is gone → break immediately, with
+ *    no mtime/TTL wait. The recorded pid is meaningless across a boot (the pid
+ *    namespace resets and the value may have been reused by an unrelated live
+ *    process), so bootId — not pid — is the disambiguator. The break is gated on
+ *    the owner token (see breakIfOwner) so two racers electing the same stale
+ *    lock cannot both win: mkdir remains the single atomic arbiter and the
+ *    conditional rm never deletes a successor's freshly-acquired lock.
+ *  - bootId null on either side, or an unparseable record → liveness/identity is
+ *    unknowable → fall back to the mtime rule (generous threshold).
  */
 function tryReclaimStale(lockDir: string): void {
   let record: OwnerRecord | undefined;
@@ -142,15 +150,20 @@ function tryReclaimStale(lockDir: string): void {
   }
 
   const thisBoot = readBootId();
-  if (record && thisBoot !== null && record.bootId === thisBoot) {
-    // Same boot: pid liveness is authoritative.
-    if (pidAlive(record.pid)) return; // live holder — NEVER reclaim
-    reclaim(lockDir); // dead holder (ESRCH) — reclaim
+  if (record && thisBoot !== null && record.bootId !== null) {
+    if (record.bootId === thisBoot) {
+      // Same boot: pid liveness is authoritative.
+      if (pidAlive(record.pid)) return; // live holder — NEVER reclaim
+      reclaim(lockDir); // dead holder (ESRCH) — reclaim
+      return;
+    }
+    // Cross-boot: the holder's boot is over → it is gone → break it.
+    breakIfOwner(lockDir, record.token);
     return;
   }
 
-  // Liveness unknowable (unparseable record, or cross-boot/null bootId):
-  // reclaim only if the lock dir is older than the generous mtime threshold.
+  // Liveness/identity unknowable (unparseable record, or null bootId on either
+  // side): reclaim only if the lock dir is older than the generous mtime rule.
   reclaimIfMtimeStale(lockDir);
 }
 
@@ -165,6 +178,25 @@ function reclaimIfMtimeStale(lockDir: string): void {
   } catch {
     // stat failed (lock vanished) — fine
   }
+}
+
+/**
+ * Break a stale lock ONLY if its owner record still carries `staleToken` — the
+ * exact identity we judged stale. Re-reading the token immediately before the rm
+ * closes the break race: if a concurrent waiter already broke and re-acquired
+ * the lock, its owner record now carries a fresh token, so this rm is skipped
+ * and the successor's lock is preserved. The atomic `mkdirSync` in the acquire
+ * loop is the single winner gate; this conditional rm only ever removes the
+ * specific stale dir, never a successor's.
+ */
+function breakIfOwner(lockDir: string, staleToken: string): void {
+  try {
+    const cur = parseOwnerRecord(fs.readFileSync(path.join(lockDir, 'owner'), 'utf8'));
+    if (cur?.token !== staleToken) return; // a successor already re-acquired
+  } catch {
+    return; // owner gone / unreadable — nothing of ours to break
+  }
+  reclaim(lockDir);
 }
 
 function reclaim(lockDir: string): void {

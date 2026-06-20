@@ -34,6 +34,15 @@ function plantStaleOwner(
   utimesSync(lockDir, old, old);
 }
 
+/** Write a JSON owner record into a lock dir, leaving its mtime FRESH (just now). */
+function plantOwner(
+  lockDir: string,
+  record: { token: string; pid: number; bootId: string | null; ts: number }
+): void {
+  mkdirSync(lockDir);
+  writeFileSync(join(lockDir, 'owner'), JSON.stringify(record));
+}
+
 describe('withSessionLock', () => {
   let dir: string;
   beforeEach(() => {
@@ -104,6 +113,69 @@ describe('withSessionLock', () => {
     });
     const r = withSessionLock(dir, () => 'reclaimed');
     expect(r).toBe('reclaimed');
+  });
+
+  it('reclaims a stale CROSS-BOOT holder immediately, even with a FRESH mtime', () => {
+    // The exact outage: a holder from a PREVIOUS boot died without releasing.
+    // lace runs in a container whose boot_id resets each boot, so the recorded
+    // bootId differs from this boot's. That boot is over → the holder is gone →
+    // the lock is unconditionally stale and must be broken WITHOUT waiting for
+    // any mtime/TTL backstop (mtime is fresh here, pid looks alive → only the
+    // cross-boot bootId mismatch proves staleness).
+    const lockDir = join(dir, '.seq.lock');
+    plantOwner(lockDir, {
+      token: 'previous-boot-token',
+      pid: process.pid, // a "live" pid (pid reuse hazard) — must be ignored
+      bootId: 'a-different-boot-00000000-0000-0000-0000-000000000000',
+      ts: Date.now(), // fresh ts; fresh mtime — the mtime rule would NOT save us
+    });
+    const r = withSessionLock(dir, () => 'reclaimed', { timeoutMs: 1000 });
+    expect(r).toBe('reclaimed');
+  });
+
+  it('two acquirers racing on a stale cross-boot lock → exactly one acquires (no double-acquire)', () => {
+    // Concurrent stale-break must elect a single winner: the mkdir is the sole
+    // atomic gate and the conditional break never deletes a successor's lock.
+    // We can't fork real processes in a unit test, so we model the race by
+    // entering the critical section once (acquirer A wins) and, from inside it,
+    // attempting a second acquire (acquirer B) — B must NOT also acquire while A
+    // holds: it must block until A releases (or time out). The stale-break logic
+    // must not let B steal A's freshly-minted lock.
+    const lockDir = join(dir, '.seq.lock');
+    plantOwner(lockDir, {
+      token: 'previous-boot-token',
+      pid: process.pid,
+      bootId: 'a-different-boot-00000000-0000-0000-0000-000000000000',
+      ts: Date.now(),
+    });
+    let bothInside = false;
+    const a = withSessionLock(
+      dir,
+      () => {
+        // A has broken the stale lock and now holds a fresh one. B tries to
+        // acquire: it must time out (A's lock is live, same boot, A's pid alive)
+        // rather than steal A's lock.
+        let bAcquired = false;
+        try {
+          withSessionLock(
+            dir,
+            () => {
+              bAcquired = true;
+            },
+            { timeoutMs: 100 }
+          );
+        } catch {
+          // expected: B times out while A holds
+        }
+        bothInside = bAcquired; // must remain false → no double-acquire
+        return 'a-held';
+      },
+      { timeoutMs: 1000 }
+    );
+    expect(a).toBe('a-held');
+    expect(bothInside).toBe(false);
+    // A released cleanly afterward.
+    expect(existsSync(lockDir)).toBe(false);
   });
 
   it('falls back to the mtime rule for a legacy/unparseable owner file (reclaims if old)', () => {
