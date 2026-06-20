@@ -5,13 +5,23 @@
 // lock + reserve-before-append prevents the cross-process duplicate race.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readAllSessionEventLines } from '../event-log';
+import { parseProcStartTime } from '../session-lock';
 
 const CHILD = join(__dirname, '_seq-append-child.ts');
+
+/** This host's boot id, mirroring the lock's best-effort probe. */
+function thisBootId(): string | null {
+  try {
+    return readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+  } catch {
+    return null;
+  }
+}
 
 function runChild(laceDir: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -100,19 +110,23 @@ describe('seq cross-process concurrency', () => {
     }
   }, 60_000);
 
-  it('N processes racing to break the SAME stale cross-boot lock elect a single winner (no dup)', async () => {
-    // The outage scenario, proven across REAL processes: a dead holder from a
-    // PREVIOUS boot left .seq.lock behind (fresh mtime, a "live"-looking pid, a
-    // foreign bootId). Every spawned process must break that stale lock and then
-    // serialize behind the mkdir gate. If the stale-break race let two winners
-    // through, we'd see a duplicate seq or a short count.
+  it('N processes racing to break the SAME stale pid-reuse lock elect a single winner (no dup)', async () => {
+    // The outage scenario, proven across REAL processes: a dead holder left
+    // .seq.lock behind with a fresh mtime, this host's UNCHANGED bootId, and a pid
+    // that looks alive (our own) but a start-time that does NOT match it — the
+    // signature of a pid reused by a newer process after a container restart.
+    // Every spawned process must detect the start-time mismatch, break the stale
+    // lock, and serialize behind the mkdir gate. If the stale-break race let two
+    // winners through, we'd see a duplicate seq or a short count.
+    const realStart = parseProcStartTime(readFileSync(`/proc/${process.pid}/stat`, 'utf8'));
     mkdirSync(join(sessionDir, '.seq.lock'), { recursive: true });
     writeFileSync(
       join(sessionDir, '.seq.lock', 'owner'),
       JSON.stringify({
-        token: 'previous-boot-token',
-        pid: process.pid, // a live pid — must be ignored (pid-reuse hazard)
-        bootId: 'a-different-boot-00000000-0000-0000-0000-000000000000',
+        token: 'reused-pid-token',
+        pid: process.pid, // a live pid — must NOT be trusted (start-time mismatch)
+        bootId: thisBootId(), // SAME host boot — bootId cannot disambiguate this
+        startTime: (realStart ?? 0) + 1, // wrong start-time ⇒ pid was reused ⇒ dead
         ts: Date.now(), // fresh: the mtime fallback would NOT clear this
       })
     );

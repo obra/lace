@@ -1,19 +1,22 @@
 // ABOUTME: A per-session cross-process advisory lock for the durable-append critical
 // ABOUTME: section. mkdir() is atomic across processes (one winner); a JSON owner record
-// (token+pid+bootId) makes release safe against a stale-reclaim race AND lets reclaim
-// check holder LIVENESS (process.kill(pid,0)) instead of trusting a frozen dir-mtime — a
-// live holder stalled past the mtime threshold (GC/swap/CPU-throttle) is NEVER reclaimed.
+// (token+pid+bootId+startTime) makes release safe against a stale-reclaim race AND lets
+// reclaim check holder LIVENESS — pid PLUS its /proc start-time, so a reused pid (a NEW
+// process landing on the dead holder's pid after a container restart) is detected as dead,
+// not mistaken for a live holder. A genuinely live holder stalled past the mtime threshold
+// (GC/swap/CPU-throttle) is NEVER reclaimed.
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-// mtime FALLBACK threshold — used ONLY when holder liveness is unknowable (the
-// owner record is unparseable, or its bootId is null/from a different boot so a
-// pid on THIS host means nothing). A live holder on this boot is gated by the
-// pid-liveness probe, not by mtime, so this threshold can be generous: it should
-// only ever fire for a genuinely dead/hung holder we cannot probe. 5 minutes is
-// far above the sub-10ms critical section, so a slow-but-live holder in the
-// unknowable case is still extremely unlikely to be false-reclaimed.
+// mtime FALLBACK threshold — used ONLY when holder liveness is unknowable: a
+// legacy/torn owner record we cannot parse, or a record with no `startTime` so a
+// bare pid on this host means nothing (pids are reused). A holder whose liveness
+// IS knowable (pid + start-time) is gated by the start-time probe, not by mtime,
+// so this threshold can be generous: it should only ever fire for a genuinely
+// dead/hung holder we cannot probe. 5 minutes is far above the sub-10ms critical
+// section, so a slow-but-live holder in the unknowable case is still extremely
+// unlikely to be false-reclaimed.
 export const SEQ_LOCK_STALE_MS = 300_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
 const SPIN_MS = 5;
@@ -22,6 +25,12 @@ interface OwnerRecord {
   token: string;
   pid: number;
   bootId: string | null;
+  // The holder pid's process start-time (/proc/<pid>/stat field 22, jiffies
+  // since host boot). With pid, this uniquely identifies the holder process: a
+  // reused pid belongs to a process with a DIFFERENT start-time, so it reads as
+  // dead. null on a legacy record written before this field existed, or when
+  // /proc was unreadable at acquire → liveness is unknowable → mtime fallback.
+  startTime: number | null;
   ts: number;
 }
 
@@ -34,23 +43,76 @@ function readBootId(): string | null {
   }
 }
 
-/** True if `pid` is a live process on this host (process.kill(pid, 0) probe). */
-function pidAlive(pid: number): boolean {
+/**
+ * The start-time (field 22, jiffies since host boot) from a /proc/<pid>/stat
+ * line, or null if absent/malformed. Field 2 (comm) is wrapped in parens and may
+ * itself contain spaces and parens (e.g. `(some )( name)`), so we parse the
+ * fixed-width tail by splitting AFTER the LAST `)`: everything past it is the
+ * space-separated fields starting at field 3 (state). field 22 is then index 19
+ * (22 − 3) of that tail.
+ */
+export function parseProcStartTime(stat: string): number | null {
+  const close = stat.lastIndexOf(')');
+  if (close === -1) return null;
+  const tail = stat
+    .slice(close + 1)
+    .trim()
+    .split(/\s+/);
+  // tail[0] = field 3 (state); field 22 = tail[22 - 3] = tail[19].
+  const raw = tail[19];
+  if (raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** This process's own /proc start-time, or null if /proc is unreadable. */
+function readSelfStartTime(): number | null {
+  return readPidStartTime(process.pid);
+}
+
+/** The start-time recorded for `pid` in /proc/<pid>/stat, or null if gone/unreadable. */
+function readPidStartTime(pid: number): number | null {
   try {
-    process.kill(pid, 0);
-    return true; // signal accepted → alive (or EPERM, handled below)
-  } catch (err) {
-    // ESRCH → no such process (dead). EPERM → process exists but is ours-to-not
-    // signal → treat as ALIVE (never reclaim a process we know exists).
-    return (err as NodeJS.ErrnoException).code === 'EPERM';
+    return parseProcStartTime(fs.readFileSync(`/proc/${pid}/stat`, 'utf8'));
+  } catch {
+    return null; // no such pid, or /proc not mounted
   }
+}
+
+/**
+ * True iff the recorded holder is still the live process it was at acquire.
+ * Identity = (pid, startTime): /proc/<pid>/stat must exist AND carry the SAME
+ * start-time. A pid that is gone, or whose start-time differs (⇒ the pid was
+ * reused by a newer process), reads as DEAD. Immune to pid reuse within a host
+ * boot, which is exactly the container-restart case (pid 55 reborn each boot).
+ *
+ * Returns undefined when liveness is unknowable: the record predates the
+ * startTime field (legacy null), or /proc/self could not be read so we have no
+ * trustworthy clock to compare against — the caller then defers to mtime.
+ */
+function isHolderAlive(record: OwnerRecord): boolean | undefined {
+  if (record.startTime === null) return undefined; // legacy record — unknowable
+  const live = readPidStartTime(record.pid);
+  if (live === null) {
+    // The pid is gone. But if /proc itself is unreadable here (no Linux /proc),
+    // we cannot distinguish "dead" from "can't tell" — fall back to mtime.
+    if (readSelfStartTime() === null) return undefined;
+    return false; // pid genuinely absent on a working /proc → dead
+  }
+  return live === record.startTime;
 }
 
 function parseOwnerRecord(raw: string): OwnerRecord | undefined {
   try {
     const o = JSON.parse(raw) as Partial<OwnerRecord>;
     if (typeof o.token === 'string' && typeof o.pid === 'number') {
-      return { token: o.token, pid: o.pid, bootId: o.bootId ?? null, ts: o.ts ?? 0 };
+      return {
+        token: o.token,
+        pid: o.pid,
+        bootId: o.bootId ?? null,
+        startTime: typeof o.startTime === 'number' ? o.startTime : null,
+        ts: o.ts ?? 0,
+      };
     }
   } catch {
     // not JSON (legacy raw-token file or torn write)
@@ -87,6 +149,7 @@ export function withSessionLock<T>(
         token,
         pid: process.pid,
         bootId: readBootId(),
+        startTime: readSelfStartTime(),
         ts: Date.now(),
       };
       fs.writeFileSync(ownerPath, JSON.stringify(record), { encoding: 'utf8' });
@@ -118,28 +181,33 @@ export function withSessionLock<T>(
 
 /**
  * Reclaim a held lock ONLY when its holder is provably gone (or unknowable AND
- * ancient). Liveness — not the frozen dir-mtime — is the authority:
+ * ancient). Holder IDENTITY (pid + /proc start-time) — not the frozen dir-mtime,
+ * and not pid alone — is the authority:
  *
- *  - Owner record unparseable (legacy raw-token / torn write) → liveness is
- *    unknowable → fall back to the mtime rule (reclaim only if older than
- *    SEQ_LOCK_STALE_MS).
- *  - Owner record on THIS boot (bootId matches) → probe the pid:
- *      · dead (ESRCH) → reclaim.
- *      · alive → return WITHOUT reclaiming, regardless of mtime. A live holder
- *        stalled past any threshold (GC/swap/CPU-throttle) is never reclaimed;
- *        the waiter keeps spinning until its own timeout. This is the fix for
- *        the duplicate-seq window where two processes entered the critical
- *        section because a frozen mtime falsely declared a live holder stale.
- *  - Owner record from a DIFFERENT boot (both bootIds non-null, mismatched) →
- *    the holder's boot is over, so the holder is gone → break immediately, with
- *    no mtime/TTL wait. The recorded pid is meaningless across a boot (the pid
- *    namespace resets and the value may have been reused by an unrelated live
- *    process), so bootId — not pid — is the disambiguator. The break is gated on
- *    the owner token (see breakIfOwner) so two racers electing the same stale
- *    lock cannot both win: mkdir remains the single atomic arbiter and the
- *    conditional rm never deletes a successor's freshly-acquired lock.
- *  - bootId null on either side, or an unparseable record → liveness/identity is
- *    unknowable → fall back to the mtime rule (generous threshold).
+ *  - Owner record from a DIFFERENT host boot (both bootIds non-null, mismatched)
+ *    → the host kernel rebooted, so the recorded pid AND its start-time belong to
+ *    a vanished boot → break immediately, with no mtime/TTL wait. This is a fast
+ *    "definitely dead" signal; it is NOT the sole reliance for the common
+ *    container-restart case, where the HOST boot_id is unchanged (only the
+ *    container's pid namespace reset) so bootId still matches.
+ *  - Otherwise probe holder identity via isHolderAlive(record):
+ *      · alive (pid present AND its /proc start-time matches the recorded one) →
+ *        return WITHOUT reclaiming, regardless of mtime. A live holder stalled
+ *        past any threshold (GC/swap/CPU-throttle) is never reclaimed.
+ *      · dead (pid gone, OR its start-time differs ⇒ the pid was REUSED by a
+ *        newer process after a container restart) → break it. This is the cure
+ *        for the outage: a dead holder's pid (e.g. 55) is reborn alive each
+ *        container boot, so a bare pid-liveness probe wrongly saw "alive" and
+ *        never reclaimed; the start-time mismatch exposes the impostor.
+ *      · unknowable (legacy record without startTime, or /proc unreadable) →
+ *        fall back to the mtime rule (reclaim only if older than
+ *        SEQ_LOCK_STALE_MS).
+ *
+ * Every break routes through breakIfOwner, which re-reads the owner token and
+ * removes the dir only if it still carries the stale token, so two racers
+ * electing the same stale lock cannot both win: mkdir remains the single atomic
+ * arbiter and the conditional rm never deletes a successor's freshly-acquired
+ * lock.
  */
 function tryReclaimStale(lockDir: string): void {
   let record: OwnerRecord | undefined;
@@ -149,21 +217,27 @@ function tryReclaimStale(lockDir: string): void {
     // owner file missing/unreadable — fall through to the mtime rule
   }
 
-  const thisBoot = readBootId();
-  if (record && thisBoot !== null && record.bootId !== null) {
-    if (record.bootId === thisBoot) {
-      // Same boot: pid liveness is authoritative.
-      if (pidAlive(record.pid)) return; // live holder — NEVER reclaim
-      reclaim(lockDir); // dead holder (ESRCH) — reclaim
+  if (record) {
+    const thisBoot = readBootId();
+    if (thisBoot !== null && record.bootId !== null && record.bootId !== thisBoot) {
+      // Host kernel rebooted → the holder's boot is over → it is gone. Fast path,
+      // independent of pid/start-time (both belong to the vanished boot).
+      breakIfOwner(lockDir, record.token);
       return;
     }
-    // Cross-boot: the holder's boot is over → it is gone → break it.
-    breakIfOwner(lockDir, record.token);
-    return;
+    const alive = isHolderAlive(record);
+    if (alive === true) return; // live holder — NEVER reclaim
+    if (alive === false) {
+      // Dead: pid gone, or its start-time differs (pid reused). Break it.
+      breakIfOwner(lockDir, record.token);
+      return;
+    }
+    // alive === undefined → liveness unknowable → mtime rule below.
   }
 
-  // Liveness/identity unknowable (unparseable record, or null bootId on either
-  // side): reclaim only if the lock dir is older than the generous mtime rule.
+  // Liveness/identity unknowable (unparseable record, or a record with no
+  // startTime / unreadable /proc): reclaim only if the lock dir is older than the
+  // generous mtime rule.
   reclaimIfMtimeStale(lockDir);
 }
 
