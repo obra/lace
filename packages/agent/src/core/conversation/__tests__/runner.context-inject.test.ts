@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ConversationRunner } from '../runner';
+import { ConversationRunner, bareTextStopReminder } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import {
   appendDurableEvent,
@@ -276,6 +276,88 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
     expect(injectedUserMsg).toBeDefined();
     expect(injectedUserMsg!.role).toBe('user');
     expect(injectedUserMsg!.content).toContain('URGENT: stop and report');
+  });
+
+  it('bareTextStopReminder returns the verify reminder when no injection was seen', () => {
+    const reminder = bareTextStopReminder(false);
+    expect(reminder).toContain('verify your work before stopping');
+    expect(reminder).not.toContain('new message arrived mid-turn');
+  });
+
+  it('bareTextStopReminder returns a handle-the-new-message directive when an injection was seen', () => {
+    const reminder = bareTextStopReminder(true);
+    expect(reminder).toContain('new message arrived mid-turn');
+    expect(reminder).not.toContain('verify your work before stopping');
+  });
+
+  it('flips the bare-text stop reminder to a directive when a mid-turn injection was seen', async () => {
+    // call 0: tool_use (completedTurns increments past 0); an inbound lands mid-call.
+    // call 1: text-only standby → bare-text stop-checkpoint with completedTurns>0 and an
+    //   injection seen → the forced-tool retry (call 2) must carry the DIRECTIVE reminder,
+    //   not "verify your work before stopping".
+    const provider = new ScriptedProvider([
+      {
+        beforeReturn: () =>
+          injectContextEvent(sessionDir, 'NEW MESSAGE from Jesse: the answer is yes'),
+        response: {
+          content: 'Checking.',
+          toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hi' } }],
+          stopReason: 'tool_use',
+          usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+        },
+      },
+      {
+        response: {
+          content: 'Standby — still awaiting your answer.',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 12, completionTokens: 6, totalTokens: 18 },
+        },
+      },
+      {
+        response: {
+          content: 'On it.',
+          toolCalls: [{ id: 'tc_2', name: 'bash', arguments: { command: 'echo done' } }],
+          stopReason: 'tool_use',
+          usage: { promptTokens: 12, completionTokens: 6, totalTokens: 18 },
+        },
+      },
+      {
+        response: {
+          content: 'Done.',
+          toolCalls: [],
+          stopReason: 'stop',
+          usage: { promptTokens: 12, completionTokens: 6, totalTokens: 18 },
+        },
+      },
+    ]);
+
+    const config: RunnerConfig = {
+      sessionDir,
+      sessionId: 'sess_test',
+      cwd,
+      executionMode: 'execute',
+      approvalMode: 'approve',
+    };
+    const deps = createMockDeps({
+      createProvider: vi.fn().mockImplementation(async () => provider),
+    });
+    const runner = new ConversationRunner(config, deps);
+
+    await runner.run({
+      content: [{ type: 'text', text: 'do work' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    expect(provider.callCount).toBeGreaterThanOrEqual(3);
+    // The injection was picked up before call 1.
+    expect(JSON.stringify(provider.receivedMessages[1])).toContain('NEW MESSAGE from Jesse');
+    // The forced-tool retry (call 2) carries the directive, not the verify reminder.
+    const retryMessages = JSON.stringify(provider.receivedMessages[2]);
+    expect(retryMessages).toContain('new message arrived mid-turn');
+    expect(retryMessages).not.toContain('verify your work before stopping');
   });
 
   it('appends multiple immediate injections in eventSeq order', async () => {
