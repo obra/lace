@@ -242,6 +242,21 @@ const MAX_PAUSE_RESUMES = 10;
 
 const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
 
+/**
+ * The reminder injected at the bare-text stop-checkpoint (model returned text,
+ * no tool call, after a tool round-trip). Normally it nudges the model to verify
+ * its work before stopping. But if a message was injected mid-turn, that ritual
+ * is the wrong pull — a passively-appended inbound reads as "more context to
+ * summarize" and loses to a standby/verify wrap-up. So flip it to a directive to
+ * handle the new message. The reminder keeps its original value (catching a
+ * premature "Done") on turns with no pending inbound.
+ */
+export function bareTextStopReminder(sawInjectionThisTurn: boolean): string {
+  return sawInjectionThisTurn
+    ? '<system-reminder>A new message arrived mid-turn and is now in your context above. Read it and handle it — reply, act on it, or explicitly defer it — before stopping. Do not just restate your prior status. Call a tool.</system-reminder>'
+    : '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>';
+}
+
 function hasFutureTenseIntent(text: string): boolean {
   if (!text) return false;
   return FUTURE_TENSE_INTENT_PATTERN.test(text);
@@ -542,6 +557,11 @@ export class ConversationRunner {
     // tool_choice=required to force a verification tool call (catches
     // NEVER_SUBMITTED pattern where model says "Done" instead of verifying)
     let retriedWithToolChoice = false;
+    // Set when a context_injected event is picked up mid-turn. Flips the
+    // bare-text stop-checkpoint reminder from "verify before stopping" to
+    // "handle the new message", so a mid-turn inbound isn't crowded out by the
+    // standby/verify wrap-up.
+    let sawInjectionThisTurn = false;
     let nextRequestOptions: RequestOptions | undefined;
     // Carries forward the parsed structured object from the last provider
     // response that produced one, surfaced on the RunResult for the prompt
@@ -584,6 +604,7 @@ export class ConversationRunner {
         for (const content of injections) {
           providerMessages = appendOrMergeUser(providerMessages, content);
         }
+        if (injections.length > 0) sawInjectionThisTurn = true;
         lastSeenEventSeq = newWatermark;
 
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
@@ -994,8 +1015,7 @@ export class ConversationRunner {
               { role: 'assistant' as const, content: assistantPlaceholder },
               {
                 role: 'user' as const,
-                content:
-                  '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>',
+                content: bareTextStopReminder(sawInjectionThisTurn),
               },
             ];
             nextRequestOptions = { toolChoice: 'required' };
