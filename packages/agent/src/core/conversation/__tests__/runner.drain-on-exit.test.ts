@@ -228,6 +228,105 @@ describe('prompt handler — drain pending immediate injects on non-success exit
     }
   });
 
+  it("fires a follow-up turn when an immediate inject lands after the runner's last readNew() on the SUCCESS path", async () => {
+    // Regression test for the success-path drain gap: an inject that arrives
+    // after the runner's last readNew() call (during the final LLM round-trip)
+    // but before turn_end is written gets an eventSeq LESS than turn_end. The
+    // old drain used findLastTurnEndEventSeq (turn_end.seq) as the watermark,
+    // so inject.seq <= watermark → hasPendingImmediateInjects returned false →
+    // the inject was not delivered until the next externally-triggered turn.
+    // The fix: the runner returns lastSeenEventSeq and the prompt handler uses
+    // it as the watermark so only genuinely unprocessed injects trigger a
+    // follow-up turn.
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    let followUpRuns = 0;
+    const runSpy = vi.spyOn(ConversationRunner.prototype, 'run').mockImplementation(async function (
+      this: ConversationRunner,
+      opts: { turnId: string }
+    ) {
+      if (!state.activeSession) throw new Error('test setup: no active session');
+      const sessionDir = state.activeSession.dir;
+
+      if (followUpRuns === 0) {
+        // First (original) turn: simulate the gap by writing an immediate inject
+        // BEFORE turn_end (so inject.seq < turn_end.seq), but return a
+        // lastSeenEventSeq that predates the inject (the runner never saw it).
+        const stateBeforeInject = readSessionState(sessionDir);
+        // Capture the watermark as if readNew() ran before the inject arrived.
+        const lastSeenEventSeq = stateBeforeInject.nextEventSeq - 1;
+
+        // Inject arrives mid-turn (after readNew, before turn_end).
+        injectImmediate(state, 'JOB-DONE-SUCCESS-GAP');
+
+        // Runner writes turn_end after the inject.
+        const stateAfterInject = readSessionState(sessionDir);
+        const { nextState } = realAppendDurableEvent(sessionDir, stateAfterInject, {
+          type: 'turn_end',
+          turnId: opts.turnId,
+          turnSeq: 1,
+          data: { type: 'turn_end', stopReason: 'end_turn' },
+        });
+        writeSessionState(sessionDir, nextState);
+
+        followUpRuns++;
+        return {
+          turnId: opts.turnId,
+          stopReason: 'end_turn' as const,
+          stopDetails: null,
+          content: [],
+          usage: { inputTokens: 0, outputTokens: 0 },
+          // Return the pre-inject watermark so the drain can detect the gap.
+          lastSeenEventSeq,
+        };
+      }
+
+      // Follow-up turn: write turn_end and return cleanly.
+      const sessionState = readSessionState(sessionDir);
+      const { nextState } = realAppendDurableEvent(sessionDir, sessionState, {
+        type: 'turn_end',
+        turnId: opts.turnId,
+        turnSeq: 1,
+        data: { type: 'turn_end', stopReason: 'end_turn' },
+      });
+      writeSessionState(sessionDir, nextState);
+      return {
+        turnId: opts.turnId,
+        stopReason: 'end_turn' as const,
+        stopDetails: null,
+        content: [],
+        usage: { inputTokens: 0, outputTokens: 0 },
+      };
+    });
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const newResult = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+
+      const promptResult = (await client.request('session/prompt', {
+        content: [{ type: 'text', text: 'hello' }],
+      })) as { stopReason: string };
+      expect(promptResult.stopReason).toBe('end_turn');
+
+      // The drain must have scheduled a follow-up internal turn for the
+      // unprocessed inject that landed after the runner's last readNew().
+      await waitFor(() => runSpy.mock.calls.length >= 2);
+      expect(runSpy).toHaveBeenCalledTimes(2);
+
+      const sessionDir = getSessionDir(newResult.sessionId);
+      const { events } = readDurableEvents(sessionDir, { afterEventSeq: 0, limit: 200 });
+      const turnStarts = events.filter((e) => e.type === 'turn_start');
+      expect(turnStarts.length).toBe(2);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
   it('does NOT fire a follow-up turn on a clean success with no pending inject', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

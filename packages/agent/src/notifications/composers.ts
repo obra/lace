@@ -1,6 +1,12 @@
 // ABOUTME: Pure body-composer functions for each notification kind. No side effects.
 // ABOUTME: Output strings are wrapped by buildNotification in inject-notification.ts.
 
+// Reminder appended to every terminal-state job notification (completed, failed,
+// cancelled). Prompts the agent to close the loop on any active Slack thread
+// before ending its turn.
+const TERMINAL_JOB_SLACK_HINT =
+  ' If this result is relevant to an active Slack thread, post an update before ending this turn.';
+
 const MAX_LINE_LENGTH = 200;
 
 function formatDuration(ms: number): string {
@@ -29,7 +35,7 @@ export interface JobCompletedCompose {
 
 export function composeJobCompletedBody(j: JobCompletedCompose): string {
   const trailing = trailingLineHint(j.lastLines);
-  const base = `Your background job completed successfully (exit code ${j.exitCode}) after ${formatDuration(j.durationMs)}, writing ${formatBytes(j.outputBytes)} bytes of output.${trailing} Call job_output(jobId="${j.jobId}") to read the full output.`;
+  const base = `Your background job completed successfully (exit code ${j.exitCode}) after ${formatDuration(j.durationMs)}, writing ${formatBytes(j.outputBytes)} bytes of output.${trailing} Call job_output(jobId="${j.jobId}") to read the full output.${TERMINAL_JOB_SLACK_HINT}`;
   if (j.jobType === 'delegate') {
     return `${base} To continue this conversation thread, call delegate(resume="${j.jobId}", prompt="your message").`;
   }
@@ -40,7 +46,7 @@ export type JobFailedCompose = JobCompletedCompose;
 
 export function composeJobFailedBody(j: JobFailedCompose): string {
   const trailing = trailingLineHint(j.lastLines);
-  const base = `Your background job failed (exit code ${j.exitCode}) after ${formatDuration(j.durationMs)}, writing ${formatBytes(j.outputBytes)} bytes of output.${trailing} Call job_output(jobId="${j.jobId}") to read the full output.`;
+  const base = `Your background job failed (exit code ${j.exitCode}) after ${formatDuration(j.durationMs)}, writing ${formatBytes(j.outputBytes)} bytes of output.${trailing} Call job_output(jobId="${j.jobId}") to read the full output.${TERMINAL_JOB_SLACK_HINT}`;
   if (j.jobType === 'delegate') {
     return `${base} To continue this conversation thread, call delegate(resume="${j.jobId}", prompt="your message").`;
   }
@@ -59,7 +65,7 @@ export interface JobCancelledCompose {
 export function composeJobCancelledBody(j: JobCancelledCompose): string {
   const trailing = trailingLineHint(j.lastLines);
   const reasonText = j.reason ? ` Reason: ${j.reason}.` : '';
-  return `Your background job was cancelled after ${formatDuration(j.durationMs)}, having written ${formatBytes(j.outputBytes)} bytes of output.${reasonText}${trailing} Call job_output(jobId="${j.jobId}") to read the full output.`;
+  return `Your background job was cancelled after ${formatDuration(j.durationMs)}, having written ${formatBytes(j.outputBytes)} bytes of output.${reasonText}${trailing} Call job_output(jobId="${j.jobId}") to read the full output.${TERMINAL_JOB_SLACK_HINT}`;
 }
 
 export interface JobProgressCompose {
