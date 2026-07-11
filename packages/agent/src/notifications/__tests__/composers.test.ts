@@ -21,7 +21,7 @@ describe('composers', () => {
         lastLines: ['build finished in 5.2s'],
       })
     ).toBe(
-      'Your background job completed successfully (exit code 0) after 12.3 seconds, writing 15,234 bytes of output. The last line was: "build finished in 5.2s". Call job_output(jobId="job_xyz") to read the full output.'
+      'Your background job completed successfully (exit code 0) after 12.3 seconds, writing 15,234 bytes of output. The last line was: "build finished in 5.2s". Call job_output(jobId="job_xyz") to read the full output. If this result is relevant to an active Slack thread, post an update before ending this turn.'
     );
   });
 
@@ -103,6 +103,47 @@ describe('composers', () => {
     });
     expect(body).not.toContain('Last line');
     expect(body).toContain('Call job_output');
+  });
+
+  it('job-completed: includes Slack follow-up hint', () => {
+    const body = composeJobCompletedBody({
+      jobId: 'job_xyz',
+      jobType: 'bash',
+      exitCode: 0,
+      durationMs: 1000,
+      outputBytes: 100,
+      lastLines: [],
+    });
+    expect(body).toContain(
+      'If this result is relevant to an active Slack thread, post an update before ending this turn.'
+    );
+  });
+
+  it('job-failed: includes Slack follow-up hint', () => {
+    const body = composeJobFailedBody({
+      jobId: 'job_q',
+      jobType: 'bash',
+      exitCode: 1,
+      durationMs: 1000,
+      outputBytes: 100,
+      lastLines: [],
+    });
+    expect(body).toContain(
+      'If this result is relevant to an active Slack thread, post an update before ending this turn.'
+    );
+  });
+
+  it('job-cancelled: includes Slack follow-up hint', () => {
+    const body = composeJobCancelledBody({
+      jobId: 'job_q',
+      jobType: 'bash',
+      durationMs: 1000,
+      outputBytes: 50,
+      lastLines: [],
+    });
+    expect(body).toContain(
+      'If this result is relevant to an active Slack thread, post an update before ending this turn.'
+    );
   });
 
   it('job-progress: omits "Recent output:" block when lastLines is empty', () => {
