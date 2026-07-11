@@ -536,19 +536,24 @@ export function registerPromptHandler(
       state.activeTurn = null;
       ownsActiveTurn = false;
 
-      // Bug 3 fix: catch immediate-inject events that landed in the closing
-      // microseconds of the turn (after the runner's last iteration but before
-      // turn_end). The setImmediate-based wake in injectNotification's
-      // triggerInternalTurn callback can no-op if it observes state.activeTurn=true
-      // before the turn ends, then the turn ends with the event unprocessed.
-      // We re-scan here, after activeTurn is cleared, and fire a synthetic
-      // internal turn if anything is waiting. The runner already consumed every
-      // inject up to the turn_end it just wrote, so the watermark is that
-      // turn_end's eventSeq.
+      // Catch immediate-inject events that landed after the runner's last
+      // readNew() call (during the final LLM round-trip) but before turn_end
+      // was written. The setImmediate-based idleWake in injectNotification
+      // no-ops while state.activeTurn is set, leaving those events unprocessed.
+      // We re-scan here, after activeTurn is cleared.
+      //
+      // Watermark: use the runner's lastSeenEventSeq — the highest eventSeq its
+      // inject tailer observed — so only genuinely unprocessed injects trigger a
+      // follow-up turn. Falling back to findLastTurnEndEventSeq (the prior
+      // approach) used the turn_end's seq as the watermark, which is HIGHER than
+      // any inject that arrived before turn_end; those injects would compare as
+      // seq <= watermark and be silently skipped even though the runner never saw
+      // them.
       scheduleImmediateInjectDrain(
         state,
         runPromptInternalRef,
-        state.activeSession ? (findLastTurnEndEventSeq(state.activeSession.dir) ?? 0) : 0
+        result.lastSeenEventSeq ??
+          (state.activeSession ? (findLastTurnEndEventSeq(state.activeSession.dir) ?? 0) : 0)
       );
 
       // RPC response uses the protocol-shaped usage.

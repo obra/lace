@@ -313,4 +313,13 @@ export interface RunResult {
    * requested or the response text could not be parsed.
    */
   structuredOutput?: unknown;
+  /**
+   * The highest `eventSeq` seen by the runner's inject tailer at the end of
+   * the turn. The prompt handler uses this as the watermark for the
+   * success-path inject drain: any inject with `eventSeq > lastSeenEventSeq`
+   * arrived after the runner's last `readNew()` call (during the final LLM
+   * round-trip) and was not incorporated into this turn's messages. Absent
+   * on synthesised mock RunResults in tests.
+   */
+  lastSeenEventSeq?: number;
 }

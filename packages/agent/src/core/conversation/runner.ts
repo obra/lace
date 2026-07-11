@@ -1377,6 +1377,7 @@ export class ConversationRunner {
         costUsd: turnCostUsd,
       },
       ...(lastStructuredOutput !== undefined ? { structuredOutput: lastStructuredOutput } : {}),
+      lastSeenEventSeq,
     };
   }
 
