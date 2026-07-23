@@ -10,8 +10,6 @@ import type {
   BetaMessage,
   BetaTextBlock,
   BetaToolUseBlock,
-  BetaMessageParam,
-  BetaOutputConfig,
 } from '@anthropic-ai/sdk/resources/beta/messages/messages';
 import type { BetaCacheMissReason } from './anthropic/cache-miss';
 import type { AnthropicBeta } from '@anthropic-ai/sdk/resources/beta/beta';
@@ -22,7 +20,6 @@ import {
   ProviderConfig,
   ProviderInfo,
   RequestOptions,
-  type ThinkingBlock,
 } from './base-provider';
 import { normalizeAnthropicStop } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
@@ -30,16 +27,12 @@ import type { CatalogProvider } from './catalog/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
-import { convertToAnthropicFormat } from './format-converters';
-import {
-  attachMessageCacheBreakpoints,
-  buildSystemWithCaching,
-  enforceBreakpointBudget,
-  markLastToolForCaching,
-  type CacheControlOptions,
-} from './cache-control';
 import { getBetasForRequest } from './anthropic/betas';
-import { sanitizeLoneSurrogates } from './anthropic/well-formed-json';
+import {
+  buildBetaMessagePayload,
+  buildCountTokensParams,
+  extractThinkingBlocks,
+} from './anthropic/beta-request';
 
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -51,12 +44,6 @@ interface AnthropicProviderConfig extends ProviderConfig {
   observability_betas_enabled?: boolean;
   [key: string]: unknown; // Allow for additional properties
 }
-
-// Anthropic-direct API supports 1h ephemeral cache TTL GA — no
-// `anthropic-beta` header required (verified against
-// platform.claude.com/docs/en/build-with-claude/prompt-caching on 2026-05-23).
-// SDK 0.60 types `ttl: '5m' | '1h'`.
-const ANTHROPIC_CACHE_OPTIONS: CacheControlOptions = { ttl: '1h' };
 
 export class AnthropicProvider extends AIProvider {
   private _anthropic: Anthropic | null = null;
@@ -114,26 +101,9 @@ export class AnthropicProvider extends AIProvider {
     model: string
   ): Promise<number | null> {
     try {
-      const anthropicMessages = convertToAnthropicFormat(messages);
-      const messagesWithCaching = attachMessageCacheBreakpoints(
-        anthropicMessages,
-        ANTHROPIC_CACHE_OPTIONS
-      );
-
-      const systemWithCaching = buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS);
-
-      const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.inputSchema,
-      }));
-      const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
-
       const result = await this.getAnthropicClient().beta.messages.countTokens({
         model,
-        messages: messagesWithCaching,
-        system: systemWithCaching,
-        ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
+        ...buildCountTokensParams(messages, systemPrompt, tools),
       });
 
       return result.input_tokens;
@@ -202,37 +172,6 @@ export class AnthropicProvider extends AIProvider {
     opts?: RequestOptions,
     conversationState?: { previousResponseId?: string | null }
   ): Anthropic.Beta.Messages.MessageCreateParams {
-    const anthropicMessages = convertToAnthropicFormat(messages);
-
-    // Attach a rolling-tail + stable-anchor pair of
-    // cache_control breakpoints on the message stream so the conversation
-    // prefix stays cached across idle gaps and survives Anthropic's
-    // 20-raw-block lookback window even on heavy tool-use turns.
-    const messagesWithCaching = attachMessageCacheBreakpoints(
-      anthropicMessages,
-      ANTHROPIC_CACHE_OPTIONS
-    );
-
-    const systemPrompt = this.getEffectiveSystemPrompt(messages);
-    const systemWithCaching = buildSystemWithCaching(systemPrompt, ANTHROPIC_CACHE_OPTIONS);
-
-    const baseTools: Anthropic.Tool[] = tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: tool.inputSchema,
-    }));
-    const anthropicTools = markLastToolForCaching(baseTools, ANTHROPIC_CACHE_OPTIONS);
-
-    // Defensive cap at Anthropic's 4-marker hard limit. With
-    // current placement (system + last-tool + anchor + tail) we're at 4
-    // exactly; this enforces it if anything upstream stamps additional
-    // markers.
-    const cappedMessages = enforceBreakpointBudget({
-      system: systemWithCaching,
-      tools: anthropicTools,
-      messages: messagesWithCaching,
-    });
-
     // Compute the typed betas[] once, reading per-model entries from the
     // attached catalog plus the per-instance observability flag. If no
     // catalog is attached, parseCatalogBetas returns [] and only the
@@ -256,91 +195,47 @@ export class AnthropicProvider extends AIProvider {
         : undefined
     );
 
-    // Opt into request-level cache diagnostics when the beta is enabled.
-    // `previous_message_id: null` opts in for the first turn of a session (no
-    // prior response to compare against); subsequent turns thread the prior
-    // BetaMessage.id forward via ConversationState.previousResponseId so the
-    // server can report cache_miss_reason vs the previous request.
-    const cacheDiagEnabled = betas.includes('cache-diagnosis-2026-04-07');
-    const diagnosticsField = cacheDiagEnabled
-      ? { diagnostics: { previous_message_id: conversationState?.previousResponseId ?? null } }
-      : {};
-
     // Native structured outputs: when the caller constrains the answer to a
-    // JSON schema, attach `output_config.format` and the structured-outputs
-    // beta. The `.create()`/`.stream()` calls (unlike `.parse()`) do not
-    // auto-inject this beta, so we add it explicitly. The schema shape matches
-    // BetaJSONOutputFormat exactly (validated upstream at the prompt handler).
+    // JSON schema, attach the structured-outputs beta explicitly (the
+    // `.create()`/`.stream()` calls do not auto-inject it). The shared builder
+    // attaches `output_config.format`.
     const outputFormat = opts?.outputFormat;
     const effectiveBetas = outputFormat
       ? [...betas, 'structured-outputs-2025-12-15' as AnthropicBeta]
       : betas;
 
-    // Reasoning effort + adaptive thinking. The effort level comes from the
-    // catalog (default_reasoning_effort) or the LACE_REASONING_EFFORT override,
-    // gated on the model actually supporting effort levels: a model flagged
-    // `has_reasoning_effort: false` (e.g. the compaction haiku) receives neither
-    // effort nor thinking, even under a global override. Effort rides in the same
-    // output_config object as any structured-output format; adaptive thinking is
-    // enabled alongside it (the model's thinking blocks are round-tripped through
-    // the event log and replayed verbatim on subsequent turns — see ThinkingBlock).
+    // Opt into request-level cache diagnostics when the beta is enabled.
+    // `previous_message_id: null` opts in for the first turn of a session;
+    // subsequent turns thread the prior BetaMessage.id forward via
+    // ConversationState.previousResponseId.
+    const cacheDiagEnabled = effectiveBetas.includes('cache-diagnosis-2026-04-07');
+    const diagnostics = cacheDiagEnabled
+      ? { previous_message_id: conversationState?.previousResponseId ?? null }
+      : undefined;
+
+    // Reasoning effort comes from the catalog (default_reasoning_effort) or the
+    // LACE_REASONING_EFFORT override, gated on the model supporting effort:
+    // a model flagged `has_reasoning_effort: false` (e.g. the compaction haiku)
+    // receives neither effort nor thinking, even under a global override.
     const catalogModel = this._catalogData?.models.find((m) => m.id === model);
     const reasoningEffort =
       catalogModel?.has_reasoning_effort === false
         ? undefined
         : this.getModelReasoningEffort(model);
-    const outputConfig: BetaOutputConfig = {
-      ...(outputFormat ? { format: outputFormat } : {}),
-      ...(reasoningEffort ? { effort: reasoningEffort as BetaOutputConfig['effort'] } : {}),
-    };
-    const outputConfigField =
-      Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {};
-    const thinkingField = reasoningEffort
-      ? { thinking: { type: 'adaptive' as const, display: 'summarized' as const } }
-      : {};
 
-    // The beta endpoint param shape is structurally compatible with the
-    // base MessageParam (same `role` + `content` fields), but the SDK's
-    // declared content-block union differs. Cast at this single boundary
-    // rather than widening the format-converter return type, which would
-    // ripple into bedrock-provider (no beta namespace on its SDK).
-    const payload: Anthropic.Beta.Messages.MessageCreateParams = {
-      model,
-      max_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
-      messages: cappedMessages as unknown as BetaMessageParam[],
-      system: systemWithCaching,
-      tools: anthropicTools,
-      betas: effectiveBetas,
-      ...diagnosticsField,
-      ...outputConfigField,
-      ...thinkingField,
-    };
-
-    // Comprehensive debug logging of request metadata (excluding message content)
-    const systemText = Array.isArray(payload.system)
-      ? payload.system.map((block) => block.text).join('')
-      : (payload.system as string | undefined);
-    logger.info('🔍 ANTHROPIC REQUEST METADATA', {
-      model: payload.model,
-      maxTokens: payload.max_tokens,
-      messageCount: payload.messages.length,
-      systemPromptLength: systemText?.length || 0,
-      systemPromptPreview: systemText?.substring(0, 100) + '...',
-      toolCount: payload.tools?.length || 0,
-      // payload.tools is BetaToolUnion[] in the type system. We only ever
-      // construct user-defined `BetaTool`-shaped entries here (which carry a
-      // `name`), so guard the union for the logger.
-      toolNames: payload.tools?.map((t) => ('name' in t ? t.name : '<server-tool>')),
-      configKeys: Object.keys(this._config),
+    return buildBetaMessagePayload({
       providerName: this.providerName,
+      messages,
+      systemPrompt: this.getEffectiveSystemPrompt(messages),
+      tools,
+      model,
+      maxTokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
+      betas: effectiveBetas,
+      reasoningEffort,
+      outputFormat,
+      diagnostics,
+      configKeys: Object.keys(this._config),
     });
-
-    // Final send-boundary guard: a lone UTF-16 surrogate anywhere in the request
-    // (e.g. left by history compaction truncating mid-emoji) makes the body
-    // invalid JSON for the Anthropic parser and fails the turn non-retryably.
-    // Replace any lone surrogate with U+FFFD so a corrupted history can't wedge
-    // the session. Clean payloads are returned unchanged (cache identity intact).
-    return sanitizeLoneSurrogates(payload);
   }
 
   /**
@@ -350,27 +245,6 @@ export class AnthropicProvider extends AIProvider {
    * contract — we log and return undefined so consumers fail-closed rather than
    * acting on garbage.
    */
-  /**
-   * Pull thinking + redacted_thinking blocks out of a response's content array,
-   * preserving wire order, so the runner can persist them and the next turn can
-   * replay them verbatim (Anthropic adaptive thinking). Returns undefined when
-   * the model produced no reasoning blocks, so the field stays absent on the
-   * common no-thinking response.
-   */
-  private _extractThinkingBlocks(
-    content: BetaMessage['content'] | undefined
-  ): ThinkingBlock[] | undefined {
-    const blocks: ThinkingBlock[] = [];
-    for (const block of content || []) {
-      if (block.type === 'thinking') {
-        blocks.push({ type: 'thinking', thinking: block.thinking, signature: block.signature });
-      } else if (block.type === 'redacted_thinking') {
-        blocks.push({ type: 'redacted_thinking', data: block.data });
-      }
-    }
-    return blocks.length > 0 ? blocks : undefined;
-  }
-
   private _extractStructuredOutput(textContent: string, options?: RequestOptions): unknown {
     if (!options?.outputFormat) return undefined;
     try {
@@ -466,7 +340,7 @@ export class AnthropicProvider extends AIProvider {
         return {
           content: textContent,
           toolCalls,
-          thinkingBlocks: this._extractThinkingBlocks(response.content),
+          thinkingBlocks: extractThinkingBlocks(response.content),
           stopReason,
           stopDetails,
           usage: normalizedUsage,
@@ -643,7 +517,7 @@ export class AnthropicProvider extends AIProvider {
           const response = {
             content: textContent,
             toolCalls,
-            thinkingBlocks: this._extractThinkingBlocks(finalMessage.content),
+            thinkingBlocks: extractThinkingBlocks(finalMessage.content),
             stopReason,
             stopDetails,
             usage: finalMessage.usage

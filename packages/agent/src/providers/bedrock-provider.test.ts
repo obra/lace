@@ -11,25 +11,31 @@ import type Anthropic from '@anthropic-ai/sdk';
 // Mock functions shared with the SDK mock below
 const mockCreate = vi.fn();
 const mockStream = vi.fn();
+const mockCountTokens = vi.fn();
 const mockConstructor = vi.fn();
 
 vi.mock('@anthropic-ai/bedrock-sdk', () => {
-  class MockAnthropicBedrock {
+  class MockAnthropicBedrockMantle {
     constructor(opts: unknown) {
       mockConstructor(opts);
     }
-    messages = {
-      create: mockCreate,
-      stream: mockStream,
+    // The Mantle client exposes messages only under the beta namespace for the
+    // provider's purposes (betas[], countTokens, output_config, thinking).
+    beta = {
+      messages: {
+        create: mockCreate,
+        stream: mockStream,
+        countTokens: mockCountTokens,
+      },
     };
   }
   return {
-    AnthropicBedrock: MockAnthropicBedrock,
-    default: MockAnthropicBedrock,
+    AnthropicBedrockMantle: MockAnthropicBedrockMantle,
+    default: MockAnthropicBedrockMantle,
   };
 });
 
-const MODEL = 'anthropic.claude-sonnet-4-5-20250929-v1:0';
+const MODEL = 'anthropic.claude-sonnet-5';
 
 describe('BedrockProvider', () => {
   let provider: BedrockProvider;
@@ -39,6 +45,7 @@ describe('BedrockProvider', () => {
     vi.clearAllMocks();
     mockCreate.mockReset();
     mockStream.mockReset();
+    mockCountTokens.mockReset();
     mockConstructor.mockReset();
 
     provider = new BedrockProvider({
@@ -112,7 +119,7 @@ describe('BedrockProvider', () => {
       expect(opts).toMatchObject({
         awsRegion: 'us-west-1',
         awsAccessKey: 'AKIATEST',
-        awsSecretKey: 'secret',
+        awsSecretAccessKey: 'secret',
       });
     });
 
@@ -130,7 +137,7 @@ describe('BedrockProvider', () => {
       const opts = mockConstructor.mock.calls[0][0] as Record<string, unknown>;
       expect(opts.awsRegion).toBe('us-west-1');
       expect(opts.awsAccessKey).toBeUndefined();
-      expect(opts.awsSecretKey).toBeUndefined();
+      expect(opts.awsSecretAccessKey).toBeUndefined();
       expect(opts.awsSessionToken).toBeUndefined();
     });
 
@@ -167,6 +174,8 @@ describe('BedrockProvider', () => {
         promptTokens: 10,
         completionTokens: 5,
         totalTokens: 15,
+        cacheCreationInputTokens: 0,
+        cacheReadInputTokens: 0,
       });
     });
 
@@ -219,9 +228,8 @@ describe('BedrockProvider', () => {
       );
 
       const callArgs = mockCreate.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
-      // Bedrock provider now also stamps the last message block
-      // with cache_control. MODEL (`claude-sonnet-4-5`) is on the 1h-TTL
-      // allowlist so the marker reads `ttl: '1h'`.
+      // The Bedrock Mantle path stamps the last message block with cache_control.
+      // 1h TTL is GA on Bedrock Mantle for every model, so the marker is `1h`.
       expect(callArgs.messages).toEqual([
         { role: 'user', content: 'User message' },
         {
@@ -245,28 +253,78 @@ describe('BedrockProvider', () => {
       expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
     });
 
-    it('uses 5m TTL for Bedrock models not on the 1h-TTL allowlist', async () => {
+    it('uses 1h TTL for every Bedrock model (1h is GA on Mantle)', async () => {
       mockCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'ok' }],
         usage: { input_tokens: 1, output_tokens: 1 },
         stop_reason: 'end_turn',
       });
 
-      // claude-3-7-sonnet does NOT support 1h on Bedrock
-      const SHORT_TTL_MODEL = 'anthropic.claude-3-7-sonnet-20250219-v1:0';
-      await provider.createResponse([{ role: 'user', content: 'hi' }], [], SHORT_TTL_MODEL);
+      // A model that used to be gated to 5m under the old allowlist now gets 1h.
+      const OLD_5M_MODEL = 'anthropic.claude-3-7-sonnet-20250219-v1:0';
+      await provider.createResponse([{ role: 'user', content: 'hi' }], [], OLD_5M_MODEL);
 
       const callArgs = mockCreate.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
       const systemBlocks = callArgs.system as Array<{ cache_control?: { ttl?: string } }>;
-      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '5m' });
+      expect(systemBlocks[0].cache_control).toEqual({ type: 'ephemeral', ttl: '1h' });
 
-      // Last message tail should also be 5m
       const lastMsg = callArgs.messages[callArgs.messages.length - 1];
       const lastBlocks = lastMsg.content as Array<{ cache_control?: { ttl?: string } }>;
       expect(lastBlocks[lastBlocks.length - 1].cache_control).toEqual({
         type: 'ephemeral',
-        ttl: '5m',
+        ttl: '1h',
       });
+    });
+
+    it('sends model-context-window-exceeded beta but filters out cache-diagnosis (Mantle rejects it)', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ok' }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stop_reason: 'end_turn',
+      });
+
+      await provider.createResponse([{ role: 'user', content: 'hi' }], [], MODEL);
+
+      const callArgs = mockCreate.mock.calls[0][0] as { betas?: string[] };
+      expect(callArgs.betas).toContain('model-context-window-exceeded-2025-08-26');
+      expect(callArgs.betas).not.toContain('cache-diagnosis-2026-04-07');
+    });
+
+    it('does not send output_config.format or diagnostics (unsupported on Mantle)', async () => {
+      mockCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'ok' }],
+        usage: { input_tokens: 1, output_tokens: 1 },
+        stop_reason: 'end_turn',
+      });
+
+      await provider.createResponse(
+        [{ role: 'user', content: 'hi' }],
+        [],
+        MODEL,
+        undefined,
+        undefined,
+        { outputFormat: { type: 'json_schema', schema: { type: 'object' } } }
+      );
+
+      const callArgs = mockCreate.mock.calls[0][0] as {
+        output_config?: { format?: unknown };
+        diagnostics?: unknown;
+        betas?: string[];
+      };
+      expect(callArgs.output_config?.format).toBeUndefined();
+      expect(callArgs.diagnostics).toBeUndefined();
+      expect(callArgs.betas).not.toContain('structured-outputs-2025-12-15');
+    });
+
+    it('counts tokens via the Mantle beta countTokens endpoint', async () => {
+      mockCountTokens.mockResolvedValue({ input_tokens: 42 });
+
+      const count = await provider.countTokens([{ role: 'user', content: 'hi there' }], [], MODEL);
+
+      expect(count).toBe(42);
+      expect(mockCountTokens).toHaveBeenCalledTimes(1);
+      const countArgs = mockCountTokens.mock.calls[0][0] as { model: string };
+      expect(countArgs.model).toBe(MODEL);
     });
 
     it('uses Bedrock-style model IDs verbatim', async () => {
@@ -316,6 +374,8 @@ describe('BedrockProvider', () => {
         promptTokens: 15,
         completionTokens: 8,
         totalTokens: 23,
+        cacheCreationInputTokens: 0,
+        cacheReadInputTokens: 0,
       });
     });
 

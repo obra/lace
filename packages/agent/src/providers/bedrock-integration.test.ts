@@ -16,8 +16,11 @@ import { describe, it, expect } from 'vitest';
 import { BedrockProvider } from './bedrock-provider';
 
 const enabled = process.env.LACE_INTEGRATION_BEDROCK === '1';
-const region = process.env.AWS_REGION ?? 'us-west-2';
-const model = process.env.LACE_BEDROCK_TEST_MODEL ?? 'anthropic.claude-3-5-haiku-20241022-v1:0';
+// Bedrock Mantle is currently served in us-east-1 for account 526275945504
+// (us-west-2 is a partial/broken deployment; us-east-2 returns 404). Bare
+// provider-prefixed model IDs only — no version suffix, no us./global profile.
+const region = process.env.AWS_REGION ?? 'us-east-1';
+const model = process.env.LACE_BEDROCK_TEST_MODEL ?? 'anthropic.claude-haiku-4-5';
 
 const describeIf = enabled ? describe : describe.skip;
 
