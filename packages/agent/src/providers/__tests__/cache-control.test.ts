@@ -7,7 +7,6 @@ import {
   ANCHOR_OFFSET_RAW_BLOCKS,
   MAX_CACHE_BREAKPOINTS,
   attachMessageCacheBreakpoints,
-  bedrockCacheTtlFor,
   buildSystemWithCaching,
   countCacheBreakpoints,
   enforceBreakpointBudget,
@@ -326,31 +325,6 @@ describe('attachMessageCacheBreakpoints — block-type whitelist', () => {
     expect(tailMarker.rawIdx - anchorMarker.rawIdx).toBeGreaterThanOrEqual(
       ANCHOR_OFFSET_RAW_BLOCKS
     );
-  });
-});
-
-describe('bedrockCacheTtlFor', () => {
-  it('returns 1h for Bedrock models on the supported allowlist', () => {
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-5-20251101-v1:0')).toBe('1h');
-    expect(bedrockCacheTtlFor('anthropic.claude-sonnet-4-5-20250929-v1:0')).toBe('1h');
-    expect(bedrockCacheTtlFor('anthropic.claude-haiku-4-5-20251001-v1:0')).toBe('1h');
-    // Inference-profile-style IDs are also matched by substring
-    expect(bedrockCacheTtlFor('us.anthropic.claude-sonnet-4-5-20250929-v1:0')).toBe('1h');
-  });
-
-  it('returns 5m for Bedrock models that only support short TTL', () => {
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-6-v1')).toBe('5m');
-    expect(bedrockCacheTtlFor('anthropic.claude-sonnet-4-6')).toBe('5m');
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-20250514-v1:0')).toBe('5m');
-    expect(bedrockCacheTtlFor('anthropic.claude-3-7-sonnet-20250219-v1:0')).toBe('5m');
-    expect(bedrockCacheTtlFor('anthropic.claude-3-5-sonnet-20241022-v2:0')).toBe('5m');
-  });
-
-  it('rejects hypothetical bad substring matches', () => {
-    // 'claude-opus-4-50' should NOT match the 'claude-opus-4-5' substring.
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-50-future-v1:0')).toBe('5m');
-    // Reverse — 'claude-opus-4-5-something' SHOULD match.
-    expect(bedrockCacheTtlFor('anthropic.claude-opus-4-5-newvariant-v2:0')).toBe('1h');
   });
 });
 

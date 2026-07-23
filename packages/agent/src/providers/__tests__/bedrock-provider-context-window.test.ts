@@ -8,16 +8,18 @@ const mockCreate = vi.fn();
 const mockStream = vi.fn();
 
 vi.mock('@anthropic-ai/bedrock-sdk', () => {
-  class MockAnthropicBedrock {
+  class MockAnthropicBedrockMantle {
     constructor(_opts: unknown) {}
-    messages = {
-      create: mockCreate,
-      stream: mockStream,
+    beta = {
+      messages: {
+        create: mockCreate,
+        stream: mockStream,
+      },
     };
   }
   return {
-    AnthropicBedrock: MockAnthropicBedrock,
-    default: MockAnthropicBedrock,
+    AnthropicBedrockMantle: MockAnthropicBedrockMantle,
+    default: MockAnthropicBedrockMantle,
   };
 });
 

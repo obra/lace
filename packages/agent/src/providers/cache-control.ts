@@ -43,22 +43,6 @@ export interface CacheControlOptions {
   ttl: CacheTtl;
 }
 
-// Match Bedrock model IDs that support 1h TTL. Use word-boundary anchoring
-// (delimiter at end of substring) so e.g. `claude-opus-4-50-…` does NOT
-// match `claude-opus-4-5`. The allowed delimiters are `-` (the version
-// separator continues) or end-of-string.
-const BEDROCK_1H_TTL_MODEL_REGEX = /(?:claude-opus-4-5|claude-sonnet-4-5|claude-haiku-4-5)(?:-|$)/;
-
-/**
- * Pick the longest cache TTL the given Bedrock model accepts. Bedrock 1h
- * TTL is GA only on a specific allowlist (Opus/Sonnet/Haiku 4.5); other
- * models silently fall back to the default 5m if 1h is sent — and at 2×
- * write cost that fallback is a real waste. Gate per-model.
- */
-export function bedrockCacheTtlFor(modelId: string): CacheTtl {
-  return BEDROCK_1H_TTL_MODEL_REGEX.test(modelId) ? '1h' : '5m';
-}
-
 function makeMarker(ttl: CacheTtl): Anthropic.CacheControlEphemeral {
   return { type: 'ephemeral', ttl };
 }
