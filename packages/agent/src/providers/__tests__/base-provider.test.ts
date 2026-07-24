@@ -5,6 +5,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ProviderMessage, ProviderResponse } from '../base-provider';
 import { Tool } from '@lace/agent/tools/tool';
 import { BaseMockProvider } from '@lace/agent/test-utils/base-mock-provider';
+import {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  AuthenticationError,
+} from '@anthropic-ai/sdk';
 
 // Mock implementation for testing
 class TestProvider extends BaseMockProvider {
@@ -78,6 +83,53 @@ describe('AIProvider retry functionality', () => {
       networkErrors.forEach((error) => {
         expect(provider.isRetryableError(error)).toBe(true);
       });
+    });
+
+    it('should identify a real SDK connection error as retryable', () => {
+      // Built from the real SDK class, not a hand-rolled lookalike: the shape is
+      // the whole point. APIConnectionError carries NO status and NO code, and
+      // its `.name` is plain "Error" — only `constructor.name` identifies it.
+      // The underlying ECONNREFUSED sits on `.cause`. Classifying this as
+      // permanent meant a transient blip failed a turn outright: during a real
+      // outage the credential arbiter logged `maxAttempts: 10` and gave up after
+      // attempt 1, every single time.
+      const sdkConnectionError = new APIConnectionError({
+        message: undefined,
+        cause: Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:9999'), {
+          code: 'ECONNREFUSED',
+        }),
+      });
+
+      expect(sdkConnectionError.name).toBe('Error');
+      expect(sdkConnectionError.status).toBeUndefined();
+      expect(provider.isRetryableError(sdkConnectionError)).toBe(true);
+    });
+
+    it('should identify a real SDK connection timeout as retryable', () => {
+      // APIConnectionTimeoutError extends APIConnectionError and arrives with no
+      // cause at all, so a cause-code check alone would miss it.
+      const sdkTimeout = new APIConnectionTimeoutError({});
+
+      expect(sdkTimeout.cause).toBeUndefined();
+      expect(provider.isRetryableError(sdkTimeout)).toBe(true);
+    });
+
+    it('should still refuse to retry an abort', () => {
+      // An abort is deliberate — it must not be resurrected by the connection
+      // classification above, even though it is also a transport-level failure.
+      const aborted = Object.assign(new Error('Aborted'), {
+        name: 'AbortError',
+        cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }),
+      });
+
+      expect(provider.isRetryableError(aborted)).toBe(false);
+    });
+
+    it('should not retry an SDK auth error just because it came from the SDK', () => {
+      // A 401 is a real decision from the API and must stay permanent.
+      const authError = new AuthenticationError(401, { message: 'bad key' }, 'bad key', undefined);
+
+      expect(provider.isRetryableError(authError)).toBe(false);
     });
 
     it('should identify HTTP 5xx errors as retryable', () => {
