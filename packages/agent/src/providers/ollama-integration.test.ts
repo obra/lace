@@ -25,13 +25,21 @@ class MockTool extends Tool {
   }
 }
 
+// The model this suite actually exercises. It is BOTH the provider's configured
+// model and the one passed to every createResponse call, and the availability
+// gate checks for exactly it. Previously the provider was configured with
+// `qwen3:0.6b` while every call passed `qwen3:32b`, so a machine with Ollama
+// running and any other model pulled sailed through the gate and then failed
+// every test on `Model "qwen3:32b" is not available`.
+const OLLAMA_TEST_MODEL = 'qwen3:0.6b';
+
 // Check provider availability once at module level
 const provider = new OllamaProvider({
-  model: 'qwen3:0.6b',
+  model: OLLAMA_TEST_MODEL,
   systemPrompt: 'You are a helpful assistant. Use tools when asked.',
 });
 
-const isOllamaAvailable = await checkProviderAvailability('Ollama', provider);
+const isOllamaAvailable = await checkProviderAvailability('Ollama', provider, OLLAMA_TEST_MODEL);
 
 const conditionalDescribe = isOllamaAvailable ? describe.sequential : describe.skip;
 
@@ -50,7 +58,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [], 'qwen3:32b');
+    const response = await provider.createResponse(messages, [], OLLAMA_TEST_MODEL);
 
     expect(response.content).toBeTruthy();
     expect(response.content.length).toBeGreaterThan(0);
@@ -65,7 +73,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
       },
     ];
 
-    const response = await provider.createResponse(messages, [mockTool], 'qwen3:32b');
+    const response = await provider.createResponse(messages, [mockTool], OLLAMA_TEST_MODEL);
 
     // Ollama tool calling might be less reliable than other providers
     expect(response.content).toBeTruthy();
@@ -76,7 +84,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
   it('should handle conversation without tools', async () => {
     const messages = [{ role: 'user' as const, content: 'What is 2 + 2?' }];
 
-    const response = await provider.createResponse(messages, [], 'qwen3:32b');
+    const response = await provider.createResponse(messages, [], OLLAMA_TEST_MODEL);
 
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('4');
@@ -88,14 +96,14 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
       { role: 'user', content: 'What is 5 + 3?' },
     ];
 
-    let response = await provider.createResponse(messages, [], 'qwen3:32b');
+    let response = await provider.createResponse(messages, [], OLLAMA_TEST_MODEL);
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('8');
 
     messages.push({ role: 'assistant', content: response.content });
     messages.push({ role: 'user', content: 'What was that answer again?' });
 
-    response = await provider.createResponse(messages, [], 'qwen3:32b');
+    response = await provider.createResponse(messages, [], OLLAMA_TEST_MODEL);
     expect(response.content).toBeTruthy();
     expect(response.content.toLowerCase()).toContain('8');
   }, 45000);
@@ -103,7 +111,7 @@ conditionalDescribe('Ollama Provider Integration Tests', () => {
   it('should return usage metadata', async () => {
     const messages = [{ role: 'user' as const, content: 'Hello' }];
 
-    const response = await provider.createResponse(messages, [], 'qwen3:32b');
+    const response = await provider.createResponse(messages, [], OLLAMA_TEST_MODEL);
 
     expect(response.content).toBeTruthy();
     expect(response.stopReason).toBeDefined();

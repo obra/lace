@@ -11,7 +11,13 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../../../server';
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
 import { getSessionDir } from '@lace/agent/storage/session-store';
-import { readDurableEvents } from '@lace/agent/storage/event-log';
+import {
+  readDurableEvents,
+  deriveNextEventSeqAcrossSessionFiles,
+} from '@lace/agent/storage/event-log';
+import { reconcileHead } from '@lace/agent/storage/seq-head';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
+import { basename } from 'node:path';
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -102,6 +108,19 @@ function writeMinimalConversation(sessionDir: string): void {
   for (const event of events) {
     appendFileSync(eventsPath, JSON.stringify(event) + '\n', { encoding: 'utf8' });
   }
+
+  // The fixture appends to the JSONL out of band, AFTER the session was opened.
+  // eventSeq is handed out from a persisted head file (`.seq`) that is only
+  // reconciled against the JSONL on session open, so without this the head still
+  // reflects the empty session: compaction's own events would be assigned seqs
+  // that collide with the fixture's, the tail split would land in the wrong
+  // place, and the "compacted" prompt would come back LARGER than the original.
+  // Reconciling here leaves the session in the state production is always in by
+  // the time it appends — the same call the open path makes.
+  reconcileHead(
+    sessionDir,
+    () => deriveNextEventSeqAcrossSessionFiles(getLaceDir(), basename(sessionDir)) - 1
+  );
 }
 
 describe('ent/session/compact — track-based strategy', () => {
