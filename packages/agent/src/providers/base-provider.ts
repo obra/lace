@@ -685,19 +685,36 @@ export abstract class AIProvider extends EventEmitter {
     }
 
     // Check for network errors (Node.js error codes)
+    const retryableCodes = ['ECONNREFUSED', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'EHOSTUNREACH'];
     if (err.code) {
-      const retryableCodes = [
-        'ECONNREFUSED',
-        'ENOTFOUND',
-        'ETIMEDOUT',
-        'ECONNRESET',
-        'EHOSTUNREACH',
-      ];
       if (typeof err.code === 'string' && retryableCodes.includes(err.code)) {
         return true;
       }
       // Check for rate_limit_exceeded code (OpenAI SDK)
       if (err.code === 'rate_limit_exceeded') {
+        return true;
+      }
+    }
+
+    // The Anthropic and OpenAI SDKs both wrap a transport failure in
+    // `APIConnectionError`, constructed with NO status and NO code — the real
+    // ECONNREFUSED/ECONNRESET sits on `.cause`. Neither the code check above nor
+    // the status check below sees it, so the single most retryable failure class
+    // there is was classified as permanent: one blip failed a turn outright,
+    // with the retry log reporting `maxAttempts: 10` and stopping at attempt 1.
+    //
+    // Identify it by CONSTRUCTOR name, not `.name`: these SDK classes never set
+    // `name`, so it reads as plain "Error". The subclass
+    // `APIConnectionTimeoutError` also arrives with no cause at all, so the
+    // cause-code check below cannot stand on its own.
+    const constructorName = (err as { constructor?: { name?: unknown } }).constructor?.name;
+    if (typeof constructorName === 'string' && constructorName.startsWith('APIConnection')) {
+      return true;
+    }
+    const cause = err.cause;
+    if (cause && typeof cause === 'object') {
+      const causeCode = (cause as Record<string, unknown>).code;
+      if (typeof causeCode === 'string' && retryableCodes.includes(causeCode)) {
         return true;
       }
     }

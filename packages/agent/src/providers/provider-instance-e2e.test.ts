@@ -722,6 +722,11 @@ describe('Provider Instance E2E Tests', () => {
           'gpt-4'
         );
 
+        // As above: the SDK wraps the DNS failure in a retryable
+        // APIConnectionError, so cap retries — this asserts the surfaced error,
+        // not the retry schedule.
+        provider.RETRY_CONFIG = { maxRetries: 1 };
+
         await expect(
           provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
         ).rejects.toThrow(/getaddrinfo ENOTFOUND|fetch failed|Connection error/i);
@@ -770,6 +775,14 @@ describe('Provider Instance E2E Tests', () => {
           'invalid-url-test',
           'gpt-4'
         );
+
+        // A connection failure is retryable — the SDK wraps ENOTFOUND in an
+        // APIConnectionError, and treating that class as permanent is what let a
+        // transient blip fail a turn outright. This test is about the error the
+        // caller finally sees, not about retry policy, so cap the retries rather
+        // than let the default schedule (10 attempts, exponential backoff) decide
+        // how long the assertion takes.
+        provider.RETRY_CONFIG = { maxRetries: 1 };
 
         await expect(
           provider.createResponse([{ role: 'user', content: 'Hello' }], [], 'gpt-4')
