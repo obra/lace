@@ -108,20 +108,37 @@ export function tagMcpServers(
  * This is the merge used by session/load and session/resume — the bug it fixed:
  * a since-deleted embedder MCP server stuck around in state.json and lace tried
  * to spawn its missing command.
+ *
+ * Entries with `source === 'persona'` also survive, because the embedder never
+ * declared them and so cannot re-declare them on resume. `subagent-job.ts`
+ * resumes with `mcpServers: []`, which previously wiped a persona's servers:
+ * a resumed browser-user lost `superpowers-chrome`, its tool count dropped
+ * 10 -> 9, and the model kept calling a tool that was no longer registered.
+ * An incoming entry of the same name still wins, so an embedder can override
+ * a persona default deliberately.
  */
 export function applyEmbedderMcpServers(existing: unknown, incoming: unknown): StoredMcpServer[] {
   const incomingServers = defaultMcpServerPlacements(validateIncomingMcpServers(incoming));
   const existingList: StoredMcpServer[] = Array.isArray(existing)
     ? (existing as StoredMcpServer[])
     : [];
+  const incomingNames = new Set(incomingServers.map((s) => s.name));
 
   const userOwned = existingList.filter((s) => s?.source === 'user');
   const userOwnedNames = new Set(userOwned.map((s) => s.name));
+  // A persona default is superseded by an explicit incoming server of the same
+  // name; otherwise it is carried through untouched.
+  const personaOwned = existingList.filter(
+    (s) => s?.source === 'persona' && !incomingNames.has(s.name) && !userOwnedNames.has(s.name)
+  );
 
   const merged: StoredMcpServer[] = [];
   for (const server of incomingServers) {
     if (userOwnedNames.has(server.name)) continue;
     merged.push({ ...server, source: 'embedder' });
+  }
+  for (const server of personaOwned) {
+    merged.push({ ...server, source: 'persona' });
   }
   for (const server of userOwned) {
     merged.push({ ...server, source: 'user' });

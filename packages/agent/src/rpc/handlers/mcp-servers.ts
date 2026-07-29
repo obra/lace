@@ -163,7 +163,7 @@ async function syncDisabledMcpServerForActiveSession(
 // optional `source` tag (see session-store.ts). The strict protocol schema
 // would reject this tag, so reading state.json uses the extended shape.
 const StoredMcpServerSchema = McpServerConfigSchema.extend({
-  source: z.enum(['embedder', 'user']).optional(),
+  source: z.enum(['embedder', 'user', 'persona']).optional(),
 });
 
 /**

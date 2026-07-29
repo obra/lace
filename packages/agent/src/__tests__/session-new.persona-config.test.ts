@@ -108,7 +108,7 @@ You are a frontmatter persona.`
         args: ['--root', '/tmp'],
         enabled: false,
         placement: 'toolRuntime',
-        source: 'embedder',
+        source: 'persona',
       },
     ]);
   });
@@ -160,7 +160,7 @@ You are a persona with MCP defaults.`
         command: 'persona-only',
         enabled: false,
         placement: 'toolRuntime',
-        source: 'embedder',
+        source: 'persona',
       },
       {
         name: 'request-only',
@@ -216,7 +216,7 @@ Persona with MCP placement.`
         secretEnv: { API_KEY: { namespace: 'project', name: 'api-key' } },
         enabled: true,
         placement: 'host',
-        source: 'embedder',
+        source: 'persona',
       },
       {
         name: 'explicit-stdio-host',
@@ -224,7 +224,7 @@ Persona with MCP placement.`
         transport: 'stdio',
         placement: 'host',
         enabled: false,
-        source: 'embedder',
+        source: 'persona',
       },
     ]);
   });
