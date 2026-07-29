@@ -87,7 +87,7 @@ describe('inject-drain prefill wedge (E2E)', () => {
   }
 
   it(
-    'drains a mid-turn inject with a request that ends on an assistant message',
+    'drains a mid-turn inject without ever dispatching an assistant prefill',
     { timeout: 30_000 },
     async () => {
       const recordPath = join(ctx.laceDir, 'provider-requests.jsonl');
@@ -145,26 +145,39 @@ describe('inject-drain prefill wedge (E2E)', () => {
           (e.data as { content: unknown[] }).content.length === 0
       );
 
-      // Preconditions: the inject landed, and the drain fired an EMPTY prompt.
+      // Precondition: the inject landed and a drain turn ran for it.
       expect(injected.length).toBeGreaterThanOrEqual(1);
-      expect(emptyPrompts.length).toBeGreaterThanOrEqual(1);
 
-      // The hypothesis. The drain dispatched a real provider request, and that
-      // request's conversation ends on an assistant message — the prefill a
-      // opus-4-8 rejects outright. Asserted against the request the
-      // provider was actually handed, not a re-derivation of it.
+      // The drain no longer prompts with empty content in this shape — an empty
+      // prompt here is precisely what produced the invalid request.
+      expect(emptyPrompts).toHaveLength(0);
+
+      // And it took the NUDGE path specifically. Without this the test would
+      // also pass if the drain had simply stopped running, which would trade
+      // one dropped notification for another.
+      const nudgePrompts = events.filter(
+        (e) =>
+          e.type === 'prompt' &&
+          JSON.stringify((e.data as { content?: unknown })?.content ?? '').includes(
+            'arrived while you were mid-turn'
+          )
+      );
+      expect(nudgePrompts).toHaveLength(1);
+
+      // The fix. The drain still dispatches a real provider request, but it now
+      // ends on a USER message, so it is not an assistant prefill. Asserted
+      // against the request the provider was actually handed — the request is
+      // built at dispatch time, so the transcript alone cannot show its shape.
       const requests = readRequestRoles(recordPath);
       expect(requests.length).toBeGreaterThanOrEqual(2);
 
-      // Control: the ORIGINAL turn's request is well-formed and ends on the
-      // user. Without this the assertion below would pass even if every request
-      // ended on an assistant message, making the test meaningless.
-      const firstRequest = requests[0];
-      expect(firstRequest[firstRequest.length - 1]).toBe('user');
-
-      const drainRequest = requests[requests.length - 1];
-      expect(drainRequest.length).toBeGreaterThan(0);
-      expect(drainRequest[drainRequest.length - 1]).toBe('assistant');
+      // EVERY request must be well-formed, the drain included. Checking all of
+      // them keeps this honest: asserting only the last would still pass if the
+      // drain had never run at all.
+      for (const roles of requests) {
+        expect(roles.length).toBeGreaterThan(0);
+        expect(roles[roles.length - 1]).toBe('user');
+      }
     }
   );
 

@@ -14,6 +14,7 @@ import {
   hasPendingImmediateInjects,
 } from '@lace/agent/storage/event-log';
 import { PROMPT_HANDLER_CAUGHT_STOP_REASON } from '@lace/agent/storage/event-types';
+import { injectDrainContent } from '@lace/agent/notifications/inject-drain-content';
 import { logger } from '@lace/agent/utils/logger';
 import { findUserCommand } from '@lace/agent/user-commands';
 import type {
@@ -68,7 +69,11 @@ function scheduleImmediateInjectDrain(
   ) {
     setImmediate(() => {
       if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-        void runPromptInternalRef.current([]);
+        // Empty content only surfaces the inject while it is still the trailing
+        // message. If the turn answered something else after it landed, the
+        // conversation now ends on an assistant message and dispatching that is
+        // a prefill the model may refuse — carry a nudge instead.
+        void runPromptInternalRef.current(injectDrainContent(state.activeSession.dir));
       }
     });
   }
