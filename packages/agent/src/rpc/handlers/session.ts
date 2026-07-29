@@ -677,9 +677,25 @@ export function registerSessionHandlers(
         : personaDefaults.mcpServers
           ? defaultMcpServerPlacements(personaDefaults.mcpServers)
           : undefined;
-    // Both persona-defaults and request-level entries come from the embedder.
+    // Tag by ORIGIN, not by who asked for the session. A server the embedder
+    // named in this request is 'embedder' — it re-declares that set on every
+    // resume, so it is safe to replace wholesale. A server that came only from
+    // persona frontmatter is 'persona': the embedder never declared it and
+    // cannot re-declare it on resume (session/resume takes no persona), so
+    // tagging it 'embedder' meant a resume with `mcpServers: []` silently
+    // dropped it — which is how a resumed browser-user lost its browser tool.
+    const requestDeclaredNames = new Set(
+      (Array.isArray(parsed.mcpServers) ? parsed.mcpServers : []).map((s) => s.name)
+    );
+    const personaDeclaredNames = new Set((personaDefaults.mcpServers ?? []).map((s) => s.name));
     const effectiveStoredMcpServers = effectiveMcpServers
-      ? tagMcpServers(effectiveMcpServers, 'embedder')
+      ? effectiveMcpServers.map((server) => ({
+          ...server,
+          source:
+            personaDeclaredNames.has(server.name) && !requestDeclaredNames.has(server.name)
+              ? ('persona' as const)
+              : ('embedder' as const),
+        }))
       : undefined;
     const effectiveToolScope = personaDefaults.toolScope;
 

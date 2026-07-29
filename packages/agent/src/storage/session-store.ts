@@ -26,7 +26,7 @@ import type { RuntimeExecutionBinding } from '../tools/runtime/types';
  * Missing `source` is treated as `embedder` for migration compatibility with
  * state.json files written before this field existed.
  */
-export type McpServerSource = 'embedder' | 'user';
+export type McpServerSource = 'embedder' | 'user' | 'persona';
 
 export type StoredMcpServer = {
   name: string;
