@@ -4,7 +4,7 @@
 // ABOUTME: still the last thing in the transcript; once the turn has emitted an
 // ABOUTME: assistant message, the drain dispatches a request whose conversation
 // ABOUTME: ends with an assistant message — an assistant prefill, which
-// ABOUTME: extended-thinking models reject with a hard 400.
+// ABOUTME: claude-opus-4-8 rejects with a hard, non-retryable 400.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
@@ -30,6 +30,11 @@ import {
  *
  * It is not retryable, so the turn dies and whatever prompted it is dropped
  * silently — the agent simply goes deaf while every container stays healthy.
+ *
+ * The refusal is a property of the MODEL, not of extended thinking: opus-4-8
+ * rejects the prefill with thinking on or off, while sonnet-4-5 accepts it. That
+ * contract is pinned live in anthropic-prefill-contract.live.test.ts, and it is
+ * why the wedge only began biting once Ada moved to opus-4.8.
  */
 describe('inject-drain prefill wedge (E2E)', () => {
   const ctx = createE2EContext({ prefix: 'lace-inject-drain-prefill' });
@@ -146,7 +151,7 @@ describe('inject-drain prefill wedge (E2E)', () => {
 
       // The hypothesis. The drain dispatched a real provider request, and that
       // request's conversation ends on an assistant message — the prefill a
-      // thinking-enabled model rejects. Asserted against the request the
+      // opus-4-8 rejects outright. Asserted against the request the
       // provider was actually handed, not a re-derivation of it.
       const requests = readRequestRoles(recordPath);
       expect(requests.length).toBeGreaterThanOrEqual(2);
