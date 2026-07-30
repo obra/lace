@@ -77,6 +77,28 @@ Body.`;
     expect(conflicts).toHaveLength(0);
   });
 
+  // The conservative default below is correct in itself, but it is ALSO the
+  // mechanism behind a long-running false positive: a subagent process used to
+  // boot without the containerMounts registry forwarded, so every readonly mount
+  // looked writable and every spawn warned about `knowledge`. The registry must
+  // reach the child (see subagent-job.ts `containerMounts`), or this default
+  // silently converts "I wasn't told" into "this is a trust-boundary violation".
+  it('an EMPTY registry reproduces the false positive the child used to hit', () => {
+    writeEnv('persistent-box', persistentEnv(['knowledge']));
+    writeEnv('browser-driver', ephemeralEnv(['knowledge']));
+    const reg = new EnvironmentRegistry({ environmentsPaths: [dir] });
+
+    // What the child saw with no registry forwarded: a bogus conflict.
+    expect(findEnvironmentMountConflicts(reg, {})).toHaveLength(1);
+
+    // What it sees once the registry arrives: the truth, which is no conflict.
+    expect(
+      findEnvironmentMountConflicts(reg, {
+        knowledge: { hostPath: '/h/k', containerPath: '/knowledge', readonly: true },
+      })
+    ).toHaveLength(0);
+  });
+
   it('treats a mount missing from the registry as read-write (conservative default)', () => {
     writeEnv('persistent-box', persistentEnv(['knowledge']));
     writeEnv('eph', ephemeralEnv(['knowledge']));

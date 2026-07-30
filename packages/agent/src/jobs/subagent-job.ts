@@ -846,6 +846,13 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         },
         userPersonasPaths: subagentUserPersonasPaths,
         userEnvironmentsPaths: subagentUserEnvironmentsPaths,
+        // The child runs the R6 mount-conflict scan on its own initialize, and
+        // that scan treats a mount ABSENT from this registry as read-write
+        // (conservative). Without forwarding, every subagent boots with an empty
+        // registry and warns that readonly mounts like `knowledge` are writable
+        // conflicts — a false positive on every spawn, which trains agents to
+        // ignore the warning entirely.
+        containerMounts: currentState.containerMounts,
         ...(subagentMcpBaseDir ? { mcpBaseDir: subagentMcpBaseDir } : {}),
         skillDirs: subagentSkillDirs,
         // Forward the credential exec-tool dir as a top-level param (the child
