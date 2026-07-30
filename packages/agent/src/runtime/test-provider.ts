@@ -6,6 +6,7 @@ import {
 import type { WireTool } from '@lace/agent/providers/base-provider';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
+import { appendFileSync } from 'node:fs';
 
 type TestProviderState = {
   phase: 'needs_tool' | 'awaiting_retry' | 'final';
@@ -119,6 +120,31 @@ export function getTestProviderCallCount(): number {
   return globalCallCount;
 }
 
+/**
+ * Request-shape recorder (env-gated by LACE_TEST_PROVIDER_RECORD_REQUESTS, a
+ * file path). Appends one JSON line per provider call with the role sequence of
+ * the messages the provider was actually handed.
+ *
+ * This exists so an E2E test can assert on the shape of the request the agent
+ * really dispatched, rather than re-deriving it from the transcript. The shape
+ * that matters is the LAST role: a conversation ending in an assistant message
+ * is an assistant prefill, which extended-thinking models reject outright
+ * (`This model does not support assistant message prefill`). That failure is
+ * invisible from the transcript alone, because the request is built from the
+ * event log at dispatch time.
+ *
+ * Recording must never perturb a turn, so every failure here is swallowed.
+ */
+function recordRequestShape(messages: ProviderMessage[]): void {
+  const target = process.env.LACE_TEST_PROVIDER_RECORD_REQUESTS;
+  if (!target) return;
+  try {
+    appendFileSync(target, `${JSON.stringify({ roles: messages.map((m) => m.role) })}\n`);
+  } catch {
+    // A recorder that breaks the run it observes is worse than no recorder.
+  }
+}
+
 export class TestAgentProvider extends AIProvider {
   private state: TestProviderState = {
     phase: 'needs_tool',
@@ -182,6 +208,7 @@ export class TestAgentProvider extends AIProvider {
     _model: string,
     signal?: AbortSignal
   ): Promise<ProviderResponse> {
+    recordRequestShape(messages);
     if (signal?.aborted) {
       return { content: '', toolCalls: [], stopReason: 'cancelled' };
     }
