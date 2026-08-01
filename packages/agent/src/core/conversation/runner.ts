@@ -251,10 +251,52 @@ const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
  * handle the new message. The reminder keeps its original value (catching a
  * premature "Done") on turns with no pending inbound.
  */
-export function bareTextStopReminder(sawInjectionThisTurn: boolean): string {
-  return sawInjectionThisTurn
-    ? '<system-reminder>A new message arrived mid-turn and is now in your context above. Read it and handle it — reply, act on it, or explicitly defer it — before stopping. Do not just restate your prior status. Call a tool.</system-reminder>'
-    : '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>';
+export type MidTurnArrival = 'none' | 'message' | 'notification' | 'both';
+
+/**
+ * What a `context_injected` event actually carries. A job-completion or a
+ * fired reminder is a NOTIFICATION, not an inbound message — announcing it as
+ * "a new message arrived" sends the agent hunting for a message that does not
+ * exist. That reads as a phantom, and the rational defence is to re-fetch the
+ * thread before every reply, which taxes every turn.
+ */
+export function classifyInjectedArrival(texts: string[]): MidTurnArrival {
+  let sawNotification = false;
+  let sawMessage = false;
+  for (const text of texts) {
+    if (/<notification\b/.test(text)) sawNotification = true;
+    else sawMessage = true;
+  }
+  if (sawNotification && sawMessage) return 'both';
+  if (sawNotification) return 'notification';
+  if (sawMessage) return 'message';
+  return 'none';
+}
+
+export function bareTextStopReminder(arrival: MidTurnArrival): string {
+  const handle =
+    ' Read it and handle it — reply, act on it, or explicitly defer it — before stopping.' +
+    ' Do not just restate your prior status. Call a tool.</system-reminder>';
+  switch (arrival) {
+    case 'message':
+      return (
+        '<system-reminder>A new message arrived mid-turn and is now in your context above.' + handle
+      );
+    case 'notification':
+      return (
+        '<system-reminder>A notification arrived mid-turn and is now in your context above.' +
+        ' It is a notification, not an inbound message — there is no new message to look for.' +
+        handle
+      );
+    case 'both':
+      return (
+        '<system-reminder>A new message and a notification arrived mid-turn and are now in' +
+        ' your context above.' +
+        handle
+      );
+    case 'none':
+      return '<system-reminder>You must use a tool to verify your work before stopping. Do not respond with text — call a tool.</system-reminder>';
+  }
 }
 
 function hasFutureTenseIntent(text: string): boolean {
@@ -561,7 +603,7 @@ export class ConversationRunner {
     // bare-text stop-checkpoint reminder from "verify before stopping" to
     // "handle the new message", so a mid-turn inbound isn't crowded out by the
     // standby/verify wrap-up.
-    let sawInjectionThisTurn = false;
+    let injectedArrival: MidTurnArrival = 'none';
     let nextRequestOptions: RequestOptions | undefined;
     // Carries forward the parsed structured object from the last provider
     // response that produced one, surfaced on the RunResult for the prompt
@@ -604,7 +646,21 @@ export class ConversationRunner {
         for (const content of injections) {
           providerMessages = appendOrMergeUser(providerMessages, content);
         }
-        if (injections.length > 0) sawInjectionThisTurn = true;
+        if (injections.length > 0) {
+          // Describe what actually landed. Calling a job-completion "a new
+          // message" is the phantom-inbound bug.
+          const arrival = classifyInjectedArrival(
+            injections.flatMap((content) =>
+              typeof content === 'string'
+                ? [content]
+                : (content as Array<{ type?: string; text?: string }>)
+                    .filter((b) => typeof b?.text === 'string')
+                    .map((b) => b.text as string)
+            )
+          );
+          injectedArrival =
+            injectedArrival === 'none' || injectedArrival === arrival ? arrival : 'both';
+        }
         lastSeenEventSeq = newWatermark;
 
         // Inject a reminder every LOOP_CHECK_INTERVAL turns to help detect
@@ -1015,7 +1071,7 @@ export class ConversationRunner {
               { role: 'assistant' as const, content: assistantPlaceholder },
               {
                 role: 'user' as const,
-                content: bareTextStopReminder(sawInjectionThisTurn),
+                content: bareTextStopReminder(injectedArrival),
               },
             ];
             nextRequestOptions = { toolChoice: 'required' };

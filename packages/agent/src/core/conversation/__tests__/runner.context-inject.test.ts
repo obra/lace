@@ -279,15 +279,32 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
   });
 
   it('bareTextStopReminder returns the verify reminder when no injection was seen', () => {
-    const reminder = bareTextStopReminder(false);
+    const reminder = bareTextStopReminder('none');
     expect(reminder).toContain('verify your work before stopping');
-    expect(reminder).not.toContain('new message arrived mid-turn');
+    expect(reminder).not.toContain('arrived mid-turn');
   });
 
-  it('bareTextStopReminder returns a handle-the-new-message directive when an injection was seen', () => {
-    const reminder = bareTextStopReminder(true);
+  it('bareTextStopReminder returns a handle-the-new-message directive for a real message', () => {
+    const reminder = bareTextStopReminder('message');
     expect(reminder).toContain('new message arrived mid-turn');
     expect(reminder).not.toContain('verify your work before stopping');
+  });
+
+  it('bareTextStopReminder calls a notification a notification, not a new message', () => {
+    // A job-completion or fired reminder is NOT an inbound message. Announcing
+    // it as one sends the agent looking for a message that does not exist —
+    // it reads as a phantom, and the defensive fix is to re-fetch the thread
+    // before every reply, which is a per-turn tax.
+    const reminder = bareTextStopReminder('notification');
+    expect(reminder).toContain('notification');
+    expect(reminder).not.toContain('new message arrived');
+    expect(reminder).not.toContain('verify your work before stopping');
+  });
+
+  it('bareTextStopReminder names both when a message and a notification both landed', () => {
+    const reminder = bareTextStopReminder('both');
+    expect(reminder).toContain('new message');
+    expect(reminder).toContain('notification');
   });
 
   it('flips the bare-text stop reminder to a directive when a mid-turn injection was seen', async () => {
