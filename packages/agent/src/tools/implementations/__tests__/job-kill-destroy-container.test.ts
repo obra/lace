@@ -111,6 +111,40 @@ describe('job_kill destroy_container', () => {
     expect(reaper.get('sess_child')).toBeDefined();
   });
 
+  it('releases an UNTRACKED child through the shim instead of claiming no container exists', async () => {
+    // The reaper is a per-process tracker. After a lace restart the entry for a
+    // live container is gone — and job_kill(destroy_container) used to report
+    // "no container to destroy" while that container demonstrably kept holding
+    // its port (Cadence, 2026-08-01, container b08acf20). The shim's release
+    // verb is idempotent, so when the job names a child session we route the
+    // release regardless of tracking and let the shim decide.
+    const calls: string[] = [];
+    const releasePerInvocation = vi.fn(async (parent: string, child: string) => {
+      calls.push(`release:${parent}:${child}`);
+    });
+    const reaper = new WorkspaceReaper();
+    reaper.bindRuntime({ releasePerInvocation } as unknown as ContainerManager);
+    // NOT tracked: no reaper.track() call — simulates the post-restart process.
+    const job = {
+      jobId: 'job_x',
+      status: 'completed',
+      subagentSessionId: 'sess_child',
+    } as JobState;
+    const jobManager = {
+      getJob: vi.fn().mockReturnValue(job),
+      cancelJob: vi.fn(),
+    } as unknown as JobManager;
+
+    const result = await new JobKillTool().execute(
+      { jobId: 'job_x', destroy_container: true },
+      ctx({ jobManager, workspaceReaper: reaper, activeSessionId: 'sess_parent' })
+    );
+    expect(result.status).toBe('completed');
+    expect(calls).toEqual(['release:sess_parent:sess_child']);
+    expect(result.content[0].text).not.toContain('no container to destroy');
+    expect(reaper.isReleased('sess_child')).toBe(true);
+  });
+
   it('destroy_container on an unknown job fails', async () => {
     const reaper = new WorkspaceReaper();
     const jobManager = { getJob: vi.fn().mockReturnValue(undefined) } as unknown as JobManager;
