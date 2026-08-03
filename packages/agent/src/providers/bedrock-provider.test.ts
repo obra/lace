@@ -1,7 +1,7 @@
 // ABOUTME: Tests for BedrockProvider - Claude via AWS Bedrock
 // ABOUTME: Mirrors the AnthropicProvider tests against the bedrock-sdk client
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from 'vitest';
 import { BedrockProvider } from './bedrock-provider';
 import { Tool } from '@lace/agent/tools/tool';
 import { ToolResult, ToolContext } from '@lace/agent/tools/types';
@@ -99,8 +99,16 @@ describe('BedrockProvider', () => {
     });
 
     it('reports not configured when no region is supplied', () => {
-      const p = new BedrockProvider({});
-      expect(p.isConfigured()).toBe(false);
+      // The provider deliberately falls back to process.env.AWS_REGION, so a
+      // developer shell with AWS_REGION set would flip this test unless we
+      // isolate the env.
+      vi.stubEnv('AWS_REGION', '');
+      try {
+        const p = new BedrockProvider({});
+        expect(p.isConfigured()).toBe(false);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
   });
 
@@ -142,6 +150,8 @@ describe('BedrockProvider', () => {
     });
 
     it('throws when no region is configured at request time', async () => {
+      vi.stubEnv('AWS_REGION', '');
+      onTestFinished(() => vi.unstubAllEnvs());
       const p = new BedrockProvider({});
       p.setSystemPrompt('s');
       // Defeat retries so the error surfaces immediately

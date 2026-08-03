@@ -77,9 +77,28 @@ Parameters:
         await workspaceReaper.runExclusive(childId, () => workspaceReaper.dispose(childId));
         return ok(`Job ${jobId} torn down — container destroyed and workspace removed.`);
       }
+      // Tracked by a DIFFERENT session: not ours to tear down.
+      if (entry) {
+        return ok(
+          `Job ${jobId} ${wasRunning ? 'cancelled' : 'already finished'} (container owned by another session; not destroyed).`
+        );
+      }
+      // Untracked. The reaper is per-process, so after a lace restart the entry
+      // for a live container is simply gone — reporting "no container to
+      // destroy" here left a finished browser holding its port with no
+      // self-serve way to reclaim it. The job is already scoped to this
+      // session, and the shim's release verb is idempotent (releasing a child
+      // with no container is a no-op there), so route the release and let the
+      // shim decide.
+      await workspaceReaper.runExclusive(childId, () =>
+        workspaceReaper.disposeUntracked(activeSessionId ?? '', childId)
+      );
+      return ok(
+        `Job ${jobId} ${wasRunning ? 'cancelled' : 'already finished'}; release routed to the shim for its container (untracked in this process).`
+      );
     }
-    // Nothing tracked to tear down (host subagent, persistent box, or already
-    // gone): the kill above is the whole effect.
+    // No child session at all (host subagent / persistent box): the kill above
+    // is the whole effect.
     return ok(
       `Job ${jobId} ${wasRunning ? 'cancelled' : 'already finished'} (no container to destroy).`
     );

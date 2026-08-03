@@ -101,6 +101,18 @@ export class WorkspaceReaper {
     this.released.add(childId);
   }
 
+  /**
+   * Route a release for a child this process never tracked (the tracker is
+   * per-process; a lace restart forgets live containers). Same shim route as
+   * dispose but with the parent supplied by the caller, since there is no
+   * entry to read it from. The shim's release verb is idempotent, so a child
+   * with no container is a harmless no-op server-side.
+   */
+  async disposeUntracked(parentId: string, childId: string): Promise<void> {
+    await this.containerManager?.releasePerInvocation(parentId, childId);
+    this.released.add(childId);
+  }
+
   /** True once this child has been disposed in this process (non-resumable). */
   isReleased(childId: string): boolean {
     return this.released.has(childId);
