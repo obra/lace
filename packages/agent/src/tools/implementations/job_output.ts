@@ -25,6 +25,8 @@ Parameters:
 - \`jobId\` (required): the job to inspect.
 - \`byteOffset\` (default 0): reserved for future incremental reads.
 
+Output remains readable after a job ends, including a job that was killed mid-flight — a partial result is still a result. \`not found\` means no job has ever had that id.
+
 Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number }\`.`;
   schema = jobOutputSchema;
   annotations: ToolAnnotations = {
@@ -49,7 +51,12 @@ Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string,
 
     const { jobId } = args;
 
-    const job = jobManager.getJob(jobId);
+    // A finished job is deleted from the live map, but its output file and its
+    // job_finished event both survive. Resolving from the map alone reports
+    // "not found" for a job whose output is sitting on disk — which makes a
+    // completed or killed job look like one that never ran. Fall back to the
+    // event-derived record so the output stays readable after the job ends.
+    const job = jobManager.getJob(jobId) ?? jobManager.listJobs().find((j) => j.jobId === jobId);
     if (!job) {
       return {
         status: 'failed',

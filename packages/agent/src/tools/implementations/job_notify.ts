@@ -69,6 +69,26 @@ Returns: \`{ subscribed: true, subscriptionId, jobId, on, filter? }\`.`;
       };
     }
 
+    // Refuse an id no job has ever had. subscribe() deliberately accepts
+    // unknown ids so internal callers can pre-register before a job lands in
+    // the map, but for an agent a bogus id buys permanent silence that looks
+    // exactly like a slow job. Check the live map first, then the event log —
+    // an already-finished job has left the map and must still be accepted.
+    if (!jobManager.getJob(args.jobId)) {
+      const known = jobManager.listJobs().some((j) => j.jobId === args.jobId);
+      if (!known) {
+        return {
+          status: 'failed',
+          content: [
+            {
+              type: 'text',
+              text: `No job with id ${JSON.stringify(args.jobId)}. Subscribing would never fire. Use the jobId returned by \`delegate\`/\`bash(background=true)\`, or \`jobs_list\` to find it.`,
+            },
+          ],
+        };
+      }
+    }
+
     // jobManager.subscribe throws on invalid filter regex; surface that to
     // the agent as a structured failure rather than letting it bubble.
     let sub;
