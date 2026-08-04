@@ -20,7 +20,7 @@ export class JobsListTool extends Tool {
 Filter by status: \`["pending","running","completed","failed","cancelled"]\`.
 Filter by type: \`["bash","delegate"]\`.
 
-Returns: \`[{ jobId, type, status, description, startTime }]\`.`;
+Returns: \`[{ jobId, type, status, description, startTime }]\`, **most recent first**. When more jobs match than \`limit\` allows, the result says how many were withheld.`;
   schema = jobsListSchema;
   annotations: ToolAnnotations = {
     title: 'List Jobs',
@@ -56,8 +56,12 @@ Returns: \`[{ jobId, type, status, description, startTime }]\`.`;
       jobs = jobs.filter((j) => typeFilter.includes(j.type));
     }
 
-    // Apply limit
-    jobs = jobs.slice(0, limit);
+    // Newest first, then limit. listJobs() derives records in event order, so
+    // an un-reversed slice returns the OLDEST jobs — in a long-lived session
+    // that puts recent work past the limit, where a killed job is
+    // indistinguishable from one that never ran.
+    const matched = jobs.length;
+    jobs = jobs.slice().reverse().slice(0, limit);
 
     // Format output
     const formatted = jobs.map((j) => ({
@@ -68,9 +72,15 @@ Returns: \`[{ jobId, type, status, description, startTime }]\`.`;
       startTime: j.startTime,
     }));
 
+    // Name the truncation. Silence here reads as "this is all of them".
+    const note =
+      matched > formatted.length
+        ? `\n\n${formatted.length} most recent of ${matched} matching jobs. Raise \`limit\` or narrow with \`status\`/\`type\` to see more.`
+        : '';
+
     return Promise.resolve({
       status: 'completed',
-      content: [{ type: 'text', text: JSON.stringify(formatted, null, 2) }],
+      content: [{ type: 'text', text: `${JSON.stringify(formatted, null, 2)}${note}` }],
     });
   }
 }

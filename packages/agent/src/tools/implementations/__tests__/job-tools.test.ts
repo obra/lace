@@ -78,6 +78,8 @@ describe('JobOutputTool', () => {
 
     const jobManager = {
       getJob: vi.fn().mockReturnValue(undefined),
+      // Unknown means unknown in BOTH places: not live, and not in history.
+      listJobs: vi.fn().mockReturnValue([]),
       getJobOutput: vi.fn().mockReturnValue(''),
     } as unknown as JobManager;
 
@@ -201,12 +203,12 @@ describe('JobsListTool', () => {
     );
 
     expect(result.status).toBe('completed');
-    // Should only contain first 3 jobs
+    // Keeps the 3 most recent (listJobs returns oldest-first), drops the rest.
     const text = result.content[0].text ?? '';
-    expect(text).toContain('job_0');
-    expect(text).toContain('job_1');
-    expect(text).toContain('job_2');
-    expect(text).not.toContain('job_3');
+    expect(text).toContain('job_9');
+    expect(text).toContain('job_8');
+    expect(text).toContain('job_7');
+    expect(text).not.toContain('job_6');
   });
 });
 

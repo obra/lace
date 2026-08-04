@@ -6,6 +6,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { JobNotifyTool } from '../job_notify';
 import { JobManager } from '@lace/agent/jobs/job-manager';
 
+/**
+ * job_notify refuses ids no job has ever had, so a stub must claim the job
+ * exists. Live-map presence is the shortest way to say "this job is real".
+ */
+function knownJob(jobId: string) {
+  return { getJob: (id: string) => (id === jobId ? { jobId } : undefined) };
+}
+
 describe('JobNotifyTool', () => {
   it('returns error when jobManager not in context', async () => {
     const tool = new JobNotifyTool();
@@ -25,7 +33,7 @@ describe('JobNotifyTool', () => {
       jobId: 'job_123',
       on: ['completed', 'failed', 'cancelled'],
     });
-    const jobManager = { subscribe } as unknown as JobManager;
+    const jobManager = { subscribe, ...knownJob('job_123') } as unknown as JobManager;
 
     const result = await tool.execute(
       { jobId: 'job_123' },
@@ -56,7 +64,7 @@ describe('JobNotifyTool', () => {
       jobId: 'job_456',
       on: ['failed'],
     });
-    const jobManager = { subscribe } as unknown as JobManager;
+    const jobManager = { subscribe, ...knownJob('job_456') } as unknown as JobManager;
 
     const result = await tool.execute(
       { jobId: 'job_456', on: ['failed'] },
@@ -78,7 +86,7 @@ describe('JobNotifyTool', () => {
       on: ['completed', 'failed', 'cancelled'],
       filter: '^ERROR:',
     });
-    const jobManager = { subscribe } as unknown as JobManager;
+    const jobManager = { subscribe, ...knownJob('job_789') } as unknown as JobManager;
 
     await tool.execute(
       { jobId: 'job_789', filter: '^ERROR:' },
@@ -95,7 +103,7 @@ describe('JobNotifyTool', () => {
   it('rejects empty on=[]', async () => {
     const tool = new JobNotifyTool();
     const subscribe = vi.fn();
-    const jobManager = { subscribe } as unknown as JobManager;
+    const jobManager = { subscribe, ...knownJob('job_1') } as unknown as JobManager;
 
     const result = await tool.execute(
       { jobId: 'job_1', on: [] },
@@ -135,7 +143,7 @@ describe('JobNotifyTool', () => {
     const subscribe = vi.fn(() => {
       throw new Error('Invalid filter regex "[invalid": SyntaxError: ...');
     });
-    const jobManager = { subscribe } as unknown as JobManager;
+    const jobManager = { subscribe, ...knownJob('job_x') } as unknown as JobManager;
 
     const result = await tool.execute(
       { jobId: 'job_x', filter: '[invalid' },
@@ -157,6 +165,9 @@ describe('JobNotifyTool', () => {
       runSubagentProcess: vi.fn(),
     });
     const subscribeSpy = vi.spyOn(jobManager, 'subscribe');
+    // The job must exist for job_notify to accept it; this test is about
+    // idempotency, not about how unknown ids are handled.
+    vi.spyOn(jobManager, 'getJob').mockReturnValue({ jobId: 'job_dup' } as never);
 
     const tool = new JobNotifyTool();
     const args = { jobId: 'job_dup', on: ['completed', 'failed', 'cancelled'] as const };
