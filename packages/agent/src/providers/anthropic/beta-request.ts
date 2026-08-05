@@ -141,6 +141,16 @@ export function buildBetaMessagePayload(
     toolNames: payload.tools?.map((t) => ('name' in t ? t.name : '<server-tool>')),
     configKeys: input.configKeys,
     providerName: input.providerName,
+    // Whether the request carries a structured-output format, and whether it
+    // carries thinking/effort alongside it. Logged because the combination is
+    // load-bearing: a model can REFUSE a structured-output request that has no
+    // thinking, returning an empty body that reads downstream as malformed
+    // JSON. Without these fields the request that failed looks identical to
+    // one that worked, which is exactly how a credential-arbiter outage stayed
+    // invisible for hours.
+    hasOutputFormat: input.outputFormat !== undefined,
+    reasoningEffort: input.reasoningEffort ?? null,
+    thinking: thinkingField.thinking?.type ?? null,
   });
 
   // Final send-boundary guard: a lone UTF-16 surrogate anywhere in the request
