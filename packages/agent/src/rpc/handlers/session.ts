@@ -49,6 +49,7 @@ import { SkillRegistry, getSkillDirectories } from '../../skills';
 import { composeSkillDirs } from '../../skills/compose-skill-dirs';
 import { getAgentSkillsDir } from '../../skills/agent-skills-dir';
 import { killAllRunningJobs } from '../../jobs';
+import { injectNotification } from '../../notifications';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import {
@@ -288,6 +289,27 @@ async function activateStoredSession(
       };
     }
     throw error;
+  }
+
+  // If the prior process died mid-turn, tell the agent so on its next turn.
+  // Without this the interrupted turn is silently closed
+  // (`repairOrphanTurnStarts`) and the agent has no idea it was cut off — it
+  // just goes quiet, which is exactly how a human waiting on a mid-turn crash
+  // gets left hanging. The notice sits in the durable log and is read on the
+  // next turn (whatever triggers it); we deliberately do NOT force an internal
+  // turn, so a restart alone never makes the agent act unprompted.
+  if (loaded.recoveredFromCrash) {
+    injectNotification({
+      sessionDir: loaded.dir,
+      kind: 'session-recovered',
+      body:
+        'You just crashed (or were restarted) mid-turn and have now restarted. ' +
+        'Your previous turn was cut off before it finished, so any work you were ' +
+        'in the middle of may be incomplete and any reply you were about to send ' +
+        'was NOT sent. Re-read the most recent messages and your open jobs to see ' +
+        'where you left off. If someone was waiting on you, tell them what ' +
+        'happened and pick the work back up.',
+    });
   }
 
   const persistedRuntimeBinding =

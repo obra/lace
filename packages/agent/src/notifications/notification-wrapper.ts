@@ -9,7 +9,8 @@ export type NotificationKind =
   | 'job-cancelled'
   | 'job-progress'
   | 'subagent-exited'
-  | 'compaction-pressure';
+  | 'compaction-pressure'
+  | 'session-recovered';
 
 export interface BuildNotificationOptions {
   kind: NotificationKind;

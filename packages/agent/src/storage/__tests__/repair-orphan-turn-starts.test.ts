@@ -112,6 +112,34 @@ describe('repairOrphanTurnStarts via loadSession', () => {
     expect(turnEnds[0].eventSeq).toBeGreaterThan(2);
   });
 
+  it('reports recoveredFromCrash=true when an orphan turn_start was repaired', () => {
+    setupSession(ctx.tempDir, [prompt(1, 'turn_solo'), turnStart(2, 'turn_solo', 1)]);
+
+    const loaded = loadSession(SESSION_ID, { repairOrphanTurnStarts: true });
+
+    expect(loaded.recoveredFromCrash).toBe(true);
+  });
+
+  it('reports recoveredFromCrash=false when the session had no orphan turns', () => {
+    setupSession(ctx.tempDir, [
+      prompt(1, 'turn_a'),
+      turnStart(2, 'turn_a', 1),
+      turnEnd(3, 'turn_a', 2),
+    ]);
+
+    const loaded = loadSession(SESSION_ID, { repairOrphanTurnStarts: true });
+
+    expect(loaded.recoveredFromCrash).toBe(false);
+  });
+
+  it('reports recoveredFromCrash=false on the default refresh path even with an orphan present', () => {
+    setupSession(ctx.tempDir, [prompt(1, 'turn_solo'), turnStart(2, 'turn_solo', 1)]);
+
+    const loaded = loadSession(SESSION_ID);
+
+    expect(loaded.recoveredFromCrash).toBe(false);
+  });
+
   it('synthesizes a turn_end for each of three back-to-back orphan turn_starts', () => {
     const dir = setupSession(ctx.tempDir, [
       prompt(1, 'turn_a'),

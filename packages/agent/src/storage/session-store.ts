@@ -96,6 +96,14 @@ export type LoadedSession = {
   meta: SessionMeta;
   dir: string;
   state: SessionState;
+  /**
+   * True when this open performed crash recovery — i.e. the prior process died
+   * mid-turn and `repairOrphanTurnStarts` synthesized at least one `turn_end`.
+   * The session-open handler uses this to inject a "you crashed and restarted"
+   * notice so the agent knows its last turn was cut off. Always false unless
+   * `repairOrphanTurnStarts` was requested.
+   */
+  recoveredFromCrash: boolean;
 };
 
 export function agentSessionsDir(): string {
@@ -300,6 +308,7 @@ export function loadSession(sessionId: string, options?: LoadSessionOptions): Lo
   );
   state.nextEventSeq = reconciledHead;
 
+  let recoveredFromCrash = false;
   if (options?.repairOrphanTurnStarts) {
     // Crash recovery: if the prior process died between turn_start and turn_end
     // (SIGKILL, OOM, container restart), synthesize a turn_end with
@@ -311,8 +320,9 @@ export function loadSession(sessionId: string, options?: LoadSessionOptions): Lo
     if (repair.synthesized > 0) {
       state = repair.nextState;
       writeSessionState(sessionDir, state);
+      recoveredFromCrash = true;
     }
   }
 
-  return { meta, dir: sessionDir, state };
+  return { meta, dir: sessionDir, state, recoveredFromCrash };
 }

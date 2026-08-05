@@ -3,13 +3,14 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, appendFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import { defaultInitializeParams } from './helpers/initialize';
 import { loadSession, writeSessionState } from '../storage/session-store';
+import { readAllSessionEventLines } from '../storage/event-log';
 import { reconcileMcpServersForActiveSession } from '../rpc/handlers/mcp-servers';
 import type { JobState } from '../server-types';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
@@ -1464,6 +1465,93 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     }, {});
     expect(bySource.user).toEqual(['user-added']);
     expect(bySource.embedder).toEqual(['core']);
+  });
+
+  it('injects a session-recovered notice when session/load repairs a mid-turn crash', async () => {
+    // Create a session, then simulate the prior process dying mid-turn by
+    // writing a turn_start with no matching turn_end into its event log.
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    const dir = loadSession(created.sessionId).dir;
+    appendFileSync(
+      join(dir, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 900,
+        timestamp: '2026-08-05T00:00:00.000Z',
+        turnId: 'turn_crashed',
+        turnSeq: 1,
+        type: 'turn_start',
+        data: { type: 'turn_start' },
+      }) + '\n',
+      'utf8'
+    );
+
+    // Fresh process opens the session — this is the crash-recovery path.
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+    await loadClient.request('initialize', defaultInitializeParams());
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [],
+    });
+
+    const injected = [...readAllSessionEventLines(dir)]
+      .map((line) => {
+        try {
+          return JSON.parse(line) as {
+            type?: string;
+            data?: { content?: Array<{ text?: string }> };
+          };
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((e) => e?.type === 'context_injected');
+    const recoveryNotice = injected.find((e) =>
+      e?.data?.content?.some((c) => (c.text ?? '').includes('kind="session-recovered"'))
+    );
+    expect(recoveryNotice).toBeDefined();
+    expect(recoveryNotice?.data?.content?.[0]?.text).toContain('crashed');
+  });
+
+  it('does NOT inject a session-recovered notice on a clean session/load', async () => {
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    const dir = loadSession(created.sessionId).dir;
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+    await loadClient.request('initialize', defaultInitializeParams());
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [],
+    });
+
+    const hasRecoveryNotice = [...readAllSessionEventLines(dir)].some((line) =>
+      line.includes('kind=\\"session-recovered\\"')
+    );
+    expect(hasRecoveryNotice).toBe(false);
   });
 
   it('keeps the current session and jobs when load rejects invalid MCP servers', async () => {
