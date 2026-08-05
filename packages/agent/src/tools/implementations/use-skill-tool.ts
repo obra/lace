@@ -1,4 +1,4 @@
-// ABOUTME: Tool to activate a skill and get its instructions and location
+// ABOUTME: Tool to activate a skill and get its instructions
 
 import { z } from 'zod';
 import { Tool } from '../tool';
@@ -16,8 +16,7 @@ const useSkillSchema = z.object({
  * a relevant skill in its available skills list, it can use this tool to get
  * the full instructions.
  *
- * Returns the skill body content along with the skill directory path for
- * accessing any additional resources the skill might reference.
+ * Returns the skill body content.
  */
 export class UseSkillTool extends Tool {
   name = 'use_skill';
@@ -55,14 +54,7 @@ export class UseSkillTool extends Tool {
       );
     }
 
-    const output = [
-      `Skill: ${skillName}`,
-      `Location: ${content.skillDir}`,
-      '',
-      '---',
-      '',
-      content.body,
-    ].join('\n');
+    const output = [`Skill: ${skillName}`, '', '---', '', content.body].join('\n');
 
     return this.createResult(output);
   }

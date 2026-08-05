@@ -517,23 +517,32 @@ export class JobManager {
       }
     }
 
-    for (const subId of subIds) {
-      const sub = this.subscriptions.get(subId);
-      if (!sub) continue;
-      if (!sub.on.includes(kind)) continue;
-      // Filter applies ONLY to 'progress'. Terminal-state kinds always
-      // fire regardless of filter — the "silence is not success" contract
-      // requires they're never filterable.
-      if (kind === 'progress') {
+    if (kind === 'progress') {
+      for (const subId of subIds) {
+        const sub = this.subscriptions.get(subId);
+        if (!sub) continue;
+        if (!sub.on.includes(kind)) continue;
         if (sub.filterRegex) {
           const preview = options.preview ?? '';
           if (!sub.filterRegex.test(preview)) continue;
         }
         this.bufferProgressForSubscription(sub.subscriptionId, inject);
-      } else {
-        // Terminal: batches were already flushed above. Just inject.
-        inject();
       }
+      return;
+    }
+
+    // Terminal: a job's terminal state is a single fact, so deliver it AT MOST
+    // ONCE even when several overlapping subscriptions match (e.g. a broad
+    // default plus a narrow on=['completed']). Injecting per matching
+    // subscription produced duplicate identical notifications for one finished
+    // job. Filters never apply to terminal kinds — "silence is not success"
+    // requires they are not filterable. Batches were already flushed above.
+    const anyTerminalMatch = Array.from(subIds).some((subId) => {
+      const sub = this.subscriptions.get(subId);
+      return sub !== undefined && sub.on.includes(kind);
+    });
+    if (anyTerminalMatch) {
+      inject();
     }
   }
 

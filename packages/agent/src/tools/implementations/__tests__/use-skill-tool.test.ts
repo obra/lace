@@ -31,7 +31,7 @@ describe('UseSkillTool', () => {
     );
   }
 
-  it('returns skill content and location for existing skill', async () => {
+  it('returns skill content for existing skill without leaking the host path', async () => {
     createSkill('commit', 'Create git commits', '# Commit Skill\n\nFollow these steps...');
     registry = new SkillRegistry({ skillDirs: [skillsDir] });
     const tool = new UseSkillTool(registry);
@@ -47,7 +47,10 @@ describe('UseSkillTool', () => {
     expect(text.type).toBe('text');
     const textContent = (text as { type: 'text'; text: string }).text;
     expect(textContent).toContain('Skill: commit');
-    expect(textContent).toContain(`Location: ${join(skillsDir, 'commit')}`);
+    // The skill dir is a container-internal absolute path that is noise (and
+    // sometimes unusable) to the agent — it must not be emitted.
+    expect(textContent).not.toContain('Location:');
+    expect(textContent).not.toContain(skillsDir);
     expect(textContent).toContain('# Commit Skill');
     expect(textContent).toContain('Follow these steps...');
   });

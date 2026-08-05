@@ -61,6 +61,22 @@ describe('JobManager subscriptions', () => {
       expect(inject).toHaveBeenCalledTimes(1);
     });
 
+    // A job's terminal state is a single fact. Two overlapping subscriptions
+    // (e.g. a broad default plus a narrow on=['completed']) both match the
+    // terminal kind, but the parent must be notified ONCE — not once per
+    // subscription. This reproduces the observed duplicate job-completion
+    // notifications (two different notification ids for one finished job).
+    it('delivers a terminal state once even when multiple subscriptions match', () => {
+      const manager = makeManager();
+      manager.subscribe({ jobId: 'job_1', on: ['completed', 'failed', 'cancelled'] });
+      manager.subscribe({ jobId: 'job_1', on: ['completed'] });
+
+      const inject = vi.fn();
+      manager.fanoutToInject('job_1', 'completed', {}, inject);
+
+      expect(inject).toHaveBeenCalledTimes(1);
+    });
+
     it('once subscribed, an unmatched kind delivers nothing (no fallback)', () => {
       // Coverage-discipline contract from the design: subscribing with
       // on=['failed'] and watching a job complete successfully produces NO
