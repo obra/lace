@@ -1,4 +1,6 @@
 import { posix, resolve as resolveHostPath } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { logger } from '../../utils/logger';
 import type {
   ContainerHandle,
   ContainerLifecycleHooks,
@@ -286,6 +288,26 @@ function normalizeHostMounts(
     .sort((left, right) => right.containerPath.length - left.containerPath.length);
 }
 
+/**
+ * Tag a bare shell `-c` command with a unique $0 sentinel so the in-container
+ * process group can be found (via /proc cmdline) and killed on abort. Killing
+ * the exec-stream CLIENT does not touch the process inside the container; the
+ * exec'd shell is its own process-group/session leader, so `kill -- -pgid`
+ * from a follow-up exec takes down the whole in-flight tree.
+ *
+ * Only the bare 3-element `sh|bash|dash -c <script>` shape is tagged — a
+ * command that already passes $0 args (e.g. `sh -c '… "$0"' <path>`) is left
+ * alone, as is any non-shell command.
+ */
+function tagShellCommandForKill(command: string[]): { command: string[]; killSentinel?: string } {
+  if (command.length !== 3) return { command };
+  const bin = command[0]?.split('/').pop();
+  if (bin !== 'sh' && bin !== 'bash' && bin !== 'dash') return { command };
+  if (!/^-(l?c|cl?)$/.test(command[1] ?? '')) return { command };
+  const killSentinel = `lace-exec-${randomUUID()}`;
+  return { command: [...command, killSentinel], killSentinel };
+}
+
 class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
   private materialized?: Promise<void>;
 
@@ -362,13 +384,22 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       opts.signal.throwIfAborted();
     }
 
+    const tagged = tagShellCommandForKill(command);
     const containerHandle = await this.containerManager.execStream(
       this.descriptor.spec.name,
-      this.optionsFor(command, opts)
+      this.optionsFor(tagged.command, opts)
     );
+
+    let treeKillFired = false;
+    const killInContainerTree = (): void => {
+      if (!tagged.killSentinel || treeKillFired) return;
+      treeKillFired = true;
+      void this.killContainerProcessGroup(tagged.killSentinel);
+    };
 
     if (opts.signal?.aborted) {
       containerHandle.kill();
+      killInContainerTree();
       opts.signal.throwIfAborted();
     }
 
@@ -376,6 +407,7 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
     const abortHandler = () => {
       aborted = true;
       containerHandle.kill();
+      killInContainerTree();
     };
     opts.signal?.addEventListener('abort', abortHandler, { once: true });
 
@@ -396,9 +428,39 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       stdin: containerHandle.stdin,
       stdout: containerHandle.stdout,
       stderr: containerHandle.stderr,
-      kill: (signal?: NodeJS.Signals) => containerHandle.kill(signal),
+      kill: (signal?: NodeJS.Signals) => {
+        containerHandle.kill(signal);
+        killInContainerTree();
+      },
       completion,
     };
+  }
+
+  /**
+   * Best-effort: kill the in-container process group of a sentinel-tagged
+   * command. The bracket trick (`[l]ace-exec-…`) keeps the killer's own
+   * cmdline from matching itself. Failures (no pgrep in the image, process
+   * already gone) are logged and swallowed — the caller is aborting anyway.
+   */
+  private async killContainerProcessGroup(sentinel: string): Promise<void> {
+    const pattern = `[${sentinel[0]}]${sentinel.slice(1)}`;
+    const script =
+      `for p in $(pgrep -f "${pattern}"); do kill -TERM -- "-$p" 2>/dev/null || kill -TERM "$p" 2>/dev/null; done; ` +
+      `sleep 2; ` +
+      `for p in $(pgrep -f "${pattern}"); do kill -KILL -- "-$p" 2>/dev/null || kill -KILL "$p" 2>/dev/null; done`;
+    try {
+      const handle = await this.containerManager.execStream(
+        this.descriptor.spec.name,
+        this.optionsFor(['sh', '-c', script])
+      );
+      handle.stdin?.end();
+      await handle.wait();
+    } catch (error) {
+      logger.debug('projected-container.tree-kill.failed', {
+        spec: this.descriptor.spec.name,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 }
 

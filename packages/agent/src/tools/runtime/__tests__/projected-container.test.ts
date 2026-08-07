@@ -90,7 +90,7 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.execStream).toHaveBeenCalledWith(
       'projected-runtime',
       expect.objectContaining({
-        command: ['/bin/sh', '-lc', 'echo ok'],
+        command: ['/bin/sh', '-lc', 'echo ok', expect.stringMatching(/^lace-exec-/)],
         workingDirectory: '/workspace',
         environment: { FOO: 'bar' },
       })
@@ -485,6 +485,90 @@ describe('ProjectedContainerToolRuntime', () => {
     );
   });
 
+  // ---------------------------------------------------------------------------
+  // In-container kill (PRI-2847): killing the exec-stream CLIENT never kills
+  // the process inside the container. Shell `-c` commands are tagged with a
+  // $0 sentinel so an abort can kill the in-container process group too.
+  // ---------------------------------------------------------------------------
+  it('tags bare shell -c commands with a kill sentinel as $0', async () => {
+    const manager = createFakeContainerManager();
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    await runtime.process.start(['/bin/bash', '-c', 'sleep 5'], { cwd: runtime.cwd });
+
+    const options = manager.execStream.mock.calls[0]![1] as { command: string[] };
+    expect(options.command).toHaveLength(4);
+    expect(options.command.slice(0, 3)).toEqual(['/bin/bash', '-c', 'sleep 5']);
+    expect(options.command[3]).toMatch(/^lace-exec-/);
+  });
+
+  it('does not tag non-shell commands or shell commands that already use $0 args', async () => {
+    const manager = createFakeContainerManager();
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    await runtime.process.start(['base64', '/tmp/x'], { cwd: runtime.cwd });
+    await runtime.process.start(['sh', '-c', 'base64 -d > "$0"', '/tmp/y'], { cwd: runtime.cwd });
+
+    const first = manager.execStream.mock.calls[0]![1] as { command: string[] };
+    const second = manager.execStream.mock.calls[1]![1] as { command: string[] };
+    expect(first.command).toEqual(['base64', '/tmp/x']);
+    expect(second.command).toEqual(['sh', '-c', 'base64 -d > "$0"', '/tmp/y']);
+  });
+
+  it('kills the in-container process group on abort for sentinel-tagged commands', async () => {
+    let resolveWait!: (result: { exitCode: number }) => void;
+    const wait = new Promise<{ exitCode: number }>((resolve) => {
+      resolveWait = resolve;
+    });
+    const containerHandle = {
+      ...createFakeExecStreamHandle(),
+      stdout: Readable.from([]),
+      stderr: Readable.from([]),
+      wait: vi.fn().mockReturnValue(wait),
+      kill: vi.fn(() => resolveWait({ exitCode: 143 })),
+    };
+    const killerHandle = createFakeExecStreamHandle();
+    const manager = {
+      materialize: vi.fn().mockResolvedValue({
+        spec: descriptor().spec,
+        containerId: 'container_123',
+        state: 'running' as const,
+      }),
+      execStream: vi.fn().mockResolvedValueOnce(containerHandle).mockResolvedValue(killerHandle),
+    };
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+    const abortController = new AbortController();
+
+    const handle = await runtime.process.start(['/bin/bash', '-c', 'sleep 60'], {
+      cwd: runtime.cwd,
+      signal: abortController.signal,
+    });
+    abortController.abort();
+    await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
+
+    await vi.waitFor(() => expect(manager.execStream).toHaveBeenCalledTimes(2));
+    const sentinel = (manager.execStream.mock.calls[0]![1] as { command: string[] }).command[3]!;
+    const killer = manager.execStream.mock.calls[1]![1] as { command: string[] };
+    // The killer targets the sentinel with the bracket trick (so it never
+    // matches its own cmdline) and kills the whole process group.
+    expect(killer.command[0]).toBe('sh');
+    expect(killer.command[2]).toContain(`[l]${sentinel.slice(1)}`);
+    expect(killer.command[2]).toContain('kill');
+    expect(killer.command[2]).not.toContain(sentinel);
+  });
+
   it('kills the container process when aborted while execStream is starting', async () => {
     const containerHandle = createFakeExecStreamHandle();
     let resolveExecStream!: (handle: typeof containerHandle) => void;
@@ -515,7 +599,7 @@ describe('ProjectedContainerToolRuntime', () => {
       expect(manager.execStream).toHaveBeenCalledWith(
         'projected-runtime',
         expect.objectContaining({
-          command: ['/bin/sh', '-lc', 'echo ok'],
+          command: ['/bin/sh', '-lc', 'echo ok', expect.stringMatching(/^lace-exec-/)],
           workingDirectory: '/workspace',
         })
       )

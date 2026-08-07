@@ -99,6 +99,9 @@ export async function killJob(job: JobState, options?: KillJobOptions): Promise<
 }
 
 export interface TerminateJobOptions {
+  /** Grace after session/cancel for the child to abort its turn (and fire the
+   * in-container tree kill) before the host-side SIGTERM (ms). Default: 1500 */
+  cancelWaitMs?: number;
   /** Grace period between SIGTERM and SIGKILL (ms). Default: 2000 */
   termWaitMs?: number;
   /** Max time to wait for the process to actually exit (ms). Default: 3000 */
@@ -126,13 +129,21 @@ export interface TerminateJobOptions {
  * that case.
  */
 export async function terminateJob(job: JobState, options?: TerminateJobOptions): Promise<boolean> {
-  const { termWaitMs = 2000, exitWaitMs = 3000 } = options ?? {};
+  const { cancelWaitMs = 1500, termWaitMs = 2000, exitWaitMs = 3000 } = options ?? {};
 
   if (job.status !== 'running') return true;
 
   if (job.childPeer && job.subagentSessionId) {
     try {
       job.childPeer.notify('session/cancel', { sessionId: job.subagentSessionId });
+      // Give the child a moment to process the cancel: the abort propagates
+      // into running tools and (for container work) issues the in-container
+      // process-group kill. SIGTERMing the child immediately would race that
+      // kill exec out of existence before it reaches the container.
+      await Promise.race([
+        job.completion,
+        new Promise<void>((resolve) => setTimeout(resolve, cancelWaitMs)),
+      ]);
     } catch (error) {
       logger.debug('job.terminate.cancel_notify.failed', {
         jobId: job.jobId,
