@@ -194,6 +194,100 @@ describe('DelegateTool', () => {
     expect(result.status).toBe('completed');
   });
 
+  // ---------------------------------------------------------------------------
+  // Resume pins the persona to the prior job's persona (PRI-2848). A resumed
+  // job must never run under a different runtime than the session it resumes —
+  // omitting `persona` on resume previously dropped the whole container
+  // derivation and reran the subagent inside the PARENT's container.
+  // ---------------------------------------------------------------------------
+  it('resume without persona reuses the prior job persona and its container binding', async () => {
+    const personaRegistry = fakePersonaRegistry('box-shell');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'box-shell': {
+        type: 'container',
+        containerSharing: 'persistent',
+        image: 'example/sen-box:latest',
+        workingDirectory: '/home/agent',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
+
+    const mockJob = {
+      jobId: 'job_resumed',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_resumed', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi
+        .fn()
+        .mockReturnValue([
+          { jobId: 'job_prev', subagentSessionId: 'sess_prior1', persona: 'box-shell' },
+        ]),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'continue', resume: 'job_prev' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
+    );
+
+    expect(result.status).toBe('completed');
+    const opts = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    expect(opts.persona).toBe('box-shell');
+    expect(opts.resumeSessionId).toBe('sess_prior1');
+    // The projected container binding, NOT the parent's host binding.
+    const binding = opts.runtimeBinding as RuntimeExecutionBinding;
+    expect(binding.toolRuntime.type).toBe('container');
+  });
+
+  it('resume with a conflicting persona fails without creating a job', async () => {
+    const personaRegistry = fakePersonaRegistry('box-shell');
+    const environmentRegistry = fakeEnvironmentRegistry({
+      'box-shell': {
+        type: 'container',
+        containerSharing: 'persistent',
+        image: 'example/sen-box:latest',
+        workingDirectory: '/home/agent',
+        mounts: [],
+        env: {},
+      },
+    });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
+
+    const createJob = vi.fn();
+    const jobManager = {
+      createJob,
+      listJobs: vi
+        .fn()
+        .mockReturnValue([
+          { jobId: 'job_prev', subagentSessionId: 'sess_prior1', persona: 'box-shell' },
+        ]),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'continue', resume: 'job_prev', persona: 'other-persona' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toContain('persona');
+    expect(createJob).not.toHaveBeenCalled();
+  });
+
   it('passes context runtimeBinding to host delegate jobs', async () => {
     const tool = new DelegateTool();
 

@@ -92,7 +92,7 @@ Every \`delegate(prompt=...)\` creates a NEW job. With \`resume=<prior jobId>\`,
 Parameters:
 - \`prompt\` (required): the task or follow-up message for the subagent.
 - \`description\`: label shown in job listings.
-- \`resume\`: jobId of a previous delegate job. The new job binds to that job's session and the subagent sees its full conversation history. \`resume\` works whether the prior job completed or was cancelled — sessions persist.
+- \`resume\`: jobId of a previous delegate job. The new job binds to that job's session and the subagent sees its full conversation history. \`resume\` works whether the prior job completed or was cancelled — sessions persist. A resumed job always keeps the prior job's persona (and thus its container/runtime); omit \`persona\` on resume — passing a different one is an error.
 - \`progressIntervalMs\`: 5000–600000 ms. Operator-controlled cadence for periodic \`progress\` notifications on this job. **Default is off** — leave unset unless you specifically want this job to emit progress on a fixed cadence regardless of who's listening. Subscribing via \`job_notify(on=['progress'], ...)\` arms the timer on its own at the default cadence; you only need this parameter to override that or to opt in without a subscriber.
 - \`connectionId\`, \`modelId\`: provider/model overrides for the subagent. Default to the parent session's values (or the persona's defaults if a \`persona\` is set).
 - \`persona\`: a persona bundle name (e.g. \`"librarian"\`). Frontmatter sets defaults; body is the subagent's system prompt template.`;
@@ -143,6 +143,10 @@ Parameters:
     // for those cases.
     let resumeSessionId: string | undefined;
     let childSessionId: string | undefined;
+    // The persona a resumed job runs under is pinned to the prior job's
+    // persona: a resumed subagent must never run under a different runtime
+    // (mounts, image, credential scope) than the session it resumes.
+    let effectivePersona = persona;
 
     if (resume) {
       const jobs = jobManager.listJobs();
@@ -166,6 +170,23 @@ Parameters:
           ],
         };
       }
+      if (persona && previousJob.persona && persona !== previousJob.persona) {
+        return {
+          status: 'failed',
+          content: [
+            {
+              type: 'text',
+              text:
+                `Cannot resume job ${resume} with persona "${persona}": ` +
+                `it ran as persona "${previousJob.persona}". A resumed job always ` +
+                `keeps its original persona; omit the persona parameter or start a fresh delegate.`,
+            },
+          ],
+        };
+      }
+      // Prior jobs created before persona was persisted have no recorded
+      // persona; for those the caller-supplied value (if any) stands.
+      effectivePersona = previousJob.persona ?? persona;
       resumeSessionId = previousJob.subagentSessionId;
       // For per_invocation resume, the child session id is the prior one (same
       // session, same container name prefix). The shim re-uses the pre-existing
@@ -190,9 +211,9 @@ Parameters:
     // Used by the reaper to identify the container to destroy after idle TTL.
     let containerSpecName: string | undefined;
 
-    if (persona) {
+    if (effectivePersona) {
       try {
-        const parsed = this.personaRegistry.parsePersona(persona);
+        const parsed = this.personaRegistry.parsePersona(effectivePersona);
         personaModelDefault = parsed.config.model;
         if (parsed.config.runtime.type === 'container') {
           // The role references an environment by name; resolve the container
@@ -298,7 +319,7 @@ Parameters:
           // verbatim — no lace-side pre-resolution or docker inspect.
           projectedRuntimeBinding = buildPersonaProjectedRuntimeBinding({
             parentSessionId: context.activeSessionId ?? 'delegate',
-            personaName: persona,
+            personaName: effectivePersona,
             environmentName,
             runtime,
             containerMounts: context.containerMounts ?? {},
@@ -340,7 +361,7 @@ Parameters:
         context.turnId && context.turnSeq !== undefined
           ? { turnId: context.turnId, turnSeq: context.turnSeq }
           : undefined,
-      ...(persona ? { persona } : {}),
+      ...(effectivePersona ? { persona: effectivePersona } : {}),
       ...(effectiveRuntimeBinding ? { runtimeBinding: effectiveRuntimeBinding } : {}),
       // Resume: pass prior session id via resumeSessionId (mutually exclusive
       // with newSubagentSessionId — enforced by JobManager).

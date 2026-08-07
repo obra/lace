@@ -162,6 +162,41 @@ describe('JobManager', () => {
       expect(jobs[0].exitCode).toBe(0);
     });
 
+    it('derives persona from job_started events', () => {
+      testDir = join(tmpdir(), `job-manager-test-${Date.now()}`);
+      mkdirSync(testDir, { recursive: true });
+
+      const events = [
+        {
+          type: 'job_started',
+          timestamp: '2025-01-15T10:00:00Z',
+          data: {
+            jobId: 'job_p1',
+            jobType: 'delegate',
+            command: 'edit identity',
+            persona: 'therapist',
+          },
+        },
+        {
+          type: 'job_finished',
+          timestamp: '2025-01-15T10:01:00Z',
+          data: { jobId: 'job_p1', outcome: 'completed' },
+        },
+      ];
+      writeFileSync(join(testDir, 'events.jsonl'), events.map((e) => JSON.stringify(e)).join('\n'));
+
+      const deps = {
+        getActiveSession: vi.fn().mockReturnValue({ sessionId: 'sess_1', dir: testDir }),
+        persistEvent: vi.fn(),
+        emitUpdate: vi.fn(),
+      };
+      const manager = new JobManager(deps);
+
+      const jobs = manager.listJobs();
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].persona).toBe('therapist');
+    });
+
     it('includes subagentSessionId from job_session_assigned events', () => {
       testDir = join(tmpdir(), `job-manager-test-${Date.now()}`);
       mkdirSync(testDir, { recursive: true });
@@ -1167,6 +1202,24 @@ describe('JobManager', () => {
       expect(eventArg.type).toBe('job_started');
       expect(eventArg.data.scratchDirHostPath).toBe('/tmp/scratch/abc');
       expect(eventArg.data.containerSharing).toBe('per_invocation');
+    });
+
+    it('persists persona in job_started event so resume survives a restart', async () => {
+      const persistEvent = vi.fn().mockResolvedValue(undefined);
+      const deps = createDeps({ persistEvent });
+      const manager = new JobManager(deps);
+
+      await manager.createJob('delegate', {
+        prompt: 'do work',
+        persona: 'therapist',
+      });
+
+      const eventArg = persistEvent.mock.calls[0][0] as {
+        type: string;
+        data: Record<string, unknown>;
+      };
+      expect(eventArg.type).toBe('job_started');
+      expect(eventArg.data.persona).toBe('therapist');
     });
   });
 });

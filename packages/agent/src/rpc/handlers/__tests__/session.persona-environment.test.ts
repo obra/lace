@@ -486,6 +486,54 @@ describe('session/new honors a persona container environment', () => {
     }
   });
 
+  // PRI-2848 backstop: an explicit container binding whose role disagrees with
+  // the session's container persona must be rejected, not trusted. Without
+  // this, a resumed subagent handed its PARENT's binding silently runs in the
+  // parent's container (wrong mounts, image, credential scope).
+  it('rejects resume when an explicit container binding role disagrees with the session persona', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    try {
+      await client.request('initialize', initParams());
+      const result = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'boxed',
+      })) as { sessionId: string };
+
+      // Take the session's own valid container binding and swap in a foreign role.
+      const statePath = join(getSessionDir(result.sessionId), 'state.json');
+      const persisted = JSON.parse(readFileSync(statePath, 'utf8')) as {
+        config: { runtimeBinding: { toolRuntime: { spec: { role?: string } } } };
+      };
+      const foreignBinding = persisted.config.runtimeBinding;
+      foreignBinding.toolRuntime.spec.role = 'core';
+
+      await expect(
+        client.request('session/resume', {
+          sessionId: result.sessionId,
+          cwd: workDir,
+          mcpServers: [],
+          config: { runtimeBinding: foreignBinding },
+        })
+      ).rejects.toMatchObject({ message: expect.stringContaining('persona') });
+
+      // A consistent binding (role matches the persona) still resumes fine.
+      foreignBinding.toolRuntime.spec.role = 'boxed';
+      await expect(
+        client.request('session/resume', {
+          sessionId: result.sessionId,
+          cwd: workDir,
+          mcpServers: [],
+          config: { runtimeBinding: foreignBinding },
+        })
+      ).resolves.toBeDefined();
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
   it('lets an explicit runtimeBinding override persona container resolution', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

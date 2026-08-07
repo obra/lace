@@ -75,6 +75,7 @@ export type JobRecord = {
   startTime: string;
   exitCode?: number;
   subagentSessionId?: string;
+  persona?: string;
 };
 
 /**
@@ -210,6 +211,7 @@ export class JobManager {
             description: toNonEmptyString(data.description) ?? undefined,
             command: toNonEmptyString(data.command) ?? undefined,
             startTime,
+            persona: toNonEmptyString(data.persona) ?? undefined,
           });
         } else if (parsed.type === 'job_session_assigned') {
           const existing = byId.get(jobId);
@@ -801,6 +803,7 @@ export class JobManager {
         ...(options.scratchDirHostPath ? { scratchDirHostPath: options.scratchDirHostPath } : {}),
         ...(options.containerSharing ? { containerSharing: options.containerSharing } : {}),
         ...(options.containerSpecName ? { containerSpecName: options.containerSpecName } : {}),
+        ...(options.persona ? { persona: options.persona } : {}),
       },
     });
 

@@ -22,6 +22,7 @@ export type DerivedJob = {
   exitCode?: number;
   subagentSessionId?: string;
   runtimeBinding?: RuntimeExecutionBinding;
+  persona?: string;
 };
 
 /**
@@ -124,6 +125,7 @@ export function createJobDerivation(deps: {
             command: toNonEmptyString(data.command) ?? undefined,
             startTime,
             ...(runtimeBinding ? { runtimeBinding } : {}),
+            persona: toNonEmptyString(data.persona) ?? undefined,
           });
         } else if (parsed.type === 'job_session_assigned') {
           const existing = byId.get(jobId);
