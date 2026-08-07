@@ -228,12 +228,12 @@ export class ContainerManager {
       this.specs.set(spec.name, spec);
       this.containerIdsBySpecName.set(spec.name, adoptable.id);
       // Adopt the daemon-side container into the runtime's in-process caches
-      // so subsequent start/exec calls succeed. No-op when the runtime has no
-      // caches to populate (apple-container falls back to its own create-path
-      // bookkeeping which is already in place when the local cache has it).
-      if (spec.containerId) {
-        await this.runtime.adopt(config, adoptable.state);
-      }
+      // so subsequent start/exec calls succeed — for EVERY adopted container,
+      // not just selector-backed ones. A selector-less per_invocation spec
+      // (a resumed delegate in a fresh process) previously skipped this and
+      // the first exec threw ContainerNotFoundError against a running
+      // container. No-op when the runtime has no caches to populate.
+      await this.runtime.adopt(config, adoptable.state);
 
       if (adoptable.state === 'running') {
         return { spec, containerId: adoptable.id, state: adoptable.state };

@@ -337,6 +337,34 @@ describe('ContainerManager', () => {
       expect(handle.state).toBe('running');
     });
 
+    it('adopts into the runtime when a selector-less container already exists', async () => {
+      // A per_invocation spec has no containerId. When its container already
+      // exists (a resumed delegate in a fresh process), materialize must still
+      // adopt it into the runtime's in-process caches — otherwise the very
+      // first exec throws ContainerNotFoundError against a running container
+      // (PRI-2848 follow-up: therapist resume hit "Container not found").
+      const spec: ContainerSpec = {
+        name: 'parent-box-child1',
+        image: 'example/box:latest',
+        workingDirectory: '/work',
+        mounts: [],
+        env: {},
+      };
+      // Simulate the container existing daemon-side already.
+      runtime['containers'].set('lace-parent-box-child1', {
+        id: 'lace-parent-box-child1',
+        state: 'running',
+      });
+      const adoptSpy = vi.spyOn(runtime, 'adopt');
+      const createSpy = vi.spyOn(runtime, 'create');
+
+      const handle = await manager.materialize(spec);
+
+      expect(handle.containerId).toBe('lace-parent-box-child1');
+      expect(adoptSpy).toHaveBeenCalledOnce();
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
     it('creates fresh when daemonInspect returns null', async () => {
       vi.spyOn(runtime, 'daemonInspect').mockResolvedValueOnce(null);
       const adoptSpy = vi.spyOn(runtime, 'adopt');

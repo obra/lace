@@ -485,8 +485,11 @@ export class PlaneRuntime implements ContainerRuntime {
     if (cached?.mounts) {
       info.mounts = cached.mounts;
     }
-    if (options.updateCache && cached) {
-      this.containers.set(containerId, { ...cached, ...info });
+    if (options.updateCache) {
+      // Insert as well as refresh: a fresh process inspecting a daemon-side
+      // container must end up with it in the cache, or exec/execStream will
+      // throw ContainerNotFoundError against a running container.
+      this.containers.set(containerId, cached ? { ...cached, ...info } : info);
     }
     return info;
   }
