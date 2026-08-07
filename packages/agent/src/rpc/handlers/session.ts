@@ -336,6 +336,24 @@ async function activateStoredSession(
   // declaredContainer is determined CHEAPLY (no env resolution), so a broken
   // env never breaks the consistency check — only the re-resolve path throws.
   let activeRuntimeBinding = params.runtimeBinding;
+  // An explicit container binding must still agree with the session's persona:
+  // the container role IS the persona name, and a role mismatch means the
+  // caller is about to run this session inside some OTHER persona's container
+  // (wrong mounts, image, credential scope). Fail closed rather than trust it.
+  if (activeRuntimeBinding?.toolRuntime.type === 'container') {
+    const personaName = loaded.state.config?.personaName ?? loaded.meta.persona;
+    const boundRole = activeRuntimeBinding.toolRuntime.spec.role;
+    if (
+      personaName !== undefined &&
+      personaDeclaresContainer(state, personaName) &&
+      boundRole !== undefined &&
+      boundRole !== personaName
+    ) {
+      throwInvalidParams(
+        `runtimeBinding role "${boundRole}" does not match this session's persona "${personaName}" — refusing to run the session in another persona's container`
+      );
+    }
+  }
   if (!activeRuntimeBinding) {
     const personaName = loaded.state.config?.personaName ?? loaded.meta.persona;
     const declaredContainer = personaDeclaresContainer(state, personaName);
