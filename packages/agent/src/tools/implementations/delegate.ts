@@ -256,12 +256,15 @@ Parameters:
             let resumeRefused = false;
             const setupWorkspace = (): void => {
               if (resume) {
-                // Released in this process (explicit), OR the prior workspace is
-                // gone / empty (crash backstop) — either way refuse rather than
-                // let a fresh spawn resurrect a hollow /work.
+                // Released in this process (explicit), OR the prior workspace
+                // dir is GONE (crash/reap backstop) — either way refuse rather
+                // than let a fresh spawn resurrect a hollow /work. An existing
+                // but EMPTY dir is fine: the shim provisions /work at spawn, so
+                // empty just means the subagent never wrote output there (e.g.
+                // its deliverable is a mounted file) — release removes the dir
+                // entirely, so present-but-empty never means content was lost.
                 const dir = childWorkspaceDir(parentId, childId);
-                const intact = fs.existsSync(dir) && fs.readdirSync(dir).length > 0;
-                if (context.workspaceReaper?.isReleased(childId) || !intact) {
+                if (context.workspaceReaper?.isReleased(childId) || !fs.existsSync(dir)) {
                   resumeRefused = true;
                   return;
                 }
