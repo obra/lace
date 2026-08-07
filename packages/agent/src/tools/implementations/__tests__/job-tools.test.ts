@@ -286,4 +286,90 @@ describe('JobKillTool', () => {
     expect(result.status).toBe('failed');
     expect(result.content[0].text).toContain('not found');
   });
+
+  it('kills the process and reports terminated once it actually exits', async () => {
+    const tool = new JobKillTool({ terminateOptions: { termWaitMs: 50, exitWaitMs: 200 } });
+
+    const { EventEmitter } = await import('node:events');
+    const emitter = new EventEmitter();
+    const proc = emitter as unknown as NonNullable<JobState['proc']>;
+    (proc as { exitCode: number | null }).exitCode = null;
+    (proc as { signalCode: string | null }).signalCode = null;
+    (proc as { pid?: number }).pid = 12345;
+    proc.kill = vi.fn(() => {
+      setImmediate(() => {
+        (proc as { signalCode: string | null }).signalCode = 'SIGTERM';
+        emitter.emit('exit', null, 'SIGTERM');
+      });
+      return true;
+    }) as unknown as NonNullable<JobState['proc']>['kill'];
+
+    const mockJob = {
+      jobId: 'job_running',
+      status: 'running' as const,
+      proc,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const jobManager = {
+      getJob: vi.fn().mockReturnValue(mockJob),
+      cancelJob: vi.fn().mockResolvedValue(undefined),
+    } as unknown as JobManager;
+
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('kill ESRCH') as NodeJS.ErrnoException;
+      err.code = 'ESRCH';
+      throw err;
+    });
+    try {
+      const result = await tool.execute(
+        { jobId: 'job_running' },
+        { signal: new AbortController().signal, jobManager }
+      );
+
+      expect(result.status).toBe('completed');
+      expect(result.content[0].text).toContain('process terminated');
+      expect(jobManager.cancelJob).toHaveBeenCalledWith('job_running');
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
+
+  it('fails honestly when the process does not exit in the grace window', async () => {
+    const tool = new JobKillTool({ terminateOptions: { termWaitMs: 20, exitWaitMs: 50 } });
+
+    const { EventEmitter } = await import('node:events');
+    const emitter = new EventEmitter();
+    const proc = emitter as unknown as NonNullable<JobState['proc']>;
+    (proc as { exitCode: number | null }).exitCode = null;
+    (proc as { signalCode: string | null }).signalCode = null;
+    (proc as { pid?: number }).pid = 12345;
+    proc.kill = vi.fn().mockReturnValue(true) as unknown as NonNullable<JobState['proc']>['kill'];
+
+    const mockJob = {
+      jobId: 'job_stuck',
+      status: 'running' as const,
+      proc,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+
+    const jobManager = {
+      getJob: vi.fn().mockReturnValue(mockJob),
+      cancelJob: vi.fn(),
+    } as unknown as JobManager;
+
+    const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    try {
+      const result = await tool.execute(
+        { jobId: 'job_stuck' },
+        { signal: new AbortController().signal, jobManager }
+      );
+
+      expect(result.status).toBe('failed');
+      expect(result.content[0].text).toContain('did not exit');
+      expect(jobManager.cancelJob).not.toHaveBeenCalled();
+    } finally {
+      killSpy.mockRestore();
+    }
+  });
 });

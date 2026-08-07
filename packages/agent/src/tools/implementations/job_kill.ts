@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
+import { terminateJob, type TerminateJobOptions } from '@lace/agent/jobs/job-control';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const jobKillSchema = z
@@ -17,7 +18,7 @@ export class JobKillTool extends Tool {
   name = 'job_kill';
   description = `Cancel a running background **job**, and optionally tear down a finished delegation's container + workspace.
 
-**Plain kill (\`destroy_container\` omitted/false).** Cancels a \`status="running"\` job. **Does NOT destroy its session** — a delegate job's conversation history survives, so you can pick it back up with \`delegate(resume=<jobId>, prompt=...)\`. Use this to redirect a delegate that's gone off-track. After killing, the job transitions to \`cancelled\` (you'll get a \`job_notify\` 'cancelled' notification if subscribed).
+**Plain kill (\`destroy_container\` omitted/false).** Terminates a \`status="running"\` job: the subagent's in-flight turn is aborted, its process killed, and the tool waits for the process to actually exit before reporting \`cancelled\`. If the process survives the grace window the tool FAILS and tells you — in that case its in-flight work may still land; verify before dispatching replacement work. **Does NOT destroy its session** — a delegate job's conversation history survives, so you can pick it back up with \`delegate(resume=<jobId>, prompt=...)\`. Use this to redirect a delegate that's gone off-track.
 
 **Teardown (\`destroy_container: true\`).** Reclaim a per_invocation subagent when you're done with its deliverable: routes teardown through the sen-docker shim, which destroys the subagent's container AND removes its \`/work\` workspace, making the delegation **non-resumable**. Works whether the job is running (it's cancelled first) or already completed. Only the parent that created the delegation can tear it down. Call this when you've finished reading the workspace path a \`delegate\` returned — it frees a slot against the per-session retention ceiling.
 
@@ -32,6 +33,15 @@ Parameters:
     // killing/releasing it just stops work and frees space rather than causing harm.
     safeInternal: true,
   };
+
+  // Termination grace windows; overridable so tests don't sit through
+  // multi-second waits.
+  private readonly terminateOptions: TerminateJobOptions;
+
+  constructor(opts: { terminateOptions?: TerminateJobOptions } = {}) {
+    super();
+    this.terminateOptions = opts.terminateOptions ?? {};
+  }
 
   protected async executeValidated(
     args: z.infer<typeof jobKillSchema>,
@@ -57,11 +67,24 @@ Parameters:
 
     const wasRunning = job.status === 'running';
     if (wasRunning) {
+      // Actually terminate the work (cancel the child's turn so in-container
+      // tool calls abort, kill the process, wait for confirmed exit) rather
+      // than just flipping status — a status flip lets the job run to
+      // completion and land writes after "cancelled" was reported.
+      const stopped = await terminateJob(job, this.terminateOptions);
+      if (!stopped) {
+        return fail(
+          `Cancel requested for job ${jobId}, but its process did not exit within the grace window — ` +
+            `in-flight work may still complete. Re-check with jobs_list/job_output before starting replacement work.`
+        );
+      }
+      // Finalize (persist job_finished, notify subscribers, drop from the map).
+      // Idempotent against the job runner's own finalize racing us.
       await jobManager.cancelJob(jobId);
     }
 
     if (!destroyContainer) {
-      return ok(`Job ${jobId} cancelled`);
+      return ok(`Job ${jobId} cancelled — process terminated.`);
     }
 
     // Teardown: cancelJob (above) stops the PROCESS; dispose routes teardown
