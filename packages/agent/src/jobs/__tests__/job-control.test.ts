@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
 import type { JobState } from '../../server-types';
-import { killJob, killAllRunningJobs } from '../job-control';
+import { killJob, killAllRunningJobs, terminateJob } from '../job-control';
 
 // Helper to create a mock JobState
 function createMockJob(overrides?: Partial<JobState>): JobState {
@@ -177,5 +177,116 @@ describe('killAllRunningJobs', () => {
 
     expect(job.status).toBe('cancelled');
     expect(process.kill).toHaveBeenCalled();
+  });
+});
+
+describe('killJob group-kill fallback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('falls back to a direct proc.kill when the group kill fails', async () => {
+    // Simulate a non-group-leader child: kill(-pid) throws ESRCH.
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('kill ESRCH') as NodeJS.ErrnoException;
+      err.code = 'ESRCH';
+      throw err;
+    });
+    const mockProc = createMockProc({ pid: 12345, exitCode: null });
+    const job = createMockJob({ status: 'running', proc: mockProc });
+    setTimeout(() => job.resolveCompletion(), 10);
+
+    await killJob(job, { waitMs: 100 });
+
+    expect(mockProc.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+});
+
+describe('terminateJob', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(process, 'kill').mockImplementation(() => true);
+  });
+
+  // A fake ChildProcess that "dies" when killed: kill() sets signalCode and
+  // emits 'exit' on the next tick, like a real process honoring SIGTERM.
+  function createExitingProc(): ChildProcess {
+    const { EventEmitter } = require('node:events') as typeof import('node:events');
+    const emitter = new EventEmitter();
+    const proc = emitter as unknown as ChildProcess & {
+      exitCode: number | null;
+      signalCode: NodeJS.Signals | null;
+    };
+    proc.exitCode = null;
+    proc.signalCode = null;
+    (proc as { pid?: number }).pid = 12345;
+    proc.kill = vi.fn((signal?: NodeJS.Signals | number) => {
+      setImmediate(() => {
+        proc.signalCode = (signal as NodeJS.Signals) ?? 'SIGTERM';
+        emitter.emit('exit', null, proc.signalCode);
+      });
+      return true;
+    }) as unknown as ChildProcess['kill'];
+    return proc;
+  }
+
+  it('notifies the child to cancel its turn, waits for real exit, and reports stopped', async () => {
+    // Group kill fails (non-group-leader child) so the direct proc.kill
+    // fallback is what actually terminates the fake process.
+    vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('kill ESRCH') as NodeJS.ErrnoException;
+      err.code = 'ESRCH';
+      throw err;
+    });
+    const proc = createExitingProc();
+    const notify = vi.fn();
+    const close = vi.fn();
+    const transportClose = vi.fn();
+    const job = createMockJob({
+      type: 'delegate',
+      status: 'running',
+      proc,
+      subagentSessionId: 'sess_child1',
+      childPeer: { notify, close } as unknown as JobState['childPeer'],
+      childTransportClose: transportClose,
+    });
+    setTimeout(() => job.resolveCompletion(), 10);
+
+    const stopped = await terminateJob(job, { termWaitMs: 100, exitWaitMs: 500 });
+
+    expect(stopped).toBe(true);
+    expect(notify).toHaveBeenCalledWith('session/cancel', { sessionId: 'sess_child1' });
+    expect(proc.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(close).toHaveBeenCalled();
+    expect(transportClose).toHaveBeenCalled();
+    expect(job.status).toBe('cancelled');
+  });
+
+  it('returns false when the process never exits', async () => {
+    const { EventEmitter } = require('node:events') as typeof import('node:events');
+    const emitter = new EventEmitter();
+    const proc = emitter as unknown as ChildProcess & {
+      exitCode: number | null;
+      signalCode: NodeJS.Signals | null;
+    };
+    proc.exitCode = null;
+    proc.signalCode = null;
+    (proc as { pid?: number }).pid = 12345;
+    proc.kill = vi.fn().mockReturnValue(true) as unknown as ChildProcess['kill'];
+
+    const job = createMockJob({ status: 'running', proc });
+
+    const stopped = await terminateJob(job, { termWaitMs: 20, exitWaitMs: 50 });
+
+    expect(stopped).toBe(false);
+  });
+
+  it('treats a job with no process as already stopped', async () => {
+    const job = createMockJob({ status: 'running' });
+    setTimeout(() => job.resolveCompletion(), 10);
+
+    const stopped = await terminateJob(job, { termWaitMs: 20, exitWaitMs: 50 });
+
+    expect(stopped).toBe(true);
   });
 });

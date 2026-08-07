@@ -52,6 +52,10 @@ function spawnNativeSubagent(executionEnv?: Record<string, string>): SubagentPro
     cwd: process.cwd(),
     env: { ...process.env, ...(executionEnv ?? {}) },
     stdio: ['pipe', 'pipe', 'pipe'],
+    // POSIX: make the subagent a process-group leader so kill(-pid) reaches
+    // its own host-side children (same choice shell jobs make). Without this
+    // the group SIGTERM in job-control throws ESRCH and kills nothing.
+    detached: process.platform !== 'win32',
   });
 
   // stdio: ['pipe', 'pipe', 'pipe'] guarantees these are non-null.
