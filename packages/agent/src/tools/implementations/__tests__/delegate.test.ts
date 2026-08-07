@@ -865,6 +865,78 @@ describe('DelegateTool', () => {
   });
 
   // ---------------------------------------------------------------------------
+  // The workspace gate on per_invocation resume distinguishes "provisioned but
+  // never written" (an EMPTY dir — fine, e.g. a therapist whose deliverable is
+  // a mounted file, not /work output) from "released or lost to a crash" (dir
+  // MISSING — refuse rather than resurrect a hollow /work).
+  // ---------------------------------------------------------------------------
+  it('per_invocation resume succeeds when the prior workspace exists but is empty', async () => {
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
+
+    const mockJob = {
+      jobId: 'job_empty_ws',
+      type: 'delegate' as const,
+      status: 'running' as const,
+      completion: new Promise<void>(() => {}),
+    } as unknown as JobState;
+    const createJob = vi.fn().mockResolvedValue({ jobId: 'job_empty_ws', job: mockJob });
+    const jobManager = {
+      createJob,
+      listJobs: vi
+        .fn()
+        .mockReturnValue([{ jobId: 'job_prev_inv', subagentSessionId: 'sess_abc123xyz' }]),
+    } as unknown as JobManager;
+
+    // Prior workspace exists but the subagent never wrote to it.
+    const priorWs = path.join(scratchBase, 'sess_parent', 'sess_abc123xyz');
+    fs.mkdirSync(priorWs, { recursive: true });
+
+    const result = await tool.execute(
+      { prompt: 'resume work', persona: 'inv-persona', resume: 'job_prev_inv' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
+    );
+
+    expect(result.status).toBe('completed');
+    const opts = createJob.mock.calls[0]![1] as Record<string, unknown>;
+    expect(opts.resumeSessionId).toBe('sess_abc123xyz');
+  });
+
+  it('per_invocation resume is refused when the prior workspace dir is missing', async () => {
+    const personaRegistry = fakePersonaRegistry('inv-persona');
+    const environmentRegistry = fakeEnvironmentRegistry({ 'inv-persona': PER_INVOCATION_RT });
+    const tool = new DelegateTool({ personaRegistry, environmentRegistry });
+
+    const createJob = vi.fn();
+    const jobManager = {
+      createJob,
+      listJobs: vi
+        .fn()
+        .mockReturnValue([{ jobId: 'job_prev_inv', subagentSessionId: 'sess_gone1' }]),
+    } as unknown as JobManager;
+
+    const result = await tool.execute(
+      { prompt: 'resume work', persona: 'inv-persona', resume: 'job_prev_inv' },
+      {
+        signal: new AbortController().signal,
+        jobManager,
+        runtimeBinding,
+        activeSessionId: 'sess_parent',
+      }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toContain('released');
+    expect(createJob).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
   // minted childSessionId must satisfy SessionIdSchema (hyphenated UUID)
   // ---------------------------------------------------------------------------
   it('mints childSessionId in SessionIdSchema format (hyphenated UUID)', async () => {

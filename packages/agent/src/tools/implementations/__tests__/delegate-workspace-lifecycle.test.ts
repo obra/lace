@@ -164,16 +164,18 @@ describe('delegate workspace lifecycle', () => {
     expect(result.content[0].text).toContain('released');
   });
 
-  it('resume-after-crash errors when the workspace is present but empty', async () => {
+  it('resume succeeds when the workspace is present but empty (subagent never wrote output)', async () => {
     const { jobManager, jobs } = makeJobManager();
-    const parentId = 'sess_crashparent';
+    const parentId = 'sess_emptyparent';
 
     const fresh = await freshDelegate(jobManager, parentId);
-    jobs.push({ jobId: 'job_crash', subagentSessionId: fresh.subagentSessionId });
-    // Crash backstop: the in-memory released mark is gone, but /work is empty
-    // (the shim provisioned it; no child output survived). Must NOT resurrect.
+    jobs.push({ jobId: 'job_nowrite', subagentSessionId: fresh.subagentSessionId });
+    // Release and TTL-reap both remove the workspace dir entirely, so a
+    // present-but-empty dir only ever means the shim provisioned /work and the
+    // subagent never wrote output there (e.g. its deliverable is a mounted
+    // file, like the therapist's persona edits). Refusing here blocked every
+    // resume of such roles (PRI-2848 follow-up).
     fs.mkdirSync(fresh.workspace, { recursive: true });
-    expect(fs.existsSync(fresh.workspace)).toBe(true);
     expect(fs.readdirSync(fresh.workspace)).toHaveLength(0);
 
     const tool = new DelegateTool({
@@ -181,9 +183,9 @@ describe('delegate workspace lifecycle', () => {
       environmentRegistry: perInvocationEnvRegistry(),
     });
     const result = await tool.execute(
-      { prompt: 'continue', persona: 'inv', resume: 'job_crash' },
+      { prompt: 'continue', persona: 'inv', resume: 'job_nowrite' },
       ctx(jobManager, parentId)
     );
-    expect(result.status).toBe('failed');
+    expect(result.status).toBe('completed');
   });
 });
