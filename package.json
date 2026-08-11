@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Lace AI coding assistant monorepo",
   "author": "Jesse Vincent <jesse@fsck.com>",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=20.18.3",
     "bun": ">=1.2.21"
