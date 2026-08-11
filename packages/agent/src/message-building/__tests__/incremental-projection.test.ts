@@ -156,13 +156,13 @@ describe('foldTailIntoProjection', () => {
     for (const events of CORPUS) assertIncrementalEqualsFull(events);
   });
 
-  it('tracks filesRead and lastTurnEndSeq incrementally, matching the full derivers', () => {
+  it('tracks filesRead and maxFoldedSeq incrementally, matching the full derivers', () => {
     const events = CORPUS[1]!; // single file_read + turn_end
     let proj = initialCachedProjection('/work');
     proj = foldTailIntoProjection(proj, events.slice(0, 3));
     proj = foldTailIntoProjection(proj, events.slice(3));
     expect([...proj.filesRead]).toEqual(['/work/a.txt']);
-    expect(proj.lastTurnEndSeq).toBe(5);
+    expect(proj.maxFoldedSeq).toBe(5);
   });
 
   it('advances headSeq to next-seq-to-fold (lastFoldedSeq + 1)', () => {
@@ -181,14 +181,14 @@ describe('foldTailIntoProjection', () => {
       messages: proj.messages,
       systemPrompt: proj.systemPrompt,
       headSeq: proj.headSeq,
-      lastTurnEndSeq: proj.lastTurnEndSeq,
+      maxFoldedSeq: proj.maxFoldedSeq,
     });
     proj = foldTailIntoProjection(proj, []);
     const after = JSON.stringify({
       messages: proj.messages,
       systemPrompt: proj.systemPrompt,
       headSeq: proj.headSeq,
-      lastTurnEndSeq: proj.lastTurnEndSeq,
+      maxFoldedSeq: proj.maxFoldedSeq,
     });
     expect(after).toBe(before);
   });
@@ -255,7 +255,7 @@ describe('projectTurnEntry', () => {
     const spy = vi.spyOn(pe, 'readParsedSessionEvents');
     const p2 = projectTurnEntry(dir, '/work', cache, SID);
     expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
-    expect(p2.lastTurnEndSeq).toBe(7);
+    expect(p2.maxFoldedSeq).toBe(7);
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -439,7 +439,7 @@ describe('projectTurnEntry — cross-shard byte-offset incremental', () => {
     const p2 = projectTurnEntry(sessionDir, '/work', cache, sessionId);
     expect(spy).not.toHaveBeenCalled(); // O(tail): never re-parses the whole log
     expect(JSON.stringify(p2.messages)).toBe(expectedMessages);
-    expect(p2.lastTurnEndSeq).toBe(7);
+    expect(p2.maxFoldedSeq).toBe(7);
     expect(JSON.stringify(p2.messages)).toContain('day-2 reply');
   });
 

@@ -1,6 +1,6 @@
 // ABOUTME: The in-memory conversation projection held across turns. A
 // CachedProjection carries the FoldState + system prompt + files-read set +
-// last-turn-end watermark + the next-seq-to-fold head. foldTailIntoProjection
+// max-folded-seq watermark + the next-seq-to-fold head. foldTailIntoProjection
 // folds ONLY a new tail of events into it (O(tail)), applying the SAME per-event
 // handling the full rebuild uses (applyEventToProjection in message-builder),
 // so an incremental fold is byte-identical to a full rebuild over the same
@@ -41,7 +41,10 @@ export type CachedProjection = {
   systemPrompt: string;
   systemPromptCount: number;
   filesRead: Set<string>;
-  lastTurnEndSeq: number | null;
+  // Highest eventSeq actually folded into foldState.messages (0 when none).
+  // Tracked separately from headSeq because headSeq may be seeded from the
+  // .seq tip, which can run ahead of the events actually parsed.
+  maxFoldedSeq: number;
   headSeq: number;
   // The workDir used to resolve relative file_read paths. Captured at cache
   // seed so an incremental fold derives filesRead identically to the full build.
@@ -74,7 +77,7 @@ export function initialCachedProjection(cwd = ''): CachedProjection {
     systemPrompt: acc.systemPrompt,
     systemPromptCount: acc.systemPromptCount,
     filesRead: new Set<string>(),
-    lastTurnEndSeq: null,
+    maxFoldedSeq: 0,
     headSeq: 1,
     cwd,
     offsets: new Map<string, number>(),
@@ -85,7 +88,7 @@ export function initialCachedProjection(cwd = ''): CachedProjection {
  * Fold a NEW tail of events into the cached projection, applying the exact
  * per-event handling of the full rebuild (applyEventToProjection). Returns a
  * fresh CachedProjection (the caller stores it). Tracks filesRead +
- * lastTurnEndSeq and advances headSeq to (max eventSeq seen) + 1.
+ * maxFoldedSeq and advances headSeq to (max eventSeq seen) + 1.
  *
  * A convenience getter `messages` is attached so callers and tests read the
  * projection without reaching into foldState.
@@ -100,7 +103,7 @@ export function foldTailIntoProjection(
     systemPromptCount: proj.systemPromptCount,
   };
   const filesRead = new Set(proj.filesRead);
-  let lastTurnEndSeq = proj.lastTurnEndSeq;
+  let maxFoldedSeq = proj.maxFoldedSeq;
   let headSeq = proj.headSeq;
 
   for (const e of events) {
@@ -120,7 +123,7 @@ export function foldTailIntoProjection(
         filesRead.add(absolutePath(proj.cwd, data.input.path));
       }
     }
-    if (e.type === 'turn_end') lastTurnEndSeq = e.eventSeq;
+    if (e.eventSeq > maxFoldedSeq) maxFoldedSeq = e.eventSeq;
     if (e.eventSeq + 1 > headSeq) headSeq = e.eventSeq + 1;
   }
 
@@ -129,7 +132,7 @@ export function foldTailIntoProjection(
     systemPrompt: acc.systemPrompt,
     systemPromptCount: acc.systemPromptCount,
     filesRead,
-    lastTurnEndSeq,
+    maxFoldedSeq,
     headSeq,
     cwd: proj.cwd,
     // The byte offsets are owned by projectTurnEntry (it knows which shards it
@@ -163,7 +166,7 @@ function seedCachedProjection(
     systemPrompt: full.systemPrompt,
     systemPromptCount: acc.systemPromptCount,
     filesRead: full.filesRead,
-    lastTurnEndSeq: full.lastTurnEndSeq,
+    maxFoldedSeq: maxSeq,
     headSeq: tip ?? maxSeq + 1,
     cwd,
     // Seed each current shard's offset to its current byte size: the full parse
@@ -251,7 +254,7 @@ export function projectTurnEntry(
       messages: folded.messages,
       systemPrompt: folded.systemPrompt,
       filesRead: folded.filesRead,
-      lastTurnEndSeq: folded.lastTurnEndSeq,
+      maxFoldedSeq: folded.maxFoldedSeq,
     };
   }
 

@@ -571,11 +571,12 @@ export class ConversationRunner {
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).
     //
-    // We start from the last turn_end rather than the very latest event so that
-    // any context_injected events written between turns (after turn_end but
-    // before run() was called) are picked up on the first iteration, not
-    // silently skipped.
-    let lastSeenEventSeq = turnEntry.lastTurnEndSeq ?? 0;
+    // Seeded at the projection's max folded seq: the prefix build above folds
+    // EVERY logged event, including context_injected events written between
+    // turns (after turn_end but before run() was called). Seeding lower — e.g.
+    // at the last turn_end — makes the tailer re-append those between-turn
+    // injects on the first iteration, so the model sees each one twice.
+    let lastSeenEventSeq = turnEntry.maxFoldedSeq;
     // One tail-reader per turn, seeded with the turn-entry watermark. Each
     // readNew() reads only the JSONL bytes appended since the last call, so the
     // per-iteration immediate-inject pickup is an incremental tail-read of the

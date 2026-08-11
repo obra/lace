@@ -13,10 +13,6 @@ import {
   deriveFilesReadFromParsedEvents,
   deriveFilesReadFromDurableEvents,
 } from '@lace/agent/storage/files-from-events';
-import {
-  findLastTurnEndSeqFromParsedEvents,
-  findLastTurnEndEventSeq,
-} from '@lace/agent/storage/event-log';
 
 describe('readParsedSessionEvents', () => {
   let dir: string;
@@ -121,7 +117,5 @@ describe('readParsedSessionEvents', () => {
     expect([...filesPure]).toEqual([...deriveFilesReadFromDurableEvents(dir, cwd)]);
     // Fixture must exercise a NON-EMPTY files-read set.
     expect(filesPure.size).toBeGreaterThan(0);
-
-    expect(findLastTurnEndSeqFromParsedEvents(events)).toBe(findLastTurnEndEventSeq(dir));
   });
 });
