@@ -40,8 +40,35 @@ export function digestToolResultText(
   const tail = buf.subarray(tailStart).toString('utf8');
   const elidedBytes =
     totalBytes - Buffer.byteLength(head, 'utf8') - Buffer.byteLength(tail, 'utf8');
+
+  // A line longer than the half budget leaves a cut mid-line. The visible text
+  // then shows a PARTIAL record abutting the marker — for a structured list,
+  // item 1's prefix and item N's suffix read as one malformed record unless
+  // the marker says so explicitly.
+  const headCutMidLine = headEnd > 0 && buf[headEnd - 1] !== 0x0a;
+  const tailCutMidLine = tailStart > 0 && buf[tailStart - 1] !== 0x0a;
+
+  // Line count of the elided middle, so a structured list can't silently lose
+  // records: "3 items visible, marker says 1 line elided" is checkable. When
+  // the head was cut mid-line, the middle's first newline merely terminates
+  // the visible (PARTIAL-flagged) head fragment's line — it is not an elided
+  // line, so skip it. The tail-side fragment has no terminating newline inside
+  // the middle, so newline-counting already excludes it.
+  let elidedLines = 0;
+  for (let i = headEnd; i < tailStart; i++) {
+    if (buf[i] === 0x0a) elidedLines++;
+  }
+  if (headCutMidLine && elidedLines > 0) elidedLines--;
+  const partialNote = headCutMidLine
+    ? tailCutMidLine
+      ? '; the lines before AND after this marker are PARTIAL (cut mid-line)'
+      : '; the line before this marker is PARTIAL (cut mid-line)'
+    : tailCutMidLine
+      ? '; the line after this marker is PARTIAL (cut mid-line)'
+      : '';
+
   const marker =
-    `\n…[${elidedBytes} bytes elided of ${totalBytes} total — recover with ` +
+    `\n…[${elidedLines} lines, ${elidedBytes} bytes elided of ${totalBytes} total${partialNote} — recover with ` +
     `read_tool_result(tool_call_id="${toolCallId}", head_lines=…, tail_lines=…, grep="…")]…\n`;
   return { text: head + marker + tail, elidedBytes, totalBytes };
 }

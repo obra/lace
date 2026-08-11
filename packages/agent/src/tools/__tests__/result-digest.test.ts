@@ -62,6 +62,58 @@ describe('tools/result-digest', () => {
     expect(tail.startsWith('AAAA-')).toBe(true);
   });
 
+  it('marker states how many lines were elided', () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 2000; i++) {
+      lines.push(`this is line number ${i} with some padding text to add bytes`);
+    }
+    const full = lines.join('\n') + '\n';
+    const result = digestToolResultText(full, 'tc_linecount');
+
+    const marker = result.text.match(/…\[(\d+) lines, \d+ bytes elided of \d+ total/);
+    expect(marker).not.toBeNull();
+    const statedElidedLines = Number(marker![1]);
+
+    // The stated count must equal the lines actually missing from the digest.
+    const markerStart = result.text.indexOf('\n…[');
+    const markerEnd = result.text.indexOf(']…\n');
+    // slice up to markerStart: the head's own trailing newline is inside the
+    // slice; the marker's leading newline (at markerStart) is not a head line.
+    const visibleHeadLines = result.text.slice(0, markerStart).split('\n').length - 1;
+    const visibleTailLines = result.text.slice(markerEnd + 3).split('\n').length - 1;
+    expect(statedElidedLines).toBe(2000 - visibleHeadLines - visibleTailLines);
+    expect(statedElidedLines).toBeGreaterThan(0);
+  });
+
+  it('flags both boundaries as partial when items are longer than the half budget', () => {
+    // The PRI-2865 failure: a 3-item list of single-line records, each larger
+    // than the 1 KiB half budget. The head ends inside item 1 and the tail
+    // begins inside item 3, so item 1's prefix and item 3's suffix read as ONE
+    // malformed record unless the marker says both sides are partial.
+    const item = (n: number) => `{"reminder":${n},"prompt":"${'x'.repeat(3000)}"}`;
+    const full = `${item(1)}\n${item(2)}\n${item(3)}\n`;
+    const result = digestToolResultText(full, 'tc_midrecord');
+
+    expect(result.elidedBytes).toBeGreaterThan(0);
+    expect(result.text).toContain('PARTIAL');
+    expect(result.text).toContain('before');
+    expect(result.text).toContain('after');
+    // Exactly ONE record (item 2) is entirely absent; items 1 and 3 are
+    // partial fragments, flagged as such — they must not inflate the count.
+    expect(result.text).toContain('…[1 lines,');
+  });
+
+  it('does not claim partial lines when the cuts landed on line boundaries', () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 2000; i++) {
+      lines.push(`AAAA-${i}-BBBB padding padding padding padding padding`);
+    }
+    const full = lines.join('\n') + '\n';
+    const result = digestToolResultText(full, 'tc_clean');
+    expect(result.elidedBytes).toBeGreaterThan(0);
+    expect(result.text).not.toContain('PARTIAL');
+  });
+
   it('does not produce broken UTF-8 when multibyte chars sit near the cut', () => {
     // Build a payload where multibyte sequences straddle the head/tail byte cuts.
     const filler = 'café 🎉 résumé naïve façade '.repeat(50); // multibyte per line
