@@ -54,7 +54,7 @@ describe('loadTurnEntryProjection', () => {
 
     expect(spy).toHaveBeenCalledTimes(1); // the whole point: ONE read+parse
     expect(proj.systemPrompt).toBe('sys');
-    expect(proj.lastTurnEndSeq).toBe(4);
+    expect(proj.maxFoldedSeq).toBe(4);
     expect(proj.filesRead instanceof Set).toBe(true);
     // messages equivalence with the standalone builder:
     expect(JSON.stringify(proj.messages)).toBe(

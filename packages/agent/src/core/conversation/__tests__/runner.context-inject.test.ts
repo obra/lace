@@ -755,5 +755,20 @@ describe('ConversationRunner - between-turn context_injected watermark', () => {
     );
     expect(injectedUserMsg).toBeDefined();
     expect(injectedUserMsg!.role).toBe('user');
+
+    // Exactly once: the rebuilt prefix already contains the between-turn
+    // injection, so the tailer must not append it a second time. (Idle-arrival
+    // notifications appearing twice in one request was a live duplicate-delivery
+    // bug: job-completed and reminder notifications doubled.)
+    const occurrences = firstCallMessages.reduce((count, m) => {
+      const text =
+        typeof m.content === 'string'
+          ? m.content
+          : (m.content as Array<{ type?: string; text?: string }>)
+              .map((b) => (typeof b?.text === 'string' ? b.text : ''))
+              .join('\n');
+      return count + (text.split('BETWEEN-TURN-INJECT').length - 1);
+    }, 0);
+    expect(occurrences).toBe(1);
   });
 });
