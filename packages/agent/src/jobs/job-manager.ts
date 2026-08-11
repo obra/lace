@@ -17,6 +17,7 @@ export type JobManagerDeps = {
   runShellProcess: (job: JobState) => void;
   runSubagentProcess: (job: JobState) => void;
   setupProgressTimer?: (job: JobState) => void;
+  setupStallTimer?: (job: JobState) => void;
 };
 
 /**
@@ -294,6 +295,10 @@ export class JobManager {
     if (this.hasProgressSubscriber(job.jobId)) {
       this.startProgressTimerIfNeeded(job.jobId);
     }
+    // Stall detection is always-on (no opt-in): arm it for every job.
+    if (job.stallTimer === undefined) {
+      this.deps.setupStallTimer?.(job);
+    }
   }
 
   getJob(jobId: string): JobState | undefined {
@@ -307,7 +312,10 @@ export class JobManager {
     // Subscriptions were the only thing keeping this timer armed; with the
     // job gone, the operator's explicit-interval branch can't reach it
     // either. Stop unconditionally.
-    if (job) this.stopProgressTimer(job);
+    if (job) {
+      this.stopProgressTimer(job);
+      this.stopStallTimer(job);
+    }
   }
 
   getRunningJobs(): Map<string, JobState> {
@@ -324,6 +332,7 @@ export class JobManager {
     // won't get GC'd just because we drop the JobState reference.
     for (const job of this.jobs.values()) {
       this.stopProgressTimer(job);
+      this.stopStallTimer(job);
     }
     this.jobs.clear();
     // Cancel every armed progress batch before dropping the subscriptions
@@ -369,6 +378,7 @@ export class JobManager {
     // the notifications path also clears it on the happy path; doing it
     // here too keeps the internal finalize entry point self-contained.
     this.stopProgressTimer(job);
+    this.stopStallTimer(job);
     this.jobs.delete(job.jobId);
     // Prune any subscriptions for this jobId. Fanout (if any) has already
     // fired upstream via createFinalizeJob in the notifications path — by
@@ -504,6 +514,15 @@ export class JobManager {
   ): void {
     const subIds = this.subscriptionsByJob.get(jobId);
     if (!subIds || subIds.size === 0) {
+      inject();
+      return;
+    }
+
+    // A stall is not terminal and not subscribable: the job is still running
+    // (pending progress batches stay armed), no subscription's `on` can name
+    // it, and filters don't apply — silence is exactly what it reports.
+    // Always-on, delivered once (the stall timer gates one-shot-ness).
+    if (kind === 'stalled') {
       inject();
       return;
     }
@@ -645,6 +664,13 @@ export class JobManager {
    * Clear the in-flight progress interval handle on `job`, if any.
    * Unconditional — callers decide when stopping is appropriate.
    */
+  private stopStallTimer(job: JobState): void {
+    if (job.stallTimer) {
+      clearInterval(job.stallTimer);
+      job.stallTimer = undefined;
+    }
+  }
+
   private stopProgressTimer(job: JobState): void {
     if (job.progressTimer) {
       clearInterval(job.progressTimer);
@@ -822,6 +848,8 @@ export class JobManager {
     if (options.progressIntervalMs !== undefined) {
       this.deps.setupProgressTimer?.(job);
     }
+    // Stall detection is always-on (no opt-in): arm it for every job.
+    this.deps.setupStallTimer?.(job);
 
     // 8. Call runShellProcess or runSubagentProcess
     if (type === 'shell') {

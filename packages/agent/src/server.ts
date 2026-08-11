@@ -23,6 +23,7 @@ import { runSubagentJobProcess as runSubagentJobProcessImpl } from './jobs/subag
 import {
   createQueueJobNotification,
   createSetupProgressTimer,
+  createSetupStallTimer,
   createFinalizeJob,
 } from './jobs/job-notifications';
 import {
@@ -397,6 +398,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runPromptInternalRef,
     queueJobNotification
   );
+  const setupStallTimer = createSetupStallTimer(queueJobNotification);
   const finalizeJob = createFinalizeJob(
     state,
     runExclusive,
@@ -471,6 +473,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     runShellProcess: (job) => void runShellJobProcess(job),
     runSubagentProcess: (job) => void runSubagentJobProcess(job),
     setupProgressTimer: (job) => setupProgressTimer(job),
+    setupStallTimer: (job) => setupStallTimer(job),
   });
 
   // Persist job_started event to session storage
@@ -517,6 +520,7 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
     persistJobStartedEvent,
     emitSessionUpdate,
     setupProgressTimer,
+    setupStallTimer,
     runShellJobProcess: (job: JobState) => void runShellJobProcess(job),
     runSubagentJobProcess: (job: JobState) => void runSubagentJobProcess(job),
   };

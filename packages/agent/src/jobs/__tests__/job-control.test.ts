@@ -2,6 +2,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import type { JobState } from '../../server-types';
 import { killJob, killAllRunningJobs, terminateJob } from '../job-control';
 
@@ -211,7 +212,6 @@ describe('terminateJob', () => {
   // A fake ChildProcess that "dies" when killed: kill() sets signalCode and
   // emits 'exit' on the next tick, like a real process honoring SIGTERM.
   function createExitingProc(): ChildProcess {
-    const { EventEmitter } = require('node:events') as typeof import('node:events');
     const emitter = new EventEmitter();
     const proc = emitter as unknown as ChildProcess & {
       exitCode: number | null;
@@ -263,7 +263,6 @@ describe('terminateJob', () => {
   });
 
   it('returns false when the process never exits', async () => {
-    const { EventEmitter } = require('node:events') as typeof import('node:events');
     const emitter = new EventEmitter();
     const proc = emitter as unknown as ChildProcess & {
       exitCode: number | null;

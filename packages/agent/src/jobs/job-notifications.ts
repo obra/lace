@@ -4,7 +4,11 @@
 
 import { existsSync, statSync } from 'node:fs';
 import { getLastLines } from './job-file-utils';
-import { DEFAULT_PROGRESS_INTERVAL_MS } from '../server-types';
+import {
+  DEFAULT_PROGRESS_INTERVAL_MS,
+  DEFAULT_STALL_THRESHOLD_MS,
+  STALL_CHECK_INTERVAL_MS,
+} from '../server-types';
 import { appendDurableEvent } from '../storage/event-log';
 import { readSessionState, writeSessionState, loadSession } from '../storage/session-store';
 import {
@@ -19,6 +23,7 @@ import {
   composeJobFailedBody,
   composeJobCancelledBody,
   composeJobProgressBody,
+  composeJobStalledBody,
 } from '../notifications/composers';
 import type { NotificationKind } from '../notifications/notification-wrapper';
 
@@ -32,6 +37,8 @@ function jobTypeToKind(type: JobNotificationType): NotificationKind {
       return 'job-cancelled';
     case 'progress':
       return 'job-progress';
+    case 'stalled':
+      return 'job-stalled';
   }
 }
 
@@ -54,7 +61,7 @@ export function createQueueJobNotification(
   return (
     job: JobState,
     type: JobNotificationType,
-    options?: { reason?: string; deltaBytes?: number }
+    options?: { reason?: string; deltaBytes?: number; stalledForMs?: number }
   ) => {
     if (!state.activeSession) return;
 
@@ -106,6 +113,15 @@ export function createQueueJobNotification(
           lastLines,
         });
         break;
+      case 'stalled':
+        body = composeJobStalledBody({
+          jobId: job.jobId,
+          durationMs,
+          stalledForMs: options?.stalledForMs ?? 0,
+          outputBytes,
+          lastLines,
+        });
+        break;
     }
 
     const sessionDir = state.activeSession.dir;
@@ -152,7 +168,7 @@ export function createSetupProgressTimer(
   queueJobNotification: (
     job: JobState,
     type: JobNotificationType,
-    options?: { reason?: string; deltaBytes?: number }
+    options?: { reason?: string; deltaBytes?: number; stalledForMs?: number }
   ) => void
 ) {
   return (job: JobState) => {
@@ -180,6 +196,55 @@ export function createSetupProgressTimer(
       job.lastProgressAt = Date.now();
       job.lastProgressBytes = currentBytes;
     }, progressInterval);
+  };
+}
+
+/**
+ * Create the stall-timer arming function. Unlike the progress timer this is
+ * ALWAYS-ON: it is armed for every job at creation with no subscriber opt-in,
+ * because the point is noticing the job nobody is watching. Each tick stats
+ * the output file; when the size has not changed for DEFAULT_STALL_THRESHOLD_MS
+ * while the job is still running, it queues ONE 'stalled' notification and
+ * re-arms only after output resumes (so a resumed-then-wedged job fires again).
+ * A byte-count proxy is valid because appends are monotonic up to the output
+ * cap; a job pinned at MAX_JOB_OUTPUT_BYTES reads as stalled, which is the
+ * honest signal for a caller to inspect either way.
+ */
+export function createSetupStallTimer(
+  queueJobNotification: (
+    job: JobState,
+    type: JobNotificationType,
+    options?: { reason?: string; deltaBytes?: number; stalledForMs?: number }
+  ) => void
+) {
+  return (job: JobState) => {
+    job.lastOutputChangeAt = Date.now();
+    job.lastStallBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+    job.stalledNotified = false;
+
+    job.stallTimer = setInterval(() => {
+      if (job.status !== 'running') {
+        if (job.stallTimer) {
+          clearInterval(job.stallTimer);
+          job.stallTimer = undefined;
+        }
+        return;
+      }
+
+      const currentBytes = existsSync(job.outputPath) ? statSync(job.outputPath).size : 0;
+      if (currentBytes !== (job.lastStallBytes ?? 0)) {
+        job.lastStallBytes = currentBytes;
+        job.lastOutputChangeAt = Date.now();
+        job.stalledNotified = false;
+        return;
+      }
+
+      const stalledForMs = Date.now() - (job.lastOutputChangeAt ?? Date.now());
+      if (!job.stalledNotified && stalledForMs >= DEFAULT_STALL_THRESHOLD_MS) {
+        job.stalledNotified = true;
+        queueJobNotification(job, 'stalled', { stalledForMs });
+      }
+    }, STALL_CHECK_INTERVAL_MS);
   };
 }
 
@@ -242,6 +307,10 @@ export function createFinalizeJob(
     if (job.progressTimer) {
       clearInterval(job.progressTimer);
       job.progressTimer = undefined;
+    }
+    if (job.stallTimer) {
+      clearInterval(job.stallTimer);
+      job.stallTimer = undefined;
     }
 
     // Queue completion notification for the agent

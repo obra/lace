@@ -21,6 +21,7 @@ function makeDeps(overrides: Partial<JobCreationDeps> = {}): JobCreationDeps {
     persistJobStartedEvent: vi.fn().mockResolvedValue(undefined),
     emitSessionUpdate: vi.fn().mockResolvedValue(undefined),
     setupProgressTimer: vi.fn(),
+    setupStallTimer: vi.fn(),
     runShellJobProcess: vi.fn(),
     runSubagentJobProcess: vi.fn(),
     ...overrides,

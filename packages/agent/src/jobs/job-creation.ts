@@ -74,6 +74,8 @@ export type JobCreationDeps = {
   ) => Promise<void>;
   /** Set up progress timer for the job. */
   setupProgressTimer: (job: JobState) => void;
+  /** Arm the always-on stall detector for the job. */
+  setupStallTimer: (job: JobState) => void;
   /** Start the shell job process. */
   runShellJobProcess: (job: JobState) => void;
   /** Start the subagent job process. */
@@ -179,6 +181,8 @@ async function finalizeJobCreation(
   if (job.progressIntervalMs !== undefined) {
     deps.setupProgressTimer(job);
   }
+  // Stall detection is always-on (no opt-in): arm it for every job.
+  deps.setupStallTimer(job);
   runJobProcess(job);
 
   return { jobId: job.jobId };

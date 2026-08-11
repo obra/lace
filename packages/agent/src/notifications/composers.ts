@@ -76,6 +76,22 @@ export interface JobProgressCompose {
   lastLines: string[];
 }
 
+export interface JobStalledCompose {
+  jobId: string;
+  durationMs: number;
+  stalledForMs: number;
+  outputBytes: number;
+  lastLines: string[];
+}
+
+export function composeJobStalledBody(j: JobStalledCompose): string {
+  const head = `Your background job may be stalled: it is still running after ${formatDuration(j.durationMs)} but has produced no new output for ${formatDuration(j.stalledForMs)} (${formatBytes(j.outputBytes)} bytes total). It may be wedged, or doing slow work that writes nothing.`;
+  const tail = `Call job_output(jobId="${j.jobId}") to inspect, or job_kill(jobId="${j.jobId}") if it should not still be running.`;
+  if (j.lastLines.length === 0) return `${head} ${tail}`;
+  const lines = j.lastLines.map((l) => `  ${truncate(l)}`).join('\n');
+  return `${head} Last output:\n${lines}\n${tail}`;
+}
+
 export function composeJobProgressBody(j: JobProgressCompose): string {
   const head = `Your background job has been running for ${formatDuration(j.durationMs)} and has written ${formatBytes(j.outputBytes)} bytes (+${formatBytes(j.deltaBytes)} since last update).`;
   if (j.lastLines.length === 0) {

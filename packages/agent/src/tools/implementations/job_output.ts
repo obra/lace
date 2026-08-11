@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
+import { DEFAULT_STALL_THRESHOLD_MS } from '../../server-types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const jobOutputSchema = z
@@ -27,7 +28,7 @@ Parameters:
 
 Output remains readable after a job ends, including a job that was killed mid-flight — a partial result is still a result. \`not found\` means no job has ever had that id.
 
-Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number }\`.`;
+Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number, stalled?: true, stalledForMs?: number }\`. \`stalled: true\` means the job is still running but its output has not grown for the stall threshold (~15 min) — it may be wedged; you will also receive a one-shot \`job-stalled\` notification when this happens.`;
   schema = jobOutputSchema;
   annotations: ToolAnnotations = {
     title: 'Get Job Output',
@@ -66,11 +67,22 @@ Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string,
 
     const output = jobManager.getJobOutput(jobId);
 
+    // Stall flag: a live running job whose output file has not grown for the
+    // stall threshold. Only live-map jobs carry lastOutputChangeAt (the
+    // event-derived fallback record is for finished jobs, which can't stall).
+    const lastOutputChangeAt = (job as { lastOutputChangeAt?: number }).lastOutputChangeAt;
+    const stalledForMs =
+      job.status === 'running' && typeof lastOutputChangeAt === 'number'
+        ? Date.now() - lastOutputChangeAt
+        : 0;
+    const stalled = stalledForMs >= DEFAULT_STALL_THRESHOLD_MS;
+
     const result = {
       jobId,
       status: job.status,
       output: output.trim() || '(no output)',
       ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+      ...(stalled ? { stalled: true, stalledForMs } : {}),
     };
 
     return {
