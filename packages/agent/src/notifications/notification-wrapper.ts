@@ -8,6 +8,7 @@ export type NotificationKind =
   | 'job-failed'
   | 'job-cancelled'
   | 'job-progress'
+  | 'job-stalled'
   | 'subagent-exited'
   | 'compaction-pressure'
   | 'session-recovered';

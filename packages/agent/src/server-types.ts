@@ -60,6 +60,12 @@ export const JOB_LOG_DIR = 'jobs';
 export const MAX_CONCURRENT_JOBS = 10;
 export const MAX_JOB_OUTPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 export const DEFAULT_PROGRESS_INTERVAL_MS = 300000; // 5 minutes
+// A running job whose output file has not grown for this long is surfaced as
+// stalled (one-shot notification; re-arms when output resumes). Always-on —
+// unlike progress, stall detection needs no subscriber, because the whole
+// point is noticing the job nobody is watching.
+export const DEFAULT_STALL_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+export const STALL_CHECK_INTERVAL_MS = 60 * 1000;
 
 // Type Utilities
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never;
@@ -72,7 +78,7 @@ export type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }
 // Job Types
 export type JobType = 'bash' | 'delegate';
 export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
-export type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress';
+export type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress' | 'stalled';
 
 export type JobState = {
   jobId: string;
@@ -112,6 +118,11 @@ export type JobState = {
   lastProgressAt?: number;
   lastProgressBytes?: number;
   progressTimer?: ReturnType<typeof setInterval>;
+  // Stall detection fields (always-on; see DEFAULT_STALL_THRESHOLD_MS)
+  lastOutputChangeAt?: number;
+  lastStallBytes?: number;
+  stalledNotified?: boolean;
+  stallTimer?: ReturnType<typeof setInterval>;
   // Subagent provider/model configuration
   connectionId?: string;
   modelId?: string;
