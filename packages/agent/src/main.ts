@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { runStartupReaper } from './containers/startup-reaper';
+import { createTurnBeacon } from './liveness/turn-beacon';
 import { fileURLToPath } from 'url';
 import { loadPlugins, PluginLoadError } from './plugins';
 import { registerBuiltinTools } from './tools/builtins';
@@ -25,6 +26,17 @@ import {
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
+
+// Heartbeat a turn-active flag so host-side deploy tooling can wait for the
+// turn to end instead of SIGTERMing the agent mid-sentence. Readers treat a
+// stale mtime as idle, so a crash needs no cleanup here.
+const turnBeacon = createTurnBeacon({
+  flagPath: path.join(laceDir, 'turn-active'),
+  isTurnActive: () => state.activeTurn !== null,
+  intervalMs: 5_000,
+});
+turnBeacon.start();
+state.turnBeacon = turnBeacon;
 
 function openLogStream(name: string) {
   const sessionDir = process.env.LACE_SESSION_DIR;
