@@ -69,3 +69,12 @@ export function createTurnBeacon(opts: TurnBeaconOptions): TurnBeacon {
     beat,
   };
 }
+
+/**
+ * Canonical per-process flag path: $LACE_DIR/turn-active.d/<pid>. Extracted so
+ * tests can pin the invariant that distinct processes get distinct files —
+ * a shared path would let an idle process unflag a busy sibling.
+ */
+export function turnFlagPathForProcess(laceDir: string, pid: number): string {
+  return path.join(laceDir, 'turn-active.d', String(pid));
+}

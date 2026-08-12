@@ -5,7 +5,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTurnBeacon } from '../turn-beacon';
+import { createTurnBeacon, turnFlagPathForProcess } from '../turn-beacon';
 
 describe('createTurnBeacon', () => {
   let dir: string;
@@ -99,6 +99,14 @@ describe('createTurnBeacon', () => {
 
     expect(existsSync(busyPath)).toBe(true);
     expect(existsSync(idlePath)).toBe(false);
+  });
+
+  it('distinct processes get distinct flag paths under turn-active.d', () => {
+    const a = turnFlagPathForProcess('/lace', 101);
+    const b = turnFlagPathForProcess('/lace', 202);
+    expect(a).not.toBe(b);
+    expect(a).toBe('/lace/turn-active.d/101');
+    expect(b).toBe('/lace/turn-active.d/202');
   });
 
   it('never throws when the flag path is unwritable', () => {

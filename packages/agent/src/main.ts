@@ -13,7 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { runStartupReaper } from './containers/startup-reaper';
-import { createTurnBeacon } from './liveness/turn-beacon';
+import { createTurnBeacon, turnFlagPathForProcess } from './liveness/turn-beacon';
 import { fileURLToPath } from 'url';
 import { loadPlugins, PluginLoadError } from './plugins';
 import { registerBuiltinTools } from './tools/builtins';
@@ -32,9 +32,9 @@ const laceDir = getLaceDir();
 // process (root agent and delegate children share LACE_DIR), so an idle
 // process never unflags a busy sibling. Readers treat a stale mtime as idle,
 // so a crash needs no cleanup here; the sweep below just caps file buildup.
-const turnFlagDir = path.join(laceDir, 'turn-active.d');
+const turnFlagDir = path.dirname(turnFlagPathForProcess(laceDir, process.pid));
 const turnBeacon = createTurnBeacon({
-  flagPath: path.join(turnFlagDir, String(process.pid)),
+  flagPath: turnFlagPathForProcess(laceDir, process.pid),
   isTurnActive: () => state.activeTurn !== null,
   intervalMs: 5_000,
 });
