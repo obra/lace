@@ -72,6 +72,32 @@ describe('listInterruptedJobs', () => {
     expect(listInterruptedJobs(dir)).toEqual([]);
   });
 
+  it('ignores injected text that merely quotes the recovery-marker string', () => {
+    appendEvents([
+      {
+        type: 'job_started',
+        timestamp: '2026-08-12T00:00:00.000Z',
+        data: { jobId: 'job_a', jobType: 'delegate', description: 'in flight' },
+      },
+      // A Slack message (or any other inject) quoting the marker text must
+      // not clear the in-flight set — only a real recovery notification does.
+      {
+        type: 'context_injected',
+        timestamp: '2026-08-12T00:30:00.000Z',
+        data: {
+          content: [
+            {
+              type: 'text',
+              text: '<notification kind="slack-message">someone pasted kind="session-recovered" in chat</notification>',
+            },
+          ],
+        },
+      },
+    ]);
+
+    expect(listInterruptedJobs(dir).map((j) => j.jobId)).toEqual(['job_a']);
+  });
+
   it('excludes unfinished jobs from a previous crash generation', () => {
     appendEvents([
       // Crash generation 1: job_a was in flight, process died, next process

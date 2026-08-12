@@ -200,11 +200,13 @@ export function listInterruptedJobs(sessionDir: string): DerivedJob[] {
 
       if (parsed.type === 'context_injected') {
         const content = Array.isArray(data.content) ? (data.content as unknown[]) : [];
+        // Anchored to the notification wrapper's opening tag so quoted
+        // mentions of the kind inside some other injected body can never
+        // register as a crash boundary.
         const isRecoveryMarker = content.some(
           (c) =>
             typeof (c as { text?: unknown }).text === 'string' &&
-            ((c as { text: string }).text.includes('kind="session-recovered"') ||
-              (c as { text: string }).text.includes("kind='session-recovered'"))
+            /^<notification\s+kind="session-recovered"/.test((c as { text: string }).text)
         );
         // Everything before this marker belongs to an earlier crash
         // generation and was already reported by it.
