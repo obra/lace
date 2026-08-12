@@ -177,3 +177,17 @@ export function createJobDerivation(deps: {
     return applyRunningJobStatus(parsedResult, runningJobs);
   };
 }
+
+/**
+ * One-shot derivation of the jobs a dead process left in flight: log says
+ * running, and no live process owns them. Used by crash recovery to tell
+ * the agent what was interrupted; reads only the durable log, so it works
+ * before the session is active.
+ */
+export function listInterruptedJobs(sessionId: string, sessionDir: string): DerivedJob[] {
+  const derive = createJobDerivation({
+    getActiveSession: () => ({ sessionId, dir: sessionDir }),
+    getRunningJobs: () => new Map(),
+  });
+  return derive().filter((job) => job.status === 'interrupted');
+}

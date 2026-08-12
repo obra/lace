@@ -50,6 +50,7 @@ import { composeSkillDirs } from '../../skills/compose-skill-dirs';
 import { getAgentSkillsDir } from '../../skills/agent-skills-dir';
 import { killAllRunningJobs } from '../../jobs';
 import { injectNotification } from '../../notifications';
+import { listInterruptedJobs } from '../../jobs/job-derivation';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { PersonaNotFoundError, PersonaParseError } from '../../config/persona-registry';
 import {
@@ -299,6 +300,21 @@ async function activateStoredSession(
   // next turn (whatever triggers it); we deliberately do NOT force an internal
   // turn, so a restart alone never makes the agent act unprompted.
   if (loaded.recoveredFromCrash) {
+    // Name what the dead process left in flight, so the agent doesn't have
+    // to reconstruct it (or guess wrong) from jobs_list.
+    const interrupted = listInterruptedJobs(loaded.meta.sessionId, loaded.dir);
+    const interruptedLines =
+      interrupted.length > 0
+        ? '\n\nJobs that were in flight when the process died (their true ' +
+          'outcome is unknown — a delegate container may still be working; ' +
+          'check with job_output before assuming loss):\n' +
+          interrupted
+            .map(
+              (job) =>
+                `- ${job.jobId} (${job.type}${job.description ? `: ${job.description}` : ''}, started ${job.startTime})`
+            )
+            .join('\n')
+        : '';
     injectNotification({
       sessionDir: loaded.dir,
       kind: 'session-recovered',
@@ -308,7 +324,7 @@ async function activateStoredSession(
         'in the middle of may be incomplete and any reply you were about to send ' +
         'was NOT sent. Re-read the most recent messages and your open jobs to see ' +
         'where you left off. If someone was waiting on you, tell them what ' +
-        'happened and pick the work back up.',
+        `happened and pick the work back up.${interruptedLines}`,
     });
   }
 
