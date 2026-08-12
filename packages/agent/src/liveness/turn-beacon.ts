@@ -43,7 +43,9 @@ export function createTurnBeacon(opts: TurnBeaconOptions): TurnBeacon {
     try {
       if (active) {
         mkdirSync(path.dirname(opts.flagPath), { recursive: true });
-        writeFileSync(opts.flagPath, `{"updatedAt":"${new Date().toISOString()}"}\n`, 'utf8');
+        // Rewritten (not just touched) every beat: the changing updatedAt is
+        // what lets tests prove the heartbeat is really refreshing the file.
+        writeFileSync(opts.flagPath, `{"updatedAt":${Date.now()}}\n`, 'utf8');
       } else {
         rmSync(opts.flagPath, { force: true });
       }

@@ -1,7 +1,7 @@
 // ABOUTME: Turn beacon maintains $LACE_DIR/turn-active while a turn runs so
 // ABOUTME: host-side deploy tooling can refuse to restart the agent mid-turn.
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -45,7 +45,7 @@ describe('createTurnBeacon', () => {
     beacon.stop();
   });
 
-  it('keeps refreshing the flag mtime across beats of a long turn', () => {
+  it('keeps refreshing the flag across beats of a long turn', () => {
     const beacon = createTurnBeacon({
       flagPath,
       isTurnActive: () => true,
@@ -53,11 +53,13 @@ describe('createTurnBeacon', () => {
     });
     beacon.start();
 
+    // The persisted updatedAt must advance beat over beat — mtime comparison
+    // alone would pass even if the file were never rewritten.
     vi.advanceTimersByTime(1000);
-    const first = statSync(flagPath).mtimeMs;
+    const first = JSON.parse(readFileSync(flagPath, 'utf8')) as { updatedAt: number };
     vi.advanceTimersByTime(5000);
-    const later = statSync(flagPath).mtimeMs;
-    expect(later).toBeGreaterThanOrEqual(first);
+    const later = JSON.parse(readFileSync(flagPath, 'utf8')) as { updatedAt: number };
+    expect(later.updatedAt).toBeGreaterThan(first.updatedAt);
 
     beacon.stop();
   });
