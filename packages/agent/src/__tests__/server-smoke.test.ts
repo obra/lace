@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -128,6 +128,38 @@ describe('agent rpc server (smoke)', () => {
       code: EntErrorCodes.JobNotFound,
       message: 'JobNotFound',
     });
+
+    client.close();
+    server.close();
+  });
+
+  it('reports an orphaned running job as interrupted with outcome-unknown summary', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', defaultInitializeParams());
+    await client.request('session/new', { cwd: process.cwd(), mcpServers: [] });
+
+    // Simulate a prior process dying with a job in flight: job_started in the
+    // durable log, no job_finished, and nothing in the in-memory map.
+    const sessionDir = state.activeSession!.dir;
+    appendFileSync(
+      join(sessionDir, 'events.jsonl'),
+      JSON.stringify({
+        type: 'job_started',
+        timestamp: '2026-08-12T00:00:00.000Z',
+        data: { jobId: 'job_orphaned', jobType: 'bash', description: 'left in flight' },
+      }) + '\n',
+      'utf8'
+    );
+
+    const output = (await client.request('ent/job/output', { jobId: 'job_orphaned' })) as {
+      status: string;
+      report: { summary: string; error?: string };
+    };
+    expect(output.status).toBe('interrupted');
+    expect(output.report.summary).toBe('Job interrupted by an agent restart; outcome unknown');
+    expect(output.report.error).toBeUndefined();
 
     client.close();
     server.close();

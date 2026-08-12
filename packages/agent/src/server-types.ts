@@ -77,7 +77,7 @@ export type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }
 
 // Job Types
 export type JobType = 'bash' | 'delegate';
-export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
 export type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress' | 'stalled';
 
 export type JobState = {
@@ -163,6 +163,12 @@ export type AgentServerState = {
     status: 'running' | 'awaiting_permission';
     abortController: AbortController;
   };
+  /**
+   * Optional turn-active flag heartbeat (see liveness/turn-beacon). Set by the
+   * agent-process entrypoint; handlers use it to raise the flag synchronously
+   * at turn start rather than waiting out a beat interval.
+   */
+  turnBeacon?: { beat(active: boolean): void };
   providerCatalog: ProviderCatalogManager;
   providerCatalogLoaded: boolean;
   providerInstances: ProviderInstanceManager;

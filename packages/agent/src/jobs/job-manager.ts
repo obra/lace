@@ -266,12 +266,15 @@ export class JobManager {
 
   /**
    * Apply running job status updates from in-memory state.
-   * Jobs marked as 'running' in events but not in the running jobs map are marked as 'failed'.
+   * A job the log says is running but the in-memory map doesn't know about
+   * means this process restarted after the job started. We don't know how
+   * the job ended — or whether its work (e.g. a delegate's container) is
+   * still going — so report 'interrupted', never an invented 'failed'.
    */
   private applyRunningStatus(jobs: JobRecord[]): JobRecord[] {
     return jobs.map((job) => {
       if (job.status === 'running' && !this.jobs.has(job.jobId)) {
-        return { ...job, status: 'failed' as JobStatus };
+        return { ...job, status: 'interrupted' as JobStatus };
       }
       return job;
     });

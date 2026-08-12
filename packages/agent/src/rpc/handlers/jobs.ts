@@ -110,7 +110,9 @@ export function registerJobHandlers(peer: JsonRpcPeer, state: AgentServerState):
               ? 'Job cancelled'
               : record.status === 'running'
                 ? 'Job running'
-                : 'Job failed',
+                : record.status === 'interrupted'
+                  ? 'Job interrupted by an agent restart; outcome unknown'
+                  : 'Job failed',
         ...(record.status === 'failed' ? { error: 'Job failed' } : {}),
       },
     };

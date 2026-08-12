@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils/logger';
 import { runStartupReaper } from './containers/startup-reaper';
+import { createTurnBeacon, turnFlagPathForProcess } from './liveness/turn-beacon';
 import { fileURLToPath } from 'url';
 import { loadPlugins, PluginLoadError } from './plugins';
 import { registerBuiltinTools } from './tools/builtins';
@@ -25,6 +26,29 @@ import {
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
+
+// Heartbeat a turn-active flag so host-side deploy tooling can wait for the
+// turn to end instead of SIGTERMing the agent mid-sentence. One flag file per
+// process (root agent and delegate children share LACE_DIR), so an idle
+// process never unflags a busy sibling. Readers treat a stale mtime as idle,
+// so a crash needs no cleanup here; the sweep below just caps file buildup.
+const turnFlagDir = path.dirname(turnFlagPathForProcess(laceDir, process.pid));
+const turnBeacon = createTurnBeacon({
+  flagPath: turnFlagPathForProcess(laceDir, process.pid),
+  isTurnActive: () => state.activeTurn !== null,
+  intervalMs: 5_000,
+});
+turnBeacon.start();
+state.turnBeacon = turnBeacon;
+try {
+  const dayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+  for (const entry of fs.readdirSync(turnFlagDir)) {
+    const p = path.join(turnFlagDir, entry);
+    if (fs.statSync(p).mtimeMs < dayAgoMs) fs.rmSync(p, { force: true });
+  }
+} catch {
+  // Best-effort housekeeping; the directory may not exist yet.
+}
 
 function openLogStream(name: string) {
   const sessionDir = process.env.LACE_SESSION_DIR;

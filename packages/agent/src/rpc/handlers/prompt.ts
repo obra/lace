@@ -190,6 +190,9 @@ export function registerPromptHandler(
     const abortController = new AbortController();
 
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
+    // Raise the deploy-guard flag now; the beacon's interval would leave a
+    // window where a just-started turn still looks idle to the host.
+    state.turnBeacon?.beat(true);
     let ownsActiveTurn = true;
 
     // Immediate-inject drain watermark for the NON-success exit paths (abort,
