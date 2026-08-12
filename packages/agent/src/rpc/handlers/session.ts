@@ -302,7 +302,7 @@ async function activateStoredSession(
   if (loaded.recoveredFromCrash) {
     // Name what the dead process left in flight, so the agent doesn't have
     // to reconstruct it (or guess wrong) from jobs_list.
-    const interrupted = listInterruptedJobs(loaded.meta.sessionId, loaded.dir);
+    const interrupted = listInterruptedJobs(loaded.dir);
     const interruptedLines =
       interrupted.length > 0
         ? '\n\nJobs that were in flight when the process died (their true ' +

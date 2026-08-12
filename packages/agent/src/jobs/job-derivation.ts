@@ -179,15 +179,59 @@ export function createJobDerivation(deps: {
 }
 
 /**
- * One-shot derivation of the jobs a dead process left in flight: log says
- * running, and no live process owns them. Used by crash recovery to tell
- * the agent what was interrupted; reads only the durable log, so it works
- * before the session is active.
+ * One-shot derivation of the jobs the process that JUST died left in flight.
+ * Used by crash recovery to tell the agent what was interrupted; reads only
+ * the durable log, so it works before the session is active.
+ *
+ * Scoped to the latest crash generation: a job orphaned by an EARLIER crash
+ * never gets a job_finished, so it stays log-running forever. Only jobs
+ * started after the previous session-recovered marker can have been owned by
+ * the process that just died.
  */
-export function listInterruptedJobs(sessionId: string, sessionDir: string): DerivedJob[] {
-  const derive = createJobDerivation({
-    getActiveSession: () => ({ sessionId, dir: sessionDir }),
-    getRunningJobs: () => new Map(),
-  });
-  return derive().filter((job) => job.status === 'interrupted');
+export function listInterruptedJobs(sessionDir: string): DerivedJob[] {
+  const lines = readAllSessionEventLines(sessionDir);
+
+  const inFlight = new Map<string, DerivedJob>();
+  for (const line of lines) {
+    if (!line) continue;
+    try {
+      const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: unknown };
+      const data = (parsed.data ?? {}) as Record<string, unknown>;
+
+      if (parsed.type === 'context_injected') {
+        const content = Array.isArray(data.content) ? (data.content as unknown[]) : [];
+        const isRecoveryMarker = content.some(
+          (c) =>
+            typeof (c as { text?: unknown }).text === 'string' &&
+            ((c as { text: string }).text.includes('kind="session-recovered"') ||
+              (c as { text: string }).text.includes("kind='session-recovered'"))
+        );
+        // Everything before this marker belongs to an earlier crash
+        // generation and was already reported by it.
+        if (isRecoveryMarker) inFlight.clear();
+        continue;
+      }
+
+      if (parsed.type !== 'job_started' && parsed.type !== 'job_finished') continue;
+      const jobId = toNonEmptyString(data.jobId);
+      if (!jobId) continue;
+
+      if (parsed.type === 'job_started') {
+        inFlight.set(jobId, {
+          jobId,
+          type: data.jobType === 'delegate' ? 'delegate' : 'bash',
+          status: 'interrupted',
+          description: toNonEmptyString(data.description) ?? undefined,
+          startTime:
+            typeof parsed.timestamp === 'string' ? parsed.timestamp : new Date().toISOString(),
+        });
+      } else {
+        inFlight.delete(jobId);
+      }
+    } catch {
+      // Ignore malformed lines.
+    }
+  }
+
+  return Array.from(inFlight.values());
 }
