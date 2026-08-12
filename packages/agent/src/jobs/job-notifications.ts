@@ -265,7 +265,10 @@ export function createFinalizeJob(
       return;
     }
 
-    if (job.status === 'running') {
+    // 'interrupted' is a derived status (log-running with no live process
+    // after a restart) and never appears on a JobState we own; the branch
+    // exists to narrow the type alongside 'running'.
+    if (job.status === 'running' || job.status === 'interrupted') {
       job.status = 'failed';
     }
 

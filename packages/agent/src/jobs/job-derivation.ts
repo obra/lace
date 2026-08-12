@@ -37,7 +37,9 @@ type JobsCache = {
 
 /**
  * Apply running job status updates from in-memory state.
- * Jobs marked as 'running' in events but not in the running jobs map are marked as 'failed'.
+ * A job the log says is running but the running-jobs map doesn't know about
+ * means the process restarted after the job started; the true outcome is
+ * unknown, so report 'interrupted', never an invented 'failed'.
  */
 function applyRunningJobStatus(
   jobs: DerivedJob[],
@@ -45,7 +47,7 @@ function applyRunningJobStatus(
 ): DerivedJob[] {
   return jobs.map((job) => {
     if (job.status === 'running' && !runningJobs.has(job.jobId)) {
-      return { ...job, status: 'failed' as JobStatus };
+      return { ...job, status: 'interrupted' as JobStatus };
     }
     return job;
   });

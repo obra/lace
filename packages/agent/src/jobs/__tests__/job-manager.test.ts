@@ -234,7 +234,7 @@ describe('JobManager', () => {
       expect(jobs[0].subagentSessionId).toBe('sess_sub_123');
     });
 
-    it('marks running jobs as failed if not in memory', () => {
+    it('marks running jobs as interrupted if not in memory', () => {
       testDir = join(tmpdir(), `job-manager-test-${Date.now()}`);
       mkdirSync(testDir, { recursive: true });
 
@@ -255,12 +255,14 @@ describe('JobManager', () => {
       };
       const manager = new JobManager(deps);
 
-      // Job is not in memory, so it should be marked as failed
+      // Job is not in memory (e.g. the process restarted since it started).
+      // The log says running and nothing says it ended — 'failed' would be
+      // an invented outcome; 'interrupted' is what we actually know.
       const jobs = manager.listJobs();
 
       expect(jobs).toHaveLength(1);
       expect(jobs[0].jobId).toBe('job_orphan');
-      expect(jobs[0].status).toBe('failed');
+      expect(jobs[0].status).toBe('interrupted');
     });
 
     it('keeps running status if job is in memory', () => {

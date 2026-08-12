@@ -60,6 +60,19 @@ describe('JobsListTool', () => {
     }
   });
 
+  it('accepts interrupted in the status filter', () => {
+    const tool = new JobsListTool();
+
+    const result = tool.schema.safeParse({
+      status: ['interrupted'],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.status).toEqual(['interrupted']);
+    }
+  });
+
   it('rejects invalid status values', () => {
     const tool = new JobsListTool();
 

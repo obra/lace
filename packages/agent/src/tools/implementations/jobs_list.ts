@@ -6,7 +6,9 @@ import { Tool } from '../tool';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const jobsListSchema = z.object({
-  status: z.array(z.enum(['pending', 'running', 'completed', 'failed', 'cancelled'])).optional(),
+  status: z
+    .array(z.enum(['pending', 'running', 'completed', 'failed', 'cancelled', 'interrupted']))
+    .optional(),
   type: z.array(z.enum(['bash', 'delegate'])).optional(),
   limit: z.number().int().min(1).max(100).default(50),
 });
@@ -17,7 +19,8 @@ export class JobsListTool extends Tool {
 
 **Remember:** each \`delegate(prompt=...)\` is one job — one round. A delegate **session** (the subagent's conversation history) can be associated with multiple jobs over time: every \`delegate(resume=<prior jobId>)\` creates a new job under the same session. This list shows jobs, not sessions; the \`subagentSessionId\` field (when present) reveals which session a delegate job belongs to.
 
-Filter by status: \`["pending","running","completed","failed","cancelled"]\`.
+Filter by status: \`["pending","running","completed","failed","cancelled","interrupted"]\`.
+\`interrupted\` = the job was running when this agent process last stopped; its true outcome is unknown (a delegate's container may even still be working). Treat it as "unverified", not as failed.
 Filter by type: \`["bash","delegate"]\`.
 
 Returns: \`[{ jobId, type, status, description, startTime }]\`, **most recent first**. When more jobs match than \`limit\` allows, the result says how many were withheld.`;

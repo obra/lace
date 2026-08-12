@@ -77,7 +77,7 @@ export type JobInnerUpdate = Extract<SessionUpdateParams, { type: 'job_update' }
 
 // Job Types
 export type JobType = 'bash' | 'delegate';
-export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+export type JobStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
 export type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progress' | 'stalled';
 
 export type JobState = {
