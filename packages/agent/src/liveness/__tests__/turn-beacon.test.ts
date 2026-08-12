@@ -76,6 +76,31 @@ describe('createTurnBeacon', () => {
     expect(readFileSync(flagPath, 'utf8')).toContain('updatedAt');
   });
 
+  it('an idle process removes only its own flag, never a busy sibling', () => {
+    // Root agent and delegate children share LACE_DIR; each beacons its own
+    // per-pid file. A regression to a shared path would let the idle beacon
+    // delete the busy one's marker and let a deploy chop a live turn.
+    const busyPath = join(dir, 'turn-active.d', '1111');
+    const idlePath = join(dir, 'turn-active.d', '2222');
+    const busy = createTurnBeacon({
+      flagPath: busyPath,
+      isTurnActive: () => true,
+      intervalMs: 1000,
+    });
+    const idle = createTurnBeacon({
+      flagPath: idlePath,
+      isTurnActive: () => false,
+      intervalMs: 1000,
+    });
+
+    busy.beat(true);
+    idle.beat(true); // was active a moment ago...
+    idle.beat(false); // ...now idle: removes its own flag only
+
+    expect(existsSync(busyPath)).toBe(true);
+    expect(existsSync(idlePath)).toBe(false);
+  });
+
   it('never throws when the flag path is unwritable', () => {
     const beacon = createTurnBeacon({
       flagPath: join(dir, 'no-such-subdir', 'nested', 'turn-active'),
