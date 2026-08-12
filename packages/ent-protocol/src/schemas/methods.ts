@@ -1577,7 +1577,7 @@ const EntJobListResultSchema = z
           jobId: NonEmptyStringSchema,
           parentJobId: NonEmptyStringSchema.optional(),
           type: z.enum(['bash', 'delegate']),
-          status: z.enum(['running', 'completed', 'failed', 'cancelled']),
+          status: z.enum(['running', 'completed', 'failed', 'cancelled', 'interrupted']),
           description: z.string().optional(),
           command: z.string().optional(),
           startTime: IsoTimestampSchema,
@@ -1618,7 +1618,7 @@ const EntJobOutputParamsSchema = z
 
 const EntJobOutputResultSchema = z
   .object({
-    status: z.enum(['running', 'completed', 'failed', 'cancelled']),
+    status: z.enum(['running', 'completed', 'failed', 'cancelled', 'interrupted']),
     output: z.string(),
     exitCode: z.number().optional(),
     outputMeta: z
