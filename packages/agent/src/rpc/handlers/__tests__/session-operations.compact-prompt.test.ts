@@ -253,6 +253,47 @@ describe('ent/session/compact — track-based strategy', () => {
     }
   });
 
+  it('emits a compaction_complete session/update after compacting', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    const notifications: Array<Record<string, unknown>> = [];
+    client.onRequest('session/update', async (params) => {
+      notifications.push(params as Record<string, unknown>);
+      return undefined;
+    });
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const newResult = (await client.request('session/new', { cwd: workDir, mcpServers: [] })) as {
+        sessionId: string;
+      };
+
+      const sessionDir = getSessionDir(newResult.sessionId);
+      writeMinimalConversation(sessionDir);
+
+      const result = (await client.request('ent/session/compact', {
+        strategy: 'track-based',
+      })) as {
+        previousTokens: number;
+        currentTokens: number;
+        messagesCompacted: number;
+        strategy?: string;
+      };
+
+      const update = notifications.find((n) => n.type === 'compaction_complete');
+      expect(update).toBeDefined();
+      expect(update?.strategy).toBe(result.strategy);
+      expect(update?.messagesCompacted).toBe(result.messagesCompacted);
+      expect(typeof update?.sessionId).toBe('string');
+      expect(typeof update?.streamSeq).toBe('number');
+      expect(update?.tokensReclaimed).toBe(result.previousTokens - result.currentTokens);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
   it('rejects legacy strategy names', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));

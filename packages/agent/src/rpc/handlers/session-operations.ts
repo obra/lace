@@ -552,6 +552,26 @@ export function registerSessionOperationHandlers(
       const { messages: afterMessages } = buildProviderMessagesFromDurableEvents(sessionDir);
       const currentTokens = estimateProviderTokens(afterMessages) + estimateTokens(systemPrompt);
 
+      // Re-read state: rerenderPersonaForSession may have written a fresh
+      // system_prompt_set since sessionState was last captured above.
+      sessionState = readSessionState(sessionDir);
+      peer.notify('session/update', {
+        sessionId: state.activeSession!.meta.sessionId,
+        streamSeq: sessionState.nextStreamSeq,
+        type: 'compaction_complete',
+        strategy: name,
+        messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
+        tokensReclaimed: previousTokens - currentTokens,
+      });
+      // Advance the stream sequence so later session/update notifications on
+      // this session don't reuse this compaction_complete's streamSeq value,
+      // mirroring injectIntoActiveSession's post-notify bump above.
+      writeSessionState(sessionDir, {
+        ...sessionState,
+        nextStreamSeq: sessionState.nextStreamSeq + 1,
+      });
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
       return {
         previousTokens,
         currentTokens,
