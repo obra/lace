@@ -1,8 +1,8 @@
 # Async-Only Delegation — Design
 
 **Status:** Design (approved direction; revised after /par adversarial review)
-**Date:** 2026-06-14
-**Repos touched:** `lace` (mechanism), `sen-core-v2` (agent guidance)
+**Date:** 2026-06-14 **Repos touched:** `lace` (mechanism), `sen-core-v2` (agent
+guidance)
 
 > Line numbers below are anchors from a point-in-time read; the implementer
 > verifies the exact line against the current file before editing.
@@ -10,15 +10,15 @@
 ## Goal
 
 Remove blocking subagent waits from lace so a human-facing parent agent can
-never go deaf to its human while a subagent runs. Delegation becomes
-async-only: every `delegate` returns immediately, and the parent learns of
-completion through a durable, always-delivered notification.
+never go deaf to its human while a subagent runs. Delegation becomes async-only:
+every `delegate` returns immediately, and the parent learns of completion
+through a durable, always-delivered notification.
 
 ## The problem
 
 A Sen coworker stopped answering its human for minutes while a delegated browser
-job ran. The human prodded twice before she replied, *"Sorry — was waiting for
-the subagent."*
+job ran. The human prodded twice before she replied, _"Sorry — was waiting for
+the subagent."_
 
 Root cause, confirmed in code:
 
@@ -52,9 +52,9 @@ than expected.
 
 ### Accepted consequence: subagents are single-turn
 
-A subagent runs exactly one assistant turn, then is torn down
-(`subagent-job.ts` runs one `session/prompt` and SIGTERMs the child in its
-`finally`). With sync removed, a subagent that itself calls `delegate` gets back
+A subagent runs exactly one assistant turn, then is torn down (`subagent-job.ts`
+runs one `session/prompt` and SIGTERMs the child in its `finally`). With sync
+removed, a subagent that itself calls `delegate` gets back
 `{ jobId, status:"started" }` but has **no future turn** in which to receive the
 child's completion notification. So **nested inline delegation is not
 supported** under async-only.
@@ -84,7 +84,7 @@ The guidance rewrite states this constraint plainly.
   per_invocation workspace framing and reaping hints already live on this path
   and are preserved.
 - Rewrite the tool description: drop the "Sync mode" paragraph (`:93`) and the
-  `background` parameter doc (`:98`); present the async flow as *the* flow;
+  `background` parameter doc (`:98`); present the async flow as _the_ flow;
   remove the now-impossible `job_output(block=true)` anti-pattern note; correct
   the `resume` note that mentions "sync or background" (`:99`).
 - Keep `prompt`, `description`, `resume`, `progressIntervalMs`, `connectionId`,
@@ -105,8 +105,9 @@ The guidance rewrite states this constraint plainly.
 - Keep the tool. It remains how a parent opts into progress notifications and
   selective terminal coverage. It is **not required** for basic completion
   delivery — the always-on fallback covers that (Reliability basis).
-- Fix its description: `job_notify.ts:34` references `delegate(..., background=true)`,
-  a now-removed parameter. Reword to the async flow.
+- Fix its description: `job_notify.ts:34` references
+  `delegate(..., background=true)`, a now-removed parameter. Reword to the async
+  flow.
 
 ### lace — leave `bash` alone
 
@@ -116,9 +117,8 @@ It is unrelated to delegation and must NOT be touched.
 ### sen-core — delegation guidance (the load-bearing rewrite)
 
 Both primary guidance surfaces teach sync-only delegation and a drifted schema
-(`delegate(subagent, task, expected_response)` rather than lace's real
-`prompt` / `persona`). The same drift appears in shipped persona prompts.
-Rewrite all of:
+(`delegate(subagent, task, expected_response)` rather than lace's real `prompt`
+/ `persona`). The same drift appears in shipped persona prompts. Rewrite all of:
 
 - `agent-runtime/user/core_identity/instructions/delegating-to-subagents.md`
 - `agent-runtime/system/sen-core/skills/innate/delegating-to-subagents/SKILL.md`
@@ -141,6 +141,7 @@ The new mental model they must teach:
    `delegate(resume=jobId, ...)` to continue, or move on.
 
 Encode two constraints:
+
 - **"Silence is not success":** never subscribe with `job_notify(on=['failed'])`
   alone — a successful job then sends nothing. Rely on the fallback or subscribe
   to all terminal kinds.
@@ -149,11 +150,12 @@ Encode two constraints:
 
 ### What we deliberately do NOT change
 
-- The `ent/job/output` RPC handler's blocking path (`rpc/handlers/jobs.ts:59-70`)
-  and the `EntJobOutputRequestSchema` `block`/`timeout` fields stay. No
-  production caller reaches them (CLI and sen-core never pass `block`); they are
-  exercised only by protocol/e2e RPC tests. Leaving them keeps the protocol
-  surface and those tests stable, with zero production effect.
+- The `ent/job/output` RPC handler's blocking path
+  (`rpc/handlers/jobs.ts:59-70`) and the `EntJobOutputRequestSchema`
+  `block`/`timeout` fields stay. No production caller reaches them (CLI and
+  sen-core never pass `block`); they are exercised only by protocol/e2e RPC
+  tests. Leaving them keeps the protocol surface and those tests stable, with
+  zero production effect.
 
 ## Reliability basis (why notify-only is safe)
 
@@ -168,9 +170,9 @@ cases:
 - **Delivery does not depend on the model subscribing.** `fanoutToInject` runs
   the inject closure once as an always-on fallback when no subscription exists
   (`job-manager.ts:503-507`); that closure carries the idle-wake hooks
-  (`job-notifications.ts:118-137`), and the delegate finalize is the
-  notifying, in-process `createFinalizeJob` (`server.ts:~442`). So a finished
-  delegate wakes even an idle, unsubscribed parent. (Verified by /par.)
+  (`job-notifications.ts:118-137`), and the delegate finalize is the notifying,
+  in-process `createFinalizeJob` (`server.ts:~442`). So a finished delegate
+  wakes even an idle, unsubscribed parent. (Verified by /par.)
 - **Notifications are durable.** Each is an `appendDurableEvent`
   (`context_injected`, `priority:'immediate'`, `inject-notification.ts:61-68`),
   surviving a busy parent; the runner recomputes position from the event log.
@@ -181,7 +183,7 @@ cases:
 
 The /par review found edges where the blanket "every terminal path notifies" is
 not literally true. None is introduced by this change, but async-only makes the
-notification the *only* delivery path, so we harden the one that matters:
+notification the _only_ delivery path, so we harden the one that matters:
 
 1. **Mid-turn completion on a non-success turn exit.** The post-turn re-scan for
    pending immediate injects runs only on the normal turn return; the abort,
@@ -197,9 +199,9 @@ notification the *only* delivery path, so we harden the one that matters:
    also died on restart). **Optional hardening:** on session restore, inject a
    `job-failed` for each orphaned `running` job. Include if cheap; otherwise
    document the `jobs_list` recovery in guidance.
-3. **Clean premature child exit** (`code===0` before the child answers the
-   RPC, `subagent-job.ts:265`) leaves the parent's request hung with no
-   finalize. Pre-existing and rare; out of scope, noted for honesty.
+3. **Clean premature child exit** (`code===0` before the child answers the RPC,
+   `subagent-job.ts:265`) leaves the parent's request hung with no finalize.
+   Pre-existing and rare; out of scope, noted for honesty.
 4. **No active session** at finalize time (`job-notifications.ts:197`) drops the
    notification. Pre-existing; out of scope.
 
@@ -224,6 +226,7 @@ The change is schema + behavior + guidance. Because the `delegate` schema is
 blast radius across tests is wide. The plan must, at minimum:
 
 **lace — unit/schema tests to update or remove:**
+
 - `tools/implementations/__tests__/delegate.test.ts` — sync-mode cases and the
   sync-preamble assertion (e.g. `^delegate jobId=`); convert to async.
 - `tools/__tests__/delegate.test.ts` — `'accepts background parameter'`,
@@ -244,14 +247,16 @@ blast radius across tests is wide. The plan must, at minimum:
 **lace — e2e tests that drive the delegate TOOL's sync branch** (because the
 test-provider emits no `background`): `agent-process.delegate.e2e.test.ts`
 (notably the `delegate jobId=` + inline-output assertion that will go red),
-`.subagent.e2e.test.ts`, `.delegate-config.e2e.test.ts`, `.event-seq.e2e.test.ts`,
-`.jobs.e2e.test.ts`, `.subagent-early-stop.e2e.test.ts`,
-`.subagent-intent-text-stop.e2e.test.ts`, `credential-integration.e2e.test.ts`.
-These need the async flow: dispatch → consume the `job-completed` notification on
-a follow-up turn → assert via `job_output`. Updating the test-provider fixtures
-to drive that follow-up turn is part of the work.
+`.subagent.e2e.test.ts`, `.delegate-config.e2e.test.ts`,
+`.event-seq.e2e.test.ts`, `.jobs.e2e.test.ts`,
+`.subagent-early-stop.e2e.test.ts`, `.subagent-intent-text-stop.e2e.test.ts`,
+`credential-integration.e2e.test.ts`. These need the async flow: dispatch →
+consume the `job-completed` notification on a follow-up turn → assert via
+`job_output`. Updating the test-provider fixtures to drive that follow-up turn
+is part of the work.
 
 **lace — new tests:**
+
 - `delegate` rejects `background`; `job_output` rejects `block`/`timeoutMs`.
 - A terminal state with no subscription still injects a wake (fallback).
 - The post-turn immediate-inject re-scan fires on abort/error turn exits

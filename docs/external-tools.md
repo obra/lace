@@ -43,12 +43,12 @@ and exit 0:
 
 - `name` (required) — the entry name for this tool. The final registered name
   depends on how the binary is loaded:
-  - **Plugin global exec dir** (`api.tools.registerExecDir`): the kernel prepends
-    `<namespace>:` automatically, so `"name": "widget"` in a plugin with
-    `namespace: 'acme'` becomes `acme:widget`.
-  - **Per-persona exec dir** (`<persona>/tools/`): the descriptor name is used as-is
-    (no namespace prefix). The name must be globally unique among tools visible to
-    that persona but can shadow a same-named plugin/core global.
+  - **Plugin global exec dir** (`api.tools.registerExecDir`): the kernel
+    prepends `<namespace>:` automatically, so `"name": "widget"` in a plugin
+    with `namespace: 'acme'` becomes `acme:widget`.
+  - **Per-persona exec dir** (`<persona>/tools/`): the descriptor name is used
+    as-is (no namespace prefix). The name must be globally unique among tools
+    visible to that persona but can shadow a same-named plugin/core global.
   - **Core exec tools**: the descriptor name is used as-is (no prefix).
 - `description` (required) — shown to the model.
 - `inputSchema` (required) — a JSON Schema **object** (`type: "object"`);
@@ -118,12 +118,13 @@ When lace invokes your tool (`run-once.ts` / `exec-tool-adapter.ts`):
 
 ### Discovery and registration
 
-`discoverExecToolsSync(dir, namePrefix?)` (from `@lace/agent/tools/exec/discover`)
-synchronously scans a single directory, runs each **executable** file (mode
-`+x`) with `lace-tool-schema` (5 s budget per binary, 30 s total budget, max 64
-binaries), and returns an `ExecToolAdapter[]`. Files that aren't executable, exit
-non-zero, or print an invalid descriptor are **skipped with a warning, never
-fatal** — one bad binary can't break discovery of the rest.
+`discoverExecToolsSync(dir, namePrefix?)` (from
+`@lace/agent/tools/exec/discover`) synchronously scans a single directory, runs
+each **executable** file (mode `+x`) with `lace-tool-schema` (5 s budget per
+binary, 30 s total budget, max 64 binaries), and returns an `ExecToolAdapter[]`.
+Files that aren't executable, exit non-zero, or print an invalid descriptor are
+**skipped with a warning, never fatal** — one bad binary can't break discovery
+of the rest.
 
 Discovery runs **synchronously at boot** through three wiring points:
 

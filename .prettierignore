@@ -42,3 +42,6 @@ CHANGELOG.md
 
 # Byte-identical test fixtures - tests assert exact match against these
 tests/scenarios/persona-path-migration-baseline/
+# Golden byte snapshots — exact committed bytes compared via toMatchFileSnapshot;
+# formatting them breaks the golden-bytes tests
+packages/agent/src/providers/__tests__/golden/*.json

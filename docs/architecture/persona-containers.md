@@ -43,21 +43,22 @@ guest: /work
 
 `<base>` = `LACE_WORK_DIR` (default `os.tmpdir()/lace-work`); `<parentId>` is
 the delegating session id, `<childId>` the subagent session id. The shim creates
-and owns this directory — lace only computes the host path (via `childWorkspaceDir`)
-so it can return the result path to the parent agent and track the entry in the
-`WorkspaceReaper`.
+and owns this directory — lace only computes the host path (via
+`childWorkspaceDir`) so it can return the result path to the parent agent and
+track the entry in the `WorkspaceReaper`.
 
 Each child mounts ONLY its own subdir — mount-scoping, not file modes, is the
 isolation boundary. The host root reads the full results tree directly via the
 filesystem.
 
-The workspace **survives the disposable container** and is the child's deliverable
-to the parent — returned by `delegate` framed as UNTRUSTED and
+The workspace **survives the disposable container** and is the child's
+deliverable to the parent — returned by `delegate` framed as UNTRUSTED and
 possibly-incomplete. The parent reclaims it with
-**`job_kill(jobId, destroy_container=true)`** (the primary explicit release path).
-Workspace reclamation also occurs on the parent's clean close and on process
-teardown. A retention ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`, default 128) fails
-a fresh delegate that would exceed it — reclaim a completed one first.
+**`job_kill(jobId, destroy_container=true)`** (the primary explicit release
+path). Workspace reclamation also occurs on the parent's clean close and on
+process teardown. A retention ceiling (`LACE_WORKSPACE_MAX_PER_PARENT`,
+default 128) fails a fresh delegate that would exceed it — reclaim a completed
+one first.
 
 Persistent personas declare their own `/work` mount via the embedder's
 container-mount registry; lace does not auto-inject `/work` for them, and a
@@ -68,8 +69,8 @@ persistent box is never reaped.
 The sen-docker shim owns the full per_invocation lifecycle:
 
 1. **Create** — shim provisions the container and its `/work` at spawn time.
-2. **Idle-TTL reap** — when no `exec` arrives within the TTL the shim destroys the
-   container and removes `/work`.
+2. **Idle-TTL reap** — when no `exec` arrives within the TTL the shim destroys
+   the container and removes `/work`.
 3. **Release** — on an explicit release request the shim destroys the container
    and removes `/work` (the `release` verb).
 
@@ -79,8 +80,8 @@ lace's role is limited to:
   result and to track in-process.
 - Enforcing the per-parent retention ceiling and the resume guard against
   released or empty workspaces.
-- Routing teardown (`job_kill(destroy_container=true)` / clean-close /
-  process teardown) through `WorkspaceReaper.dispose` →
+- Routing teardown (`job_kill(destroy_container=true)` / clean-close / process
+  teardown) through `WorkspaceReaper.dispose` →
   `ContainerManager.releasePerInvocation` → the plane `release` verb.
 
 lace does NOT run a crash sweep, owner marker, or its own idle reaper. The shim
@@ -91,22 +92,21 @@ is the backstop for all orphan and idle cleanup.
 Every subagent gets an ephemeral, auto-cleaned `$TMPDIR` separate from `/work`
 (which is the retained, parent-visible result tree). A **host** subagent gets a
 `mkdtemp` host dir (opaque `lace-tmp-` prefix) under `<results-base>/.tmp` — the
-shim-owned tree — on its process env, removed in the job's exit `finally`. Placing
-it there means a SIGKILL leak (which skips the `finally`) lands in a known,
-shim-reclaimable location rather than the OS temp root. A **container** subagent
-gets `TMPDIR=/tmp` (the
-container's own fs), set last so a persona cannot redirect temp into `/work`;
-cleaned with the container.
+shim-owned tree — on its process env, removed in the job's exit `finally`.
+Placing it there means a SIGKILL leak (which skips the `finally`) lands in a
+known, shim-reclaimable location rather than the OS temp root. A **container**
+subagent gets `TMPDIR=/tmp` (the container's own fs), set last so a persona
+cannot redirect temp into `/work`; cleaned with the container.
 
 ## Host subagents are NOT a security boundary
 
-A host child-process subagent runs as the same uid, inherits the parent's env and
-workDir, and sees the whole host filesystem — it can read any sibling's workspace
-and the session store. The ephemeral workdir + `$TMPDIR` are **hygiene, not
-isolation**. Therefore **adversarial / untrusted / prompt-injectable work MUST
-run as a `per_invocation` container persona, never as a host subagent.** A
-container child is isolated by mount-scoping (only its own `/work`), so it cannot
-read or plant a sibling's workspace.
+A host child-process subagent runs as the same uid, inherits the parent's env
+and workDir, and sees the whole host filesystem — it can read any sibling's
+workspace and the session store. The ephemeral workdir + `$TMPDIR` are
+**hygiene, not isolation**. Therefore **adversarial / untrusted /
+prompt-injectable work MUST run as a `per_invocation` container persona, never
+as a host subagent.** A container child is isolated by mount-scoping (only its
+own `/work`), so it cannot read or plant a sibling's workspace.
 
 ## lace-ps: operator/debug visibility
 
