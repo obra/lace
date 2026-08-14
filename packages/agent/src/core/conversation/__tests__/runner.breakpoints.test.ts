@@ -340,6 +340,111 @@ describe('ConversationRunner - configurable breakpoints', () => {
     expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
   });
 
+  it('crossing a compact breakpoint emits a compaction_complete session update (PRI-2889)', async () => {
+    // The post-compaction wake in sen-core subscribes to this update; without it,
+    // in-place breakpoint compaction strands in-flight work (ada, 2026-08-14).
+    mockBreakpoints.mockReturnValue([{ at: 0.5, action: 'compact' }]);
+    seedSession(sessionDir, sessionId, cwd, 'compact-low');
+
+    const provider = new ScriptedProvider(
+      [
+        {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'stop',
+          usage: { promptTokens: 600_000, completionTokens: 10, totalTokens: 600_010 },
+        },
+      ],
+      1_000_000
+    );
+
+    const executor = new ToolExecutor();
+    executor.registerAllAvailableTools({ skillDirs: [] } as any);
+
+    const config: RunnerConfig = {
+      sessionDir,
+      sessionId,
+      cwd,
+      executionMode: 'execute',
+      approvalMode: 'approve',
+      persona: 'compact-low',
+    };
+    const deps = createMockDeps({
+      createProvider: vi.fn().mockImplementation(async () => provider),
+      createToolExecutor: vi.fn().mockReturnValue({
+        executor,
+        toolsForProvider: executor.getAllTools(),
+      }),
+    });
+
+    const runner = new ConversationRunner(config, deps);
+    await runner.run({
+      content: [{ type: 'text', text: 'hello' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    const compactionUpdates = (deps.onUpdate as ReturnType<typeof vi.fn>).mock.calls
+      .map(([, update]) => update)
+      .filter((u: { type: string }) => u.type === 'compaction_complete');
+    expect(compactionUpdates).toHaveLength(1);
+    expect(compactionUpdates[0]).toMatchObject({
+      type: 'compaction_complete',
+      strategy: expect.any(String),
+      messagesCompacted: expect.any(Number),
+    });
+  });
+
+  it('a notify breakpoint does not emit compaction_complete', async () => {
+    mockBreakpoints.mockReturnValue([{ at: 0.5, action: 'notify' }]);
+    seedSession(sessionDir, sessionId, cwd, 'notify-low');
+
+    const provider = new ScriptedProvider(
+      [
+        {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'stop',
+          usage: { promptTokens: 600_000, completionTokens: 10, totalTokens: 600_010 },
+        },
+      ],
+      1_000_000
+    );
+
+    const executor = new ToolExecutor();
+    executor.registerAllAvailableTools({ skillDirs: [] } as any);
+
+    const config: RunnerConfig = {
+      sessionDir,
+      sessionId,
+      cwd,
+      executionMode: 'execute',
+      approvalMode: 'approve',
+      persona: 'notify-low',
+    };
+    const deps = createMockDeps({
+      createProvider: vi.fn().mockImplementation(async () => provider),
+      createToolExecutor: vi.fn().mockReturnValue({
+        executor,
+        toolsForProvider: executor.getAllTools(),
+      }),
+    });
+
+    const runner = new ConversationRunner(config, deps);
+    await runner.run({
+      content: [{ type: 'text', text: 'hello' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    const compactionUpdates = (deps.onUpdate as ReturnType<typeof vi.fn>).mock.calls
+      .map(([, update]) => update)
+      .filter((u: { type: string }) => u.type === 'compaction_complete');
+    expect(compactionUpdates).toHaveLength(0);
+  });
+
   it('highestFiredBreakpointAt persists after a notify crossing', async () => {
     mockBreakpoints.mockReturnValue([{ at: 0.5, action: 'notify' }]);
     seedSession(sessionDir, sessionId, cwd, 'notify-persist');

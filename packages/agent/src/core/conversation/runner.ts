@@ -1365,9 +1365,10 @@ export class ConversationRunner {
           const allEvents = readDurableEvents(sessionDir, {
             limit: Number.MAX_SAFE_INTEGER,
           }).events;
-          const strategy = resolveCompactionStrategy(
-            this.config.persona ? compactionStrategyNameForSession(sessionDir) : 'track-based'
-          );
+          const strategyName = this.config.persona
+            ? compactionStrategyNameForSession(sessionDir)
+            : 'track-based';
+          const strategy = resolveCompactionStrategy(strategyName);
           const compactionCtx = buildCompactionContext({
             threadId: sessionId,
             sessionDir,
@@ -1397,6 +1398,20 @@ export class ConversationRunner {
               // Re-render the persona (model + system prompt) from the current
               // persona file so the compacted session reflects the live persona.
               await this.deps.rerenderPersonaAfterCompaction?.();
+            });
+            // Notify clients that an in-place compaction ran, mirroring the
+            // ent/session/compact handler's compaction_complete emit. sen-core's
+            // post-compaction wake keys on this update; without it, breakpoint
+            // and compact_session compactions strand in-flight work (PRI-2889).
+            // Emitted OUTSIDE the runExclusive section above: onUpdate takes the
+            // same mutex, and nesting it would deadlock.
+            await this.deps.onUpdate(durableTurnSeq, {
+              type: 'compaction_complete',
+              strategy: strategyName,
+              messagesCompacted:
+                typeof result.compactionEvent.data.messagesCompacted === 'number'
+                  ? result.compactionEvent.data.messagesCompacted
+                  : 0,
             });
           }
         }
