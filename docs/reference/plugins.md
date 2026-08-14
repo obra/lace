@@ -130,14 +130,15 @@ incompatible kernel fails loudly at load rather than misbehaving later.
 
 Four typed registries, each a `Registry<T>` — a select-one-by-name table.
 Personas and skills are **not** registries; they are contributed via directories
-(see [Personas and Skills via directories](#personas-and-skills-via-directories)).
+(see
+[Personas and Skills via directories](#personas-and-skills-via-directories)).
 
-| `api` field  | Value type                 | Import the type from           | Consumed at                                                                                               |
-| ------------ | -------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `tools`      | `Tool`                     | `@lace/agent/tools/tool`       | `ToolExecutor.registerAllAvailableTools()` draws every registered tool into each session executor.        |
-| `compaction` | `CompactionStrategy`       | `@lace/agent/compaction/types` | `resolveCompactionStrategy(name)` selects a strategy by name (persona-configured, default `track-based`). |
-| `recall`     | `RecallMembershipExtractor`| `@lace/agent/plugins/api`      | `recall(action:"thread", groupKey)` calls the registered extractor with an **opaque** key to select a conversation's events from the verbatim journal. The kernel never parses the key. |
-| `runtimes`   | `ContainerRuntime`         | `@lace/agent/containers/types` | `createDefaultContainerManager(platform, name)` selects a runtime by name.                                |
+| `api` field  | Value type                  | Import the type from           | Consumed at                                                                                                                                                                             |
+| ------------ | --------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tools`      | `Tool`                      | `@lace/agent/tools/tool`       | `ToolExecutor.registerAllAvailableTools()` draws every registered tool into each session executor.                                                                                      |
+| `compaction` | `CompactionStrategy`        | `@lace/agent/compaction/types` | `resolveCompactionStrategy(name)` selects a strategy by name (persona-configured, default `track-based`).                                                                               |
+| `recall`     | `RecallMembershipExtractor` | `@lace/agent/plugins/api`      | `recall(action:"thread", groupKey)` calls the registered extractor with an **opaque** key to select a conversation's events from the verbatim journal. The kernel never parses the key. |
+| `runtimes`   | `ContainerRuntime`          | `@lace/agent/containers/types` | `createDefaultContainerManager(platform, name)` selects a runtime by name.                                                                                                              |
 
 ### Ownership and duplicates
 
@@ -165,8 +166,8 @@ class Registry<T> {
 
 The exported `registries` object exposes one of these per kind —
 `registries.tools`, `registries.compaction`, `registries.recall`,
-`registries.runtimes` — each with the full surface above. In a test you can assert ownership (e.g.
-`registries.compaction.owner('acme:strat')`).
+`registries.runtimes` — each with the full surface above. In a test you can
+assert ownership (e.g. `registries.compaction.owner('acme:strat')`).
 
 ## Personas and Skills via directories
 
@@ -179,8 +180,8 @@ names them at boot.
 Registers a directory of flat `<entry>.md` persona files. Each `.md` file
 becomes a persona named `<namespace>:<entry>`, where `namespace` is
 `meta.namespace` from the plugin's `meta`. For example, a plugin with
-`namespace: 'acme'` and a file `personas/researcher.md` produces a persona
-named `acme:researcher`.
+`namespace: 'acme'` and a file `personas/researcher.md` produces a persona named
+`acme:researcher`.
 
 Precedence order: user-disk personas override plugin personas override bundled
 personas. A user who drops `~/.lace/agent-personas/researcher.md` silences the
@@ -199,7 +200,8 @@ the name is bare (e.g. `researcher`, not `acme:researcher`). All skill sources
 (plugins, user-disk, bundled) share a single flat namespace; collisions are
 resolved first-wins and emit a `warn`. Choose collision-safe skill names.
 
-(Contrast: tools and personas ARE `<namespace>:<entry>`-namespaced; skills are not.)
+(Contrast: tools and personas ARE `<namespace>:<entry>`-namespaced; skills are
+not.)
 
 ### Per-persona tools and skills (`<persona>/tools/` and `<persona>/skills/`)
 
@@ -422,7 +424,10 @@ interface CompactionContext {
   // (converts {prompt}->messages; defaults `model` to the session modelId).
   // Absent when no connection/model is available; deterministic strategies ignore it.
   query?: (opts: {
-    messages?: ProviderMessage[]; prompt?: string; model?: string; signal?: AbortSignal;
+    messages?: ProviderMessage[];
+    prompt?: string;
+    model?: string;
+    signal?: AbortSignal;
   }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
   // Free-text steering from the compact caller (compact_session / ent.session.compact
   // `guidance`, or /compact's command tail). Absent when auto-fired; built-ins ignore it.
@@ -431,11 +436,12 @@ interface CompactionContext {
 ```
 
 **Compaction is triggered three ways**, all routing through the persona-selected
-strategy and `validatePreserved`: automatically in the runner's post-turn hook at
-the persona's `compaction.breakpoints` (`{ at, action: 'notify' | 'compact' }`);
-by the agent calling the built-in **`compact_session`** tool (optional `guidance`;
-it schedules a post-turn compaction and asks the model to end its turn); or via the
-`ent/session/compact` RPC / the `/compact` command.
+strategy and `validatePreserved`: automatically in the runner's post-turn hook
+at the persona's `compaction.breakpoints`
+(`{ at, action: 'notify' | 'compact' }`); by the agent calling the built-in
+**`compact_session`** tool (optional `guidance`; it schedules a post-turn
+compaction and asks the model to end its turn); or via the `ent/session/compact`
+RPC / the `/compact` command.
 
 Return `{ noop: true }` when there is nothing to compact — do **not** return a
 `compactionEvent` with an empty `preserved`. `ContextCompactedEventData` (from
@@ -462,19 +468,19 @@ result). When building test fixtures, a minimal `turn_end` data payload is
 `{ stopReason: 'end_turn', usage: { costUsd: 0 } }`; a `prompt`/`message`
 payload carries `{ content: string | ContentBlock[] }`.
 
-**The toolkit:** `@lace/agent/compaction/toolkit` exports the
-domain-neutral compaction primitives (promoted out of the kernel `track-based`
-strategy in the Slack de-leak): `splitAtTailBoundary` (events -> earlier/tail at a
-turn boundary), `demuxByTrack(events, attributeFn)` (group earlier events by a
+**The toolkit:** `@lace/agent/compaction/toolkit` exports the domain-neutral
+compaction primitives (promoted out of the kernel `track-based` strategy in the
+Slack de-leak): `splitAtTailBoundary` (events -> earlier/tail at a turn
+boundary), `demuxByTrack(events, attributeFn)` (group earlier events by a
 caller-supplied per-event track key — the de-interleave seam a custom strategy
-injects its own attributor into), `buildPreservedTail` / `buildPreservedWithPrefix`
-(build the verbatim-tail + prefix preserved stream), the generic non-Slack salience
-helpers `jobSalience` / `untrackedSalience` / `systemSalience` with
-`renderGenericSections`, and
-`mergePreservedAdjacent(entries: PreservedEntry[])` — apply the last to your preserved
-list so message replay stays legal (drops empties, merges consecutive same-role
-entries, ensures a leading user-role entry; returns `[]` when nothing remains →
-return `{ noop: true }`). A `PreservedEntry` is
+injects its own attributor into), `buildPreservedTail` /
+`buildPreservedWithPrefix` (build the verbatim-tail + prefix preserved stream),
+the generic non-Slack salience helpers `jobSalience` / `untrackedSalience` /
+`systemSalience` with `renderGenericSections`, and
+`mergePreservedAdjacent(entries: PreservedEntry[])` — apply the last to your
+preserved list so message replay stays legal (drops empties, merges consecutive
+same-role entries, ensures a leading user-role entry; returns `[]` when nothing
+remains → return `{ noop: true }`). A `PreservedEntry` is
 `{ role: string; content: string | Block[]; toolCalls?: unknown[]; toolResults?: unknown[] }`
 where `Block = { type: string; [k: string]: unknown }`. `PreservedEntry` **is**
 exported from `@lace/agent/compaction/toolkit` — import the type rather than

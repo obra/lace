@@ -23,10 +23,10 @@ Each session directory holds:
 2. Write `H + 1` to the head file — **reserving** `H` before appending.
 3. Append the JSONL line with `seq = H`.
 
-The lock is held across the JSONL append, so reading `MAX(JSONL)` for seeding and
-the turn_end dedup both see a stable log with no concurrent appender interleaving.
-The recall/journal index write-through happens outside the lock — it is
-best-effort and never on a correctness path.
+The lock is held across the JSONL append, so reading `MAX(JSONL)` for seeding
+and the turn_end dedup both see a stable log with no concurrent appender
+interleaving. The recall/journal index write-through happens outside the lock —
+it is best-effort and never on a correctness path.
 
 ## Why reserve-before-append
 
@@ -39,8 +39,8 @@ event was never durable, the caller never saw success, and the next append gets
 
 When a session is opened, the head is reconciled monotonically:
 `head = MAX(readHead() | 0, MAX(JSONL) + 1)`. This only ever moves the head
-**up**, so a stale or lost head (an un-fsync'd write lost to a crash, a head that
-never existed) can never hand out a seq `<=` an existing JSONL seq.
+**up**, so a stale or lost head (an un-fsync'd write lost to a crash, a head
+that never existed) can never hand out a seq `<=` an existing JSONL seq.
 
 ## Sequence numbers are unique and monotonic; gaps are normal
 
@@ -48,6 +48,6 @@ never existed) can never hand out a seq `<=` an existing JSONL seq.
 expected** — a burned reserve leaves a hole — and every consumer tolerates them:
 the reducer sorts by seq, watermarks compare with `>` / `<=` (never `+1`),
 checkpoints match exact stored seqs, and range reads tolerate missing neighbors.
-Nothing assumes gapless seqs. `SessionState.nextEventSeq` is advisory only: it is
-derived from the reconciled head on open and never drives assignment, and a gap
-no longer triggers a state-file rewrite.
+Nothing assumes gapless seqs. `SessionState.nextEventSeq` is advisory only: it
+is derived from the reconciled head on open and never drives assignment, and a
+gap no longer triggers a state-file rewrite.

@@ -22,6 +22,7 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --ignore-path ../../.prettierignore --write \"src/**/*.{ts,js,json}\" \"**/*.{json,md,yml,yaml}\"",
     "test": "vitest run --exclude 'src/__tests__/**' --exclude src/containers/apple-container.integration.test.ts --exclude src/containers/container-cleanup-validation.test.ts --exclude src/jobs/__tests__/persona-container-sharing.integration.test.ts && vitest run --no-file-parallelism src/__tests__/ src/containers/apple-container.integration.test.ts src/containers/container-cleanup-validation.test.ts src/jobs/__tests__/persona-container-sharing.integration.test.ts",
+    "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=text-summary --exclude 'src/__tests__/**' --exclude src/containers/apple-container.integration.test.ts --exclude src/containers/container-cleanup-validation.test.ts --exclude src/jobs/__tests__/persona-container-sharing.integration.test.ts && vitest run --no-file-parallelism src/__tests__/ src/containers/apple-container.integration.test.ts src/containers/container-cleanup-validation.test.ts src/jobs/__tests__/persona-container-sharing.integration.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {

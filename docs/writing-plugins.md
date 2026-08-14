@@ -14,10 +14,13 @@ the same set, so your extensions are available everywhere automatically.
 
 You can contribute several kinds of thing:
 
-- **tools** — functions the model can call (registered by name into the tools registry)
+- **tools** — functions the model can call (registered by name into the tools
+  registry)
 - **compaction strategies** — how a long conversation gets summarized
-- **personas** — named system-prompt + config bundles for (sub)agents, contributed as a directory of `.md` files
-- **skills** — prompt skill directories, contributed as a directory of skill subdirs
+- **personas** — named system-prompt + config bundles for (sub)agents,
+  contributed as a directory of `.md` files
+- **skills** — prompt skill directories, contributed as a directory of skill
+  subdirs
 - **exec tools** — standalone executable tools discovered from a directory
 - **container runtimes** — backends that run containerized work
 
@@ -152,27 +155,27 @@ export function register(api: PluginApi): void {
 
 **Naming:** plugin-contributed personas and exec tools are named
 `<namespace>:<entry>` where `namespace` is `meta.namespace` (e.g. `acme`) and
-`entry` is the file stem (personas) or the `name` returned by
-`lace-tool-schema` (exec tools). Skills are **not** namespaced — a skill is
-named by its sub-directory name (which must match the `name` field in its
-`SKILL.md` frontmatter), bare (e.g. `researcher`, not `acme:researcher`). All
-skill sources share a single flat namespace; collisions are first-wins and emit a
-`warn`, so choose collision-safe skill names. Built-in and user-defined tool/persona
-names stay bare (no prefix). MCP tool names continue to use `<serverId>/<toolName>`
-— that slash convention is MCP-specific and unaffected.
+`entry` is the file stem (personas) or the `name` returned by `lace-tool-schema`
+(exec tools). Skills are **not** namespaced — a skill is named by its
+sub-directory name (which must match the `name` field in its `SKILL.md`
+frontmatter), bare (e.g. `researcher`, not `acme:researcher`). All skill sources
+share a single flat namespace; collisions are first-wins and emit a `warn`, so
+choose collision-safe skill names. Built-in and user-defined tool/persona names
+stay bare (no prefix). MCP tool names continue to use `<serverId>/<toolName>` —
+that slash convention is MCP-specific and unaffected.
 
 **Persona file format:** the same YAML frontmatter + Markdown body used by
 user-disk and bundled personas. See [Agent Personas](agent-personas.md) for the
-frontmatter fields. Mustache variables (`{{system.os}}`, `{{system.sessionDate}}`,
-etc.) work normally; `@path` includes resolve relative to the persona's own
-directory.
+frontmatter fields. Mustache variables (`{{system.os}}`,
+`{{system.sessionDate}}`, etc.) work normally; `@path` includes resolve relative
+to the persona's own directory.
 
 **Per-persona resources:** a persona at `personas/<entry>.md` may have a sibling
 `personas/<entry>/tools/` directory (exec tools active only when that persona is
 running) and `personas/<entry>/skills/` (skills injected only for that persona).
 Per-persona exec tool descriptor names are bare (not re-namespaced) and can
-override a same-named global plugin or core tool — but never a reserved
-kernel built-in.
+override a same-named global plugin or core tool — but never a reserved kernel
+built-in.
 
 **Precedence:** user-disk personas override plugin personas override bundled
 ones. A user who drops a file in `~/.lace/agent-personas/` with the same logical

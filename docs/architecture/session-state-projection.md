@@ -6,8 +6,8 @@
 At the start of every turn the agent needs the conversation projection: the
 provider message prefix, the system prompt, the files-read set, and the
 last-turn-end watermark. Rather than re-parsing the whole durable event log each
-turn, the agent process holds the projection **in memory across turns**, keyed by
-session, and on each turn folds only the events appended since the last turn.
+turn, the agent process holds the projection **in memory across turns**, keyed
+by session, and on each turn folds only the events appended since the last turn.
 
 ## The mechanism
 
@@ -25,8 +25,9 @@ projection is cached for the active session and the tip has not moved backward,
 the runner tail-reads only the events with `eventSeq >= headSeq` and folds them
 into the cached projection — O(tail) instead of O(events). Because `headSeq` is
 the next seq to fold, an event already folded is never re-applied. Both
-own-process and cross-process appends advance `.seq`, so the tail-read sees every
-new event (including a context inject written by another process between turns).
+own-process and cross-process appends advance `.seq`, so the tail-read sees
+every new event (including a context inject written by another process between
+turns).
 
 On a cold start, a cache miss, or a tip that moved backward, the runner falls
 back to a full rebuild over the whole log and seeds the cache from it.
@@ -36,10 +37,10 @@ so an incremental fold is byte-identical to a full rebuild over the same events.
 
 ## The projection is the persisted prefix only
 
-The cache holds only what is durable on disk. The runner's non-persisted per-turn
-live-tail mutations — loop reminders, tool_result construction, tool-choice
-retries — are layered onto the per-turn provider messages and are never folded
-into the cached projection.
+The cache holds only what is durable on disk. The runner's non-persisted
+per-turn live-tail mutations — loop reminders, tool_result construction,
+tool-choice retries — are layered onto the per-turn provider messages and are
+never folded into the cached projection.
 
 ## Divergence canary
 
