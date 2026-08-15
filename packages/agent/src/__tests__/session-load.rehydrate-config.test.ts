@@ -1596,6 +1596,74 @@ describe('session/load rehydrates connectionId+modelId from persisted state', ()
     expect(text).toContain('refactor the flux capacitor');
   });
 
+  it('names interrupted jobs even when the process died between turns (PRI-2893)', async () => {
+    // The deploy path waits for turn-idle before restarting, so the common
+    // production restart kills in-flight JOBS with no orphaned turn_start.
+    // The notice must fire on orphaned jobs alone, not only on a mid-turn
+    // crash — otherwise the loss is silent unless the agent happens to call
+    // jobs_list.
+    const setupState = createAgentServerState();
+    const { client: setupClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, setupState)
+    );
+    await setupClient.request('initialize', defaultInitializeParams());
+    const created = (await setupClient.request('session/new', {
+      cwd: tempDir,
+      mcpServers: [],
+    })) as { sessionId: string };
+
+    // Prior process died between turns: job_started with no job_finished,
+    // every turn_start properly closed (none written at all here).
+    const dir = loadSession(created.sessionId).dir;
+    appendFileSync(
+      join(dir, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 901,
+        timestamp: '2026-08-05T00:00:01.000Z',
+        type: 'job_started',
+        data: {
+          jobId: 'job_between_turns_1',
+          jobType: 'delegate',
+          description: 'fix batch-2 attribution',
+        },
+      }) + '\n',
+      'utf8'
+    );
+
+    const loadState = createAgentServerState();
+    const { client: loadClient } = createPairedPeers((peer) =>
+      registerAgentRpcMethods(peer, loadState)
+    );
+    await loadClient.request('initialize', defaultInitializeParams());
+    await loadClient.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: tempDir,
+      mcpServers: [],
+    });
+
+    const injected = [...readAllSessionEventLines(dir)]
+      .map((line) => {
+        try {
+          return JSON.parse(line) as {
+            type?: string;
+            data?: { content?: Array<{ text?: string }> };
+          };
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((e) => e?.type === 'context_injected');
+    const recoveryNotice = injected.find((e) =>
+      e?.data?.content?.some((c) => (c.text ?? '').includes('kind="session-recovered"'))
+    );
+    expect(recoveryNotice).toBeDefined();
+    const text = recoveryNotice?.data?.content?.[0]?.text ?? '';
+    expect(text).toContain('job_between_turns_1');
+    expect(text).toContain('fix batch-2 attribution');
+    // The turn was NOT cut off — the notice must not claim a mid-turn crash.
+    expect(text).not.toContain('cut off');
+  });
+
   it('does NOT inject a session-recovered notice on a clean session/load', async () => {
     const setupState = createAgentServerState();
     const { client: setupClient } = createPairedPeers((peer) =>
