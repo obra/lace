@@ -299,10 +299,17 @@ async function activateStoredSession(
   // gets left hanging. The notice sits in the durable log and is read on the
   // next turn (whatever triggers it); we deliberately do NOT force an internal
   // turn, so a restart alone never makes the agent act unprompted.
-  if (loaded.recoveredFromCrash) {
+  // The common production restart (a deploy) waits for turn-idle first, so it
+  // kills in-flight JOBS with no orphaned turn_start — recoveredFromCrash
+  // stays false and, before PRI-2893, the loss was silent unless the agent
+  // happened to call jobs_list. Orphaned jobs alone must therefore also
+  // trigger the notice. Filtering against this process's in-memory map keeps
+  // a same-process re-activation from reporting its own live jobs.
+  const inMemoryJobs = state.jobManager.getRunningJobs();
+  const interrupted = listInterruptedJobs(loaded.dir).filter((job) => !inMemoryJobs.has(job.jobId));
+  if (loaded.recoveredFromCrash || interrupted.length > 0) {
     // Name what the dead process left in flight, so the agent doesn't have
     // to reconstruct it (or guess wrong) from jobs_list.
-    const interrupted = listInterruptedJobs(loaded.dir);
     const interruptedLines =
       interrupted.length > 0
         ? '\n\nJobs that were in flight when the process died (their true ' +
@@ -315,16 +322,22 @@ async function activateStoredSession(
             )
             .join('\n')
         : '';
-    injectNotification({
-      sessionDir: loaded.dir,
-      kind: 'session-recovered',
-      body:
-        'You just crashed (or were restarted) mid-turn and have now restarted. ' +
+    const body = loaded.recoveredFromCrash
+      ? 'You just crashed (or were restarted) mid-turn and have now restarted. ' +
         'Your previous turn was cut off before it finished, so any work you were ' +
         'in the middle of may be incomplete and any reply you were about to send ' +
         'was NOT sent. Re-read the most recent messages and your open jobs to see ' +
         'where you left off. If someone was waiting on you, tell them what ' +
-        `happened and pick the work back up.${interruptedLines}`,
+        `happened and pick the work back up.${interruptedLines}`
+      : 'The agent process was restarted between turns (e.g. a deploy) while ' +
+        'background jobs were still in flight. Your conversation was not ' +
+        'interrupted, but the jobs below did not finish under the old process. ' +
+        'Check them with job_output and re-dispatch whatever still ' +
+        `matters.${interruptedLines}`;
+    injectNotification({
+      sessionDir: loaded.dir,
+      kind: 'session-recovered',
+      body,
     });
   }
 
