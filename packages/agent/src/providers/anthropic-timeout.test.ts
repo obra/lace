@@ -141,6 +141,10 @@ describe('PRI-2896: Anthropic client timeout tuning', () => {
   it('does not abort a stream that keeps emitting events past the idle threshold', async () => {
     const handlers: StreamHandlers = {};
     let resolveFinal!: (value: unknown) => void;
+    // The stream MUST honor the abort signal, or this test cannot fail: an
+    // over-eager watchdog would abort a controller nobody listens to and the
+    // assertions would pass anyway.
+    let abortSignal: AbortSignal | undefined;
     const stream = {
       on: vi.fn((event: string, handler: (...args: unknown[]) => void) => {
         (handlers[event] ??= []).push(handler);
@@ -148,12 +152,22 @@ describe('PRI-2896: Anthropic client timeout tuning', () => {
       }),
       finalMessage: vi.fn(
         () =>
-          new Promise((resolve) => {
+          new Promise((resolve, reject) => {
             resolveFinal = resolve;
+            const rejectAborted = () => {
+              const err = new Error('Request was aborted.');
+              err.name = 'APIUserAbortError';
+              reject(err);
+            };
+            if (abortSignal?.aborted) rejectAborted();
+            else abortSignal?.addEventListener('abort', rejectAborted, { once: true });
           })
       ),
     };
-    mockStream.mockReturnValue(stream);
+    mockStream.mockImplementation((_payload: unknown, opts: { signal?: AbortSignal }) => {
+      abortSignal = opts.signal;
+      return stream;
+    });
 
     const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
     const promise = provider.createStreamingResponse(messages, [], 'claude-3-5-haiku-20241022');

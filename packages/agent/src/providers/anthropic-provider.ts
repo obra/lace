@@ -37,11 +37,18 @@ import {
 // PRI-2896: without explicit tuning the SDK defaults to a 10-minute timeout
 // with 2 internal retries — and retries its own timeouts — so a dead connection
 // could wedge one lace-level attempt for ~30 minutes before lace's retry loop
-// even saw a failure (~40 min observed in production). The SDK's timer only
-// covers time-to-response-headers (it is cleared when fetch resolves), so the
-// headers cap cannot kill a long-running healthy stream; silence after headers
-// is the idle watchdog's job.
-export const STREAM_HEADERS_TIMEOUT_MS = 120_000;
+// even saw a failure (~40 min observed in production).
+//
+// The two caps guard different phases, and the headers cap is deliberately the
+// LOOSER of the two. The SDK's timer is armed before fetch and cleared when the
+// response resolves, so it covers DNS + TLS + request-body upload + server
+// first byte — a phase that is legitimately slow for our large cache-heavy
+// prompts (multi-MB POST bodies; on a cache miss the server may not flush SSE
+// headers until prefill progresses). A spurious abort there re-sends the whole
+// prompt and re-bills the cache read. After headers, by contrast, Anthropic's
+// SSE `ping` keepalives keep arriving, so a silent gap is a genuine
+// dead-connection signal and can be caught much sooner.
+export const STREAM_HEADERS_TIMEOUT_MS = 300_000;
 export const STREAM_IDLE_TIMEOUT_MS = 180_000;
 const STREAM_IDLE_POLL_MS = 10_000;
 
