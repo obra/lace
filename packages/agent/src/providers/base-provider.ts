@@ -206,6 +206,14 @@ export interface RequestOptions {
 // liveness probe. The interval cap is what bounds how long a recovered API goes
 // unnoticed — probes are free, so it stays tight. The budget is the outer
 // bound: a turn may wait out a long outage, but not indefinitely.
+/** A composed abort signal that fires when a request goes silent. See createStallGuard. */
+export interface StallGuard {
+  readonly signal: AbortSignal;
+  noteActivity(): void;
+  readonly stalled: boolean;
+  dispose(): void;
+}
+
 /** Backoff/accounting carried across every recovery wait within one withRetry call. */
 export interface OutageState {
   intervalMs: number;
@@ -838,6 +846,77 @@ export abstract class AIProvider extends EventEmitter {
   /**
    * Wraps an operation with retry logic
    */
+  /**
+   * PRI-2896/PRI-2900: guard against a request that goes silent. The SDK's own
+   * timeout only covers time-to-response-headers (its timer is cleared once
+   * fetch resolves), so a connection that dies after headers produces silence,
+   * not an error, until TCP eventually gives up — which is how a coworker sat
+   * unresponsive for ~40 minutes.
+   *
+   * The guard composes the caller's signal with one of its own and aborts when
+   * nothing has happened for `idleMs`. Streaming callers call `noteActivity()`
+   * on every stream event, so the window measures the gap between events;
+   * callers with no events to report (a non-streaming body read) simply never
+   * call it, and `idleMs` becomes a hard deadline for the whole request.
+   *
+   * `dispose()` must run in a `finally` — it clears the timer and unhooks the
+   * caller's (long-lived) signal.
+   */
+  protected createStallGuard(opts: {
+    idleMs: number;
+    pollMs: number;
+    signal?: AbortSignal;
+  }): StallGuard {
+    const controller = new AbortController();
+    const onCallerAbort = () => controller.abort();
+    if (opts.signal) {
+      if (opts.signal.aborted) controller.abort();
+      else opts.signal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+    let lastActivityAt = Date.now();
+    let stalled = false;
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivityAt > opts.idleMs) {
+        stalled = true;
+        controller.abort();
+      }
+    }, opts.pollMs);
+    timer.unref?.();
+
+    return {
+      signal: controller.signal,
+      noteActivity: () => {
+        lastActivityAt = Date.now();
+      },
+      get stalled(): boolean {
+        return stalled;
+      },
+      dispose: () => {
+        clearInterval(timer);
+        opts.signal?.removeEventListener('abort', onCallerAbort);
+      },
+    };
+  }
+
+  /**
+   * Convert a stall-guard abort into the error it actually represents: a timed
+   * out connection, retryable, rather than the user-abort the SDK reports.
+   * Returns null when the caller's own signal aborted — a real cancellation is
+   * never masked.
+   */
+  protected stallError(
+    guard: StallGuard,
+    idleMs: number,
+    callerSignal?: AbortSignal
+  ): (Error & { code: string }) | null {
+    if (!guard.stalled || callerSignal?.aborted === true) return null;
+    const error = new Error(
+      `${this.providerName} produced no activity for ${idleMs}ms; aborted as stalled`
+    ) as Error & { code: string };
+    error.code = 'ETIMEDOUT';
+    return error;
+  }
+
   /**
    * PRI-2901: a zero-token liveness check used to ride out a provider outage
    * without re-sending the prompt. Return null when the provider has no cheap

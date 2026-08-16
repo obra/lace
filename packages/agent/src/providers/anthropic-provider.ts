@@ -54,6 +54,10 @@ const STREAM_IDLE_POLL_MS = 10_000;
 // A liveness probe that hangs is useless — it must answer well inside the
 // interval between probes (PRI-2901).
 const HEALTH_PROBE_TIMEOUT_MS = 30_000;
+// PRI-2900: a non-streaming request has no progress events, so this bounds the
+// whole call. The SDK itself refuses non-streaming work it expects to exceed
+// ten minutes, so anything longer than that is already outside its contract.
+export const NONSTREAMING_TIMEOUT_MS = 600_000;
 
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -335,15 +339,32 @@ export class AnthropicProvider extends AIProvider {
         // Log request with pretty formatting
         logProviderRequest('anthropic', requestPayload as unknown as Record<string, unknown>);
 
+        // PRI-2900: the non-streaming path has no events to watch, so the guard
+        // acts as a hard deadline for the whole request. Without it the body
+        // read after response headers is unbounded — the same SDK behavior that
+        // let a stalled stream hang for 40 minutes.
+        const guard = this.createStallGuard({
+          idleMs: NONSTREAMING_TIMEOUT_MS,
+          pollMs: STREAM_IDLE_POLL_MS,
+          ...(signal ? { signal } : {}),
+        });
         let response: BetaMessage;
         try {
           response = (await this.getAnthropicClient().beta.messages.create(requestPayload, {
-            signal,
+            signal: guard.signal,
+            timeout: NONSTREAMING_TIMEOUT_MS,
           })) as BetaMessage;
         } catch (providerError) {
+          const stalled = this.stallError(guard, NONSTREAMING_TIMEOUT_MS, signal);
+          if (stalled) {
+            logger.error('Request stalled', { provider: 'anthropic', error: stalled.message });
+            throw stalled;
+          }
           const classified = tryClassifyAsContextWindow(providerError, 'AnthropicProvider');
           if (classified) return classified;
           throw providerError;
+        } finally {
+          guard.dispose();
         }
 
         // Log response with pretty formatting
@@ -437,29 +458,16 @@ export class AnthropicProvider extends AIProvider {
           streaming: true,
         });
 
-        // PRI-2896: compose the caller's signal with an idle watchdog. The
-        // SDK's own timer only covers time-to-headers; once the stream is open
-        // a dead connection produces silence, not an error, until TCP gives up.
-        // The watchdog aborts a silent stream so the failure surfaces in
-        // seconds and lace's retry loop can take over.
-        const streamAbort = new AbortController();
-        const onCallerAbort = () => streamAbort.abort();
-        if (signal) {
-          if (signal.aborted) streamAbort.abort();
-          else signal.addEventListener('abort', onCallerAbort, { once: true });
-        }
-        let lastStreamEventAt = Date.now();
-        let idleTimedOut = false;
-        const idleWatchdog = setInterval(() => {
-          if (Date.now() - lastStreamEventAt > STREAM_IDLE_TIMEOUT_MS) {
-            idleTimedOut = true;
-            streamAbort.abort();
-          }
-        }, STREAM_IDLE_POLL_MS);
-        idleWatchdog.unref?.();
+        // PRI-2896: a dead connection produces silence rather than an error
+        // once the stream is open, so guard the gap between stream events.
+        const guard = this.createStallGuard({
+          idleMs: STREAM_IDLE_TIMEOUT_MS,
+          pollMs: STREAM_IDLE_POLL_MS,
+          ...(signal ? { signal } : {}),
+        });
 
         const stream = this.getAnthropicClient().beta.messages.stream(requestPayload, {
-          signal: streamAbort.signal,
+          signal: guard.signal,
           timeout: STREAM_HEADERS_TIMEOUT_MS,
         });
 
@@ -481,7 +489,7 @@ export class AnthropicProvider extends AIProvider {
 
           // Listen for progressive token usage updates and thinking blocks during streaming
           stream.on('streamEvent', (event: BetaRawMessageStreamEvent) => {
-            lastStreamEventAt = Date.now();
+            guard.noteActivity();
             if (event.type === 'message_delta' && event.usage) {
               const usage = event.usage;
               this.emit('token_usage_update', {
@@ -626,24 +634,20 @@ export class AnthropicProvider extends AIProvider {
           // context-window 400s shouldn't surface as ERROR-level noise.
           const classified = tryClassifyAsContextWindow(error, 'AnthropicProvider (streaming)');
           if (classified) return classified;
-          // PRI-2896: an idle-watchdog abort surfaces from the SDK as a
+          // PRI-2896: a stall-guard abort surfaces from the SDK as a
           // user-abort. Re-throw it as what it actually is — a timed-out
           // connection (ETIMEDOUT so withRetry classifies it retryable) — and
           // never mask a real caller abort.
-          if (idleTimedOut && !signal?.aborted) {
-            const idleError = new Error(
-              `Anthropic stream produced no events for ${STREAM_IDLE_TIMEOUT_MS}ms; aborted as stalled`
-            ) as Error & { code: string };
-            idleError.code = 'ETIMEDOUT';
-            logger.error('Streaming error from Anthropic', { error: idleError.message });
-            throw idleError;
+          const stalled = this.stallError(guard, STREAM_IDLE_TIMEOUT_MS, signal);
+          if (stalled) {
+            logger.error('Streaming error from Anthropic', { error: stalled.message });
+            throw stalled;
           }
           const errorObj = error as Error;
           logger.error('Streaming error from Anthropic', { error: errorObj.message });
           throw error;
         } finally {
-          clearInterval(idleWatchdog);
-          if (signal) signal.removeEventListener('abort', onCallerAbort);
+          guard.dispose();
         }
       },
       {

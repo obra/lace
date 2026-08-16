@@ -39,6 +39,12 @@ import {
 // 2026-07-23: `cache-diagnosis-2026-04-07` returns 400 "invalid beta flag",
 // while `model-context-window-exceeded-2025-08-26` is accepted. Filter the
 // rejected ones out of the betas[] we send on the Bedrock path.
+// PRI-2900: Bedrock streams carry the same stall exposure as the direct
+// Anthropic path — see createStallGuard. Matching values, for the same reason:
+// keepalive events make a long silence a genuine dead-connection signal.
+export const BEDROCK_STREAM_IDLE_TIMEOUT_MS = 180_000;
+const BEDROCK_STREAM_IDLE_POLL_MS = 10_000;
+
 const BEDROCK_UNSUPPORTED_BETAS: ReadonlySet<AnthropicBeta> = new Set<AnthropicBeta>([
   'cache-diagnosis-2026-04-07',
 ]);
@@ -278,7 +284,17 @@ export class BedrockProvider extends AIProvider {
           streaming: true,
         });
 
-        const stream = this.getBedrockClient().beta.messages.stream(requestPayload, { signal });
+        // PRI-2900: same stall exposure as the Anthropic streaming path — a
+        // connection that dies after headers goes silent rather than erroring.
+        const guard = this.createStallGuard({
+          idleMs: BEDROCK_STREAM_IDLE_TIMEOUT_MS,
+          pollMs: BEDROCK_STREAM_IDLE_POLL_MS,
+          ...(signal ? { signal } : {}),
+        });
+
+        const stream = this.getBedrockClient().beta.messages.stream(requestPayload, {
+          signal: guard.signal,
+        });
         streamCreated = true;
 
         let toolCalls: ToolCall[] = [];
@@ -293,6 +309,7 @@ export class BedrockProvider extends AIProvider {
           let currentBlockType: string | null = null;
 
           stream.on('streamEvent', (event: BetaRawMessageStreamEvent) => {
+            guard.noteActivity();
             if (event.type === 'message_delta' && event.usage) {
               const usage = event.usage;
               this.emit('token_usage_update', {
@@ -414,9 +431,16 @@ export class BedrockProvider extends AIProvider {
           // context-window 400s shouldn't surface as ERROR-level noise.
           const classified = tryClassifyAsContextWindow(error, 'BedrockProvider (streaming)');
           if (classified) return classified;
+          const stalled = this.stallError(guard, BEDROCK_STREAM_IDLE_TIMEOUT_MS, signal);
+          if (stalled) {
+            logger.error('Streaming error from Bedrock', { error: stalled.message });
+            throw stalled;
+          }
           const errorObj = error as Error;
           logger.error('Streaming error from Bedrock', { error: errorObj.message });
           throw error;
+        } finally {
+          guard.dispose();
         }
       },
       {
