@@ -34,6 +34,24 @@ import {
   extractThinkingBlocks,
 } from './anthropic/beta-request';
 
+// PRI-2896: without explicit tuning the SDK defaults to a 10-minute timeout
+// with 2 internal retries — and retries its own timeouts — so a dead connection
+// could wedge one lace-level attempt for ~30 minutes before lace's retry loop
+// even saw a failure (~40 min observed in production).
+//
+// The two caps guard different phases, and the headers cap is deliberately the
+// LOOSER of the two. The SDK's timer is armed before fetch and cleared when the
+// response resolves, so it covers DNS + TLS + request-body upload + server
+// first byte — a phase that is legitimately slow for our large cache-heavy
+// prompts (multi-MB POST bodies; on a cache miss the server may not flush SSE
+// headers until prefill progresses). A spurious abort there re-sends the whole
+// prompt and re-bills the cache read. After headers, by contrast, Anthropic's
+// SSE `ping` keepalives keep arriving, so a silent gap is a genuine
+// dead-connection signal and can be caught much sooner.
+export const STREAM_HEADERS_TIMEOUT_MS = 300_000;
+export const STREAM_IDLE_TIMEOUT_MS = 180_000;
+const STREAM_IDLE_POLL_MS = 10_000;
+
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
   /**
@@ -64,10 +82,15 @@ export class AnthropicProvider extends AIProvider {
       const anthropicConfig: {
         apiKey: string;
         dangerouslyAllowBrowser: boolean;
+        maxRetries: number;
         baseURL?: string;
       } = {
         apiKey: config.apiKey,
         dangerouslyAllowBrowser: true, // Allow in test environments
+        // PRI-2896: lace's withRetry owns retries. The SDK's internal retries
+        // (default 2, each with its own timeout) stack under ours and multiply
+        // worst-case unresponsiveness while making attempt counts in our logs lie.
+        maxRetries: 0,
       };
 
       // Support custom base URL for Anthropic-compatible APIs
@@ -381,8 +404,30 @@ export class AnthropicProvider extends AIProvider {
           streaming: true,
         });
 
+        // PRI-2896: compose the caller's signal with an idle watchdog. The
+        // SDK's own timer only covers time-to-headers; once the stream is open
+        // a dead connection produces silence, not an error, until TCP gives up.
+        // The watchdog aborts a silent stream so the failure surfaces in
+        // seconds and lace's retry loop can take over.
+        const streamAbort = new AbortController();
+        const onCallerAbort = () => streamAbort.abort();
+        if (signal) {
+          if (signal.aborted) streamAbort.abort();
+          else signal.addEventListener('abort', onCallerAbort, { once: true });
+        }
+        let lastStreamEventAt = Date.now();
+        let idleTimedOut = false;
+        const idleWatchdog = setInterval(() => {
+          if (Date.now() - lastStreamEventAt > STREAM_IDLE_TIMEOUT_MS) {
+            idleTimedOut = true;
+            streamAbort.abort();
+          }
+        }, STREAM_IDLE_POLL_MS);
+        idleWatchdog.unref?.();
+
         const stream = this.getAnthropicClient().beta.messages.stream(requestPayload, {
-          signal,
+          signal: streamAbort.signal,
+          timeout: STREAM_HEADERS_TIMEOUT_MS,
         });
 
         let toolCalls: ToolCall[] = [];
@@ -403,6 +448,7 @@ export class AnthropicProvider extends AIProvider {
 
           // Listen for progressive token usage updates and thinking blocks during streaming
           stream.on('streamEvent', (event: BetaRawMessageStreamEvent) => {
+            lastStreamEventAt = Date.now();
             if (event.type === 'message_delta' && event.usage) {
               const usage = event.usage;
               this.emit('token_usage_update', {
@@ -547,9 +593,24 @@ export class AnthropicProvider extends AIProvider {
           // context-window 400s shouldn't surface as ERROR-level noise.
           const classified = tryClassifyAsContextWindow(error, 'AnthropicProvider (streaming)');
           if (classified) return classified;
+          // PRI-2896: an idle-watchdog abort surfaces from the SDK as a
+          // user-abort. Re-throw it as what it actually is — a timed-out
+          // connection (ETIMEDOUT so withRetry classifies it retryable) — and
+          // never mask a real caller abort.
+          if (idleTimedOut && !signal?.aborted) {
+            const idleError = new Error(
+              `Anthropic stream produced no events for ${STREAM_IDLE_TIMEOUT_MS}ms; aborted as stalled`
+            ) as Error & { code: string };
+            idleError.code = 'ETIMEDOUT';
+            logger.error('Streaming error from Anthropic', { error: idleError.message });
+            throw idleError;
+          }
           const errorObj = error as Error;
           logger.error('Streaming error from Anthropic', { error: errorObj.message });
           throw error;
+        } finally {
+          clearInterval(idleWatchdog);
+          if (signal) signal.removeEventListener('abort', onCallerAbort);
         }
       },
       {

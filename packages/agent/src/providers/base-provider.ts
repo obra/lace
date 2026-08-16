@@ -757,10 +757,22 @@ export abstract class AIProvider extends EventEmitter {
       }
     }
 
-    // Check for Retry-After header in error response
+    // Check for Retry-After header in error response. The Anthropic and OpenAI
+    // SDKs hand us a `Headers` instance, whose values are unreachable by
+    // bracket access — so read via `.get()` first and only fall back to a plain
+    // object. This went unnoticed while the SDKs ran their own retry loops
+    // (which read the header correctly); with SDK-internal retries disabled
+    // (PRI-2896) we are the only reader left, and a 429's server-supplied delay
+    // would otherwise be replaced by blind exponential backoff.
     if (err.headers && typeof err.headers === 'object') {
-      const headers = err.headers as Record<string, unknown>;
-      const retryAfter = headers['retry-after'] || headers['Retry-After'];
+      const rawHeaders = err.headers as { get?: (name: string) => string | null } & Record<
+        string,
+        unknown
+      >;
+      const retryAfter =
+        typeof rawHeaders.get === 'function'
+          ? (rawHeaders.get('retry-after') ?? undefined)
+          : ((rawHeaders['retry-after'] ?? rawHeaders['Retry-After']) as unknown);
       if (typeof retryAfter === 'string') {
         const seconds = parseFloat(retryAfter);
         if (!isNaN(seconds)) {
