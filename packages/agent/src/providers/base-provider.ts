@@ -199,6 +199,33 @@ export interface RequestOptions {
  * - 'thinking_delta': { text: string } - Streaming thinking content
  * - 'thinking_end': { tokens: number } - Extended thinking complete with token count
  */
+
+// PRI-2901: outage survival. A few fast retries absorb an ordinary blip; past
+// that, re-sending a coworker-sized prompt at a provider that is simply down
+// burns tokens and buys nothing, so the retry loop switches to a zero-token
+// liveness probe. The interval cap is what bounds how long a recovered API goes
+// unnoticed — probes are free, so it stays tight. The budget is the outer
+// bound: a turn may wait out a long outage, but not indefinitely.
+/** A composed abort signal that fires when a request goes silent. See createStallGuard. */
+export interface StallGuard {
+  readonly signal: AbortSignal;
+  noteActivity(): void;
+  readonly stalled: boolean;
+  dispose(): void;
+}
+
+/** Backoff/accounting carried across every recovery wait within one withRetry call. */
+export interface OutageState {
+  intervalMs: number;
+  probes: number;
+  startedAtMs: number | undefined;
+}
+
+export const OUTAGE_PROBE_AFTER_ATTEMPTS = 3;
+export const OUTAGE_PROBE_INITIAL_INTERVAL_MS = 5_000;
+export const OUTAGE_PROBE_MAX_INTERVAL_MS = 300_000;
+export const OUTAGE_BUDGET_MS = 6 * 60 * 60 * 1_000;
+
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
@@ -819,6 +846,218 @@ export abstract class AIProvider extends EventEmitter {
   /**
    * Wraps an operation with retry logic
    */
+  /**
+   * PRI-2896/PRI-2900: guard against a request that goes silent. The SDK's own
+   * timeout only covers time-to-response-headers (its timer is cleared once
+   * fetch resolves), so a connection that dies after headers produces silence,
+   * not an error, until TCP eventually gives up — which is how a coworker sat
+   * unresponsive for ~40 minutes.
+   *
+   * The guard composes the caller's signal with one of its own and aborts when
+   * nothing has happened for `idleMs`. Streaming callers call `noteActivity()`
+   * on every stream event, so the window measures the gap between events;
+   * callers with no events to report (a non-streaming body read) simply never
+   * call it, and `idleMs` becomes a hard deadline for the whole request.
+   *
+   * `dispose()` must run in a `finally` — it clears the timer and unhooks the
+   * caller's (long-lived) signal.
+   */
+  protected createStallGuard(opts: {
+    idleMs: number;
+    pollMs: number;
+    signal?: AbortSignal;
+  }): StallGuard {
+    const controller = new AbortController();
+    const onCallerAbort = () => controller.abort();
+    if (opts.signal) {
+      if (opts.signal.aborted) controller.abort();
+      else opts.signal.addEventListener('abort', onCallerAbort, { once: true });
+    }
+    let lastActivityAt = Date.now();
+    let stalled = false;
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivityAt > opts.idleMs) {
+        stalled = true;
+        controller.abort();
+      }
+    }, opts.pollMs);
+    timer.unref?.();
+
+    return {
+      signal: controller.signal,
+      noteActivity: () => {
+        lastActivityAt = Date.now();
+      },
+      get stalled(): boolean {
+        return stalled;
+      },
+      dispose: () => {
+        clearInterval(timer);
+        opts.signal?.removeEventListener('abort', onCallerAbort);
+      },
+    };
+  }
+
+  /**
+   * Convert a stall-guard abort into the error it actually represents: a timed
+   * out connection, retryable, rather than the user-abort the SDK reports.
+   * Returns null when the caller's own signal aborted — a real cancellation is
+   * never masked.
+   */
+  protected stallError(
+    guard: StallGuard,
+    idleMs: number,
+    callerSignal?: AbortSignal
+  ): (Error & { code: string }) | null {
+    if (!guard.stalled || callerSignal?.aborted === true) return null;
+    const error = new Error(
+      `${this.providerName} produced no activity for ${idleMs}ms; aborted as stalled`
+    ) as Error & { code: string };
+    error.code = 'ETIMEDOUT';
+    return error;
+  }
+
+  /**
+   * PRI-2901: a zero-token liveness check used to ride out a provider outage
+   * without re-sending the prompt. Return null when the provider has no cheap
+   * probe — callers then keep the ordinary retry behavior. Implementations must
+   * not consume tokens: this runs repeatedly for as long as the outage lasts.
+   */
+  protected healthProbe(_signal?: AbortSignal): Promise<void> | null {
+    return null;
+  }
+
+  /**
+   * Whether this provider has a health probe. Must not perform I/O: it is a
+   * capability question, asked before we decide to wait. (Answering it by
+   * calling `healthProbe` and discarding the promise leaks an unhandled
+   * rejection the moment the provider is actually down, which on Node's
+   * default `--unhandled-rejections=throw` kills the agent process.)
+   */
+  protected supportsHealthProbe(): boolean {
+    return false;
+  }
+
+  /**
+   * Poll `healthProbe` on exponential backoff (capped) until the provider
+   * answers, the caller aborts, or `deadlineMs` passes.
+   *
+   * Returns true once the provider is reachable again, false immediately when
+   * this provider has no probe. Throws on abort, and on budget exhaustion —
+   * a turn that has waited out the full budget should fail loudly rather than
+   * wait forever.
+   */
+  protected async waitForProviderRecovery(
+    state: OutageState,
+    deadlineMs: number,
+    signal?: AbortSignal
+  ): Promise<void> {
+    if (state.startedAtMs === undefined) {
+      state.startedAtMs = Date.now();
+      logger.warn('Provider unreachable; entering outage mode (no prompt re-sends)', {
+        provider: this.providerName,
+        budgetMs: deadlineMs - state.startedAtMs,
+      });
+    }
+
+    for (;;) {
+      if (signal?.aborted) {
+        const abortError = new Error('Aborted');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
+      if (Date.now() >= deadlineMs) {
+        const elapsedMinutes = Math.round((Date.now() - state.startedAtMs) / 60_000);
+        throw new Error(
+          `Provider outage: ${this.providerName} did not answer ${state.probes} liveness probes over ${elapsedMinutes} minutes; giving up on this turn.`
+        );
+      }
+
+      await this.sleepUnlessAborted(Math.min(state.intervalMs, deadlineMs - Date.now()), signal);
+      state.intervalMs = Math.min(state.intervalMs * 2, OUTAGE_PROBE_MAX_INTERVAL_MS);
+      state.probes += 1;
+
+      const probe = this.healthProbe(signal);
+      if (probe === null) return;
+      try {
+        await probe;
+      } catch (err) {
+        // A permanent answer (a revoked key, a proxy that only forwards
+        // /v1/messages) would otherwise keep "failing" forever and burn the
+        // whole budget waiting for a recovery that can never come. Transient
+        // statuses and connection-level failures are the outage itself and keep
+        // us probing — see probeIndicatesUnreachable.
+        if (!this.probeIndicatesUnreachable(err)) {
+          logger.warn('Liveness probe answered with an error; treating provider as reachable', {
+            provider: this.providerName,
+            error: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+          });
+          return;
+        }
+        continue;
+      }
+      logger.warn('Provider reachable again; resuming', {
+        provider: this.providerName,
+        probes: state.probes,
+        outageMinutes: Math.round((Date.now() - state.startedAtMs) / 60_000),
+      });
+      return;
+    }
+  }
+
+  /**
+   * True when a failed probe means we could not reach the provider at all, as
+   * opposed to reaching it and being told something (any HTTP status).
+   */
+  private probeIndicatesUnreachable(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return true;
+    const raw = error as { status?: unknown; statusCode?: unknown };
+    const status = typeof raw.status === 'number' ? raw.status : raw.statusCode;
+    // No status at all means we never got an answer: APIConnectionError,
+    // APIConnectionTimeoutError and APIUserAbortError all construct with an
+    // undefined status, so this is the connection-level case.
+    if (typeof status !== 'number') return true;
+    // A status the retry layer considers transient IS the outage: an
+    // overloaded_error (529), a 503, a 429, a 408 request timeout. Re-sending a
+    // coworker-sized prompt into one is the cost this whole mechanism exists to
+    // avoid, so keep probing. This list is kept in step with
+    // `isRetryableError` on purpose — a status the two classifiers disagree
+    // about would end the ride-out for a fault the retry loop then treats as
+    // temporary.
+    //
+    // Anything else the server can tell us (401 on a revoked key, 404 from a
+    // proxy that only forwards /v1/messages) is a permanent condition probing
+    // will never clear, so stop waiting and let the real request's own error
+    // decide the turn.
+    return status >= 500 || status === 429 || status === 408;
+  }
+
+  /** Resolves after `ms`, or rejects promptly if the caller aborts. */
+  private sleepUnlessAborted(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        const abortError = new Error('Aborted');
+        abortError.name = 'AbortError';
+        reject(abortError);
+        return;
+      }
+      const onAbort = () => {
+        clearTimeout(timer);
+        const abortError = new Error('Aborted');
+        abortError.name = 'AbortError';
+        reject(abortError);
+      };
+      const timer = setTimeout(
+        () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve();
+        },
+        Math.max(0, ms)
+      );
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
   protected async withRetry<T>(
     operation: () => Promise<T>,
     options?: {
@@ -830,6 +1069,15 @@ export abstract class AIProvider extends EventEmitter {
   ): Promise<T> {
     const config = this.RETRY_CONFIG;
     const maxAttempts = options?.maxAttempts ?? config.maxRetries;
+    const outageDeadlineMs = Date.now() + OUTAGE_BUDGET_MS;
+    // Shared across recovery cycles so the backoff keeps growing (rather than
+    // restarting at 5s every time a probe briefly succeeds) and the give-up
+    // error can report the real probe count and elapsed time.
+    const outageState: OutageState = {
+      intervalMs: OUTAGE_PROBE_INITIAL_INTERVAL_MS,
+      probes: 0,
+      startedAtMs: undefined,
+    };
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -874,6 +1122,24 @@ export abstract class AIProvider extends EventEmitter {
           }
 
           throw error;
+        }
+
+        // PRI-2901: past the blip attempts, stop re-sending the prompt. Each
+        // full retry re-uploads the whole request (hundreds of thousands of
+        // cache-read tokens on a coworker's context) and, against a provider
+        // that is simply down, buys nothing. Switch to a zero-token liveness
+        // probe until the API answers again, then re-issue the real request
+        // once. Bounded by a wall-clock budget so a turn cannot hang forever.
+        if (attempt >= OUTAGE_PROBE_AFTER_ATTEMPTS && this.supportsHealthProbe()) {
+          // Wait for the provider to answer again instead of spending an
+          // attempt on a re-send that cannot succeed. The attempt counter is
+          // deliberately NOT reset: waiting is what the budget below bounds,
+          // while `maxAttempts` keeps bounding how many times we re-send the
+          // prompt. A provider that answers the probe but keeps failing the
+          // real request ("flapping") therefore costs the same handful of
+          // re-sends it always did, not one per recovery for six hours.
+          await this.waitForProviderRecovery(outageState, outageDeadlineMs, options?.signal);
+          continue;
         }
 
         // Calculate delay for next attempt (respects rate limit headers if present)
