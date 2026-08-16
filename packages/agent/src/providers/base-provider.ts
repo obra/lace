@@ -206,6 +206,13 @@ export interface RequestOptions {
 // liveness probe. The interval cap is what bounds how long a recovered API goes
 // unnoticed — probes are free, so it stays tight. The budget is the outer
 // bound: a turn may wait out a long outage, but not indefinitely.
+/** Backoff/accounting carried across every recovery wait within one withRetry call. */
+export interface OutageState {
+  intervalMs: number;
+  probes: number;
+  startedAtMs: number | undefined;
+}
+
 export const OUTAGE_PROBE_AFTER_ATTEMPTS = 3;
 export const OUTAGE_PROBE_INITIAL_INTERVAL_MS = 5_000;
 export const OUTAGE_PROBE_MAX_INTERVAL_MS = 300_000;
@@ -842,6 +849,17 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   /**
+   * Whether this provider has a health probe. Must not perform I/O: it is a
+   * capability question, asked before we decide to wait. (Answering it by
+   * calling `healthProbe` and discarding the promise leaks an unhandled
+   * rejection the moment the provider is actually down, which on Node's
+   * default `--unhandled-rejections=throw` kills the agent process.)
+   */
+  protected supportsHealthProbe(): boolean {
+    return false;
+  }
+
+  /**
    * Poll `healthProbe` on exponential backoff (capped) until the provider
    * answers, the caller aborts, or `deadlineMs` passes.
    *
@@ -851,18 +869,17 @@ export abstract class AIProvider extends EventEmitter {
    * wait forever.
    */
   protected async waitForProviderRecovery(
+    state: OutageState,
     deadlineMs: number,
     signal?: AbortSignal
-  ): Promise<boolean> {
-    if (this.healthProbe(signal) === null) return false;
-
-    let interval = OUTAGE_PROBE_INITIAL_INTERVAL_MS;
-    let probes = 0;
-    const startedAt = Date.now();
-    logger.warn('Provider unreachable; entering outage mode (no prompt re-sends)', {
-      provider: this.providerName,
-      budgetMs: deadlineMs - startedAt,
-    });
+  ): Promise<void> {
+    if (state.startedAtMs === undefined) {
+      state.startedAtMs = Date.now();
+      logger.warn('Provider unreachable; entering outage mode (no prompt re-sends)', {
+        provider: this.providerName,
+        budgetMs: deadlineMs - state.startedAtMs,
+      });
+    }
 
     for (;;) {
       if (signal?.aborted) {
@@ -871,30 +888,54 @@ export abstract class AIProvider extends EventEmitter {
         throw abortError;
       }
       if (Date.now() >= deadlineMs) {
-        const elapsedMinutes = Math.round((Date.now() - startedAt) / 60_000);
+        const elapsedMinutes = Math.round((Date.now() - state.startedAtMs) / 60_000);
         throw new Error(
-          `Provider outage: ${this.providerName} did not answer ${probes} liveness probes over ${elapsedMinutes} minutes; giving up on this turn.`
+          `Provider outage: ${this.providerName} did not answer ${state.probes} liveness probes over ${elapsedMinutes} minutes; giving up on this turn.`
         );
       }
 
-      await this.sleepUnlessAborted(Math.min(interval, deadlineMs - Date.now()), signal);
-      interval = Math.min(interval * 2, OUTAGE_PROBE_MAX_INTERVAL_MS);
-      probes += 1;
+      await this.sleepUnlessAborted(Math.min(state.intervalMs, deadlineMs - Date.now()), signal);
+      state.intervalMs = Math.min(state.intervalMs * 2, OUTAGE_PROBE_MAX_INTERVAL_MS);
+      state.probes += 1;
 
+      const probe = this.healthProbe(signal);
+      if (probe === null) return;
       try {
-        const probe = this.healthProbe(signal);
-        if (probe === null) return false;
         await probe;
-        logger.warn('Provider reachable again; resuming', {
-          provider: this.providerName,
-          probes,
-          outageMinutes: Math.round((Date.now() - startedAt) / 60_000),
-        });
-        return true;
-      } catch {
-        // Still down. Keep probing — cheaply — until recovery or the budget.
+      } catch (err) {
+        // An HTTP status means the server answered, so the API is reachable —
+        // a revoked key, a proxied baseURL that only forwards /v1/messages, or
+        // a rate limit would otherwise keep "failing" forever and burn the
+        // whole budget waiting for a recovery that already happened. Only a
+        // connection-level failure counts as still-down.
+        if (!this.probeIndicatesUnreachable(err)) {
+          logger.warn('Liveness probe answered with an error; treating provider as reachable', {
+            provider: this.providerName,
+            error: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
+          });
+          return;
+        }
+        continue;
       }
+      logger.warn('Provider reachable again; resuming', {
+        provider: this.providerName,
+        probes: state.probes,
+        outageMinutes: Math.round((Date.now() - state.startedAtMs) / 60_000),
+      });
+      return;
     }
+  }
+
+  /**
+   * True when a failed probe means we could not reach the provider at all, as
+   * opposed to reaching it and being told something (any HTTP status).
+   */
+  private probeIndicatesUnreachable(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return true;
+    const err = error as { status?: unknown; response?: { status?: unknown } };
+    if (typeof err.status === 'number') return false;
+    if (typeof err.response?.status === 'number') return false;
+    return true;
   }
 
   /** Resolves after `ms`, or rejects promptly if the caller aborts. */
@@ -935,6 +976,14 @@ export abstract class AIProvider extends EventEmitter {
     const config = this.RETRY_CONFIG;
     const maxAttempts = options?.maxAttempts ?? config.maxRetries;
     const outageDeadlineMs = Date.now() + OUTAGE_BUDGET_MS;
+    // Shared across recovery cycles so the backoff keeps growing (rather than
+    // restarting at 5s every time a probe briefly succeeds) and the give-up
+    // error can report the real probe count and elapsed time.
+    const outageState: OutageState = {
+      intervalMs: OUTAGE_PROBE_INITIAL_INTERVAL_MS,
+      probes: 0,
+      startedAtMs: undefined,
+    };
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -987,15 +1036,16 @@ export abstract class AIProvider extends EventEmitter {
         // that is simply down, buys nothing. Switch to a zero-token liveness
         // probe until the API answers again, then re-issue the real request
         // once. Bounded by a wall-clock budget so a turn cannot hang forever.
-        if (attempt >= OUTAGE_PROBE_AFTER_ATTEMPTS) {
-          const recovered = await this.waitForProviderRecovery(outageDeadlineMs, options?.signal);
-          if (recovered) {
-            // Recovered: the next pass gets a fresh attempt budget, since the
-            // failures we just rode out were the outage, not this request.
-            attempt = 0;
-            continue;
-          }
-          // No probe for this provider — fall through to the ordinary backoff.
+        if (attempt >= OUTAGE_PROBE_AFTER_ATTEMPTS && this.supportsHealthProbe()) {
+          // Wait for the provider to answer again instead of spending an
+          // attempt on a re-send that cannot succeed. The attempt counter is
+          // deliberately NOT reset: waiting is what the budget below bounds,
+          // while `maxAttempts` keeps bounding how many times we re-send the
+          // prompt. A provider that answers the probe but keeps failing the
+          // real request ("flapping") therefore costs the same handful of
+          // re-sends it always did, not one per recovery for six hours.
+          await this.waitForProviderRecovery(outageState, outageDeadlineMs, options?.signal);
+          continue;
         }
 
         // Calculate delay for next attempt (respects rate limit headers if present)

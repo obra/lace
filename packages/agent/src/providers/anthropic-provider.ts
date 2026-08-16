@@ -117,12 +117,21 @@ export class AnthropicProvider extends AIProvider {
    * hand-rolled SDK mocks in our tests), so those callers keep the ordinary
    * retry behavior rather than crashing inside the retry loop.
    */
-  protected override healthProbe(signal?: AbortSignal): Promise<void> | null {
-    const models = (
+  protected override supportsHealthProbe(): boolean {
+    return typeof this.modelsResource()?.list === 'function';
+  }
+
+  /** The SDK's `models` resource, absent on older SDKs and hand-rolled mocks. */
+  private modelsResource(): { list?: (...args: unknown[]) => Promise<unknown> } | undefined {
+    return (
       this.getAnthropicClient() as unknown as {
         models?: { list?: (...args: unknown[]) => Promise<unknown> };
       }
     ).models;
+  }
+
+  protected override healthProbe(signal?: AbortSignal): Promise<void> | null {
+    const models = this.modelsResource();
     if (!models || typeof models.list !== 'function') return null;
     return Promise.resolve(
       models.list({ limit: 1 }, { signal, timeout: HEALTH_PROBE_TIMEOUT_MS })

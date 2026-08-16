@@ -36,10 +36,25 @@ class ProbeableProvider extends AIProvider {
     return false;
   }
 
+  probeHttpStatus: number | undefined;
+
+  protected override supportsHealthProbe(): boolean {
+    return this.probeSupported;
+  }
+
   protected override healthProbe(): Promise<void> | null {
     if (!this.probeSupported) return null;
     this.probeCalls += 1;
     if (this.apiIsUp) return Promise.resolve();
+    if (this.probeHttpStatus !== undefined) {
+      // The server answered — a revoked key, a proxy that only forwards
+      // /v1/messages, a 429. Reachable, just unhappy.
+      const httpErr = new Error(`probe: HTTP ${this.probeHttpStatus}`) as Error & {
+        status: number;
+      };
+      httpErr.status = this.probeHttpStatus;
+      return Promise.reject(httpErr);
+    }
     const err = new Error('probe: connection refused') as Error & { code: string };
     err.code = 'ECONNREFUSED';
     return Promise.reject(err);
@@ -118,13 +133,63 @@ describe('PRI-2901: provider outage survival', () => {
     const promise = p.run();
     promise.catch(() => {});
 
+    // Measure the STEADY-STATE rate, after the exponential ramp has hit the
+    // cap. Counting the first hour cannot distinguish a capped schedule from an
+    // uncapped one: pure doubling from 5s also lands ~9 probes in hour one.
     await vi.advanceTimersByTimeAsync(60 * 60_000);
-    const probesInOneHour = p.probeCalls;
+    const afterFirstHour = p.probeCalls;
+    await vi.advanceTimersByTimeAsync(60 * 60_000);
+    const inSecondHour = p.probeCalls - afterFirstHour;
 
-    // At the 5-minute cap an hour holds ~12 probes; a much larger number means
-    // the cap is not being applied, a much smaller one means it backs off past it.
-    expect(probesInOneHour).toBeGreaterThan(8);
-    expect(probesInOneHour).toBeLessThan(30);
+    // An hour at the 5-minute cap is 12 probes. Written as a literal on
+    // purpose: deriving it from OUTAGE_PROBE_MAX_INTERVAL_MS would move both
+    // sides of the assertion together, so raising the cap could not fail this
+    // test — which is exactly the hole a mutation found in the first version.
+    expect(inSecondHour).toBeGreaterThanOrEqual(11);
+    expect(inSecondHour).toBeLessThanOrEqual(13);
+    expect(OUTAGE_PROBE_MAX_INTERVAL_MS).toBe(300_000);
+  });
+
+  it('does not turn a flapping provider into thousands of prompt re-sends', async () => {
+    // The nastiest real outage shape: /v1/models answers fine while the real
+    // endpoint keeps 5xx-ing. Riding this out must never cost more full
+    // re-sends than the ordinary retry budget would have.
+    const p = provider();
+    p.apiIsUp = true; // probe always healthy
+    p.operationFails = true; // real request never recovers
+    const promise = p.run();
+    const settled = promise.then(
+      () => 'resolved',
+      () => 'rejected'
+    );
+
+    await vi.advanceTimersByTimeAsync(OUTAGE_BUDGET_MS + 60_000);
+
+    expect(await settled).toBe('rejected');
+    // The pre-fix implementation reset the attempt counter on every successful
+    // probe and made ~8,000 full-prompt attempts here.
+    expect(p.operationCalls).toBeLessThanOrEqual(10);
+  });
+
+  it('treats a probe that gets an HTTP answer as proof the provider is reachable', async () => {
+    // A revoked key or a proxied baseURL that only forwards /v1/messages makes
+    // the probe fail forever. That must not be read as a six-hour outage.
+    const p = provider();
+    p.probeHttpStatus = 401;
+    const promise = p.run();
+    const settled = promise.then(
+      () => 'resolved',
+      () => 'rejected'
+    );
+
+    // Well short of the 6h budget: each probe answers immediately, so the
+    // attempt budget runs out in minutes rather than hours.
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+
+    expect(await settled).toBe('rejected');
+    // Failed on the real error's attempt budget rather than waiting out the
+    // outage budget — a handful of probes, not the ~72 a 6h wait would take.
+    expect(p.probeCalls).toBeLessThan(15);
   });
 
   it('gives up after the wall-clock budget with an accurate error', async () => {
@@ -150,14 +215,18 @@ describe('PRI-2901: provider outage survival', () => {
     const promise = p.run({ signal: controller.signal });
     const settled = promise.then(
       () => 'resolved',
-      () => 'rejected'
+      (err: Error) => err
     );
 
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     controller.abort();
     await vi.advanceTimersByTimeAsync(1_000);
 
-    expect(await settled).toBe('rejected');
+    const result = await settled;
+    expect(result).toBeInstanceOf(Error);
+    // Specifically an abort — not the budget error arriving early, which a
+    // bare "did it reject" assertion would happily accept.
+    expect((result as Error).name).toBe('AbortError');
   });
 
   it('keeps the pre-existing retry behavior when the provider has no probe', async () => {
