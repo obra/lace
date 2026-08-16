@@ -460,13 +460,17 @@ export class AnthropicProvider extends AIProvider {
 
         // PRI-2896: a dead connection produces silence rather than an error
         // once the stream is open, so guard the gap between stream events.
+        // Resolve the client first: it throws on missing credentials, and a
+        // throw between creating the guard and the try/finally would strand
+        // its interval and its listener on the caller's long-lived signal.
+        const client = this.getAnthropicClient();
         const guard = this.createStallGuard({
           idleMs: STREAM_IDLE_TIMEOUT_MS,
           pollMs: STREAM_IDLE_POLL_MS,
           ...(signal ? { signal } : {}),
         });
 
-        const stream = this.getAnthropicClient().beta.messages.stream(requestPayload, {
+        const stream = client.beta.messages.stream(requestPayload, {
           signal: guard.signal,
           timeout: STREAM_HEADERS_TIMEOUT_MS,
         });

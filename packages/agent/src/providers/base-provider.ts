@@ -1011,10 +1011,19 @@ export abstract class AIProvider extends EventEmitter {
    */
   private probeIndicatesUnreachable(error: unknown): boolean {
     if (!error || typeof error !== 'object') return true;
-    const err = error as { status?: unknown; response?: { status?: unknown } };
-    if (typeof err.status === 'number') return false;
-    if (typeof err.response?.status === 'number') return false;
-    return true;
+    const status = (error as { status?: unknown }).status;
+    // No status at all means we never got an answer: APIConnectionError,
+    // APIConnectionTimeoutError and APIUserAbortError all construct with an
+    // undefined status, so this is the connection-level case.
+    if (typeof status !== 'number') return true;
+    // 5xx and 429 ARE the outage. An overloaded_error (529) or a 503 is
+    // precisely the shape of a provider incident, and re-sending a
+    // coworker-sized prompt into one is the cost this whole mechanism exists
+    // to avoid — so keep probing. Anything else the server can tell us (401 on
+    // a revoked key, 404 from a proxy that only forwards /v1/messages) is a
+    // permanent condition that probing will never clear, so stop waiting and
+    // let the real request's own error decide the turn.
+    return status >= 500 || status === 429;
   }
 
   /** Resolves after `ms`, or rejects promptly if the caller aborts. */

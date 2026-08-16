@@ -171,7 +171,35 @@ describe('PRI-2901: provider outage survival', () => {
     expect(p.operationCalls).toBeLessThanOrEqual(10);
   });
 
-  it('treats a probe that gets an HTTP answer as proof the provider is reachable', async () => {
+  it('keeps riding out a 5xx — that IS the outage', async () => {
+    // An overloaded_error (529) or a 503 is the actual shape of a provider
+    // incident. Reading "the server answered" as "healthy" here would send the
+    // full prompt straight back into the outage, which is the cost this whole
+    // mechanism exists to avoid.
+    const p = provider();
+    p.probeHttpStatus = 529;
+    const promise = p.run();
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+
+    expect(p.operationCalls).toBe(OUTAGE_PROBE_AFTER_ATTEMPTS);
+    expect(p.probeCalls).toBeGreaterThan(5);
+  });
+
+  it('keeps riding out a 429', async () => {
+    const p = provider();
+    p.probeHttpStatus = 429;
+    const promise = p.run();
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(30 * 60_000);
+
+    expect(p.operationCalls).toBe(OUTAGE_PROBE_AFTER_ATTEMPTS);
+    expect(p.probeCalls).toBeGreaterThan(5);
+  });
+
+  it('stops waiting on a 4xx — probing will never clear a revoked key', async () => {
     // A revoked key or a proxied baseURL that only forwards /v1/messages makes
     // the probe fail forever. That must not be read as a six-hour outage.
     const p = provider();

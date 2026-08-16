@@ -286,13 +286,16 @@ export class BedrockProvider extends AIProvider {
 
         // PRI-2900: same stall exposure as the Anthropic streaming path — a
         // connection that dies after headers goes silent rather than erroring.
+        // Client first: it throws on missing credentials, and a throw before
+        // the try/finally would strand the guard's interval and listener.
+        const client = this.getBedrockClient();
         const guard = this.createStallGuard({
           idleMs: BEDROCK_STREAM_IDLE_TIMEOUT_MS,
           pollMs: BEDROCK_STREAM_IDLE_POLL_MS,
           ...(signal ? { signal } : {}),
         });
 
-        const stream = this.getBedrockClient().beta.messages.stream(requestPayload, {
+        const stream = client.beta.messages.stream(requestPayload, {
           signal: guard.signal,
         });
         streamCreated = true;
