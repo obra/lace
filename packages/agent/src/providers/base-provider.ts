@@ -199,6 +199,18 @@ export interface RequestOptions {
  * - 'thinking_delta': { text: string } - Streaming thinking content
  * - 'thinking_end': { tokens: number } - Extended thinking complete with token count
  */
+
+// PRI-2901: outage survival. A few fast retries absorb an ordinary blip; past
+// that, re-sending a coworker-sized prompt at a provider that is simply down
+// burns tokens and buys nothing, so the retry loop switches to a zero-token
+// liveness probe. The interval cap is what bounds how long a recovered API goes
+// unnoticed — probes are free, so it stays tight. The budget is the outer
+// bound: a turn may wait out a long outage, but not indefinitely.
+export const OUTAGE_PROBE_AFTER_ATTEMPTS = 3;
+export const OUTAGE_PROBE_INITIAL_INTERVAL_MS = 5_000;
+export const OUTAGE_PROBE_MAX_INTERVAL_MS = 300_000;
+export const OUTAGE_BUDGET_MS = 6 * 60 * 60 * 1_000;
+
 export abstract class AIProvider extends EventEmitter {
   protected readonly _config: ProviderConfig;
   protected _systemPrompt: string = '';
@@ -819,6 +831,98 @@ export abstract class AIProvider extends EventEmitter {
   /**
    * Wraps an operation with retry logic
    */
+  /**
+   * PRI-2901: a zero-token liveness check used to ride out a provider outage
+   * without re-sending the prompt. Return null when the provider has no cheap
+   * probe — callers then keep the ordinary retry behavior. Implementations must
+   * not consume tokens: this runs repeatedly for as long as the outage lasts.
+   */
+  protected healthProbe(_signal?: AbortSignal): Promise<void> | null {
+    return null;
+  }
+
+  /**
+   * Poll `healthProbe` on exponential backoff (capped) until the provider
+   * answers, the caller aborts, or `deadlineMs` passes.
+   *
+   * Returns true once the provider is reachable again, false immediately when
+   * this provider has no probe. Throws on abort, and on budget exhaustion —
+   * a turn that has waited out the full budget should fail loudly rather than
+   * wait forever.
+   */
+  protected async waitForProviderRecovery(
+    deadlineMs: number,
+    signal?: AbortSignal
+  ): Promise<boolean> {
+    if (this.healthProbe(signal) === null) return false;
+
+    let interval = OUTAGE_PROBE_INITIAL_INTERVAL_MS;
+    let probes = 0;
+    const startedAt = Date.now();
+    logger.warn('Provider unreachable; entering outage mode (no prompt re-sends)', {
+      provider: this.providerName,
+      budgetMs: deadlineMs - startedAt,
+    });
+
+    for (;;) {
+      if (signal?.aborted) {
+        const abortError = new Error('Aborted');
+        abortError.name = 'AbortError';
+        throw abortError;
+      }
+      if (Date.now() >= deadlineMs) {
+        const elapsedMinutes = Math.round((Date.now() - startedAt) / 60_000);
+        throw new Error(
+          `Provider outage: ${this.providerName} did not answer ${probes} liveness probes over ${elapsedMinutes} minutes; giving up on this turn.`
+        );
+      }
+
+      await this.sleepUnlessAborted(Math.min(interval, deadlineMs - Date.now()), signal);
+      interval = Math.min(interval * 2, OUTAGE_PROBE_MAX_INTERVAL_MS);
+      probes += 1;
+
+      try {
+        const probe = this.healthProbe(signal);
+        if (probe === null) return false;
+        await probe;
+        logger.warn('Provider reachable again; resuming', {
+          provider: this.providerName,
+          probes,
+          outageMinutes: Math.round((Date.now() - startedAt) / 60_000),
+        });
+        return true;
+      } catch {
+        // Still down. Keep probing — cheaply — until recovery or the budget.
+      }
+    }
+  }
+
+  /** Resolves after `ms`, or rejects promptly if the caller aborts. */
+  private sleepUnlessAborted(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      if (signal?.aborted) {
+        const abortError = new Error('Aborted');
+        abortError.name = 'AbortError';
+        reject(abortError);
+        return;
+      }
+      const onAbort = () => {
+        clearTimeout(timer);
+        const abortError = new Error('Aborted');
+        abortError.name = 'AbortError';
+        reject(abortError);
+      };
+      const timer = setTimeout(
+        () => {
+          signal?.removeEventListener('abort', onAbort);
+          resolve();
+        },
+        Math.max(0, ms)
+      );
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
   protected async withRetry<T>(
     operation: () => Promise<T>,
     options?: {
@@ -830,6 +934,7 @@ export abstract class AIProvider extends EventEmitter {
   ): Promise<T> {
     const config = this.RETRY_CONFIG;
     const maxAttempts = options?.maxAttempts ?? config.maxRetries;
+    const outageDeadlineMs = Date.now() + OUTAGE_BUDGET_MS;
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -874,6 +979,23 @@ export abstract class AIProvider extends EventEmitter {
           }
 
           throw error;
+        }
+
+        // PRI-2901: past the blip attempts, stop re-sending the prompt. Each
+        // full retry re-uploads the whole request (hundreds of thousands of
+        // cache-read tokens on a coworker's context) and, against a provider
+        // that is simply down, buys nothing. Switch to a zero-token liveness
+        // probe until the API answers again, then re-issue the real request
+        // once. Bounded by a wall-clock budget so a turn cannot hang forever.
+        if (attempt >= OUTAGE_PROBE_AFTER_ATTEMPTS) {
+          const recovered = await this.waitForProviderRecovery(outageDeadlineMs, options?.signal);
+          if (recovered) {
+            // Recovered: the next pass gets a fresh attempt budget, since the
+            // failures we just rode out were the outage, not this request.
+            attempt = 0;
+            continue;
+          }
+          // No probe for this provider — fall through to the ordinary backoff.
         }
 
         // Calculate delay for next attempt (respects rate limit headers if present)

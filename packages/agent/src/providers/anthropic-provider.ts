@@ -51,6 +51,9 @@ import {
 export const STREAM_HEADERS_TIMEOUT_MS = 300_000;
 export const STREAM_IDLE_TIMEOUT_MS = 180_000;
 const STREAM_IDLE_POLL_MS = 10_000;
+// A liveness probe that hangs is useless — it must answer well inside the
+// interval between probes (PRI-2901).
+const HEALTH_PROBE_TIMEOUT_MS = 30_000;
 
 interface AnthropicProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -103,6 +106,27 @@ export class AnthropicProvider extends AIProvider {
       this._anthropic = new Anthropic(anthropicConfig);
     }
     return this._anthropic;
+  }
+
+  /**
+   * PRI-2901: zero-token liveness probe — a one-item model list, the cheapest
+   * authenticated GET the API offers. Used only while riding out an outage, in
+   * place of re-sending the prompt.
+   *
+   * Returns null when the client has no `models` resource (older SDKs, and the
+   * hand-rolled SDK mocks in our tests), so those callers keep the ordinary
+   * retry behavior rather than crashing inside the retry loop.
+   */
+  protected override healthProbe(signal?: AbortSignal): Promise<void> | null {
+    const models = (
+      this.getAnthropicClient() as unknown as {
+        models?: { list?: (...args: unknown[]) => Promise<unknown> };
+      }
+    ).models;
+    if (!models || typeof models.list !== 'function') return null;
+    return Promise.resolve(
+      models.list({ limit: 1 }, { signal, timeout: HEALTH_PROBE_TIMEOUT_MS })
+    ).then(() => undefined);
   }
 
   /**
