@@ -470,14 +470,16 @@ export class AnthropicProvider extends AIProvider {
           ...(signal ? { signal } : {}),
         });
 
-        const stream = client.beta.messages.stream(requestPayload, {
-          signal: guard.signal,
-          timeout: STREAM_HEADERS_TIMEOUT_MS,
-        });
-
         let toolCalls: ToolCall[] = [];
 
+        // Inside the try so that a throw from stream() itself still reaches the
+        // finally: otherwise it strands the guard's interval and its listener
+        // on the caller's long-lived signal.
         try {
+          const stream = client.beta.messages.stream(requestPayload, {
+            signal: guard.signal,
+            timeout: STREAM_HEADERS_TIMEOUT_MS,
+          });
           // Handle streaming events - use the 'text' event for token-by-token streaming
           stream.on('text', (text) => {
             streamingStarted = true; // Mark that streaming has begun

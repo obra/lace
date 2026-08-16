@@ -982,11 +982,11 @@ export abstract class AIProvider extends EventEmitter {
       try {
         await probe;
       } catch (err) {
-        // An HTTP status means the server answered, so the API is reachable —
-        // a revoked key, a proxied baseURL that only forwards /v1/messages, or
-        // a rate limit would otherwise keep "failing" forever and burn the
-        // whole budget waiting for a recovery that already happened. Only a
-        // connection-level failure counts as still-down.
+        // A permanent answer (a revoked key, a proxy that only forwards
+        // /v1/messages) would otherwise keep "failing" forever and burn the
+        // whole budget waiting for a recovery that can never come. Transient
+        // statuses and connection-level failures are the outage itself and keep
+        // us probing — see probeIndicatesUnreachable.
         if (!this.probeIndicatesUnreachable(err)) {
           logger.warn('Liveness probe answered with an error; treating provider as reachable', {
             provider: this.providerName,
@@ -1011,19 +1011,25 @@ export abstract class AIProvider extends EventEmitter {
    */
   private probeIndicatesUnreachable(error: unknown): boolean {
     if (!error || typeof error !== 'object') return true;
-    const status = (error as { status?: unknown }).status;
+    const raw = error as { status?: unknown; statusCode?: unknown };
+    const status = typeof raw.status === 'number' ? raw.status : raw.statusCode;
     // No status at all means we never got an answer: APIConnectionError,
     // APIConnectionTimeoutError and APIUserAbortError all construct with an
     // undefined status, so this is the connection-level case.
     if (typeof status !== 'number') return true;
-    // 5xx and 429 ARE the outage. An overloaded_error (529) or a 503 is
-    // precisely the shape of a provider incident, and re-sending a
-    // coworker-sized prompt into one is the cost this whole mechanism exists
-    // to avoid — so keep probing. Anything else the server can tell us (401 on
-    // a revoked key, 404 from a proxy that only forwards /v1/messages) is a
-    // permanent condition that probing will never clear, so stop waiting and
-    // let the real request's own error decide the turn.
-    return status >= 500 || status === 429;
+    // A status the retry layer considers transient IS the outage: an
+    // overloaded_error (529), a 503, a 429, a 408 request timeout. Re-sending a
+    // coworker-sized prompt into one is the cost this whole mechanism exists to
+    // avoid, so keep probing. This list is kept in step with
+    // `isRetryableError` on purpose — a status the two classifiers disagree
+    // about would end the ride-out for a fault the retry loop then treats as
+    // temporary.
+    //
+    // Anything else the server can tell us (401 on a revoked key, 404 from a
+    // proxy that only forwards /v1/messages) is a permanent condition probing
+    // will never clear, so stop waiting and let the real request's own error
+    // decide the turn.
+    return status >= 500 || status === 429 || status === 408;
   }
 
   /** Resolves after `ms`, or rejects promptly if the caller aborts. */

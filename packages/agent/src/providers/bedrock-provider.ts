@@ -44,6 +44,8 @@ import {
 // keepalive events make a long silence a genuine dead-connection signal.
 export const BEDROCK_STREAM_IDLE_TIMEOUT_MS = 180_000;
 const BEDROCK_STREAM_IDLE_POLL_MS = 10_000;
+// No progress events on the non-streaming path, so this bounds the whole call.
+export const BEDROCK_NONSTREAMING_TIMEOUT_MS = 600_000;
 
 const BEDROCK_UNSUPPORTED_BETAS: ReadonlySet<AnthropicBeta> = new Set<AnthropicBeta>([
   'cache-diagnosis-2026-04-07',
@@ -197,15 +199,32 @@ export class BedrockProvider extends AIProvider {
 
         logProviderRequest('bedrock', requestPayload as unknown as Record<string, unknown>);
 
+        // PRI-2900: the non-streaming path has no progress events, so the guard
+        // is a hard deadline for the whole request. Without it the body read
+        // after response headers is unbounded, which is the same exposure the
+        // streaming guard closes.
+        const guard = this.createStallGuard({
+          idleMs: BEDROCK_NONSTREAMING_TIMEOUT_MS,
+          pollMs: BEDROCK_STREAM_IDLE_POLL_MS,
+          ...(signal ? { signal } : {}),
+        });
         let response: BetaMessage;
         try {
           response = (await this.getBedrockClient().beta.messages.create(requestPayload, {
-            signal,
+            signal: guard.signal,
+            timeout: BEDROCK_NONSTREAMING_TIMEOUT_MS,
           })) as BetaMessage;
         } catch (providerError) {
+          const stalled = this.stallError(guard, BEDROCK_NONSTREAMING_TIMEOUT_MS, signal);
+          if (stalled) {
+            logger.error('Request stalled', { provider: 'bedrock', error: stalled.message });
+            throw stalled;
+          }
           const classified = tryClassifyAsContextWindow(providerError, 'BedrockProvider');
           if (classified) return classified;
           throw providerError;
+        } finally {
+          guard.dispose();
         }
 
         logProviderResponse('bedrock', response);
@@ -295,14 +314,15 @@ export class BedrockProvider extends AIProvider {
           ...(signal ? { signal } : {}),
         });
 
-        const stream = client.beta.messages.stream(requestPayload, {
-          signal: guard.signal,
-        });
-        streamCreated = true;
-
         let toolCalls: ToolCall[] = [];
 
+        // Inside the try so a throw from stream() still reaches the finally —
+        // otherwise the guard's interval and listener leak.
         try {
+          const stream = client.beta.messages.stream(requestPayload, {
+            signal: guard.signal,
+          });
+          streamCreated = true;
           stream.on('text', (text) => {
             streamingStarted = true;
             this.emit('token', { token: text });
