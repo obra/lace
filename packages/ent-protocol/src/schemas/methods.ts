@@ -1583,6 +1583,10 @@ const EntJobListResultSchema = z
           startTime: IsoTimestampSchema,
           parentToolUseId: NonEmptyStringSchema.optional(),
           subagentSessionId: NonEmptyStringSchema.optional(),
+          // Only on 'interrupted' jobs: true when the restart that just
+          // happened orphaned this job, false when it is residue from an
+          // older one. Interrupted jobs are never aged out of the log.
+          interruptedByLatestRestart: z.boolean().optional(),
         })
         .strict()
     ),

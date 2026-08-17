@@ -9,6 +9,27 @@ import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { readAllSessionEventLines } from '../storage/event-log';
 
 /**
+ * True when a durable event is the `session-recovered` notice a restarting
+ * process injects. That notice IS the crash-generation boundary: everything
+ * logged before it belongs to a process that has already died and been
+ * reported on.
+ *
+ * Anchored to the notification wrapper's opening tag so a quoted mention of
+ * the kind inside some other injected body (a Slack message, say) can never
+ * register as a boundary.
+ */
+export function isSessionRecoveredMarker(event: { type?: string; data?: unknown }): boolean {
+  if (event.type !== 'context_injected') return false;
+  const data = (event.data ?? {}) as Record<string, unknown>;
+  const content = Array.isArray(data.content) ? (data.content as unknown[]) : [];
+  return content.some(
+    (c) =>
+      typeof (c as { text?: unknown }).text === 'string' &&
+      /^<notification\s+kind="session-recovered"/.test((c as { text: string }).text)
+  );
+}
+
+/**
  * A derived job record from events.
  */
 export type DerivedJob = {
@@ -199,18 +220,9 @@ export function listInterruptedJobs(sessionDir: string): DerivedJob[] {
       const data = (parsed.data ?? {}) as Record<string, unknown>;
 
       if (parsed.type === 'context_injected') {
-        const content = Array.isArray(data.content) ? (data.content as unknown[]) : [];
-        // Anchored to the notification wrapper's opening tag so quoted
-        // mentions of the kind inside some other injected body can never
-        // register as a crash boundary.
-        const isRecoveryMarker = content.some(
-          (c) =>
-            typeof (c as { text?: unknown }).text === 'string' &&
-            /^<notification\s+kind="session-recovered"/.test((c as { text: string }).text)
-        );
         // Everything before this marker belongs to an earlier crash
         // generation and was already reported by it.
-        if (isRecoveryMarker) inFlight.clear();
+        if (isSessionRecoveredMarker(parsed)) inFlight.clear();
         continue;
       }
 

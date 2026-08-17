@@ -31,6 +31,9 @@ export function registerJobHandlers(peer: JsonRpcPeer, state: AgentServerState):
       command: j.command,
       startTime: j.startTime,
       ...(j.subagentSessionId ? { subagentSessionId: j.subagentSessionId } : {}),
+      ...(j.interruptedByLatestRestart !== undefined
+        ? { interruptedByLatestRestart: j.interruptedByLatestRestart }
+        : {}),
     }));
 
     return { jobs };

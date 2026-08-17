@@ -21,6 +21,7 @@ export class JobsListTool extends Tool {
 
 Filter by status: \`["pending","running","completed","failed","cancelled","interrupted"]\`.
 \`interrupted\` = the job was running when this agent process last stopped; its true outcome is unknown (a delegate's container may even still be working). Treat it as "unverified", not as failed.
+Interrupted jobs are never aged out, so this list holds one for every restart in this box's history. Each carries \`interruptedByLatestRestart\`: \`true\` means the restart that just happened killed it (this is the work you may have just lost), \`false\` means it is residue from an older restart and was already reported at the time.
 Filter by type: \`["bash","delegate"]\`.
 
 Returns: \`[{ jobId, type, status, description, startTime }]\`, **most recent first**. When more jobs match than \`limit\` allows, the result says how many were withheld.`;
@@ -73,6 +74,9 @@ Returns: \`[{ jobId, type, status, description, startTime }]\`, **most recent fi
       status: j.status,
       description: j.description,
       startTime: j.startTime,
+      ...(j.interruptedByLatestRestart !== undefined
+        ? { interruptedByLatestRestart: j.interruptedByLatestRestart }
+        : {}),
     }));
 
     // Name the truncation. Silence here reads as "this is all of them".
