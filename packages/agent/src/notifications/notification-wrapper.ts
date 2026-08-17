@@ -11,6 +11,7 @@ export type NotificationKind =
   | 'job-stalled'
   | 'subagent-exited'
   | 'compaction-pressure'
+  | 'emergency-compaction'
   | 'session-recovered';
 
 export interface BuildNotificationOptions {
