@@ -184,6 +184,13 @@ const TAIL_TURNS = 10;
  * the prefix summary), with plenty of headroom for new turns before the next
  * compaction fires. The token-blind 10-turn tail once reached ~600K in
  * production and 400'd every request with `prompt_too_long`.
+ *
+ * Known limitation, tracked separately: this is a FIXED constant, not a
+ * fraction of the running model's context window. On a model with a window
+ * under ~350K the preserved tail alone can still exceed it, so a compaction
+ * cannot get the session back under the limit. The runner's emergency
+ * compaction (PRI-2903) logs loudly when the compacted history is still over
+ * the window rather than retrying indefinitely.
  */
 const TAIL_TOKEN_BUDGET = 300_000;
 

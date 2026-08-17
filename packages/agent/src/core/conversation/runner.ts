@@ -49,6 +49,7 @@ import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
 import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
 import { computePressure, evaluateBreakpoints } from './compaction-trigger';
+import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import {
   compactionStrategyNameForSession,
@@ -239,6 +240,24 @@ const FUTURE_TENSE_INTENT_PATTERN =
  * `code: 'pause_turn_loop'`.
  */
 const MAX_PAUSE_RESUMES = 10;
+
+/**
+ * Safety bound on emergency compactions within a single `run()`. The runner
+ * compacts and retries when the provider rejects the prompt with
+ * `context_window_exceeded` (PRI-2903); this caps how often that can happen
+ * before the stop surfaces to the caller as a failed turn.
+ *
+ * Two, not one: a long agentic run can legitimately grow back over the window
+ * after healing once, and refusing to heal the second time re-wedges the
+ * session this exists to rescue. It must stay a hard numeric bound rather than
+ * a flag, because the emergency retry cancels the loop's `completedTurns`
+ * increment — so `maxTurns` cannot backstop it, and this counter is the only
+ * thing standing between a permanently-oversized session and an infinite
+ * compact/retry loop. Back-to-back overflows are usually cut short earlier
+ * anyway: re-compacting an already-compacted log returns a noop, which falls
+ * through to the terminal stop.
+ */
+const MAX_EMERGENCY_COMPACTIONS = 2;
 
 const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
 
@@ -584,7 +603,9 @@ export class ConversationRunner {
     // Key the tailer off the on-disk session-id (the transcript shards' basename),
     // which is what the durable log is written under — matching the full-scan
     // reader, whose sessionDir basename drives shard discovery.
-    const injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
+    // Re-seeded (not just re-read) after an emergency compaction rebuilds the
+    // projection — see the emergency arm below.
+    let injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
@@ -631,10 +652,8 @@ export class ConversationRunner {
     let partialThinkingBlocks: ThinkingBlock[] = [];
     let pauseResumeCount = 0;
 
-    // Emergency-compaction budget for this turn: exactly one compact + retry on
-    // context_window_exceeded. See the call site for why a second rejection
-    // must fail loudly instead of compacting again.
-    let emergencyCompactionUsed = false;
+    // Emergency-compaction budget for this run() — see MAX_EMERGENCY_COMPACTIONS.
+    let emergencyCompactions = 0;
 
     // Per-turn compaction request cell. compact_session mutates this during
     // tool execution; the post-turn block reads it to decide whether to fire.
@@ -1051,13 +1070,17 @@ export class ConversationRunner {
         // (PRI-2903) — the one mechanism that could rescue the session needed
         // the session to be healthy enough to make a request, so it never
         // fired and the coworker stayed wedged across restarts. So compact
-        // here, mid-turn, and retry the turn once.
+        // here, mid-turn, and retry the turn.
         //
-        // Bounded to a single attempt per turn: `emergencyCompactionUsed` makes
-        // a second context_window_exceeded fall through to the terminal break
-        // below and surface as a failed turn rather than looping.
-        if (stopReason === 'context_window_exceeded' && !emergencyCompactionUsed) {
-          emergencyCompactionUsed = true;
+        // Bounded by MAX_EMERGENCY_COMPACTIONS per run(): once the budget is
+        // spent, a further context_window_exceeded falls through to the
+        // terminal break below and surfaces as a failed turn rather than
+        // looping.
+        if (
+          stopReason === 'context_window_exceeded' &&
+          emergencyCompactions < MAX_EMERGENCY_COMPACTIONS
+        ) {
+          emergencyCompactions++;
           let compacted = false;
           try {
             compacted = await this.compactSession({
@@ -1074,11 +1097,14 @@ export class ConversationRunner {
             });
           }
           if (compacted) {
-            // Rebuild the message prefix from the now-compacted log. Every
-            // in-memory mutation made earlier this turn is discarded on
-            // purpose: the events behind them are folded into the compacted
-            // projection, and re-applying them would resurrect the history we
-            // just summarized away.
+            // Rebuild the message prefix from the now-compacted log. The
+            // per-turn in-memory mutations made before this point (loop
+            // reminders, tool-choice nudges, appended tool results, injects
+            // picked up earlier this turn) are dropped on purpose: the durable
+            // events behind them are folded into the compacted projection, and
+            // re-applying them would resurrect the history we just summarized
+            // away. The mutable per-turn state that is NOT part of
+            // providerMessages is reset explicitly below.
             const compactedEntry = projectionCache
               ? projectTurnEntry(
                   sessionDir,
@@ -1092,6 +1118,47 @@ export class ConversationRunner {
               // rerenderPersonaAfterCompaction may have written a new
               // system_prompt_set; the retry should use it.
               provider.setSystemPrompt(compactedEntry.systemPrompt);
+            }
+            // Re-seed the inject tailer at the rebuilt projection's watermark.
+            // The rebuild folded EVERY logged event, including any peer
+            // context_injected that landed while the oversized call was failing
+            // and the compaction was running (10.7s in the live incident — long
+            // enough for a Slack message or a job completion). Without the
+            // re-seed the old tailer, still holding its pre-call watermark,
+            // re-emits that inject at the top of the retry iteration and the
+            // model sees it twice. Same phantom-double the between-turn seeding
+            // above exists to prevent.
+            lastSeenEventSeq = compactedEntry.maxFoldedSeq;
+            injectTailer = createInjectTailer(
+              getLaceDir(),
+              basename(sessionDir),
+              compactedEntry.maxFoldedSeq
+            );
+            // A tail of pre-compaction generation must not be glued onto the
+            // post-compaction answer. `pause_turn` accumulates text and
+            // thinking across iterations for a single durable 'message' event,
+            // and the terminal-stop switch arm above does not reset them — so a
+            // turn that paused, then overflowed, would persist
+            // "<partial><recovered answer>" as one message.
+            partialAssistantText = '';
+            partialThinkingBlocks = [];
+            pauseResumeCount = 0;
+            // The compacted history is the whole point of the retry. If it is
+            // STILL over the window, the retry will 400 again and the session
+            // churns — the tail budget in track-compaction is a fixed constant,
+            // not a function of this model's window, so that is reachable on
+            // any model with a window under ~350K. Say so loudly; the retry
+            // still runs, and the emergency budget bounds the churn.
+            const compactedEstimate = estimateProviderTokens(providerMessages);
+            const windowSize = provider.contextWindowForModel(modelId ?? 'default');
+            if (compactedEstimate >= windowSize) {
+              logger.error('runner: compacted history STILL exceeds the context window', {
+                turnId,
+                sessionId,
+                compactedEstimate,
+                windowSize,
+                modelId,
+              });
             }
             // Say what happened. The agent notices the memory gap regardless,
             // and an unexplained gap is worse than an explained one. Written as

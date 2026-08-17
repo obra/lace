@@ -10,7 +10,13 @@ import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
-import { invalidatePersonaCache, readDurableEvents } from '@lace/agent/storage/event-log';
+import {
+  appendDurableEvent,
+  invalidatePersonaCache,
+  readDurableEvents,
+} from '@lace/agent/storage/event-log';
+import { readSessionState, writeSessionState } from '@lace/agent/storage/session-store';
+import { injectNotification } from '@lace/agent/notifications/inject-notification';
 import {
   AIProvider,
   type ProviderMessage,
@@ -27,6 +33,9 @@ const CONTEXT_EXCEEDED: ProviderResponse = {
   stopReason: 'context_window_exceeded',
   stopDetails: { type: 'context_window_exceeded', source: 'http_400_prompt_too_long' },
   usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+  // Providers with server-side conversation state hand back a response id that
+  // the runner chains onto the next call.
+  responseId: 'resp_pre_compaction',
 };
 
 const CLEAN_TURN: ProviderResponse = {
@@ -36,12 +45,22 @@ const CLEAN_TURN: ProviderResponse = {
   usage: { promptTokens: 50_000, completionTokens: 10, totalTokens: 50_010 },
 };
 
-/** Scripted provider that records the message list sent on every call. */
+/** Scripted provider that records what was actually sent on every call. */
 class ScriptedProvider extends AIProvider {
   callCount = 0;
   readonly sentMessages: ProviderMessage[][] = [];
+  readonly sentSystemPrompts: string[] = [];
+  readonly sentPreviousResponseIds: (string | undefined)[] = [];
 
-  constructor(private readonly script: ProviderResponse[]) {
+  /**
+   * @param beforeRespond runs before each scripted response is returned, with
+   *   the 0-based call index. Models a peer writing to the durable log while
+   *   the provider call is in flight.
+   */
+  constructor(
+    private readonly script: ProviderResponse[],
+    private readonly beforeRespond?: (callIndex: number) => void
+  ) {
     super();
   }
 
@@ -87,11 +106,14 @@ class ScriptedProvider extends AIProvider {
     _tools: WireTool[],
     _model: string,
     _signal?: AbortSignal,
-    _state?: ConversationState,
+    state?: ConversationState,
     _options?: RequestOptions
   ): Promise<ProviderResponse> {
     this.sentMessages.push(structuredClone(messages));
+    this.sentSystemPrompts.push(this.systemPrompt);
+    this.sentPreviousResponseIds.push(state?.previousResponseId ?? undefined);
     const step = this.script[Math.min(this.callCount, this.script.length - 1)]!;
+    this.beforeRespond?.(this.callCount);
     this.callCount++;
     return step;
   }
@@ -244,7 +266,7 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
   });
 
-  function run(provider: AIProvider) {
+  function run(provider: AIProvider, depOverrides: Partial<RunnerDependencies> = {}) {
     const config: RunnerConfig = {
       sessionDir,
       sessionId,
@@ -252,7 +274,7 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
       executionMode: 'execute',
       approvalMode: 'approve',
     };
-    const deps = createMockDeps(provider);
+    const deps = createMockDeps(provider, depOverrides);
     const runner = new ConversationRunner(config, deps);
     return {
       deps,
@@ -315,15 +337,104 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     expect(retryText.split('kind="emergency-compaction"')).toHaveLength(2);
   });
 
-  it('compacts at most once per turn: a second rejection fails the turn', async () => {
-    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CONTEXT_EXCEEDED]);
+  it('gives up rather than looping when compaction cannot get back under the window', async () => {
+    // A provider that NEVER stops rejecting. The emergency budget is the only
+    // thing that can stop this — the retry cancels the loop's turn increment,
+    // so maxTurns cannot backstop it. Without a hard bound this run never ends.
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED]);
     const { promise } = run(provider);
     const result = await promise;
 
-    expect(provider.callCount).toBe(2);
     expect(result.stopReason).toBe('context_window_exceeded');
     expect(result.stopDetails).toEqual(CONTEXT_EXCEEDED.stopDetails);
-    expect(durableEvents().filter((e) => e.type === 'context_compacted')).toHaveLength(1);
+    // Follows from MAX_EMERGENCY_COMPACTIONS = 2: two compactions are spent,
+    // and the third rejection has no budget left, so it ends the turn.
+    expect(durableEvents().filter((e) => e.type === 'context_compacted')).toHaveLength(2);
+    expect(provider.callCount).toBe(3);
+  });
+
+  it('delivers a peer inject that lands during the compaction exactly once', async () => {
+    // A Slack message or job completion arriving while the oversized call is
+    // failing (10.7s in the live incident) is folded into the rebuilt
+    // projection AND sits past the inject tailer's pre-call watermark. If the
+    // tailer is not re-seeded on the rebuild, the model sees it twice.
+    const marker = 'PEER-INJECT-DURING-COMPACTION';
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN], (callIndex) => {
+      if (callIndex !== 0) return;
+      injectNotification({
+        sessionDir,
+        kind: 'job-completed',
+        body: marker,
+      });
+    });
+    await run(provider).promise;
+
+    expect(provider.callCount).toBe(2);
+    const retryText = messagesAsText(provider.sentMessages[1]!);
+    expect(retryText).toContain(marker);
+    expect(retryText.split(marker)).toHaveLength(2);
+  });
+
+  it('does not glue pre-compaction partial generation onto the recovered answer', async () => {
+    // pause_turn accumulates text across iterations for a single durable
+    // 'message' event. If the emergency retry does not clear that accumulator,
+    // the partial the model produced against the OLD context is concatenated
+    // onto the answer it produces against the compacted one, and that
+    // corrupted splice is what gets persisted.
+    const partial = 'PARTIAL-PRECOMPACTION-TEXT';
+    const provider = new ScriptedProvider([
+      {
+        content: partial,
+        toolCalls: [],
+        stopReason: 'pause_turn',
+        usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      },
+      CONTEXT_EXCEEDED,
+      CLEAN_TURN,
+    ]);
+    const { promise } = run(provider);
+    const result = await promise;
+
+    expect(result.stopReason).toBe('end_turn');
+    const answer = CLEAN_TURN.content as string;
+    expect(result.content).toEqual([{ type: 'text', text: answer }]);
+
+    const messages = durableEvents().filter(
+      (e) => e.type === 'message' && JSON.stringify(e.data).includes(answer)
+    );
+    expect(messages).toHaveLength(1);
+    expect(JSON.stringify(messages[0]!.data)).not.toContain(partial);
+  });
+
+  it('drops the pre-compaction response chain on the retry', async () => {
+    // previousResponseId identifies a server-side conversation keyed to the
+    // message list we just replaced.
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    await run(provider).promise;
+
+    expect(provider.sentPreviousResponseIds[0]).toBeUndefined();
+    expect(provider.sentPreviousResponseIds[1]).toBeUndefined();
+  });
+
+  it('retries with the system prompt the compaction re-rendered', async () => {
+    // Compaction re-renders the persona, which can write a new
+    // system_prompt_set. The retry must send the new one, not the prompt the
+    // turn started with.
+    const rerenderedPrompt = 'You are a test assistant, re-rendered after compaction.';
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    await run(provider, {
+      rerenderPersonaAfterCompaction: vi.fn().mockImplementation(async () => {
+        const state = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, state, {
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: rerenderedPrompt },
+        });
+        writeSessionState(sessionDir, nextState);
+      }),
+    }).promise;
+
+    expect(provider.sentSystemPrompts[0]).toBe('You are a test assistant.');
+    expect(provider.sentSystemPrompts[1]).toBe(rerenderedPrompt);
   });
 
   it('does not compact when the turn never exceeds the window', async () => {
