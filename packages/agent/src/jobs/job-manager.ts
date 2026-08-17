@@ -9,6 +9,7 @@ import { toNonEmptyString } from '../rpc/utils';
 import { getJobOutputPath } from './job-file-utils';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import { readAllSessionEventLines } from '../storage/event-log';
+import { isSessionRecoveredMarker } from './job-derivation';
 
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
@@ -77,6 +78,12 @@ export type JobRecord = {
   exitCode?: number;
   subagentSessionId?: string;
   persona?: string;
+  // How many session-recovered markers preceded this job's start, i.e. which
+  // crash generation started it. Derived bookkeeping for the flag below.
+  restartGeneration?: number;
+  // Set only on 'interrupted' jobs: true when the restart that just happened
+  // is what killed this job, false when it is residue from an older one.
+  interruptedByLatestRestart?: boolean;
 };
 
 /**
@@ -87,6 +94,9 @@ type JobsCache = {
   fileSize: number;
   fileMtime: number;
   result: JobRecord[];
+  // Total session-recovered markers in the log at parse time (see
+  // applyRunningStatus).
+  restartGenerations: number;
 };
 
 /**
@@ -179,15 +189,25 @@ export class JobManager {
       this.listJobsCache.fileSize === lineCount &&
       this.listJobsCache.fileMtime === 0
     ) {
-      return this.applyRunningStatus(this.listJobsCache.result);
+      return this.applyRunningStatus(
+        this.listJobsCache.result,
+        this.listJobsCache.restartGenerations
+      );
     }
 
     const byId = new Map<string, JobRecord>();
+    // Counts the crash generations the log has seen so far, so each job can
+    // record the one it was started in.
+    let restartGenerations = 0;
 
     for (const line of lines) {
       if (!line) continue;
       try {
         const parsed = JSON.parse(line) as { type?: string; timestamp?: string; data?: unknown };
+        if (isSessionRecoveredMarker(parsed)) {
+          restartGenerations += 1;
+          continue;
+        }
         if (
           parsed.type !== 'job_started' &&
           parsed.type !== 'job_finished' &&
@@ -213,6 +233,7 @@ export class JobManager {
             command: toNonEmptyString(data.command) ?? undefined,
             startTime,
             persona: toNonEmptyString(data.persona) ?? undefined,
+            restartGeneration: restartGenerations,
           });
         } else if (parsed.type === 'job_session_assigned') {
           const existing = byId.get(jobId);
@@ -259,9 +280,10 @@ export class JobManager {
       fileSize: lineCount,
       fileMtime: 0,
       result: parsedResult,
+      restartGenerations,
     };
 
-    return this.applyRunningStatus(parsedResult);
+    return this.applyRunningStatus(parsedResult, restartGenerations);
   }
 
   /**
@@ -270,11 +292,26 @@ export class JobManager {
    * means this process restarted after the job started. We don't know how
    * the job ended — or whether its work (e.g. a delegate's container) is
    * still going — so report 'interrupted', never an invented 'failed'.
+   *
+   * Interrupted jobs are never aged out of the log, so every restart in the
+   * box's history leaves one here forever. Tag each with whether the restart
+   * that just happened is what killed it: without that, a job orphaned thirty
+   * seconds ago looks exactly like one orphaned in May, and an agent that
+   * learns to ignore the list is blind to the next real interruption.
+   *
+   * A job orphaned by the latest restart was started in the generation the
+   * restart ended — the one just before the marker this process wrote on
+   * recovery — hence `restartGenerations - 1`. Jobs started since that marker
+   * (a leak within this process, not a restart victim) count as current too.
    */
-  private applyRunningStatus(jobs: JobRecord[]): JobRecord[] {
+  private applyRunningStatus(jobs: JobRecord[], restartGenerations: number): JobRecord[] {
     return jobs.map((job) => {
       if (job.status === 'running' && !this.jobs.has(job.jobId)) {
-        return { ...job, status: 'interrupted' as JobStatus };
+        return {
+          ...job,
+          status: 'interrupted' as JobStatus,
+          interruptedByLatestRestart: (job.restartGeneration ?? 0) >= restartGenerations - 1,
+        };
       }
       return job;
     });

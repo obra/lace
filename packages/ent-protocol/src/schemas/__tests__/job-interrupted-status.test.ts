@@ -22,6 +22,27 @@ describe('interrupted job status in job RPC responses', () => {
     expect(() => EntJobListResponseSchema.parse(response)).not.toThrow();
   });
 
+  it('ent/job/list carries which restart generation interrupted a job', () => {
+    // The schema is strict: without the field declared, the recency signal
+    // never reaches the agent at all.
+    const response = {
+      jsonrpc: '2.0' as const,
+      id: 1,
+      result: {
+        jobs: [
+          {
+            jobId: 'job_orphan',
+            type: 'delegate' as const,
+            status: 'interrupted' as const,
+            startTime: '2026-08-12T00:00:00.000Z',
+            interruptedByLatestRestart: false,
+          },
+        ],
+      },
+    };
+    expect(() => EntJobListResponseSchema.parse(response)).not.toThrow();
+  });
+
   it('ent/job/output accepts status interrupted', () => {
     const response = {
       jsonrpc: '2.0' as const,
