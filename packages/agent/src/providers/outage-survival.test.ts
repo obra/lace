@@ -7,14 +7,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   AIProvider,
-  type ProviderMessage,
-  type ProviderResponse,
-  type WireTool,
-} from './base-provider';
-import {
   OUTAGE_BUDGET_MS,
   OUTAGE_PROBE_AFTER_ATTEMPTS,
   OUTAGE_PROBE_MAX_INTERVAL_MS,
+  type ProviderResponse,
 } from './base-provider';
 
 // A provider whose operation and health probe are both scriptable, so a full
