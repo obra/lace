@@ -49,6 +49,7 @@ import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
 import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
 import { computePressure, evaluateBreakpoints } from './compaction-trigger';
+import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import {
   compactionStrategyNameForSession,
@@ -239,6 +240,24 @@ const FUTURE_TENSE_INTENT_PATTERN =
  * `code: 'pause_turn_loop'`.
  */
 const MAX_PAUSE_RESUMES = 10;
+
+/**
+ * Safety bound on emergency compactions within a single `run()`. The runner
+ * compacts and retries when the provider rejects the prompt with
+ * `context_window_exceeded` (PRI-2903); this caps how often that can happen
+ * before the stop surfaces to the caller as a failed turn.
+ *
+ * Two, not one: a long agentic run can legitimately grow back over the window
+ * after healing once, and refusing to heal the second time re-wedges the
+ * session this exists to rescue. It must stay a hard numeric bound rather than
+ * a flag, because the emergency retry cancels the loop's `completedTurns`
+ * increment — so `maxTurns` cannot backstop it, and this counter is the only
+ * thing standing between a permanently-oversized session and an infinite
+ * compact/retry loop. Back-to-back overflows are usually cut short earlier
+ * anyway: re-compacting an already-compacted log returns a noop, which falls
+ * through to the terminal stop.
+ */
+const MAX_EMERGENCY_COMPACTIONS = 2;
 
 const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
 
@@ -584,7 +603,9 @@ export class ConversationRunner {
     // Key the tailer off the on-disk session-id (the transcript shards' basename),
     // which is what the durable log is written under — matching the full-scan
     // reader, whose sessionDir basename drives shard discovery.
-    const injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
+    // Re-seeded (not just re-read) after an emergency compaction rebuilds the
+    // projection — see the emergency arm below.
+    let injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
@@ -630,6 +651,9 @@ export class ConversationRunner {
     // logical turn. Reset on every non-pause iteration (mirrors partialAssistantText).
     let partialThinkingBlocks: ThinkingBlock[] = [];
     let pauseResumeCount = 0;
+
+    // Emergency-compaction budget for this run() — see MAX_EMERGENCY_COMPACTIONS.
+    let emergencyCompactions = 0;
 
     // Per-turn compaction request cell. compact_session mutates this during
     // tool execution; the post-turn block reads it to decide whether to fire.
@@ -1038,6 +1062,137 @@ export class ConversationRunner {
             });
         }
 
+        // Emergency compaction self-heal. The provider has told us outright
+        // that the prompt no longer fits — the most explicit context-pressure
+        // signal there is, and on this session the ONLY one we will ever get:
+        // ordinary pressure is computed from the usage on a SUCCESSFUL
+        // response, and over the window nothing succeeds. That is the trap
+        // (PRI-2903) — the one mechanism that could rescue the session needed
+        // the session to be healthy enough to make a request, so it never
+        // fired and the coworker stayed wedged across restarts. So compact
+        // here, mid-turn, and retry the turn.
+        //
+        // Bounded by MAX_EMERGENCY_COMPACTIONS per run(): once the budget is
+        // spent, a further context_window_exceeded falls through to the
+        // terminal break below and surfaces as a failed turn rather than
+        // looping.
+        if (
+          stopReason === 'context_window_exceeded' &&
+          emergencyCompactions < MAX_EMERGENCY_COMPACTIONS
+        ) {
+          emergencyCompactions++;
+          let compacted = false;
+          try {
+            compacted = await this.compactSession({
+              modelId,
+              updateTurnSeq: durableTurnSeq,
+            });
+          } catch (compactionErr) {
+            // Nothing to fall back to — let the terminal break surface the
+            // original context_window_exceeded to the caller.
+            logger.error('runner: emergency compaction failed', {
+              err: compactionErr instanceof Error ? compactionErr.message : String(compactionErr),
+              turnId,
+              sessionId,
+            });
+          }
+          if (compacted) {
+            // Rebuild the message prefix from the now-compacted log. The
+            // per-turn in-memory mutations made before this point (loop
+            // reminders, tool-choice nudges, appended tool results, injects
+            // picked up earlier this turn) are dropped on purpose: the durable
+            // events behind them are folded into the compacted projection, and
+            // re-applying them would resurrect the history we just summarized
+            // away. The mutable per-turn state that is NOT part of
+            // providerMessages is reset explicitly below.
+            const compactedEntry = projectionCache
+              ? projectTurnEntry(
+                  sessionDir,
+                  runtimeBinding.toolRuntime.cwd,
+                  projectionCache,
+                  sessionId
+                )
+              : loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+            providerMessages = compactedEntry.messages;
+            if (compactedEntry.systemPrompt) {
+              // rerenderPersonaAfterCompaction may have written a new
+              // system_prompt_set; the retry should use it.
+              provider.setSystemPrompt(compactedEntry.systemPrompt);
+            }
+            // Re-seed the inject tailer at the rebuilt projection's watermark.
+            // The rebuild folded EVERY logged event, including any peer
+            // context_injected that landed while the oversized call was failing
+            // and the compaction was running (10.7s in the live incident — long
+            // enough for a Slack message or a job completion). Without the
+            // re-seed the old tailer, still holding its pre-call watermark,
+            // re-emits that inject at the top of the retry iteration and the
+            // model sees it twice. Same phantom-double the between-turn seeding
+            // above exists to prevent.
+            lastSeenEventSeq = compactedEntry.maxFoldedSeq;
+            injectTailer = createInjectTailer(
+              getLaceDir(),
+              basename(sessionDir),
+              compactedEntry.maxFoldedSeq
+            );
+            // A tail of pre-compaction generation must not be glued onto the
+            // post-compaction answer. `pause_turn` accumulates text and
+            // thinking across iterations for a single durable 'message' event,
+            // and the terminal-stop switch arm above does not reset them — so a
+            // turn that paused, then overflowed, would persist
+            // "<partial><recovered answer>" as one message.
+            partialAssistantText = '';
+            partialThinkingBlocks = [];
+            pauseResumeCount = 0;
+            // The compacted history is the whole point of the retry. If it is
+            // STILL over the window, the retry will 400 again and the session
+            // churns — the tail budget in track-compaction is a fixed constant,
+            // not a function of this model's window, so that is reachable on
+            // any model with a window under ~350K. Say so loudly; the retry
+            // still runs, and the emergency budget bounds the churn.
+            const compactedEstimate = estimateProviderTokens(providerMessages);
+            const windowSize = provider.contextWindowForModel(modelId ?? 'default');
+            if (compactedEstimate >= windowSize) {
+              logger.error('runner: compacted history STILL exceeds the context window', {
+                turnId,
+                sessionId,
+                compactedEstimate,
+                windowSize,
+                modelId,
+              });
+            }
+            // Say what happened. The agent notices the memory gap regardless,
+            // and an unexplained gap is worse than an explained one. Written as
+            // a durable context_injected event and NOT appended in-memory here:
+            // the tailer at the top of the next iteration picks it up exactly
+            // once, and it survives into later turns.
+            await this.deps.runExclusive(() => {
+              injectNotification({
+                sessionDir,
+                kind: 'emergency-compaction',
+                body:
+                  'Your conversation exceeded the model context window, so an emergency' +
+                  ' compaction just ran and older history was replaced with a summary.' +
+                  ' If you find a gap in what you remember, that is why — re-read files,' +
+                  ' tickets, or transcripts rather than trusting recall for anything from' +
+                  ' earlier in this session.',
+              });
+            });
+            // A server-side response chain describes the pre-compaction message
+            // list; it no longer matches what we are about to send.
+            lastResponseId = undefined;
+            stopReason = 'end_turn';
+            stopDetails = null;
+            logger.warn('runner: emergency compaction after context_window_exceeded, retrying', {
+              turnId,
+              sessionId,
+            });
+            // The retry is the same logical turn, so cancel the for-loop's
+            // increment (mirroring the pause_turn resume path).
+            completedTurns--;
+            continue;
+          }
+        }
+
         // Terminal provider stops (refusal / context_window_exceeded /
         // max_output_tokens / stop_sequence) exit the loop here. budget_exceeded
         // is set ABOVE the switch on every iteration; it is intentionally
@@ -1362,58 +1517,11 @@ export class ConversationRunner {
         }
 
         if (compactionRequest.requested || breakpointCompactCrossed) {
-          const allEvents = readDurableEvents(sessionDir, {
-            limit: Number.MAX_SAFE_INTEGER,
-          }).events;
-          const strategyName = this.config.persona
-            ? compactionStrategyNameForSession(sessionDir)
-            : 'track-based';
-          const strategy = resolveCompactionStrategy(strategyName);
-          const compactionCtx = buildCompactionContext({
-            threadId: sessionId,
-            sessionDir,
-            connectionId: this.config.connectionId,
-            modelId: modelId ?? undefined,
+          await this.compactSession({
+            modelId,
             guidance: compactionRequest.guidance,
+            updateTurnSeq: durableTurnSeq,
           });
-          const raw = await strategy.compact(
-            // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
-            // is the typed union. The shapes are identical on disk — this cast is
-            // safe because the event-log writer and event-types agree on the wire
-            // format.
-            allEvents as unknown as TypedDurableEvent[],
-            compactionCtx
-          );
-          const result = validatePreserved(raw);
-          if (!('noop' in result)) {
-            await this.deps.runExclusive(async () => {
-              const sessionState = readSessionState(sessionDir);
-              const { nextState } = appendDurableEvent(sessionDir, sessionState, {
-                type: 'context_compacted',
-                // ContextCompactedEventData satisfies Record<string,unknown>; the
-                // cast here is the symmetric inverse of the one above.
-                data: result.compactionEvent.data as Record<string, unknown>,
-              });
-              writeSessionState(sessionDir, nextState);
-              // Re-render the persona (model + system prompt) from the current
-              // persona file so the compacted session reflects the live persona.
-              await this.deps.rerenderPersonaAfterCompaction?.();
-            });
-            // Notify clients that an in-place compaction ran, mirroring the
-            // ent/session/compact handler's compaction_complete emit. sen-core's
-            // post-compaction wake keys on this update; without it, breakpoint
-            // and compact_session compactions strand in-flight work (PRI-2889).
-            // Emitted OUTSIDE the runExclusive section above: onUpdate takes the
-            // same mutex, and nesting it would deadlock.
-            await this.deps.onUpdate(durableTurnSeq, {
-              type: 'compaction_complete',
-              strategy: strategyName,
-              messagesCompacted:
-                typeof result.compactionEvent.data.messagesCompacted === 'number'
-                  ? result.compactionEvent.data.messagesCompacted
-                  : 0,
-            });
-          }
         }
       } catch (compactionErr) {
         logger.error('runner: compaction failed', {
@@ -1451,6 +1559,78 @@ export class ConversationRunner {
       ...(lastStructuredOutput !== undefined ? { structuredOutput: lastStructuredOutput } : {}),
       lastSeenEventSeq,
     };
+  }
+
+  /**
+   * Run one compaction pass over the session's durable log, persisting the
+   * resulting `context_compacted` event and telling clients it happened.
+   * Returns true when the log was actually compacted; a strategy noop (nothing
+   * worth summarizing) returns false and writes nothing.
+   *
+   * Shared by the two triggers: the post-turn one in run()'s finally block
+   * (persona breakpoints and the compact_session tool) and the mid-turn
+   * emergency one that fires on context_window_exceeded.
+   */
+  private async compactSession(params: {
+    modelId?: string;
+    guidance?: string;
+    /** Stream seq for the compaction_complete update. */
+    updateTurnSeq: number;
+  }): Promise<boolean> {
+    const { sessionDir, sessionId } = this.config;
+    const allEvents = readDurableEvents(sessionDir, {
+      limit: Number.MAX_SAFE_INTEGER,
+    }).events;
+    const strategyName = this.config.persona
+      ? compactionStrategyNameForSession(sessionDir)
+      : 'track-based';
+    const strategy = resolveCompactionStrategy(strategyName);
+    const compactionCtx = buildCompactionContext({
+      threadId: sessionId,
+      sessionDir,
+      connectionId: this.config.connectionId,
+      modelId: params.modelId ?? undefined,
+      guidance: params.guidance,
+    });
+    const raw = await strategy.compact(
+      // DurableEvent.data is Record<string,unknown>; TypedDurableEvent.data
+      // is the typed union. The shapes are identical on disk — this cast is
+      // safe because the event-log writer and event-types agree on the wire
+      // format.
+      allEvents as unknown as TypedDurableEvent[],
+      compactionCtx
+    );
+    const result = validatePreserved(raw);
+    if ('noop' in result) return false;
+
+    await this.deps.runExclusive(async () => {
+      const sessionState = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+        type: 'context_compacted',
+        // ContextCompactedEventData satisfies Record<string,unknown>; the
+        // cast here is the symmetric inverse of the one above.
+        data: result.compactionEvent.data as Record<string, unknown>,
+      });
+      writeSessionState(sessionDir, nextState);
+      // Re-render the persona (model + system prompt) from the current
+      // persona file so the compacted session reflects the live persona.
+      await this.deps.rerenderPersonaAfterCompaction?.();
+    });
+    // Notify clients that an in-place compaction ran, mirroring the
+    // ent/session/compact handler's compaction_complete emit. sen-core's
+    // post-compaction wake keys on this update; without it, breakpoint
+    // and compact_session compactions strand in-flight work (PRI-2889).
+    // Emitted OUTSIDE the runExclusive section above: onUpdate takes the
+    // same mutex, and nesting it would deadlock.
+    await this.deps.onUpdate(params.updateTurnSeq, {
+      type: 'compaction_complete',
+      strategy: strategyName,
+      messagesCompacted:
+        typeof result.compactionEvent.data.messagesCompacted === 'number'
+          ? result.compactionEvent.data.messagesCompacted
+          : 0,
+    });
+    return true;
   }
 
   /**
