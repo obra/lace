@@ -38,6 +38,7 @@ export function buildCompactionContext(
     modelId?: string;
     guidance?: string;
     referenceTimestamp?: string;
+    contextWindow?: number;
   },
   deps?: BuildContextDeps
 ): CompactionContext {
@@ -48,6 +49,7 @@ export function buildCompactionContext(
     threadId: opts.threadId,
     sessionDir: opts.sessionDir,
     referenceTimestamp: opts.referenceTimestamp ?? new Date().toISOString(),
+    ...(opts.contextWindow !== undefined ? { contextWindow: opts.contextWindow } : {}),
     ...(opts.guidance !== undefined ? { guidance: opts.guidance } : {}),
   };
 

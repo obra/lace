@@ -11,6 +11,9 @@ import {
   splitAtTailBoundary,
   trimTailToTokenBudget,
   estimateTailTokens,
+  tailTokenBudget,
+  TAIL_TOKEN_BUDGET_CAP,
+  TAIL_BUDGET_WINDOW_FRACTION,
   UNTRACKED,
 } from '../track-compaction';
 import { demuxByTrack } from '../toolkit';
@@ -640,6 +643,44 @@ describe('compact()', () => {
 // oldest tail turns back into `earlier` (compressed into the prefix) until the
 // verbatim tail fits a token budget, always keeping ≥1 (the in-flight) turn.
 
+// PRI-2906: the budget itself must follow the running model's context window.
+// A fixed 300K tail is larger than the whole window on a 200K model, so a
+// compacted session there is still over the limit and can never self-heal.
+describe('tailTokenBudget', () => {
+  it('is 90% of the window on a model too small for the cap', () => {
+    // Literal, not derived from the constants under test — a wrong fraction or
+    // a dropped multiplication has to change this number.
+    expect(tailTokenBudget(200_000)).toBe(180_000);
+    expect(tailTokenBudget(128_000)).toBe(115_200);
+  });
+
+  it('caps at 300K once 90% of the window would exceed it', () => {
+    expect(tailTokenBudget(1_000_000)).toBe(300_000);
+    expect(tailTokenBudget(400_000)).toBe(300_000);
+  });
+
+  it('switches from fraction to cap at the crossover window', () => {
+    // 90% crosses 300K at a 333,334-token window. Just under keeps the
+    // fraction; just over pins to the cap. Catches a min/max swap.
+    expect(tailTokenBudget(333_000)).toBe(299_700);
+    expect(tailTokenBudget(334_000)).toBe(300_000);
+  });
+
+  it('assumes the provider fallback window when the window is unknown', () => {
+    // buildCompactionContext callers that cannot resolve a provider leave
+    // contextWindow absent. Falling back to the old 300K constant would keep
+    // the wedge on every small model; fall back to the same 200K the provider
+    // itself assumes, which is safe on every model we ship.
+    expect(tailTokenBudget(undefined)).toBe(180_000);
+    expect(tailTokenBudget(0)).toBe(180_000);
+  });
+
+  it('pins the cap and fraction to the values the docs and tickets quote', () => {
+    expect(TAIL_TOKEN_BUDGET_CAP).toBe(300_000);
+    expect(TAIL_BUDGET_WINDOW_FRACTION).toBe(0.9);
+  });
+});
+
 describe('trimTailToTokenBudget', () => {
   // A turn whose assistant message carries `chars` characters of text.
   const sizedTurn = (startSeq: number, t: number, chars: number): TypedDurableEvent[] => {
@@ -730,6 +771,32 @@ describe('trimTailToTokenBudget', () => {
     if (!('compactionEvent' in result)) return;
     // Plain turn-count split would compact only the first 2 turns (8 events).
     expect(result.compactionEvent.data.messagesCompacted).toBeGreaterThan(8);
+  });
+
+  it('compact() preserves a smaller tail on a small-window model than a large one', async () => {
+    // The end-to-end behavior PRI-2906 is about: the same history compacted for
+    // a 200K model must give up more of its tail than for a 1M model, because
+    // the 1M model's 300K tail would not fit a 200K window at all.
+    const events = buildSession(Array(12).fill(200_000)); // ~50k tokens/turn
+
+    const big = await compact(events, { threadId: 's_big', contextWindow: 1_000_000 });
+    const small = await compact(events, { threadId: 's_small', contextWindow: 200_000 });
+
+    expect('compactionEvent' in big && 'compactionEvent' in small).toBe(true);
+    if (!('compactionEvent' in big) || !('compactionEvent' in small)) return;
+
+    expect(small.compactionEvent.data.messagesCompacted).toBeGreaterThan(
+      big.compactionEvent.data.messagesCompacted ?? 0
+    );
+  });
+
+  it('compact() keeps the preserved tail under the small model window', async () => {
+    // Not just "smaller" — actually under budget, which is the whole point:
+    // a compaction that leaves the session over the window cannot self-heal it.
+    const events = buildSession(Array(12).fill(200_000));
+    const split = trimTailToTokenBudget(events, 10, tailTokenBudget(200_000));
+    expect(estimateTailTokens(split.tail)).toBeLessThanOrEqual(180_000);
+    expect(estimateTailTokens(split.tail)).toBeLessThan(200_000);
   });
 });
 

@@ -173,26 +173,54 @@ export function salienceForTrack(trackId: string, events: TypedDurableEvent[]): 
 const TAIL_TURNS = 10;
 
 /**
- * Upper bound (in estimated tokens) on the verbatim tail we preserve through a
- * compaction. `TAIL_TURNS` caps the tail by *turn count*; this caps it by
- * *size*, so a handful of very large recent turns (long messages + big tool /
- * subagent outputs) can't blow past the model's context window even right after
+ * Ceiling on the verbatim tail we preserve through a compaction, in estimated
+ * tokens. `TAIL_TURNS` caps the tail by *turn count*; this caps it by *size*,
+ * so a handful of very large recent turns (long messages + big tool / subagent
+ * outputs) can't blow past the model's context window even right after
  * compacting.
  *
- * 300K is deliberately conservative: it leaves ample room under a 1M-token
- * window (far under the ~950K usable after system prompt + output reserve +
- * the prefix summary), with plenty of headroom for new turns before the next
+ * 300K is the ceiling rather than the answer: on a 1M-token window it leaves
+ * ample room (far under the ~950K usable after system prompt + output reserve +
+ * the prefix summary) with plenty of headroom for new turns before the next
  * compaction fires. The token-blind 10-turn tail once reached ~600K in
  * production and 400'd every request with `prompt_too_long`.
- *
- * Known limitation, tracked separately: this is a FIXED constant, not a
- * fraction of the running model's context window. On a model with a window
- * under ~350K the preserved tail alone can still exceed it, so a compaction
- * cannot get the session back under the limit. The runner's emergency
- * compaction (PRI-2903) logs loudly when the compacted history is still over
- * the window rather than retrying indefinitely.
  */
-const TAIL_TOKEN_BUDGET = 300_000;
+export const TAIL_TOKEN_BUDGET_CAP = 300_000;
+
+/**
+ * Fraction of the model's context window the preserved tail may occupy. The
+ * remaining 10% is the room compaction needs to be worth anything: the prefix
+ * summary, the system prompt, and at least one new turn all have to fit
+ * alongside the tail or the session is still over the window the moment it
+ * finishes compacting.
+ */
+export const TAIL_BUDGET_WINDOW_FRACTION = 0.9;
+
+/**
+ * The window we assume when the call site couldn't tell us one. Matches
+ * `BaseProvider.contextWindowForModel`'s own fallback, so an unplumbed caller
+ * degrades to a tail that is safe on every model we ship rather than to the
+ * 300K ceiling, which is larger than the entire window on a 200K model.
+ */
+const ASSUMED_CONTEXT_WINDOW = 200_000;
+
+/**
+ * Token budget for the preserved tail on a model with this context window.
+ *
+ * Before PRI-2906 this was a flat 300K with no relationship to the running
+ * model. On any window under ~333K that budget exceeded the window itself, so
+ * a compacted session was still over the limit — PRI-2903's emergency
+ * self-heal would compact, retry, 400 again, and every later turn would burn
+ * another compaction that also could not help. We only failed to notice
+ * because the fleet runs ~1M-window models.
+ */
+export function tailTokenBudget(contextWindow?: number): number {
+  const window =
+    contextWindow !== undefined && Number.isFinite(contextWindow) && contextWindow > 0
+      ? contextWindow
+      : ASSUMED_CONTEXT_WINDOW;
+  return Math.min(TAIL_TOKEN_BUDGET_CAP, Math.floor(window * TAIL_BUDGET_WINDOW_FRACTION));
+}
 
 /**
  * Estimate the on-wire token size of the verbatim tail by building the exact
@@ -252,9 +280,13 @@ export function trimTailToTokenBudget(
  */
 export async function compact(
   events: TypedDurableEvent[],
-  _ctx: CompactionContext
+  ctx: CompactionContext
 ): Promise<CompactResult> {
-  const { earlier, tail } = trimTailToTokenBudget(events, TAIL_TURNS, TAIL_TOKEN_BUDGET);
+  const { earlier, tail } = trimTailToTokenBudget(
+    events,
+    TAIL_TURNS,
+    tailTokenBudget(ctx.contextWindow)
+  );
 
   if (earlier.length === 0) {
     return { noop: true };
