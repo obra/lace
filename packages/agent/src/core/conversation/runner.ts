@@ -1147,11 +1147,15 @@ export class ConversationRunner {
             // The compacted history is the whole point of the retry. If it is
             // STILL over the window, the retry will 400 again and the session
             // churns. Since PRI-2906 the tail budget is a fraction of this
-            // model's window, so the remaining way to land here is a single
-            // in-flight turn too large to compress at all — track-based
-            // preserves it regardless rather than dropping the turn. Say so
-            // loudly; the retry still runs, and the emergency budget bounds
-            // the churn.
+            // model's window, which removes the largest cause but not every
+            // one: a single in-flight turn too big to compress at all is
+            // preserved regardless rather than dropped; a strategy may ignore
+            // ctx.contextWindow; the catalog may report the wrong window for a
+            // model it doesn't describe; and this very check measures messages
+            // only — estimateProviderTokens excludes the system prompt, tool
+            // schemas, and images, so it under-reports and can stay quiet on a
+            // session that will 400 again. Say so loudly; the retry still
+            // runs, and the emergency budget bounds the churn.
             const compactedEstimate = estimateProviderTokens(providerMessages);
             const windowSize = provider.contextWindowForModel(modelId ?? 'default');
             if (compactedEstimate >= windowSize) {

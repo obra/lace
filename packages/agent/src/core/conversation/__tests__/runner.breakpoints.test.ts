@@ -27,6 +27,7 @@ import type { Tool } from '@lace/agent/tools/tool';
 import { ToolExecutor } from '@lace/agent/tools/executor';
 import { registerBuiltinTools } from '@lace/agent/tools/builtins';
 import { resetRegistriesForTest } from '@lace/agent/plugins';
+import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 
 // ---------------------------------------------------------------------------
 // Mock compactionBreakpointsForSession so persona file loading is not required
@@ -201,6 +202,56 @@ function seedSession(sessionDir: string, sessionId: string, cwd: string, persona
   );
 }
 
+/**
+ * Like seedSession, but with turns big enough that the compaction's TOKEN
+ * budget — not its turn count — decides where the tail split lands.
+ */
+function seedLargeTurns(
+  sessionDir: string,
+  sessionId: string,
+  cwd: string,
+  persona: string,
+  count: number,
+  chars: number
+): void {
+  const now = new Date().toISOString();
+  const lines: string[] = [
+    JSON.stringify({
+      eventSeq: 1,
+      timestamp: now,
+      type: 'system_prompt_set',
+      data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+    }),
+  ];
+  let seq = 2;
+  for (let i = 0; i < count; i++) {
+    const tid = `big_turn_${i}`;
+    const push = (type: string, data: Record<string, unknown>, turnId?: string) =>
+      lines.push(
+        JSON.stringify({
+          eventSeq: seq++,
+          timestamp: now,
+          ...(turnId ? { turnId } : {}),
+          type,
+          data: { type, ...data },
+        })
+      );
+    push('prompt', { content: [{ type: 'text', text: `big prompt ${i}` }] });
+    push('turn_start', {}, tid);
+    push('message', { content: [{ type: 'text', text: 'x'.repeat(chars) }] }, tid);
+    push('turn_end', { stopReason: 'end_turn' }, tid);
+  }
+  writeFileSync(join(sessionDir, 'events.jsonl'), lines.join('\n') + '\n');
+  writeFileSync(
+    join(sessionDir, 'state.json'),
+    JSON.stringify({ nextEventSeq: seq, nextStreamSeq: 1 })
+  );
+  writeFileSync(
+    join(sessionDir, 'meta.json'),
+    JSON.stringify({ sessionId, workDir: cwd, created: now, persona })
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -338,6 +389,73 @@ describe('ConversationRunner - configurable breakpoints', () => {
 
     const { events } = readDurableEvents(sessionDir, {});
     expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
+  });
+
+  it('sizes a breakpoint compaction to the model window, not a fixed 300K (PRI-2906)', async () => {
+    // The post-turn trigger is the common case — breakpoints and the
+    // compact_session tool both land here — so it is the one that most needs
+    // to hand the strategy the right window. A compaction sized for a 1M model
+    // leaves a 200K session still over its limit, which is the wedge.
+    mockBreakpoints.mockReturnValue([{ at: 0.5, action: 'compact' }]);
+
+    const compactedUnderWindow = async (window: number) => {
+      seedLargeTurns(sessionDir, sessionId, cwd, 'compact-low', 12, 200_000);
+      const provider = new ScriptedProvider(
+        [
+          {
+            content: 'done',
+            toolCalls: [],
+            stopReason: 'stop',
+            usage: {
+              promptTokens: Math.floor(window * 0.6),
+              completionTokens: 10,
+              totalTokens: Math.floor(window * 0.6) + 10,
+            },
+          },
+        ],
+        window
+      );
+      const executor = new ToolExecutor();
+      executor.registerAllAvailableTools({ skillDirs: [] } as any);
+      const runner = new ConversationRunner(
+        {
+          sessionDir,
+          sessionId,
+          cwd,
+          executionMode: 'execute',
+          approvalMode: 'approve',
+          persona: 'compact-low',
+        },
+        createMockDeps({
+          createProvider: vi.fn().mockImplementation(async () => provider),
+          createToolExecutor: vi.fn().mockReturnValue({
+            executor,
+            toolsForProvider: executor.getAllTools(),
+          }),
+        })
+      );
+      await runner.run({
+        content: [{ type: 'text', text: 'hello' }],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+      const { events } = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
+      const compacted = events.filter((e) => e.type === 'context_compacted');
+      expect(compacted.length).toBeGreaterThan(0);
+      const preserved = (compacted.at(-1)!.data as { preserved: ProviderMessage[] }).preserved;
+      return estimateProviderTokens(preserved);
+    };
+
+    const narrow = await compactedUnderWindow(200_000);
+    const wide = await compactedUnderWindow(1_000_000);
+
+    // The 200K session's compacted history actually fits its window...
+    expect(narrow).toBeLessThan(200_000);
+    // ...and it is genuinely a different, smaller history than the 1M one,
+    // which keeps the 300K ceiling. Equal values mean the window never reached
+    // the strategy.
+    expect(narrow).toBeLessThan(wide);
   });
 
   it('crossing a compact breakpoint emits a compaction_complete session update (PRI-2889)', async () => {

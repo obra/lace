@@ -13,6 +13,7 @@ import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
 import { buildCompactionContext } from '@lace/agent/compaction/build-context';
+import { resolveContextWindow } from '@lace/agent/compaction/context-window';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import {
@@ -162,6 +163,10 @@ export async function handleSlashCommand(
           sessionDir,
           connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
+          contextWindow: await resolveContextWindow({
+            connectionId: effectiveConfig.connectionId,
+            modelId: effectiveConfig.modelId,
+          }),
           guidance,
         });
         const raw = await resolveCompactionStrategy(name).compact(events, compactionCtx);

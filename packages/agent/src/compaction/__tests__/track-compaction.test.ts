@@ -19,6 +19,8 @@ import {
 import { demuxByTrack } from '../toolkit';
 import { logger } from '@lace/agent/utils/logger';
 import type { CompactionContext } from '../types';
+import type { ProviderMessage } from '@lace/agent/providers/base-provider';
+import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 import type { DurableEventData, TypedDurableEvent } from '@lace/agent/storage/event-types';
 
 const event = (
@@ -647,37 +649,46 @@ describe('compact()', () => {
 // A fixed 300K tail is larger than the whole window on a 200K model, so a
 // compacted session there is still over the limit and can never self-heal.
 describe('tailTokenBudget', () => {
-  it('is 90% of the window on a model too small for the cap', () => {
+  it('is a fraction of the window on a model too small for the cap', () => {
     // Literal, not derived from the constants under test — a wrong fraction or
     // a dropped multiplication has to change this number.
-    expect(tailTokenBudget(200_000)).toBe(180_000);
-    expect(tailTokenBudget(128_000)).toBe(115_200);
+    expect(tailTokenBudget(200_000)).toBe(120_000);
+    expect(tailTokenBudget(128_000)).toBe(76_800);
   });
 
-  it('caps at 300K once 90% of the window would exceed it', () => {
+  it('caps at 300K once the fraction of the window would exceed it', () => {
     expect(tailTokenBudget(1_000_000)).toBe(300_000);
-    expect(tailTokenBudget(400_000)).toBe(300_000);
+    expect(tailTokenBudget(800_000)).toBe(300_000);
   });
 
   it('switches from fraction to cap at the crossover window', () => {
-    // 90% crosses 300K at a 333,334-token window. Just under keeps the
-    // fraction; just over pins to the cap. Catches a min/max swap.
-    expect(tailTokenBudget(333_000)).toBe(299_700);
-    expect(tailTokenBudget(334_000)).toBe(300_000);
+    // The fraction crosses 300K at a 500,000-token window. Just under keeps the
+    // fraction; at and above pins to the cap. Catches a min/max swap.
+    expect(tailTokenBudget(499_000)).toBe(299_400);
+    expect(tailTokenBudget(500_000)).toBe(300_000);
+  });
+
+  it('leaves the compacted session below the lowest compact breakpoint', () => {
+    // The reason the fraction is what it is: compaction has to relieve
+    // pressure past the LOWEST breakpoint, because highestFiredBreakpointAt
+    // only resets there. A budget at or above it leaves every breakpoint
+    // fired and no post-turn compaction ever runs again.
+    const lowestCompactBreakpoint = 0.6;
+    expect(TAIL_BUDGET_WINDOW_FRACTION).toBeLessThanOrEqual(lowestCompactBreakpoint);
   });
 
   it('assumes the provider fallback window when the window is unknown', () => {
-    // buildCompactionContext callers that cannot resolve a provider leave
+    // A call site with no connection or model to resolve one from leaves
     // contextWindow absent. Falling back to the old 300K constant would keep
     // the wedge on every small model; fall back to the same 200K the provider
     // itself assumes, which is safe on every model we ship.
-    expect(tailTokenBudget(undefined)).toBe(180_000);
-    expect(tailTokenBudget(0)).toBe(180_000);
+    expect(tailTokenBudget(undefined)).toBe(120_000);
+    expect(tailTokenBudget(0)).toBe(120_000);
   });
 
   it('pins the cap and fraction to the values the docs and tickets quote', () => {
     expect(TAIL_TOKEN_BUDGET_CAP).toBe(300_000);
-    expect(TAIL_BUDGET_WINDOW_FRACTION).toBe(0.9);
+    expect(TAIL_BUDGET_WINDOW_FRACTION).toBe(0.6);
   });
 });
 
@@ -790,13 +801,34 @@ describe('trimTailToTokenBudget', () => {
     );
   });
 
-  it('compact() keeps the preserved tail under the small model window', async () => {
-    // Not just "smaller" — actually under budget, which is the whole point:
-    // a compaction that leaves the session over the window cannot self-heal it.
+  it('compact() emits a preserved history that fits the small model window', async () => {
+    // Not just "smaller" — under the window, which is the whole point: a
+    // compaction that leaves the session over the limit cannot self-heal it.
+    // Measured on what compact() actually emits (summary prefix included), not
+    // on a budget number handed back to the function that was given it.
     const events = buildSession(Array(12).fill(200_000));
-    const split = trimTailToTokenBudget(events, 10, tailTokenBudget(200_000));
-    expect(estimateTailTokens(split.tail)).toBeLessThanOrEqual(180_000);
-    expect(estimateTailTokens(split.tail)).toBeLessThan(200_000);
+    const result = await compact(events, { threadId: 's_fits', contextWindow: 200_000 });
+    expect('compactionEvent' in result).toBe(true);
+    if (!('compactionEvent' in result)) return;
+
+    const preserved = result.compactionEvent.data.preserved as ProviderMessage[];
+    expect(estimateProviderTokens(preserved)).toBeLessThan(200_000);
+  });
+
+  it('compact() leaves real headroom, not just a hair under the window', async () => {
+    // A fraction of 0.99 would satisfy "under the window" while leaving nothing
+    // for the system prompt, tool schemas, or the next turn — i.e. the wedge
+    // restored under a passing test. Pin the actual headroom.
+    const events = buildSession(Array(12).fill(200_000));
+    const result = await compact(events, { threadId: 's_headroom', contextWindow: 200_000 });
+    if (!('compactionEvent' in result)) throw new Error('expected a compaction');
+
+    const preserved = result.compactionEvent.data.preserved as ProviderMessage[];
+    // 120_000 is the budget at a 200K window; the prefix summary rides on top.
+    // Requiring the whole compacted history to clear 65% of the window leaves
+    // real room for the system prompt, tool schemas, and output reserve that
+    // the estimator never counts.
+    expect(estimateProviderTokens(preserved)).toBeLessThanOrEqual(130_000);
   });
 });
 

@@ -41,6 +41,7 @@ import {
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
 import { buildCompactionContext } from '@lace/agent/compaction/build-context';
+import { resolveContextWindow } from '@lace/agent/compaction/context-window';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
@@ -514,6 +515,10 @@ export function registerSessionOperationHandlers(
         sessionDir,
         connectionId: effectiveConfig.connectionId,
         modelId: effectiveConfig.modelId,
+        contextWindow: await resolveContextWindow({
+          connectionId: effectiveConfig.connectionId,
+          modelId: effectiveConfig.modelId,
+        }),
         guidance: parsed?.guidance,
       });
       const raw = await strategy.compact(events, compactionCtx);

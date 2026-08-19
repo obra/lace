@@ -127,4 +127,17 @@ describe('buildCompactionContext', () => {
     const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
     expect(ctx.query).toBeDefined();
   });
+
+  it('forwards contextWindow so the strategy can size its tail (PRI-2906)', () => {
+    const ctx = buildCompactionContext({ ...BASE_OPTS, contextWindow: 200_000 });
+    expect(ctx.contextWindow).toBe(200_000);
+  });
+
+  it('omits contextWindow rather than forwarding undefined', () => {
+    // exactOptionalPropertyTypes: a present-but-undefined key and an absent one
+    // are different to a strategy that checks `in`, and the fallback path keys
+    // on absence.
+    const ctx = buildCompactionContext(BASE_OPTS);
+    expect('contextWindow' in ctx).toBe(false);
+  });
 });

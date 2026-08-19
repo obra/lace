@@ -429,11 +429,41 @@ interface CompactionContext {
     model?: string;
     signal?: AbortSignal;
   }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
+  // Context window of the model this session runs on. Size the verbatim tail you
+  // preserve against it — see "Sizing the preserved tail" below. Absent only when
+  // the call site has no connection/model to resolve one from.
+  readonly contextWindow?: number;
   // Free-text steering from the compact caller (compact_session / ent.session.compact
   // `guidance`, or /compact's command tail). Absent when auto-fired; built-ins ignore it.
   guidance?: string;
 }
 ```
+
+**Sizing the preserved tail.** A strategy that preserves recent turns verbatim
+must bound that tail by TOKENS, not just by turn count — a handful of large
+turns can preserve more than the whole context window, and a compaction that
+leaves the session over the limit cannot get it back under, so the next turn
+400s and every turn after it burns another compaction that also cannot help.
+The toolkit ships the primitives:
+
+```ts
+import { tailTokenBudget, trimTailToTokenBudget } from '@lace/agent/compaction/toolkit';
+
+const { earlier, tail } = trimTailToTokenBudget(
+  events,
+  TAIL_TURNS,
+  tailTokenBudget(ctx.contextWindow),
+  // Optional: measure through your own shrinking step, so the budget sees what
+  // the provider actually receives rather than the raw events.
+  trimMyToolIO
+);
+```
+
+`tailTokenBudget` returns `min(300K, 60% of the window)`, falling back to a
+conservative 200K window when `ctx.contextWindow` is absent. The fraction sits
+below the lowest default compact breakpoint on purpose: compaction has to
+relieve pressure past that breakpoint, or `highestFiredBreakpointAt` never
+resets and no further post-turn compaction fires.
 
 **Compaction is triggered three ways**, all routing through the persona-selected
 strategy and `validatePreserved`: automatically in the runner's post-turn hook
