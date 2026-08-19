@@ -40,8 +40,7 @@ import {
 } from '../../message-building/message-builder';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
-import { buildCompactionContext } from '@lace/agent/compaction/build-context';
-import { resolveContextWindow } from '@lace/agent/compaction/context-window';
+import { buildCompactionContextForConnection } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
 import { buildSessionConfigOptions, isApprovalMode } from '../session-config';
@@ -510,15 +509,11 @@ export function registerSessionOperationHandlers(
         const msg = err instanceof Error ? err.message : String(err);
         throw { code: -32602, message: msg, data: { category: 'protocol' } };
       }
-      const compactionCtx = buildCompactionContext({
+      const compactionCtx = await buildCompactionContextForConnection({
         threadId: state.activeSession!.meta.sessionId,
         sessionDir,
         connectionId: effectiveConfig.connectionId,
         modelId: effectiveConfig.modelId,
-        contextWindow: await resolveContextWindow({
-          connectionId: effectiveConfig.connectionId,
-          modelId: effectiveConfig.modelId,
-        }),
         guidance: parsed?.guidance,
       });
       const raw = await strategy.compact(events, compactionCtx);

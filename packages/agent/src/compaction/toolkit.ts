@@ -7,7 +7,7 @@ import type { ContentBlock, ThinkingBlock } from '@lace/agent/providers/base-pro
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import type { ToolResult as ProtocolToolResult } from '@lace/ent-protocol';
 import { foldEvents } from '@lace/agent/message-building/fold-event';
-import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
+import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
 import type { FoldEventInput } from '@lace/agent/message-building/fold-event';
 
@@ -589,19 +589,44 @@ export const TAIL_TOKEN_BUDGET_CAP = 300_000;
  * skips images entirely. So the fraction has to leave room for a payload it
  * cannot see.
  *
- * 0.6 rather than something closer to the line, because of what compaction is
- * FOR. The default breakpoints compact at 0.6 and 0.9, and
- * `highestFiredBreakpointAt` only resets once pressure falls below the LOWEST
- * of them. A compaction that lands the session back at 0.9 leaves every
- * breakpoint still fired, so no post-turn compaction ever runs again and the
- * session sits pinned at the limit — the same wedge one notch further along.
- * Landing under the lowest compact breakpoint is what makes compaction
+ * The value tracks the lowest default compact breakpoint, because of what
+ * compaction is FOR. `highestFiredBreakpointAt` only resets once pressure
+ * falls back BELOW the lowest breakpoint (strictly below —
+ * `evaluateBreakpoints` computes `pressure < minAt`). A compaction that lands
+ * the session at or above it leaves every breakpoint still fired, so no
+ * post-turn compaction ever runs again and the session sits pinned at the
+ * limit, carried only by emergency compactions — the same wedge one notch
+ * further along. Landing under that breakpoint is what makes compaction
  * self-healing rather than a one-shot.
  *
- * On any model at or above a 500K window the 300K cap binds first, so this
- * fraction only takes effect where the wedge actually lives: small windows.
+ * So this is not "how much of the window the tail may use" — it is the
+ * PRESSURE the session should sit at once compaction finishes, tail plus
+ * everything that rides along with it. 0.5 leaves real margin under the 0.6
+ * breakpoint, which matters because the reset is strict and the overhead is
+ * an estimate. Sizing the tail itself at 0.6 would land pressure at 0.6 or
+ * above and re-latch every time.
  */
-export const TAIL_BUDGET_WINDOW_FRACTION = 0.6;
+export const TAIL_BUDGET_WINDOW_FRACTION = 0.5;
+
+/**
+ * Tokens reserved for everything that ships alongside the preserved tail and
+ * is invisible to the budget.
+ *
+ * `estimateProviderTokens` counts message text, tool calls, and tool results.
+ * It does not count the system prompt, the tool schemas, or images — and the
+ * prefix summary is merged on afterwards. But `computePressure` divides the
+ * model's report of the WHOLE input by the window. So a tail sized to exactly
+ * 60% of the window produces a turn whose measured pressure is 60% plus all of
+ * that, which lands back at or above the breakpoint and re-latches it.
+ *
+ * lace's builtin tool schemas alone measure ~7K tokens before any MCP or skill
+ * tools are registered; a persona system prompt and a prefix summary are each
+ * a few thousand more. 25K is chosen to cover that with room for a fleet
+ * that adds tools, and it is an absolute figure rather than a fraction because
+ * the overhead is absolute — it does not shrink with the window, which is
+ * precisely why small-window models were the ones that wedged.
+ */
+export const NON_TAIL_OVERHEAD_ALLOWANCE = 25_000;
 
 /**
  * The window we assume when the call site couldn't tell us one. Matches
@@ -626,7 +651,12 @@ export function tailTokenBudget(contextWindow?: number): number {
     contextWindow !== undefined && Number.isFinite(contextWindow) && contextWindow > 0
       ? contextWindow
       : ASSUMED_CONTEXT_WINDOW;
-  return Math.min(TAIL_TOKEN_BUDGET_CAP, Math.floor(window * TAIL_BUDGET_WINDOW_FRACTION));
+  const fromWindow = Math.floor(window * TAIL_BUDGET_WINDOW_FRACTION) - NON_TAIL_OVERHEAD_ALLOWANCE;
+  // Never negative. On a window too small to hold the overhead at all, the
+  // budget collapses to zero and `trimTailToTokenBudget` falls through to its
+  // preserve-the-in-flight-turn-anyway path, which is the right degenerate
+  // answer: there is no tail size that would fit.
+  return Math.max(0, Math.min(TAIL_TOKEN_BUDGET_CAP, fromWindow));
 }
 
 /**

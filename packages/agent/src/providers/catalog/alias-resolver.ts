@@ -1,7 +1,15 @@
 // ABOUTME: Resolves bare model aliases (haiku, sonnet, opus) to concrete catalog ids
 // ABOUTME: Exact catalog ids pass through unchanged; unknown strings also pass through
 
-import type { CatalogModel } from './types';
+/**
+ * Anything with an id can be ranked — the resolver reads nothing else. Widened
+ * from CatalogModel so a caller holding a provider's own ModelInfo[] can resolve
+ * an alias against exactly the model list that provider was built with, rather
+ * than re-deriving one from the catalog and risking a different answer.
+ */
+interface HasModelId {
+  id: string;
+}
 
 const KNOWN_ALIASES = new Set(['haiku', 'sonnet', 'opus']);
 const DATE_PATTERN = /(\d{8})/;
@@ -13,8 +21,8 @@ function dateScore(id: string): number {
 
 export function resolveModelAlias(
   modelId: string,
-  models: CatalogModel[],
-  fallbackModels?: CatalogModel[]
+  models: HasModelId[],
+  fallbackModels?: HasModelId[]
 ): string {
   if (models.some((m) => m.id === modelId)) {
     return modelId;
@@ -44,7 +52,7 @@ export function resolveModelAlias(
   return modelId;
 }
 
-function pickNewest(matches: CatalogModel[]): string {
+function pickNewest(matches: HasModelId[]): string {
   const sorted = [...matches].sort((a, b) => {
     const dateDiff = dateScore(b.id) - dateScore(a.id);
     if (dateDiff !== 0) return dateDiff;

@@ -12,8 +12,7 @@ import {
 import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
 import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
-import { buildCompactionContext } from '@lace/agent/compaction/build-context';
-import { resolveContextWindow } from '@lace/agent/compaction/context-window';
+import { buildCompactionContextForConnection } from '@lace/agent/compaction/build-context';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import {
@@ -158,15 +157,11 @@ export async function handleSlashCommand(
         const name = compactionStrategyNameForSession(sessionDir);
         // args is the free-text tail after /compact — thread as guidance.
         const guidance = args.trim() || undefined;
-        const compactionCtx = buildCompactionContext({
+        const compactionCtx = await buildCompactionContextForConnection({
           threadId: sessionId,
           sessionDir,
           connectionId: effectiveConfig.connectionId,
           modelId: effectiveConfig.modelId,
-          contextWindow: await resolveContextWindow({
-            connectionId: effectiveConfig.connectionId,
-            modelId: effectiveConfig.modelId,
-          }),
           guidance,
         });
         const raw = await resolveCompactionStrategy(name).compact(events, compactionCtx);

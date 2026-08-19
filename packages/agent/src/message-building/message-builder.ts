@@ -5,7 +5,10 @@ import type { ContentBlock, ProviderMessage, ThinkingBlock } from '../providers/
 import { appendOrMergeUser } from './append-or-merge';
 import { foldEvent, initialFoldState, type FoldState } from './fold-event';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
-import { estimateTokens } from '@lace/agent/utils/token-estimation';
+import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
+
+// Re-exported from its pure home so the many existing importers are unchanged.
+export { estimateProviderTokens };
 import { logger } from '@lace/agent/utils/logger';
 import { readParsedSessionEvents, type ParsedSessionEvent } from './parsed-events';
 
@@ -402,31 +405,4 @@ export function buildProviderMessagesFromParsedEvents(
   for (const e of parsedEvents) applyEventToProjection(acc, e.type, e.data);
   finalizeProjectionWarnings(acc);
   return { messages: acc.state.messages, systemPrompt: acc.systemPrompt };
-}
-
-/**
- * Estimates the total token count for a set of provider messages.
- * Includes content tokens, tool call tokens, and tool result tokens.
- */
-export function estimateProviderTokens(messages: ProviderMessage[]): number {
-  let total = 0;
-  for (const message of messages) {
-    if (typeof message.content === 'string') {
-      total += estimateTokens(message.content);
-    } else {
-      // Count tokens for text blocks only (images don't count as text tokens)
-      const textContent = message.content
-        .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
-        .map((b) => b.text)
-        .join('\n');
-      total += estimateTokens(textContent);
-    }
-    if (message.toolCalls) {
-      total += estimateTokens(JSON.stringify(message.toolCalls));
-    }
-    if (message.toolResults) {
-      total += estimateTokens(JSON.stringify(message.toolResults));
-    }
-  }
-  return total;
 }

@@ -2,7 +2,7 @@
 // ABOUTME: Verifies prompt→messages mapping, model defaulting, guidance passthrough, and connection guard
 
 import { describe, it, expect, vi } from 'vitest';
-import { buildCompactionContext } from '../build-context';
+import { buildCompactionContext, buildCompactionContextForConnection } from '../build-context';
 
 describe('buildCompactionContext', () => {
   const BASE_OPTS = {
@@ -131,6 +131,34 @@ describe('buildCompactionContext', () => {
   it('forwards contextWindow so the strategy can size its tail (PRI-2906)', () => {
     const ctx = buildCompactionContext({ ...BASE_OPTS, contextWindow: 200_000 });
     expect(ctx.contextWindow).toBe(200_000);
+  });
+
+  it('buildCompactionContextForConnection resolves the window and threads it in', async () => {
+    // The composition is the unit under test. Before this existed, the resolve
+    // and the build were two lines repeated in each RPC handler, and deleting
+    // the window from either one passed the entire suite.
+    const resolveContextWindow = vi.fn().mockResolvedValue(750_000);
+    const ctx = await buildCompactionContextForConnection(BASE_OPTS, {
+      oneShotQuery: vi.fn(),
+      resolveContextWindow,
+    });
+    expect(resolveContextWindow).toHaveBeenCalledWith({
+      connectionId: BASE_OPTS.connectionId,
+      modelId: BASE_OPTS.modelId,
+    });
+    expect(ctx.contextWindow).toBe(750_000);
+  });
+
+  it('buildCompactionContextForConnection omits the window when it cannot be resolved', async () => {
+    const ctx = await buildCompactionContextForConnection(BASE_OPTS, {
+      oneShotQuery: vi.fn(),
+      resolveContextWindow: vi.fn().mockResolvedValue(undefined),
+    });
+    expect('contextWindow' in ctx).toBe(false);
+    // Everything else still arrives — a failed window lookup must not cost the
+    // caller its query binding or its guidance.
+    expect(ctx.query).toBeDefined();
+    expect(ctx.threadId).toBe(BASE_OPTS.threadId);
   });
 
   it('omits contextWindow rather than forwarding undefined', () => {

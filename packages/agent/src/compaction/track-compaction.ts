@@ -26,6 +26,7 @@ export { UNTRACKED, splitAtTailBoundary };
 export {
   TAIL_TOKEN_BUDGET_CAP,
   TAIL_BUDGET_WINDOW_FRACTION,
+  NON_TAIL_OVERHEAD_ALLOWANCE,
   tailTokenBudget,
   estimateTailTokens,
   trimTailToTokenBudget,

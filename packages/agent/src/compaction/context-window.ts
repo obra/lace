@@ -3,6 +3,7 @@
 
 import type { AIProvider } from '@lace/agent/providers/base-provider';
 import { createProviderForTurn as defaultCreateProviderForTurn } from '@lace/agent/providers/turn-factory';
+import { resolveModelAlias } from '@lace/agent/providers/catalog/alias-resolver';
 import { logger } from '@lace/agent/utils/logger';
 
 type CreateProviderForTurn = typeof defaultCreateProviderForTurn;
@@ -31,7 +32,26 @@ export async function resolveContextWindow(
   let provider: AIProvider | undefined;
   try {
     provider = await factory({ connectionId: opts.connectionId, modelId: opts.modelId });
-    return provider.contextWindowForModel(opts.modelId);
+    // Resolve the id the same way the factory did before looking it up. The
+    // factory resolves a bare alias ('opus', 'sonnet') internally but does not
+    // hand the resolved id back, and `contextWindowForModel` does an exact match
+    // — so passing the alias straight through misses every catalog entry and
+    // silently returns the 200K default. On a 1M model that would cut the
+    // preserved tail to a fraction of what fits, which is the regression this
+    // whole plumbing exists to avoid.
+    const models = provider.getAvailableModels();
+    const resolvedId = resolveModelAlias(opts.modelId, models);
+    const model = models.find((m) => m.id === resolvedId);
+    if (!model) {
+      // Better to say "I don't know" than to report a default as if it were
+      // this model's real window.
+      logger.warn('compaction: model is absent from the provider catalog', {
+        modelId: opts.modelId,
+        resolvedId,
+      });
+      return undefined;
+    }
+    return model.contextWindow;
   } catch (err) {
     logger.warn('compaction: could not resolve the model context window', {
       connectionId: opts.connectionId,

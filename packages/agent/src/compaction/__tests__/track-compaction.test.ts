@@ -14,9 +14,11 @@ import {
   tailTokenBudget,
   TAIL_TOKEN_BUDGET_CAP,
   TAIL_BUDGET_WINDOW_FRACTION,
+  NON_TAIL_OVERHEAD_ALLOWANCE,
   UNTRACKED,
 } from '../track-compaction';
 import { demuxByTrack } from '../toolkit';
+import { DEFAULT_BREAKPOINTS } from '@lace/agent/compaction/select';
 import { logger } from '@lace/agent/utils/logger';
 import type { CompactionContext } from '../types';
 import type { ProviderMessage } from '@lace/agent/providers/base-provider';
@@ -649,32 +651,55 @@ describe('compact()', () => {
 // A fixed 300K tail is larger than the whole window on a 200K model, so a
 // compacted session there is still over the limit and can never self-heal.
 describe('tailTokenBudget', () => {
-  it('is a fraction of the window on a model too small for the cap', () => {
-    // Literal, not derived from the constants under test — a wrong fraction or
-    // a dropped multiplication has to change this number.
-    expect(tailTokenBudget(200_000)).toBe(120_000);
-    expect(tailTokenBudget(128_000)).toBe(76_800);
+  it('is a fraction of the window, less the overhead, on a model under the cap', () => {
+    // Literal, not derived from the constants under test — a wrong fraction, a
+    // dropped multiplication, or a forgotten overhead has to change these.
+    expect(tailTokenBudget(200_000)).toBe(75_000);
+    expect(tailTokenBudget(128_000)).toBe(39_000);
   });
 
-  it('caps at 300K once the fraction of the window would exceed it', () => {
+  it('caps at 300K once the window is large enough', () => {
     expect(tailTokenBudget(1_000_000)).toBe(300_000);
-    expect(tailTokenBudget(800_000)).toBe(300_000);
+    expect(tailTokenBudget(700_000)).toBe(300_000);
   });
 
   it('switches from fraction to cap at the crossover window', () => {
-    // The fraction crosses 300K at a 500,000-token window. Just under keeps the
-    // fraction; at and above pins to the cap. Catches a min/max swap.
-    expect(tailTokenBudget(499_000)).toBe(299_400);
-    expect(tailTokenBudget(500_000)).toBe(300_000);
+    // 0.5 * w - 25_000 reaches 300_000 at a 650,000-token window. Just under
+    // keeps the fraction; at and above pins to the cap. Catches a min/max swap.
+    expect(tailTokenBudget(649_000)).toBe(299_500);
+    expect(tailTokenBudget(650_000)).toBe(300_000);
+  });
+
+  it('never returns a negative budget on a window smaller than the overhead', () => {
+    // 0.5 * 32K is under the overhead allowance. A negative budget would make
+    // trimTailToTokenBudget peel every turn it is allowed to and then log a
+    // nonsense number; zero falls through to preserve-the-in-flight-turn.
+    expect(tailTokenBudget(32_000)).toBe(0);
   });
 
   it('leaves the compacted session below the lowest compact breakpoint', () => {
-    // The reason the fraction is what it is: compaction has to relieve
-    // pressure past the LOWEST breakpoint, because highestFiredBreakpointAt
-    // only resets there. A budget at or above it leaves every breakpoint
-    // fired and no post-turn compaction ever runs again.
-    const lowestCompactBreakpoint = 0.6;
-    expect(TAIL_BUDGET_WINDOW_FRACTION).toBeLessThanOrEqual(lowestCompactBreakpoint);
+    // This is the whole reason the numbers are what they are, and it is the
+    // invariant that actually matters — not the fraction in isolation.
+    //
+    // computePressure divides the model's report of the ENTIRE input by the
+    // window, while the budget bounds only the verbatim tail. So the pressure a
+    // compaction leaves behind is (tail + everything else) / window, and
+    // "everything else" — system prompt, tool schemas, prefix summary, images —
+    // is exactly what the estimator cannot see. evaluateBreakpoints resets
+    // `highestFiredBreakpointAt` only when pressure is STRICTLY below the
+    // lowest breakpoint, so landing at it is as bad as landing above it: every
+    // breakpoint stays fired and no post-turn compaction runs again.
+    //
+    // Reads the real DEFAULT_BREAKPOINTS rather than a copy of the number, so
+    // that retuning them without retuning this fails here instead of in
+    // production six months later.
+    const lowestCompact = Math.min(
+      ...DEFAULT_BREAKPOINTS.filter((b) => b.action === 'compact').map((b) => b.at)
+    );
+    for (const window of [128_000, 200_000, 400_000, 1_000_000]) {
+      const worstCasePressure = (tailTokenBudget(window) + NON_TAIL_OVERHEAD_ALLOWANCE) / window;
+      expect(worstCasePressure).toBeLessThan(lowestCompact);
+    }
   });
 
   it('assumes the provider fallback window when the window is unknown', () => {
@@ -682,13 +707,14 @@ describe('tailTokenBudget', () => {
     // contextWindow absent. Falling back to the old 300K constant would keep
     // the wedge on every small model; fall back to the same 200K the provider
     // itself assumes, which is safe on every model we ship.
-    expect(tailTokenBudget(undefined)).toBe(120_000);
-    expect(tailTokenBudget(0)).toBe(120_000);
+    expect(tailTokenBudget(undefined)).toBe(75_000);
+    expect(tailTokenBudget(0)).toBe(75_000);
   });
 
-  it('pins the cap and fraction to the values the docs and tickets quote', () => {
+  it('pins the constants to the values the docs and tickets quote', () => {
     expect(TAIL_TOKEN_BUDGET_CAP).toBe(300_000);
-    expect(TAIL_BUDGET_WINDOW_FRACTION).toBe(0.6);
+    expect(TAIL_BUDGET_WINDOW_FRACTION).toBe(0.5);
+    expect(NON_TAIL_OVERHEAD_ALLOWANCE).toBe(25_000);
   });
 });
 
@@ -763,6 +789,34 @@ describe('trimTailToTokenBudget', () => {
     }
   });
 
+  it('measures the tail through the caller’s transform, not the raw events', () => {
+    // sen-multiconv caps tool IO before preserving its tail, so the raw events
+    // are far bigger than what the provider receives. Measuring the raw tail
+    // would peel turns that would have fit once trimmed — silently discarding
+    // history to satisfy a budget the real payload never exceeded.
+    const events = buildSession(Array(12).fill(20_000)); // ~5k tokens/turn raw
+
+    const rawSplit = trimTailToTokenBudget(events, 10, 12_000);
+    // A transform that shrinks every message to almost nothing.
+    const shrink = (tail: TypedDurableEvent[]): TypedDurableEvent[] =>
+      tail.map((e) =>
+        e.type === 'message'
+          ? ({ ...e, data: { ...e.data, content: 'x' } } as TypedDurableEvent)
+          : e
+      );
+    const shrunkSplit = trimTailToTokenBudget(events, 10, 12_000, shrink);
+
+    // Same budget, same events — but the transformed tail fits, so nothing is
+    // peeled and the full 10-turn tail survives.
+    expect(shrunkSplit.tail.length).toBeGreaterThan(rawSplit.tail.length);
+    expect(shrunkSplit.earlier.length).toBeLessThan(rawSplit.earlier.length);
+    // The returned split is the UNTRANSFORMED events — the caller applies its
+    // own transform downstream, and getting shrunken events back here would
+    // silently destroy the history it was about to preserve.
+    const preservedText = JSON.stringify(shrunkSplit.tail);
+    expect(preservedText).toContain('x'.repeat(20_000));
+  });
+
   it('is deterministic: same input → same split', () => {
     const events = buildSession(Array(12).fill(20_000));
     const a = trimTailToTokenBudget(events, 10, 12_000);
@@ -824,11 +878,11 @@ describe('trimTailToTokenBudget', () => {
     if (!('compactionEvent' in result)) throw new Error('expected a compaction');
 
     const preserved = result.compactionEvent.data.preserved as ProviderMessage[];
-    // 120_000 is the budget at a 200K window; the prefix summary rides on top.
-    // Requiring the whole compacted history to clear 65% of the window leaves
-    // real room for the system prompt, tool schemas, and output reserve that
-    // the estimator never counts.
-    expect(estimateProviderTokens(preserved)).toBeLessThanOrEqual(130_000);
+    // 75_000 is the budget at a 200K window; the prefix summary rides on top.
+    // Requiring the whole compacted history to clear half the window leaves the
+    // room the system prompt, tool schemas, and output reserve need — none of
+    // which the estimator counts.
+    expect(estimateProviderTokens(preserved)).toBeLessThanOrEqual(100_000);
   });
 });
 
