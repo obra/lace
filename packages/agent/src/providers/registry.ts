@@ -334,7 +334,14 @@ export class ProviderRegistry {
     const staticCatalog = this.catalogManager.getProvider(providerId);
     const catalog = await this.getCatalogProvider(providerId);
     if (catalog) {
-      const resolvedModelId = resolveModelAlias(modelId, catalog.models, staticCatalog?.models);
+      const resolvedModelId = resolveModelAlias(
+        modelId,
+        catalog.models,
+        staticCatalog?.models,
+        // Pins come from the STATIC catalog: they are our deliberate choice of
+        // what an alias means, not something a live provider listing reports.
+        staticCatalog?.model_aliases ?? catalog.model_aliases
+      );
       const model =
         catalog.models.find((m) => m.id === resolvedModelId) ??
         staticCatalog?.models.find((m) => m.id === resolvedModelId);
@@ -424,7 +431,8 @@ export class ProviderRegistry {
     const resolvedModelId = resolveModelAlias(
       modelId,
       catalog?.models ?? [],
-      staticCatalog?.models
+      staticCatalog?.models,
+      staticCatalog?.model_aliases ?? catalog?.model_aliases
     );
     if (resolvedModelId !== modelId) {
       logger.debug('Resolved model alias', {

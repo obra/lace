@@ -40,7 +40,12 @@ export async function resolveContextWindow(
     // preserved tail to a fraction of what fits, which is the regression this
     // whole plumbing exists to avoid.
     const models = provider.getAvailableModels();
-    const resolvedId = resolveModelAlias(opts.modelId, models);
+    const resolvedId = resolveModelAlias(
+      opts.modelId,
+      models,
+      undefined,
+      provider.modelAliasesForProvider()
+    );
     const model = models.find((m) => m.id === resolvedId);
     if (!model) {
       // Better to say "I don't know" than to report a default as if it were

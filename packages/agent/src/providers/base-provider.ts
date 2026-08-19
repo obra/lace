@@ -557,6 +557,17 @@ export abstract class AIProvider extends EventEmitter {
     return this.getModelContextWindow(modelId, fallback);
   }
 
+  /**
+   * This provider's explicit alias pins, if its catalog declares any. Public so
+   * that anything resolving an alias OUTSIDE the registry resolves it to the
+   * same model the registry would have built — two resolvers disagreeing about
+   * what `opus` means is how a session gets sized against a window it does not
+   * have.
+   */
+  modelAliasesForProvider(): Record<string, string> | undefined {
+    return this._catalogData?.model_aliases;
+  }
+
   // Get model max output tokens from catalog or fallback
   protected getModelMaxOutputTokens(modelId: string, fallback: number = 8192): number {
     if (!this._catalogData) {
