@@ -1085,6 +1085,7 @@ export class ConversationRunner {
           try {
             compacted = await this.compactSession({
               modelId,
+              contextWindow: provider.contextWindowForModel(modelId ?? 'default'),
               updateTurnSeq: durableTurnSeq,
             });
           } catch (compactionErr) {
@@ -1145,10 +1146,16 @@ export class ConversationRunner {
             pauseResumeCount = 0;
             // The compacted history is the whole point of the retry. If it is
             // STILL over the window, the retry will 400 again and the session
-            // churns — the tail budget in track-compaction is a fixed constant,
-            // not a function of this model's window, so that is reachable on
-            // any model with a window under ~350K. Say so loudly; the retry
-            // still runs, and the emergency budget bounds the churn.
+            // churns. Since PRI-2906 the tail budget is a fraction of this
+            // model's window, which removes the largest cause but not every
+            // one: a single in-flight turn too big to compress at all is
+            // preserved regardless rather than dropped; a strategy may ignore
+            // ctx.contextWindow; the catalog may report the wrong window for a
+            // model it doesn't describe; and this very check measures messages
+            // only — estimateProviderTokens excludes the system prompt, tool
+            // schemas, and images, so it under-reports and can stay quiet on a
+            // session that will 400 again. Say so loudly; the retry still
+            // runs, and the emergency budget bounds the churn.
             const compactedEstimate = estimateProviderTokens(providerMessages);
             const windowSize = provider.contextWindowForModel(modelId ?? 'default');
             if (compactedEstimate >= windowSize) {
@@ -1519,6 +1526,7 @@ export class ConversationRunner {
         if (compactionRequest.requested || breakpointCompactCrossed) {
           await this.compactSession({
             modelId,
+            contextWindow: contextWindowSize,
             guidance: compactionRequest.guidance,
             updateTurnSeq: durableTurnSeq,
           });
@@ -1574,6 +1582,13 @@ export class ConversationRunner {
   private async compactSession(params: {
     modelId?: string;
     guidance?: string;
+    /**
+     * Context window of the model this turn ran on. The strategy sizes the
+     * preserved tail against it — without it, compaction can hand back a
+     * history that is still too big for the very model that just rejected it
+     * (PRI-2906). Both callers run inside `run()`, where the provider is live.
+     */
+    contextWindow: number;
     /** Stream seq for the compaction_complete update. */
     updateTurnSeq: number;
   }): Promise<boolean> {
@@ -1590,6 +1605,7 @@ export class ConversationRunner {
       sessionDir,
       connectionId: this.config.connectionId,
       modelId: params.modelId ?? undefined,
+      contextWindow: params.contextWindow,
       guidance: params.guidance,
     });
     const raw = await strategy.compact(

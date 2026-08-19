@@ -26,6 +26,7 @@ import {
   type WireTool,
 } from '@lace/agent/providers/base-provider';
 import { resetRegistriesForTest } from '@lace/agent/plugins';
+import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 
 const CONTEXT_EXCEEDED: ProviderResponse = {
   content: '',
@@ -290,6 +291,77 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
   function durableEvents() {
     return readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER }).events;
   }
+
+  /**
+   * Replace the seeded log with `count` completed turns whose answers are
+   * `chars` long, so the preserved tail is big enough for the token budget —
+   * not the turn count — to decide where the split lands.
+   */
+  function seedLargeTurns(count: number, chars: number) {
+    const now = new Date().toISOString();
+    const lines: string[] = [
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: now,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+      }),
+    ];
+    let seq = 2;
+    for (let i = 0; i < count; i++) {
+      const tid = `big_turn_${i}`;
+      const push = (type: string, data: Record<string, unknown>, turnId?: string) =>
+        lines.push(
+          JSON.stringify({
+            eventSeq: seq++,
+            timestamp: now,
+            ...(turnId ? { turnId } : {}),
+            type,
+            data: { type, ...data },
+          })
+        );
+      push('prompt', { content: [{ type: 'text', text: `big prompt ${i}` }] });
+      push('turn_start', {}, tid);
+      push('message', { content: [{ type: 'text', text: 'x'.repeat(chars) }] }, tid);
+      push('turn_end', { stopReason: 'end_turn' }, tid);
+    }
+    writeFileSync(join(sessionDir, 'events.jsonl'), lines.join('\n') + '\n');
+    writeFileSync(
+      join(sessionDir, 'state.json'),
+      JSON.stringify({ nextEventSeq: seq, nextStreamSeq: 1 })
+    );
+  }
+
+  it('sizes the preserved tail to the model window rather than a fixed 300K', async () => {
+    // PRI-2906. The tail budget used to be a flat 300K with no relationship to
+    // the running model. On a 200K model that budget is bigger than the entire
+    // window, so this very retry would 400 again and every later turn would
+    // burn another compaction that also could not help. Two runs over the same
+    // ~600K history, differing only in the provider's window.
+    const HISTORY = { turns: 12, chars: 200_000 }; // ~50k tokens per turn
+
+    seedLargeTurns(HISTORY.turns, HISTORY.chars);
+    const wide = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    await run(wide).promise;
+    const wideRetryTokens = estimateProviderTokens(wide.sentMessages[1]!);
+
+    class NarrowProvider extends ScriptedProvider {
+      override contextWindowForModel(): number {
+        return 200_000;
+      }
+    }
+    seedLargeTurns(HISTORY.turns, HISTORY.chars);
+    const narrow = new NarrowProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    await run(narrow).promise;
+    const narrowRetryTokens = estimateProviderTokens(narrow.sentMessages[1]!);
+
+    // The 1M model keeps the 300K ceiling — which is what makes this history
+    // still far too big for a 200K model.
+    expect(wideRetryTokens).toBeGreaterThan(200_000);
+    // The 200K model's retry actually fits the window it just bounced off.
+    expect(narrowRetryTokens).toBeLessThan(200_000);
+    expect(narrowRetryTokens).toBeLessThan(wideRetryTokens);
+  });
 
   it('compacts and retries the turn once, so the turn completes', async () => {
     const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);

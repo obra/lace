@@ -7,6 +7,8 @@ import type { ContentBlock, ThinkingBlock } from '@lace/agent/providers/base-pro
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import type { ToolResult as ProtocolToolResult } from '@lace/ent-protocol';
 import { foldEvents } from '@lace/agent/message-building/fold-event';
+import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
+import { logger } from '@lace/agent/utils/logger';
 import type { FoldEventInput } from '@lace/agent/message-building/fold-event';
 
 // ---------------------------------------------------------------------------
@@ -554,4 +556,167 @@ export function buildPreservedWithPrefix(
   };
 
   return [mergedFirst, ...tail.slice(1)];
+}
+
+// ---------------------------------------------------------------------------
+// Token-budgeting the preserved tail
+// ---------------------------------------------------------------------------
+// Shared by every strategy that preserves a verbatim tail, because the size of
+// that tail is a property of the MODEL, not of how a given strategy chooses to
+// summarize (PRI-2906).
+
+/**
+ * Ceiling on the verbatim tail we preserve through a compaction, in estimated
+ * tokens. `TAIL_TURNS` caps the tail by *turn count*; this caps it by *size*,
+ * so a handful of very large recent turns (long messages + big tool / subagent
+ * outputs) can't blow past the model's context window even right after
+ * compacting.
+ *
+ * 300K is the ceiling rather than the answer: on a 1M-token window it leaves
+ * ample room (far under the ~950K usable after system prompt + output reserve +
+ * the prefix summary) with plenty of headroom for new turns before the next
+ * compaction fires. The token-blind 10-turn tail once reached ~600K in
+ * production and 400'd every request with `prompt_too_long`.
+ */
+export const TAIL_TOKEN_BUDGET_CAP = 300_000;
+
+/**
+ * Fraction of the model's context window the preserved tail may occupy.
+ *
+ * The tail is only part of what gets sent. The prefix summary, the system
+ * prompt, the tool schemas, and the output reserve all ride alongside it, and
+ * `estimateProviderTokens` counts none of them — it measures message text and
+ * skips images entirely. So the fraction has to leave room for a payload it
+ * cannot see.
+ *
+ * The value tracks the lowest default compact breakpoint, because of what
+ * compaction is FOR. `highestFiredBreakpointAt` only resets once pressure
+ * falls back BELOW the lowest breakpoint (strictly below —
+ * `evaluateBreakpoints` computes `pressure < minAt`). A compaction that lands
+ * the session at or above it leaves every breakpoint still fired, so no
+ * post-turn compaction ever runs again and the session sits pinned at the
+ * limit, carried only by emergency compactions — the same wedge one notch
+ * further along. Landing under that breakpoint is what makes compaction
+ * self-healing rather than a one-shot.
+ *
+ * So this is not "how much of the window the tail may use" — it is the
+ * PRESSURE the session should sit at once compaction finishes, tail plus
+ * everything that rides along with it. 0.5 leaves real margin under the 0.6
+ * breakpoint, which matters because the reset is strict and the overhead is
+ * an estimate. Sizing the tail itself at 0.6 would land pressure at 0.6 or
+ * above and re-latch every time.
+ */
+export const TAIL_BUDGET_WINDOW_FRACTION = 0.5;
+
+/**
+ * Tokens reserved for everything that ships alongside the preserved tail and
+ * is invisible to the budget.
+ *
+ * `estimateProviderTokens` counts message text, tool calls, and tool results.
+ * It does not count the system prompt, the tool schemas, or images — and the
+ * prefix summary is merged on afterwards. But `computePressure` divides the
+ * model's report of the WHOLE input by the window. So a tail sized to exactly
+ * 60% of the window produces a turn whose measured pressure is 60% plus all of
+ * that, which lands back at or above the breakpoint and re-latches it.
+ *
+ * lace's builtin tool schemas alone measure ~7K tokens before any MCP or skill
+ * tools are registered; a persona system prompt and a prefix summary are each
+ * a few thousand more. 25K is chosen to cover that with room for a fleet
+ * that adds tools, and it is an absolute figure rather than a fraction because
+ * the overhead is absolute — it does not shrink with the window, which is
+ * precisely why small-window models were the ones that wedged.
+ */
+export const NON_TAIL_OVERHEAD_ALLOWANCE = 25_000;
+
+/**
+ * The window we assume when the call site couldn't tell us one. Matches
+ * `BaseProvider.contextWindowForModel`'s own fallback, so an unplumbed caller
+ * degrades to a tail that is safe on every model we ship rather than to the
+ * 300K ceiling, which is larger than the entire window on a 200K model.
+ */
+const ASSUMED_CONTEXT_WINDOW = 200_000;
+
+/**
+ * Token budget for the preserved tail on a model with this context window.
+ *
+ * Before PRI-2906 this was a flat 300K with no relationship to the running
+ * model. On any window under ~333K that budget exceeded the window itself, so
+ * a compacted session was still over the limit — PRI-2903's emergency
+ * self-heal would compact, retry, 400 again, and every later turn would burn
+ * another compaction that also could not help. We only failed to notice
+ * because the fleet runs ~1M-window models.
+ */
+export function tailTokenBudget(contextWindow?: number): number {
+  const window =
+    contextWindow !== undefined && Number.isFinite(contextWindow) && contextWindow > 0
+      ? contextWindow
+      : ASSUMED_CONTEXT_WINDOW;
+  const fromWindow = Math.floor(window * TAIL_BUDGET_WINDOW_FRACTION) - NON_TAIL_OVERHEAD_ALLOWANCE;
+  // Never negative. On a window too small to hold the overhead at all, the
+  // budget collapses to zero and `trimTailToTokenBudget` falls through to its
+  // preserve-the-in-flight-turn-anyway path, which is the right degenerate
+  // answer: there is no tail size that would fit.
+  return Math.max(0, Math.min(TAIL_TOKEN_BUDGET_CAP, fromWindow));
+}
+
+/**
+ * Estimate the on-wire token size of the verbatim tail by building the exact
+ * PreservedMessage stream the provider will replay and running it through the
+ * same estimator the auto-compaction trigger and message-builder use. Pure and
+ * deterministic — no model call.
+ */
+export function estimateTailTokens(tail: TypedDurableEvent[]): number {
+  return estimateProviderTokens(buildPreservedTail(tail));
+}
+
+/**
+ * Apply a token budget to the turn-based split. Starting from the turn-count
+ * split, while the verbatim tail's estimated tokens exceed `budget` AND the
+ * tail still holds more than one turn, peel the OLDEST tail turn back into
+ * `earlier` (where it gets compressed into the prefix) and re-estimate.
+ *
+ * Always preserves at least the most recent turn — we can't compress the
+ * in-flight turn. If that single remaining turn still exceeds the budget it is
+ * preserved anyway and a warning is logged (the tool-result-truncation work
+ * addresses that residual case).
+ *
+ * Re-derives `{earlier, tail}` via `splitAtTailBoundary` at the reduced turn
+ * count so the unchanged prefix-compression and `buildPreservedTail` logic runs
+ * over the adjusted split.
+ */
+export function trimTailToTokenBudget(
+  events: TypedDurableEvent[],
+  tailTurns: number,
+  budget: number,
+  /**
+   * Optional transform applied before measuring, for strategies that shrink the
+   * tail before preserving it (sen-multiconv caps tool IO). Measuring the raw
+   * tail would peel turns that would have fit once trimmed, so the budget has
+   * to see what the provider will actually receive. The returned split is
+   * always the untransformed events — the caller still applies its own
+   * transform downstream.
+   */
+  prepareTail?: (tail: TypedDurableEvent[]) => TypedDurableEvent[]
+): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
+  const measure = (tail: TypedDurableEvent[]) => estimateTailTokens(prepareTail?.(tail) ?? tail);
+  let split = splitAtTailBoundary(events, tailTurns);
+  let turns = tailTurns;
+
+  while (turns > 1 && measure(split.tail) > budget) {
+    turns -= 1;
+    split = splitAtTailBoundary(events, turns);
+  }
+
+  if (measure(split.tail) > budget) {
+    logger.warn(
+      'compaction: preserved tail exceeds token budget with a single turn — preserving it anyway',
+      {
+        budget,
+        estimatedTailTokens: measure(split.tail),
+        tailTurns: turns,
+      }
+    );
+  }
+
+  return split;
 }

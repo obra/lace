@@ -3,13 +3,13 @@
 
 import { isEventOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
-import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
-import { logger } from '@lace/agent/utils/logger';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext, CompactResult } from './types';
 import {
   UNTRACKED,
   splitAtTailBoundary,
+  tailTokenBudget,
+  trimTailToTokenBudget,
   demuxByTrack,
   buildPreservedTail,
   buildPreservedWithPrefix,
@@ -19,8 +19,18 @@ import {
   type TrackBlock,
 } from './toolkit';
 
-// Re-export so the existing test imports keep working.
+// Re-export so the existing test imports keep working. The tail-budget
+// primitives live in the toolkit because every strategy that preserves a
+// verbatim tail needs them, not just this one.
 export { UNTRACKED, splitAtTailBoundary };
+export {
+  TAIL_TOKEN_BUDGET_CAP,
+  TAIL_BUDGET_WINDOW_FRACTION,
+  NON_TAIL_OVERHEAD_ALLOWANCE,
+  tailTokenBudget,
+  estimateTailTokens,
+  trimTailToTokenBudget,
+} from './toolkit';
 
 /**
  * Walk events and map each `turn_start.turnId` to the track of the
@@ -173,88 +183,18 @@ export function salienceForTrack(trackId: string, events: TypedDurableEvent[]): 
 const TAIL_TURNS = 10;
 
 /**
- * Upper bound (in estimated tokens) on the verbatim tail we preserve through a
- * compaction. `TAIL_TURNS` caps the tail by *turn count*; this caps it by
- * *size*, so a handful of very large recent turns (long messages + big tool /
- * subagent outputs) can't blow past the model's context window even right after
- * compacting.
- *
- * 300K is deliberately conservative: it leaves ample room under a 1M-token
- * window (far under the ~950K usable after system prompt + output reserve +
- * the prefix summary), with plenty of headroom for new turns before the next
- * compaction fires. The token-blind 10-turn tail once reached ~600K in
- * production and 400'd every request with `prompt_too_long`.
- *
- * Known limitation, tracked separately: this is a FIXED constant, not a
- * fraction of the running model's context window. On a model with a window
- * under ~350K the preserved tail alone can still exceed it, so a compaction
- * cannot get the session back under the limit. The runner's emergency
- * compaction (PRI-2903) logs loudly when the compacted history is still over
- * the window rather than retrying indefinitely.
- */
-const TAIL_TOKEN_BUDGET = 300_000;
-
-/**
- * Estimate the on-wire token size of the verbatim tail by building the exact
- * PreservedMessage stream the provider will replay and running it through the
- * same estimator the auto-compaction trigger and message-builder use. Pure and
- * deterministic — no model call.
- */
-export function estimateTailTokens(tail: TypedDurableEvent[]): number {
-  return estimateProviderTokens(buildPreservedTail(tail));
-}
-
-/**
- * Apply a token budget to the turn-based split. Starting from the turn-count
- * split, while the verbatim tail's estimated tokens exceed `budget` AND the
- * tail still holds more than one turn, peel the OLDEST tail turn back into
- * `earlier` (where it gets compressed into the prefix) and re-estimate.
- *
- * Always preserves at least the most recent turn — we can't compress the
- * in-flight turn. If that single remaining turn still exceeds the budget it is
- * preserved anyway and a warning is logged (the tool-result-truncation work
- * addresses that residual case).
- *
- * Re-derives `{earlier, tail}` via `splitAtTailBoundary` at the reduced turn
- * count so the unchanged prefix-compression and `buildPreservedTail` logic runs
- * over the adjusted split.
- */
-export function trimTailToTokenBudget(
-  events: TypedDurableEvent[],
-  tailTurns: number,
-  budget: number
-): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
-  let split = splitAtTailBoundary(events, tailTurns);
-  let turns = tailTurns;
-
-  while (turns > 1 && estimateTailTokens(split.tail) > budget) {
-    turns -= 1;
-    split = splitAtTailBoundary(events, turns);
-  }
-
-  if (estimateTailTokens(split.tail) > budget) {
-    logger.warn(
-      'compaction: preserved tail exceeds token budget with a single turn — preserving it anyway',
-      {
-        budget,
-        estimatedTailTokens: estimateTailTokens(split.tail),
-        tailTurns: turns,
-      }
-    );
-  }
-
-  return split;
-}
-
-/**
  * Track-based compaction orchestrator. Pure: returns the event the caller
  * should write, without writing it. Deterministic — no model access.
  */
 export async function compact(
   events: TypedDurableEvent[],
-  _ctx: CompactionContext
+  ctx: CompactionContext
 ): Promise<CompactResult> {
-  const { earlier, tail } = trimTailToTokenBudget(events, TAIL_TURNS, TAIL_TOKEN_BUDGET);
+  const { earlier, tail } = trimTailToTokenBudget(
+    events,
+    TAIL_TURNS,
+    tailTokenBudget(ctx.contextWindow)
+  );
 
   if (earlier.length === 0) {
     return { noop: true };

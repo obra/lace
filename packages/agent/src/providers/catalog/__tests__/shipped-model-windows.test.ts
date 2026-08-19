@@ -1,0 +1,38 @@
+// ABOUTME: Pins the context window of every model the fleet actually runs, because
+// ABOUTME: a model missing from this catalog does not fail — it silently gets the
+// ABOUTME: dynamic provider's INFERRED_CONTEXT_WINDOW of 200K. That guess is
+// ABOUTME: invisible at runtime and now decides how much history compaction keeps.
+
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { CatalogProviderSchema } from '../types';
+
+/**
+ * Models named by sen's personas and environments. A model absent from the
+ * static catalog resolves to a 200K window whether or not that is true, which
+ * (a) makes compaction pressure fire five times too early on a 1M model and
+ * (b) since PRI-2906 shrinks the preserved tail to match the wrong number.
+ * `claude-sonnet-5` was exactly that case: three personas ran it while lace
+ * believed it held 200K.
+ */
+const EXPECTED_WINDOWS: Record<string, number> = {
+  'claude-opus-5': 1_000_000,
+  'claude-opus-4-8': 1_000_000,
+  'claude-sonnet-5': 1_000_000,
+  'claude-haiku-4-5-20251001': 200_000,
+};
+
+describe('shipped Anthropic catalog', () => {
+  const raw = readFileSync(path.resolve(__dirname, '../data/anthropic.json'), 'utf8');
+  const catalog = CatalogProviderSchema.parse(JSON.parse(raw));
+  const byId = new Map(catalog.models.map((m) => [m.id, m]));
+
+  for (const [id, window] of Object.entries(EXPECTED_WINDOWS)) {
+    it(`describes ${id} with a ${window / 1000}K context window`, () => {
+      const model = byId.get(id);
+      expect(model, `${id} is missing from the static catalog`).toBeDefined();
+      expect(model!.context_window).toBe(window);
+    });
+  }
+});

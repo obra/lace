@@ -4,6 +4,7 @@
 
 import type { ProviderMessage, ProviderResponse } from '@lace/agent/providers/base-provider';
 import { oneShotQuery as defaultOneShotQuery } from '@lace/agent/conversation/one-shot-query';
+import { resolveContextWindow as defaultResolveContextWindow } from './context-window';
 import type { CompactionContext } from './types';
 
 type OneShotQuery = typeof defaultOneShotQuery;
@@ -30,6 +31,44 @@ interface BuildContextDeps {
  * When `connectionId` or `modelId` is falsy, `ctx.query` is omitted entirely
  * rather than bound to a function that will always throw InvalidParams.
  */
+/**
+ * Build a CompactionContext for a call site that holds a connection and a model
+ * but no live provider — the manual compaction paths (`ent/session/compact`,
+ * `/compact`). Resolves the model's context window and threads it in.
+ *
+ * This exists as one function rather than two lines repeated at each call site
+ * because the two-line version was invisible to tests: deleting the window from
+ * either handler passed the entire suite. Composed here, the composition itself
+ * is testable, and the handlers are left with a single call that either happens
+ * or does not.
+ */
+export async function buildCompactionContextForConnection(
+  opts: {
+    threadId: string;
+    sessionDir: string;
+    connectionId?: string;
+    modelId?: string;
+    guidance?: string;
+    referenceTimestamp?: string;
+  },
+  deps?: BuildContextDeps & {
+    resolveContextWindow?: (o: {
+      connectionId?: string;
+      modelId?: string;
+    }) => Promise<number | undefined>;
+  }
+): Promise<CompactionContext> {
+  const resolve = deps?.resolveContextWindow ?? defaultResolveContextWindow;
+  const contextWindow = await resolve({
+    connectionId: opts.connectionId,
+    modelId: opts.modelId,
+  });
+  return buildCompactionContext(
+    { ...opts, ...(contextWindow !== undefined ? { contextWindow } : {}) },
+    deps
+  );
+}
+
 export function buildCompactionContext(
   opts: {
     threadId: string;
@@ -38,6 +77,7 @@ export function buildCompactionContext(
     modelId?: string;
     guidance?: string;
     referenceTimestamp?: string;
+    contextWindow?: number;
   },
   deps?: BuildContextDeps
 ): CompactionContext {
@@ -48,6 +88,7 @@ export function buildCompactionContext(
     threadId: opts.threadId,
     sessionDir: opts.sessionDir,
     referenceTimestamp: opts.referenceTimestamp ?? new Date().toISOString(),
+    ...(opts.contextWindow !== undefined ? { contextWindow: opts.contextWindow } : {}),
     ...(opts.guidance !== undefined ? { guidance: opts.guidance } : {}),
   };
 

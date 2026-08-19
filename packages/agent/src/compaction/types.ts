@@ -32,6 +32,15 @@ export interface CompactionContext {
     signal?: AbortSignal;
   }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
   /**
+   * Context window (in tokens) of the model this session runs on, when the
+   * call site can resolve it. Strategies size the history they preserve
+   * against it: a tail larger than the window leaves the session over the
+   * limit the moment compaction finishes, which is the wedge PRI-2906
+   * describes. Absent when the caller holds no provider; strategies then
+   * assume the provider's own conservative fallback.
+   */
+  readonly contextWindow?: number;
+  /**
    * Free-text steering hint forwarded from the compact caller:
    * - compact_session / ent.session.compact passes the request's `guidance` field
    * - /compact passes the remainder of the command line
