@@ -55,6 +55,16 @@ describe('shipped Anthropic catalog', () => {
     });
   }
 
+  it('defaults to current-generation models', () => {
+    // What a session with no configured model gets. These drifted a generation
+    // behind the same way the aliases did, and just as quietly: nothing reports
+    // which model a default resolved to.
+    expect(catalog.default_large_model_id).toBe('claude-sonnet-5');
+    expect(catalog.default_small_model_id).toBe('claude-haiku-4-5-20251001');
+    expect(byId.has(catalog.default_large_model_id)).toBe(true);
+    expect(byId.has(catalog.default_small_model_id)).toBe(true);
+  });
+
   it('serves every model an alias points at', () => {
     // A pin naming a model this provider does not list falls back to the
     // ranking, silently — which is the failure the pins exist to prevent.
