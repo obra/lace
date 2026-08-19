@@ -374,6 +374,11 @@ export const CatalogProviderInfoSchema = z
     api_endpoint: z.string().optional(),
     default_large_model_id: NonEmptyStringSchema,
     default_small_model_id: NonEmptyStringSchema,
+    // What this provider's bare aliases ('opus', 'sonnet', 'haiku') resolve to.
+    // On the wire because the handler returns the catalog as-is, and because a
+    // client showing a model picker should be able to say what an alias means
+    // rather than re-deriving it and disagreeing with the agent.
+    model_aliases: z.record(z.string(), z.string()).optional(),
     models: z.array(CatalogModelInfoSchema),
   })
   .strict();

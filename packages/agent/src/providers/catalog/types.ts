@@ -49,6 +49,10 @@ export const CatalogProviderSchema = z.object({
   api_endpoint: z.string().optional(),
   default_large_model_id: z.string().min(1),
   default_small_model_id: z.string().min(1),
+  // What this provider's bare aliases ('opus', 'sonnet', 'haiku') mean, as a
+  // deliberate choice rather than something inferred from the model list.
+  // Absent for providers that are happy with the resolver's ranking.
+  model_aliases: z.record(z.string(), z.string()).optional(),
   models: z.array(CatalogModelSchema),
 });
 

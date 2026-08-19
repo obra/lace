@@ -94,3 +94,75 @@ describe('resolveModelAlias', () => {
     expect(resolveModelAlias('haiku', models)).toBe('claude-haiku-old-20200101');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Explicit alias pins (PRI-2918)
+// ---------------------------------------------------------------------------
+// The date-ranking heuristic below is a guess about which model an alias means,
+// and it guessed wrong: current-generation Anthropic ids carry no date, score
+// zero, and lose to older dated ones. A provider that knows what its aliases
+// mean says so instead of being inferred at.
+
+describe('resolveModelAlias — explicit pins', () => {
+  const currentGen: CatalogModel[] = [
+    makeModel('claude-opus-5'),
+    makeModel('claude-opus-4-8'),
+    makeModel('claude-sonnet-5'),
+    makeModel('claude-sonnet-4-5-20250929'),
+    makeModel('claude-opus-4-5-20251101'),
+    makeModel('claude-haiku-4-5-20251001'),
+  ];
+  const pins = {
+    opus: 'claude-opus-4-8',
+    sonnet: 'claude-sonnet-5',
+    haiku: 'claude-haiku-4-5-20251001',
+  };
+
+  it('resolves an alias to the pinned id', () => {
+    expect(resolveModelAlias('opus', currentGen, undefined, pins)).toBe('claude-opus-4-8');
+    expect(resolveModelAlias('sonnet', currentGen, undefined, pins)).toBe('claude-sonnet-5');
+    expect(resolveModelAlias('haiku', currentGen, undefined, pins)).toBe(
+      'claude-haiku-4-5-20251001'
+    );
+  });
+
+  it('honours a pin that is not what any ranking would have picked', () => {
+    // The point of pinning: `opus` means 4.8 because that is the deliberate
+    // choice, not because 4.8 sorts highest. Newest-wins would say opus-5 and
+    // the date heuristic says opus-4-5-20251101; both are wrong here.
+    const resolved = resolveModelAlias('opus', currentGen, undefined, pins);
+    expect(resolved).not.toBe('claude-opus-5');
+    expect(resolved).not.toBe('claude-opus-4-5-20251101');
+  });
+
+  it('is case-insensitive, like the rest of alias handling', () => {
+    expect(resolveModelAlias('OPUS', currentGen, undefined, pins)).toBe('claude-opus-4-8');
+    expect(resolveModelAlias('Sonnet', currentGen, undefined, pins)).toBe('claude-sonnet-5');
+  });
+
+  it('falls back to the static catalog when the live one is cold', () => {
+    // Same reason the heuristic takes a fallback list: a dynamic catalog can be
+    // partial or stale, and a pin naming a model it has not listed yet must not
+    // silently degrade to the old wrong answer.
+    expect(resolveModelAlias('sonnet', [], currentGen, pins)).toBe('claude-sonnet-5');
+  });
+
+  it('ignores a pin whose target no provider serves', () => {
+    // A stale pin must not hand back an id that will 404 at request time; fall
+    // through to the heuristic, which at least returns something servable.
+    const stale = { sonnet: 'claude-sonnet-99' };
+    expect(resolveModelAlias('sonnet', currentGen, undefined, stale)).toBe(
+      'claude-sonnet-4-5-20250929'
+    );
+  });
+
+  it('leaves an exact model id alone even when it is also a pin key', () => {
+    expect(resolveModelAlias('claude-opus-5', currentGen, undefined, pins)).toBe('claude-opus-5');
+  });
+
+  it('still resolves by ranking for a provider with no pins', () => {
+    // openai/openrouter catalogs carry no pins; their behaviour is unchanged.
+    expect(resolveModelAlias('haiku', anthropicLike)).toBe('claude-haiku-4-5-20251001');
+    expect(resolveModelAlias('gpt-4', anthropicLike)).toBe('gpt-4');
+  });
+});

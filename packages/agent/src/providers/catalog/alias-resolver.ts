@@ -22,7 +22,14 @@ function dateScore(id: string): number {
 export function resolveModelAlias(
   modelId: string,
   models: HasModelId[],
-  fallbackModels?: HasModelId[]
+  fallbackModels?: HasModelId[],
+  /**
+   * The provider's own statement of what its aliases mean, from the catalog's
+   * `model_aliases`. Consulted before the ranking below, because the ranking is
+   * a guess and this is not: it says `opus` means Opus 4.8 because that is the
+   * model we chose to run, which no ordering of ids would tell you.
+   */
+  aliasPins?: Record<string, string>
 ): string {
   if (models.some((m) => m.id === modelId)) {
     return modelId;
@@ -31,6 +38,18 @@ export function resolveModelAlias(
   const aliasKey = modelId.toLowerCase();
   if (!KNOWN_ALIASES.has(aliasKey)) {
     return modelId;
+  }
+
+  const pinned = aliasPins?.[aliasKey];
+  if (pinned) {
+    // Only honour a pin the provider can actually serve. A stale pin naming a
+    // retired model would otherwise hand back an id that 404s at request time;
+    // falling through to the ranking at least returns something servable.
+    const servable =
+      models.some((m) => m.id === pinned) || fallbackModels?.some((m) => m.id === pinned);
+    if (servable) {
+      return pinned;
+    }
   }
 
   const primaryMatches = models.filter((m) => m.id.toLowerCase().includes(aliasKey));

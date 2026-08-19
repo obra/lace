@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { CatalogProviderSchema } from '../types';
+import { resolveModelAlias } from '../alias-resolver';
 
 /**
  * Models named by sen's personas and environments. A model absent from the
@@ -35,4 +36,40 @@ describe('shipped Anthropic catalog', () => {
       expect(model!.context_window).toBe(window);
     });
   }
+
+  // A bare alias is what someone types when they have not thought about the
+  // exact id, so what it resolves to is a decision, not a detail. Pinned here
+  // against the SHIPPED catalog, resolved through the real resolver — the same
+  // path the registry and compaction both take.
+  const EXPECTED_ALIASES: Record<string, string> = {
+    opus: 'claude-opus-4-8',
+    sonnet: 'claude-sonnet-5',
+    haiku: 'claude-haiku-4-5-20251001',
+  };
+
+  for (const [alias, expected] of Object.entries(EXPECTED_ALIASES)) {
+    it(`resolves the bare alias '${alias}' to ${expected}`, () => {
+      expect(resolveModelAlias(alias, catalog.models, undefined, catalog.model_aliases)).toBe(
+        expected
+      );
+    });
+  }
+
+  it('defaults to current-generation models', () => {
+    // What a session with no configured model gets. These drifted a generation
+    // behind the same way the aliases did, and just as quietly: nothing reports
+    // which model a default resolved to.
+    expect(catalog.default_large_model_id).toBe('claude-sonnet-5');
+    expect(catalog.default_small_model_id).toBe('claude-haiku-4-5-20251001');
+    expect(byId.has(catalog.default_large_model_id)).toBe(true);
+    expect(byId.has(catalog.default_small_model_id)).toBe(true);
+  });
+
+  it('serves every model an alias points at', () => {
+    // A pin naming a model this provider does not list falls back to the
+    // ranking, silently — which is the failure the pins exist to prevent.
+    for (const target of Object.values(catalog.model_aliases ?? {})) {
+      expect(byId.has(target), `alias target ${target} is not in the catalog`).toBe(true);
+    }
+  });
 });
