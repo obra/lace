@@ -41,9 +41,9 @@ function pathologicalConversation(): TypedDurableEvent[] {
   const events: TypedDurableEvent[] = [];
   for (let i = 0; i < PATHOLOGICAL_EVENTS; i++) {
     events.push(
-      event(i * 2, 'prompt', { content: [{ type: 'text', text: `${LONG_TEXT} prompt ${i}` }] })
+      event(i * 2, 'prompt', { content: [{ type: 'text', text: `prompt ${i} ${LONG_TEXT}` }] })
     );
-    events.push(event(i * 2 + 1, 'message', { content: `${LONG_TEXT} reply ${i}` }));
+    events.push(event(i * 2 + 1, 'message', { content: `reply ${i} ${LONG_TEXT}` }));
   }
   return events;
 }
