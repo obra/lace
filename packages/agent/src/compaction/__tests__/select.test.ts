@@ -12,9 +12,13 @@ vi.mock('@lace/agent/config/persona-registry', () => ({
     parsePersona: vi.fn(),
   },
 }));
+vi.mock('@lace/agent/utils/logger', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
 
 import { personaForSessionDir } from '@lace/agent/storage/event-log';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
+import { logger } from '@lace/agent/utils/logger';
 import {
   compactionBreakpointsForSession,
   compactionStrategyNameForSession,
@@ -23,6 +27,7 @@ import {
 
 const mockPersonaForSessionDir = vi.mocked(personaForSessionDir);
 const mockParsePersona = vi.mocked(personaRegistry.parsePersona);
+const mockWarn = vi.mocked(logger.warn);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -120,5 +125,68 @@ describe('compactionStrategyNameForSession', () => {
       body: '',
     } as any);
     expect(compactionStrategyNameForSession('/some/dir')).toBe('my-strategy');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PRI-2943: a persona that cannot be resolved must not degrade in silence.
+//
+// cadence-sen ran 203 consecutive compactions on `track-based` while her
+// persona asked for `sen-multiconv`, because `personaRegistry.parsePersona`
+// threw (her instance had no `$LACE_DIR/agent-personas`) and this module
+// swallowed the throw with a bare `catch`. Nothing logged. The fallback itself
+// is correct — compaction must not become fatal on a live coworker — but it
+// has to be OBSERVABLE, and the strategy side needs the same coverage the
+// breakpoint side already had.
+// ---------------------------------------------------------------------------
+describe('persona resolution failure is loud (PRI-2943)', () => {
+  it('still falls back to track-based when parsePersona throws', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    mockParsePersona.mockImplementation(() => {
+      throw new Error("Persona 'core' not found. Available personas: lace");
+    });
+    expect(compactionStrategyNameForSession('/some/dir')).toBe('track-based');
+  });
+
+  it('warns when a named persona cannot be parsed for its strategy', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    mockParsePersona.mockImplementation(() => {
+      throw new Error("Persona 'core' not found. Available personas: lace");
+    });
+    compactionStrategyNameForSession('/some/dir');
+    expect(mockWarn).toHaveBeenCalled();
+  });
+
+  it('names the persona and the session dir in the warning', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    mockParsePersona.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    compactionStrategyNameForSession('/instances/cadence/state/lace/agent-sessions/sess_x');
+    const logged = JSON.stringify(mockWarn.mock.calls);
+    expect(logged).toContain('core');
+    expect(logged).toContain('sess_x');
+  });
+
+  it('warns when a named persona cannot be parsed for its breakpoints', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    mockParsePersona.mockImplementation(() => {
+      throw new Error('boom');
+    });
+    compactionBreakpointsForSession('/some/dir');
+    expect(mockWarn).toHaveBeenCalled();
+  });
+
+  it('stays quiet on the legitimate no-persona path', () => {
+    mockPersonaForSessionDir.mockReturnValue(null);
+    expect(compactionStrategyNameForSession('/some/dir')).toBe('track-based');
+    expect(mockWarn).not.toHaveBeenCalled();
+  });
+
+  it('stays quiet when a parsed persona simply configures no strategy', () => {
+    mockPersonaForSessionDir.mockReturnValue('minimal');
+    mockParsePersona.mockReturnValue({ config: {}, body: '' } as any);
+    expect(compactionStrategyNameForSession('/some/dir')).toBe('track-based');
+    expect(mockWarn).not.toHaveBeenCalled();
   });
 });
