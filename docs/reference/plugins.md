@@ -443,11 +443,14 @@ interface CompactionContext {
 must bound that tail by TOKENS, not just by turn count — a handful of large
 turns can preserve more than the whole context window, and a compaction that
 leaves the session over the limit cannot get it back under, so the next turn
-400s and every turn after it burns another compaction that also cannot help.
-The toolkit ships the primitives:
+400s and every turn after it burns another compaction that also cannot help. The
+toolkit ships the primitives:
 
 ```ts
-import { tailTokenBudget, trimTailToTokenBudget } from '@lace/agent/compaction/toolkit';
+import {
+  tailTokenBudget,
+  trimTailToTokenBudget,
+} from '@lace/agent/compaction/toolkit';
 
 const { earlier, tail } = trimTailToTokenBudget(
   events,

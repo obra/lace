@@ -50,7 +50,11 @@ import { logger } from '@lace/agent/utils/logger';
 import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
 import { computePressure, evaluateBreakpoints } from './compaction-trigger';
 import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
-import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
+import {
+  assessCompactionProgress,
+  resolveCompactionStrategy,
+  validatePreserved,
+} from '@lace/agent/compaction/strategy';
 import {
   compactionStrategyNameForSession,
   compactionBreakpointsForSession,
@@ -1618,6 +1622,28 @@ export class ConversationRunner {
     );
     const result = validatePreserved(raw);
     if ('noop' in result) return false;
+
+    // Structural validity is not progress (PRI-2943). A strategy can emit a
+    // perfectly well-formed prefix that is itself larger than the window, and
+    // because compaction over a fixed event log is deterministic, retrying
+    // reproduces it byte for byte. cadence-sen wrote ten identical 2.6MB
+    // context_compacted events in one day this way — each one making the
+    // session no more runnable than the last, and each one costing another
+    // 2.6MB of transcript. Refuse to persist a compaction that made no
+    // progress, and say why once per attempt rather than failing mutely.
+    const progress = assessCompactionProgress(result, {
+      ...(params.contextWindow !== undefined ? { contextWindow: params.contextWindow } : {}),
+      inputChars: JSON.stringify(allEvents).length,
+    });
+    if (!progress.ok) {
+      logger.error('runner: compaction made no progress; refusing to persist it', {
+        sessionId,
+        strategy: strategyName,
+        retryable: progress.retryable,
+        reason: progress.reason,
+      });
+      return false;
+    }
 
     await this.deps.runExclusive(async () => {
       const sessionState = readSessionState(sessionDir);

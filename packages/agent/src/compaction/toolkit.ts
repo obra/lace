@@ -335,6 +335,79 @@ export function jobSalience(trackId: string, events: TypedDurableEvent[]): Track
   return { trackId, body, estimatedTokens: estimate(body), ...activityOf(events) };
 }
 
+// ---------------------------------------------------------------------------
+// Size bounds (PRI-2943)
+//
+// Per-LINE truncation without a bound on the NUMBER of lines is not a bound.
+// cadence-sen's compacted prefix reached 2,304,363 chars — 4,056 `Assistant:`
+// lines, 679 `User:`, 840 `Note:`, each dutifully capped at 500 chars — which
+// is larger than the 1M-token window it had to fit inside. Compaction could
+// then never get the session back under the limit, and the coworker was
+// unrecoverable without hand surgery.
+//
+// track-based is the strategy every session falls back to when its persona
+// cannot be resolved, so its output has to be bounded by construction rather
+// than by the good behaviour of the sessions that reach it. Dropped material is
+// never lost: it stays in events.jsonl and is recall-able. What the agent needs
+// in the auto-loaded prefix is the RECENT end plus an honest marker saying the
+// rest exists.
+// ---------------------------------------------------------------------------
+
+/** Max prose lines kept in a single untracked/generic conversation block. */
+const UNTRACKED_MAX_LINES = 400;
+/** Max chars kept in a single untracked/generic conversation block. */
+const UNTRACKED_MAX_CHARS = 60_000;
+/** Max chars for one rendered `##` section of the generic prefix. */
+const SECTION_CHAR_BUDGET = 60_000;
+/** Max chars for the whole rendered generic prefix, all sections together. */
+const PREFIX_CHAR_BUDGET = 120_000;
+/** Stale-block eviction for system/untracked tracks: within 2 days OR newest 15. */
+const SYSTEM_EVICT_HORIZON_MS = 2 * 24 * 60 * 60 * 1000;
+const SYSTEM_EVICT_FLOOR_N = 15;
+
+function omissionNote(n: number, unit: string): string {
+  return `…${n} older ${unit} omitted from this summary — still in the event log, use recall to read them.`;
+}
+
+/**
+ * Keep the most recent lines within both the line-count and char budgets.
+ * Lines arrive oldest-first, so trimming takes from the front.
+ */
+function keepNewestLines(lines: string[]): string {
+  let kept = lines;
+  if (kept.length > UNTRACKED_MAX_LINES) kept = kept.slice(-UNTRACKED_MAX_LINES);
+  let used = kept.reduce((n, l) => n + l.length + 1, 0);
+  let start = 0;
+  while (start < kept.length - 1 && used > UNTRACKED_MAX_CHARS) {
+    used -= kept[start].length + 1;
+    start++;
+  }
+  kept = kept.slice(start);
+  const droppedCount = lines.length - kept.length;
+  if (droppedCount === 0) return kept.join('\n');
+  return [omissionNote(droppedCount, 'turns'), ...kept].join('\n');
+}
+
+/**
+ * Render a set of track bodies within a char budget, keeping the most recently
+ * active and restoring chronological order for what survives.
+ */
+function renderSectionWithinBudget(blocks: TrackBlock[], budget: number): string {
+  const newestFirst = [...blocks].sort((a, b) => b.lastSeq - a.lastSeq);
+  const kept: TrackBlock[] = [];
+  let used = 0;
+  for (const b of newestFirst) {
+    const cost = b.body.length + 2;
+    if (kept.length > 0 && used + cost > budget) continue;
+    kept.push(b);
+    used += cost;
+  }
+  kept.sort((a, b) => a.lastSeq - b.lastSeq);
+  const body = kept.map((b) => b.body).join('\n\n');
+  const dropped = blocks.length - kept.length;
+  return dropped > 0 ? `${body}\n\n${omissionNote(dropped, 'entries')}` : body;
+}
+
 /**
  * Salience for untracked (and generic conversation) tracks:
  * User/Assistant/Note prose extraction.
@@ -353,7 +426,7 @@ export function untrackedSalience(trackId: string, events: TypedDurableEvent[]):
       if (t) lines.push(`Note: ${truncate(t, 500)}`);
     }
   }
-  const body = lines.length > 0 ? lines.join('\n') : '(empty)';
+  const body = lines.length > 0 ? keepNewestLines(lines) : '(empty)';
   return { trackId, body, estimatedTokens: estimate(body), ...activityOf(events) };
 }
 
@@ -421,9 +494,21 @@ export function renderGenericSections(input: GenericRenderInput, extraSections?:
       getSeq: (b) => b.lastSeq,
     });
   }
-  const systemBlocks = input.blocks.filter(
+  let systemBlocks = input.blocks.filter(
     (b) => b.trackId.startsWith('system:') || b.trackId === 'untracked'
   );
+  // System/untracked tracks evict on the same age+floor rule as job tracks.
+  // Before PRI-2943 only `job:` evicted, so `## System events` grew forever —
+  // 868,093 chars of it on the coworker this bound was written for.
+  if (input.referenceTimestamp) {
+    systemBlocks = applyRecencyKeep(systemBlocks, {
+      now: input.referenceTimestamp,
+      horizonMs: SYSTEM_EVICT_HORIZON_MS,
+      floorN: SYSTEM_EVICT_FLOOR_N,
+      getTs: (b) => b.lastActivityTs,
+      getSeq: (b) => b.lastSeq,
+    });
+  }
   const otherBlocks = input.blocks.filter(
     (b) =>
       !b.trackId.startsWith('job:') && !b.trackId.startsWith('system:') && b.trackId !== 'untracked'
@@ -450,15 +535,23 @@ export function renderGenericSections(input: GenericRenderInput, extraSections?:
 
   if (systemBlocks.length > 0) {
     parts.push('\n## System events\n');
-    parts.push(systemBlocks.map((b) => b.body).join('\n\n'));
+    parts.push(renderSectionWithinBudget(systemBlocks, SECTION_CHAR_BUDGET));
   }
 
   if (otherBlocks.length > 0) {
     parts.push('\n## Other\n');
-    parts.push(otherBlocks.map((b) => b.body).join('\n\n'));
+    parts.push(renderSectionWithinBudget(otherBlocks, SECTION_CHAR_BUDGET));
   }
 
-  return parts.join('\n');
+  // Whole-prefix backstop. The per-section budgets bound the common case; this
+  // catches any future section, or an extraSections block a plugin hands in,
+  // from putting the prefix back over the window.
+  const rendered = parts.join('\n');
+  if (rendered.length <= PREFIX_CHAR_BUDGET) return rendered;
+  return `${stripTrailingLoneSurrogate(rendered.slice(0, PREFIX_CHAR_BUDGET))}\n${omissionNote(
+    rendered.length - PREFIX_CHAR_BUDGET,
+    'chars'
+  )}`;
 }
 
 // ---------------------------------------------------------------------------
