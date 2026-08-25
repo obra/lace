@@ -26,14 +26,18 @@ export function estimateProviderTokens(messages: ProviderMessage[]): number {
   for (const message of messages) {
     if (typeof message.content === 'string') {
       total += estimateTokens(message.content);
-    } else {
+    } else if (Array.isArray(message.content)) {
       // Count tokens for text blocks only (images don't count as text tokens)
       const textContent = message.content
-        .filter((b): b is ContentBlock & { type: 'text' } => b.type === 'text')
+        .filter((b): b is ContentBlock & { type: 'text' } => b?.type === 'text')
         .map((b) => b.text)
         .join('\n');
       total += estimateTokens(textContent);
     }
+    // Anything else contributes no text. The type says content is always a
+    // string or a block array, and real transcripts disagree: ada's bad-state
+    // fixture folds to entries with no content field at all. Throwing here
+    // would take compaction down on precisely the sessions that need it most.
     if (message.toolCalls) {
       total += estimateTokens(JSON.stringify(message.toolCalls));
     }

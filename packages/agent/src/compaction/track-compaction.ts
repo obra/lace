@@ -30,6 +30,9 @@ export {
   tailTokenBudget,
   estimateTailTokens,
   trimTailToTokenBudget,
+  lastReportedContextTokens,
+  estimateCurrentContextTokens,
+  contextMeasurementScale,
 } from './toolkit';
 
 /**
@@ -193,7 +196,9 @@ export async function compact(
   const { earlier, tail } = trimTailToTokenBudget(
     events,
     TAIL_TURNS,
-    tailTokenBudget(ctx.contextWindow)
+    tailTokenBudget(ctx.contextWindow),
+    undefined,
+    ctx.measuredContextTokens
   );
 
   if (earlier.length === 0) {

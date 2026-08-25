@@ -1086,11 +1086,21 @@ export class ConversationRunner {
           emergencyCompactions < MAX_EMERGENCY_COMPACTIONS
         ) {
           emergencyCompactions++;
+          const lastCallContextTokens =
+            lastCallInputTokens + lastCallCacheCreationInputTokens + lastCallCacheReadInputTokens;
           let compacted = false;
           try {
             compacted = await this.compactSession({
               modelId,
               contextWindow: provider.contextWindowForModel(modelId ?? 'default'),
+              // The call that just overflowed reported no usage, so these hold
+              // the last SUCCESSFUL call's figures — a lower bound on the
+              // context that failed, which is exactly the direction that keeps
+              // this honest. Zero (nothing has succeeded yet this run) is sent
+              // as absent, never as an empty context.
+              ...(lastCallContextTokens > 0
+                ? { measuredContextTokens: lastCallContextTokens }
+                : {}),
               updateTurnSeq: durableTurnSeq,
             });
           } catch (compactionErr) {
@@ -1532,6 +1542,12 @@ export class ConversationRunner {
           const compacted = await this.compactSession({
             modelId,
             contextWindow: contextWindowSize,
+            // The very number `pressure` above was computed from. Handing the
+            // strategy the window but not the measurement is what let it
+            // disagree with the trigger that woke it (PRI-2947).
+            ...(usage.lastCallInputContextTokens > 0
+              ? { measuredContextTokens: usage.lastCallInputContextTokens }
+              : {}),
             guidance: compactionRequest.guidance,
             updateTurnSeq: durableTurnSeq,
           });
@@ -1634,6 +1650,17 @@ export class ConversationRunner {
      * (PRI-2906). Both callers run inside `run()`, where the provider is live.
      */
     contextWindow: number;
+    /**
+     * What the provider reported this session's context cost on its last call.
+     * The strategy's own estimator is a chars/4 floor over durable event text —
+     * blind to the system prompt, the tool schemas and every image — so on real
+     * coworker content it reads an order of magnitude under the figure the
+     * pressure trigger three lines up just acted on, and the strategy concludes
+     * its tail fits when the model says the window is two-thirds gone
+     * (PRI-2947). Absent when no call in this run reported usage; absent means
+     * unknown, and the strategy falls back to its estimate.
+     */
+    measuredContextTokens?: number;
     /** Stream seq for the compaction_complete update. */
     updateTurnSeq: number;
   }): Promise<boolean> {
@@ -1655,6 +1682,9 @@ export class ConversationRunner {
       connectionId: this.config.connectionId,
       modelId: params.modelId ?? undefined,
       contextWindow: params.contextWindow,
+      ...(params.measuredContextTokens !== undefined
+        ? { measuredContextTokens: params.measuredContextTokens }
+        : {}),
       guidance: params.guidance,
     });
     const raw = await strategy.compact(
