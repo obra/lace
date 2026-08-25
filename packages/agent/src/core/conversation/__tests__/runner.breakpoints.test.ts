@@ -399,7 +399,14 @@ describe('ConversationRunner - configurable breakpoints', () => {
     mockBreakpoints.mockReturnValue([{ at: 0.5, action: 'compact' }]);
 
     const compactedUnderWindow = async (window: number) => {
-      seedLargeTurns(sessionDir, sessionId, cwd, 'compact-low', 12, 200_000);
+      // A session directory of its own per arm. Re-seeding the shared one left
+      // the second arm running against the FIRST arm's compacted log — so the
+      // two numbers being compared came from different histories, and the
+      // scripted usage no longer described the session it was attached to.
+      const armSessionId = `sess_${randomUUID()}`;
+      const sessionDir = join(laceDir, 'agent-sessions', armSessionId);
+      mkdirSync(sessionDir, { recursive: true });
+      seedLargeTurns(sessionDir, armSessionId, cwd, 'compact-low', 12, 200_000);
       const provider = new ScriptedProvider(
         [
           {
@@ -420,7 +427,7 @@ describe('ConversationRunner - configurable breakpoints', () => {
       const runner = new ConversationRunner(
         {
           sessionDir,
-          sessionId,
+          sessionId: armSessionId,
           cwd,
           executionMode: 'execute',
           approvalMode: 'approve',

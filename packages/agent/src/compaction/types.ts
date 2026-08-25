@@ -41,6 +41,28 @@ export interface CompactionContext {
    */
   readonly contextWindow?: number;
   /**
+   * What the provider reported the session's context actually cost on its most
+   * recent API call — the whole input: system prompt, tool schemas, images,
+   * history. The number the compaction TRIGGER already computes pressure from.
+   *
+   * Strategies size their verbatim tail against a local `chars/4` estimate over
+   * durable event text, which sees none of that and under-reads real coworker
+   * content by an order of magnitude. Handed the same measurement the trigger
+   * used, a strategy can calibrate that estimate instead of arguing with the
+   * model about how full its own window is (PRI-2947).
+   *
+   * Absent — never zero — when nobody reported one: a first turn, a legacy
+   * transcript, a provider with no usage accounting. A zero would read as "the
+   * context is empty" and would suppress compaction for the life of the
+   * session. Absent means "we were told nothing", and a strategy handed nothing
+   * must fall back to its own estimate rather than to an implied number.
+   *
+   * Absolute tokens rather than a pressure ratio: `contextWindow` rides
+   * alongside, so a strategy that wants the ratio can divide, while the tail
+   * budget it is compared against is denominated in tokens.
+   */
+  readonly measuredContextTokens?: number;
+  /**
    * Free-text steering hint forwarded from the compact caller:
    * - compact_session / ent.session.compact passes the request's `guidance` field
    * - /compact passes the remainder of the command line

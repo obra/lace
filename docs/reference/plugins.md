@@ -433,6 +433,12 @@ interface CompactionContext {
   // preserve against it — see "Sizing the preserved tail" below. Absent only when
   // the call site has no connection/model to resolve one from.
   readonly contextWindow?: number;
+  // What the provider reported the context cost on its most recent API call —
+  // the whole input, including the system prompt, the tool schemas and images.
+  // Calibrate your tail estimate against it; see "Sizing the preserved tail".
+  // ABSENT, never 0, when nobody reported one (first turn, legacy transcript,
+  // a provider with no usage accounting).
+  readonly measuredContextTokens?: number;
   // Free-text steering from the compact caller (compact_session / ent.session.compact
   // `guidance`, or /compact's command tail). Absent when auto-fired; built-ins ignore it.
   guidance?: string;
@@ -458,15 +464,35 @@ const { earlier, tail } = trimTailToTokenBudget(
   tailTokenBudget(ctx.contextWindow),
   // Optional: measure through your own shrinking step, so the budget sees what
   // the provider actually receives rather than the raw events.
-  trimMyToolIO
+  trimMyToolIO,
+  // Optional: the model's own report of the context size. Pass it.
+  ctx.measuredContextTokens
 );
 ```
 
-`tailTokenBudget` returns `min(300K, 60% of the window)`, falling back to a
-conservative 200K window when `ctx.contextWindow` is absent. The fraction sits
+`tailTokenBudget` returns `min(300K, 50% of the window) - 25K`, falling back to
+a conservative 200K window when `ctx.contextWindow` is absent. The fraction sits
 below the lowest default compact breakpoint on purpose: compaction has to
 relieve pressure past that breakpoint, or `highestFiredBreakpointAt` never
 resets and no further post-turn compaction fires.
+
+**Measure, don't estimate.** The budget is compared against `estimateTailTokens`
+— a `chars/4` floor over message text that counts no system prompt, no tool
+schema and no image. On real coworker content that reads an order of magnitude
+under the truth, so a session the runner knows is at 63% of its window looks to
+the strategy like it comfortably fits, nothing is peeled, and compaction returns
+a noop forever. Passing `ctx.measuredContextTokens` lets `trimTailToTokenBudget`
+calibrate the estimator against what the model actually charged: it derives a
+scale (clamped at 1, so it can never shrink the estimate) and applies it to
+every tail measurement. When the context holds a measurement neither you nor the
+caller passed, it reads the newest `turn_end`'s `lastCallInputContextTokens`
+itself, so `/compact` and `ent/session/compact` are covered too. With no
+measurement anywhere the estimate stands exactly as before.
+
+This cannot make compaction more aggressive on a healthy session: the scaled
+measurement of the FULL tail is the reported figure itself, so peeling begins
+only when the model says the session is over the budget — the same number the
+pressure trigger acts on.
 
 **Compaction is triggered three ways**, all routing through the persona-selected
 strategy and `validatePreserved`: automatically in the runner's post-turn hook

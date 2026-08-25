@@ -2,7 +2,7 @@
 // ABOUTME: Pure, self-contained (no rpc/utils dependency). Safe for cross-checkout import.
 
 import { isEventOfType } from '@lace/agent/storage/event-types';
-import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
+import type { TypedDurableEvent, ContextCompactedEventData } from '@lace/agent/storage/event-types';
 import type { ContentBlock, ThinkingBlock } from '@lace/agent/providers/base-provider';
 import type { ToolCall as CoreToolCall, ToolResult as CoreToolResult } from '../tools/types';
 import type { ToolResult as ProtocolToolResult } from '@lace/ent-protocol';
@@ -762,6 +762,103 @@ export function estimateTailTokens(tail: TypedDurableEvent[]): number {
   return estimateProviderTokens(buildPreservedTail(tail));
 }
 
+/** Index of the newest `context_compacted` event, or -1 when there is none. */
+function lastCompactedIndex(events: TypedDurableEvent[]): number {
+  for (let i = events.length - 1; i >= 0; i--) {
+    if (events[i].type === 'context_compacted') return i;
+  }
+  return -1;
+}
+
+/**
+ * The provider's own report of how big this session's context actually is, read
+ * from the newest `turn_end` — `lastCallInputContextTokens`, the whole input of
+ * the last API call: system prompt, tool schemas, images, history, everything
+ * `estimateProviderTokens` cannot see.
+ *
+ * Returns `undefined`, never 0, when nothing reported one (a legacy transcript,
+ * a first turn, a provider that reports no usage). A zero would read as "the
+ * context is empty" and is exactly how you build a compaction that never fires.
+ *
+ * Only turns AFTER the newest compaction count. An older figure describes the
+ * pre-compaction context; pairing it with an estimate of the post-compaction
+ * event set would invent an enormous correction factor and peel the tail to
+ * nothing.
+ */
+export function lastReportedContextTokens(events: TypedDurableEvent[]): number | undefined {
+  for (let i = events.length - 1; i > lastCompactedIndex(events); i--) {
+    const e = events[i];
+    if (!isEventOfType(e, 'turn_end')) continue;
+    const reported = e.data.usage?.lastCallInputContextTokens;
+    if (typeof reported === 'number' && Number.isFinite(reported) && reported > 0) return reported;
+  }
+  return undefined;
+}
+
+/**
+ * The local estimator's reading of the context the provider is currently
+ * replaying: the newest compaction's preserved prefix plus every event since.
+ * The denominator of the calibration below — it has to cover the same span the
+ * measurement does, or the ratio between them means nothing.
+ */
+export function estimateCurrentContextTokens(events: TypedDurableEvent[]): number {
+  const compactedAt = lastCompactedIndex(events);
+  // `preserved` is `unknown[]` on the event and genuinely is unknown on a real
+  // transcript — ada's bad-state fixture carries entries with no `content` at
+  // all. The cast is safe because `estimateProviderTokens` counts anything it
+  // does not recognize as no text rather than throwing.
+  const prefix =
+    compactedAt >= 0
+      ? (((events[compactedAt].data as ContextCompactedEventData).preserved ??
+          []) as PreservedMessage[])
+      : [];
+  const since = buildPreservedTail(events.slice(compactedAt + 1));
+  return estimateProviderTokens([...prefix, ...since]);
+}
+
+/**
+ * How far `estimateProviderTokens` under-reads this session's real content, as
+ * a multiplier ≥ 1.
+ *
+ * The estimator is a chars/4 floor over message text. Real coworker content
+ * measures 2.4–2.9 chars per token, and the system prompt, the tool schemas and
+ * every image are outside what it counts at all — on ada-sen the prompt and
+ * schemas alone are 88K characters. So a session the runner knows is at 633K
+ * tokens estimates at ~25K, the tail budget sees a tail that comfortably fits,
+ * nothing is peeled, and compaction returns a noop on a session that is
+ * two-thirds full (PRI-2947).
+ *
+ * The correction is deliberately a ratio and not a subtracted gap. A fixed gap
+ * would survive every peel — the loop would shed turn after turn without the
+ * measure ever falling, and land on a single turn every time. A ratio shrinks
+ * as the tail shrinks, which is how the density half of the error actually
+ * behaves. The fixed half (prompt + schemas) is amortized across the tail by
+ * the same ratio, which over-attributes it to a shrinking tail; that errs
+ * toward peeling one more turn than strictly needed, which is the safe
+ * direction for a mechanism whose job is to get back under the window.
+ *
+ * Clamped at 1: this can only ever make the tail read closer to what the model
+ * sees, never smaller. Absent, zero, negative and NaN measurements all mean "we
+ * were told nothing" and leave the estimate exactly as it was.
+ */
+export function contextMeasurementScale(
+  events: TypedDurableEvent[],
+  measuredContextTokens: number | undefined
+): number {
+  if (
+    measuredContextTokens === undefined ||
+    !Number.isFinite(measuredContextTokens) ||
+    measuredContextTokens <= 0
+  ) {
+    return 1;
+  }
+  const estimated = estimateCurrentContextTokens(events);
+  // Nothing to calibrate against — any factor derived from zero would be
+  // invented rather than measured.
+  if (estimated <= 0) return 1;
+  return Math.max(1, measuredContextTokens / estimated);
+}
+
 /**
  * Apply a token budget to the turn-based split. Starting from the turn-count
  * split, while the verbatim tail's estimated tokens exceed `budget` AND the
@@ -789,9 +886,24 @@ export function trimTailToTokenBudget(
    * always the untransformed events — the caller still applies its own
    * transform downstream.
    */
-  prepareTail?: (tail: TypedDurableEvent[]) => TypedDurableEvent[]
+  prepareTail?: (tail: TypedDurableEvent[]) => TypedDurableEvent[],
+  /**
+   * The provider's report of the session's real context size, when the caller
+   * holds a fresher one than the durable log does — the runner's in-flight
+   * figure, which on the emergency path predates any `turn_end` for the turn
+   * that just blew the window. Omitted, the newest `turn_end` is consulted, so
+   * the out-of-band callers (`/compact`, `ent/session/compact`) get the
+   * correction too. Nothing anywhere reports it: the estimate stands as it did
+   * before PRI-2947.
+   */
+  measuredContextTokens?: number
 ): { earlier: TypedDurableEvent[]; tail: TypedDurableEvent[] } {
-  const measure = (tail: TypedDurableEvent[]) => estimateTailTokens(prepareTail?.(tail) ?? tail);
+  const scale = contextMeasurementScale(
+    events,
+    measuredContextTokens ?? lastReportedContextTokens(events)
+  );
+  const measure = (tail: TypedDurableEvent[]) =>
+    Math.round(estimateTailTokens(prepareTail?.(tail) ?? tail) * scale);
   let split = splitAtTailBoundary(events, tailTurns);
   let turns = tailTurns;
 
@@ -800,12 +912,25 @@ export function trimTailToTokenBudget(
     split = splitAtTailBoundary(events, turns);
   }
 
+  // Peeling only counts when a whole TURN moved. On a session with a single
+  // turn the loop bottoms out at one turn and `splitAtTailBoundary` hands back
+  // the leading `system_prompt_set` as `earlier` — non-empty, but holding no
+  // conversation at all. A strategy testing `earlier.length === 0` reads that
+  // as something to summarize and writes a compaction that preserves the whole
+  // history verbatim, which sheds nothing and spends the breakpoint that
+  // authorized it (PRI-2945). There is no tail size that fits such a session;
+  // hand back the untrimmed split and let the strategy noop.
+  if (!split.earlier.some((e) => e.type === 'turn_end')) {
+    split = splitAtTailBoundary(events, tailTurns);
+  }
+
   if (measure(split.tail) > budget) {
     logger.warn(
       'compaction: preserved tail exceeds token budget with a single turn — preserving it anyway',
       {
         budget,
         estimatedTailTokens: measure(split.tail),
+        measurementScale: scale,
         tailTurns: turns,
       }
     );
