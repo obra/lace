@@ -1483,6 +1483,7 @@ export class ConversationRunner {
         // bypasses the clean-stop gate entirely so the agent can explicitly
         // request compaction at any stop reason).
         let breakpointCompactCrossed = false;
+        let pendingBreakpointLatch: number | null = null;
         if (isCleanStop) {
           const breakpoints = compactionBreakpointsForPersona(
             this.config.persona ?? null,
@@ -1520,25 +1521,60 @@ export class ConversationRunner {
             });
           } else if (ev.fire?.action === 'compact') {
             breakpointCompactCrossed = true;
-            // Persist the new highestFiredBreakpointAt — the compact path below
-            // will read and write state under its own runExclusive.
-            await this.deps.runExclusive(() => {
-              const sessionState = readSessionState(sessionDir);
-              writeSessionState(sessionDir, {
-                ...sessionState,
-                highestFiredBreakpointAt: ev.nextHighestFiredAt,
-              });
-            });
+            // The latch is NOT written here. It is written below, and only if
+            // the compaction it authorized actually produced something. See
+            // the comment on that write.
+            pendingBreakpointLatch = ev.nextHighestFiredAt;
           }
         }
 
         if (compactionRequest.requested || breakpointCompactCrossed) {
-          await this.compactSession({
+          const compacted = await this.compactSession({
             modelId,
             contextWindow: contextWindowSize,
             guidance: compactionRequest.guidance,
             updateTurnSeq: durableTurnSeq,
           });
+
+          // Spend the breakpoint only on a compaction that happened (PRI-2945).
+          //
+          // `compactSession` returns false when the strategy had nothing to
+          // work with — track-based preserves the last ten turns verbatim, so
+          // a session shorter than that whose durable text fits the tail
+          // budget has no `earlier` slice and returns a noop. Latching anyway
+          // is permanent: `evaluateBreakpoints` only resets once pressure
+          // falls back BELOW the lowest breakpoint, and a session that just
+          // failed to shed anything is still above it. Every later turn then
+          // evaluates to `fire: null`, including the turns where compaction
+          // would finally have worked. Measured on ada-sen: 427 subagent
+          // sessions, zero `context_compacted` events, some of them twenty
+          // turns long at 63% of their window.
+          //
+          // Leaving the latch alone means the next clean turn re-evaluates and
+          // tries again. Retrying is cheap — track-based is pure and takes no
+          // model call — and it is the only thing that lets a session compact
+          // as soon as it becomes able to.
+          if (breakpointCompactCrossed && pendingBreakpointLatch !== null) {
+            if (compacted) {
+              await this.deps.runExclusive(() => {
+                const sessionState = readSessionState(sessionDir);
+                writeSessionState(sessionDir, {
+                  ...sessionState,
+                  highestFiredBreakpointAt: pendingBreakpointLatch,
+                });
+              });
+            } else {
+              logger.warn(
+                'runner: breakpoint fired but compaction produced nothing; leaving the breakpoint unspent',
+                {
+                  sessionId,
+                  turnId,
+                  pressure,
+                  breakpoint: pendingBreakpointLatch,
+                }
+              );
+            }
+          }
         }
       } catch (compactionErr) {
         logger.error('runner: compaction failed', {
