@@ -47,6 +47,7 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { logger } from '@lace/agent/utils/logger';
+import { personaRegistry } from '@lace/agent/config/persona-registry';
 import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
 import { computePressure, evaluateBreakpoints } from './compaction-trigger';
 import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
@@ -56,8 +57,8 @@ import {
   validatePreserved,
 } from '@lace/agent/compaction/strategy';
 import {
-  compactionStrategyNameForSession,
-  compactionBreakpointsForSession,
+  compactionStrategyNameForPersona,
+  compactionBreakpointsForPersona,
 } from '@lace/agent/compaction/select';
 import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
@@ -1483,7 +1484,11 @@ export class ConversationRunner {
         // request compaction at any stop reason).
         let breakpointCompactCrossed = false;
         if (isCleanStop) {
-          const breakpoints = compactionBreakpointsForSession(sessionDir);
+          const breakpoints = compactionBreakpointsForPersona(
+            this.config.persona ?? null,
+            this.deps.personaRegistry ?? personaRegistry,
+            { sessionDir }
+          );
           const currentHighestFiredAt = readSessionState(sessionDir).highestFiredBreakpointAt ?? 0;
           const ev = evaluateBreakpoints({
             pressure,
@@ -1600,9 +1605,13 @@ export class ConversationRunner {
     const allEvents = readDurableEvents(sessionDir, {
       limit: Number.MAX_SAFE_INTEGER,
     }).events;
-    const strategyName = this.config.persona
-      ? compactionStrategyNameForSession(sessionDir)
-      : 'track-based';
+    // config.persona is the session's own record of its persona; passing it
+    // directly means the guard and the lookup can no longer disagree.
+    const strategyName = compactionStrategyNameForPersona(
+      this.config.persona ?? null,
+      this.deps.personaRegistry ?? personaRegistry,
+      { sessionDir }
+    );
     const strategy = resolveCompactionStrategy(strategyName);
     const compactionCtx = buildCompactionContext({
       threadId: sessionId,

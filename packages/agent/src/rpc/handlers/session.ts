@@ -68,7 +68,8 @@ import {
 import type { RuntimeExecutionBinding } from '../../tools/runtime/types';
 import { buildPersonaProjectedRuntimeBinding } from '../../jobs/persona-projected-binding';
 import { assertCompactionStrategyRegistered } from '../../compaction/strategy';
-import { compactionStrategyNameForSession } from '../../compaction/select';
+import { compactionStrategyNameForPersona } from '../../compaction/select';
+import { personaForSessionDir } from '@lace/agent/storage/event-log';
 
 type SessionRestoreParams = {
   sessionId: string;
@@ -427,7 +428,13 @@ async function activateStoredSession(
   // Fail fast if the persona stored in this session selects a compaction strategy
   // whose plugin isn't loaded. Surfaces misconfiguration at session-open time rather
   // than hours later at the first compaction.
-  assertCompactionStrategyRegistered(compactionStrategyNameForSession(loadedWithMcpServers.dir));
+  assertCompactionStrategyRegistered(
+    compactionStrategyNameForPersona(
+      personaForSessionDir(loadedWithMcpServers.dir),
+      state.personaRegistry,
+      { sessionDir: loadedWithMcpServers.dir }
+    )
+  );
 
   if (switchingSessions) {
     await releaseRunningSessionWork(peer, state, runExclusive);

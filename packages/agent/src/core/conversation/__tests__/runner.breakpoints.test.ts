@@ -4,7 +4,7 @@
 // ABOUTME: and resets when pressure drops, and noop sessions fire once then go quiet.
 //
 // The persona→breakpoints unit path is covered by select.test.ts. These tests
-// mock compactionBreakpointsForSession so the runner wiring tests do not depend
+// mock compactionBreakpointsForPersona so the runner wiring tests do not depend
 // on the singleton personaRegistry seeing test-specific persona files.
 
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,21 +30,21 @@ import { resetRegistriesForTest } from '@lace/agent/plugins';
 import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 
 // ---------------------------------------------------------------------------
-// Mock compactionBreakpointsForSession so persona file loading is not required
+// Mock compactionBreakpointsForPersona so persona file loading is not required
 // ---------------------------------------------------------------------------
 vi.mock('@lace/agent/compaction/select', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@lace/agent/compaction/select')>();
   return {
     ...actual,
-    compactionBreakpointsForSession: vi.fn(),
+    compactionBreakpointsForPersona: vi.fn(),
   };
 });
 
 import {
-  compactionBreakpointsForSession,
+  compactionBreakpointsForPersona,
   DEFAULT_BREAKPOINTS,
 } from '@lace/agent/compaction/select';
-const mockBreakpoints = vi.mocked(compactionBreakpointsForSession);
+const mockBreakpoints = vi.mocked(compactionBreakpointsForPersona);
 
 // ---------------------------------------------------------------------------
 // Shared mock helpers (mirror runner.compact-session.test.ts pattern)
@@ -723,7 +723,7 @@ describe('ConversationRunner - configurable breakpoints', () => {
   });
 
   it('default 0.6/0.9 breakpoints fire compact when no persona is configured', async () => {
-    // No persona → compactionBreakpointsForSession returns DEFAULT_BREAKPOINTS [0.6 compact, 0.9 compact].
+    // No persona → compactionBreakpointsForPersona returns DEFAULT_BREAKPOINTS [0.6 compact, 0.9 compact].
     // The call is unconditional; select.ts handles missing personas gracefully (returns defaults).
     mockBreakpoints.mockReturnValue(DEFAULT_BREAKPOINTS);
     seedSession(sessionDir, sessionId, cwd); // no persona
