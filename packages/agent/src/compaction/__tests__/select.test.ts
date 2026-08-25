@@ -1,19 +1,14 @@
 // ABOUTME: Tests for compactionStrategyNameForPersona and compactionBreakpointsForPersona —
 // ABOUTME: persona-configured values, defaults, and the loud-fallback contract (PRI-2943).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Breakpoint } from '../select';
 
-// Mock the two external dependencies so we don't need real files or a registry
-vi.mock('@lace/agent/config/persona-registry', () => ({
-  personaRegistry: {
-    parsePersona: vi.fn(),
-  },
-}));
+// Only the logger is mocked. These resolvers take their registry as an argument
+// now, so there is no module singleton left to stub out — which is the point of
+// the change they cover.
 vi.mock('@lace/agent/utils/logger', () => ({
   logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
-import { personaRegistry } from '@lace/agent/config/persona-registry';
 import { logger } from '@lace/agent/utils/logger';
 import {
   compactionBreakpointsForPersona,
@@ -21,7 +16,6 @@ import {
   DEFAULT_BREAKPOINTS,
 } from '../select';
 
-const mockParsePersona = vi.mocked(personaRegistry.parsePersona);
 const mockWarn = vi.mocked(logger.warn);
 
 beforeEach(() => {
