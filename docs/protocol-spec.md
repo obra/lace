@@ -2240,11 +2240,26 @@ interface UsageInfo {
   outputTokens: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
+  lastCallInputContextTokens?: number;
   thinkingTokens?: number;
   totalTokens?: number;
   costUsd?: number;
 }
 ```
+
+`inputTokens`, `cacheReadTokens` and `cacheWriteTokens` are **turn-cumulative**:
+a turn containing a ten-call tool loop over a 100k context sums to roughly 1M.
+Summing them measures work done, not context occupied.
+
+`lastCallInputContextTokens` is the **last** API call's on-the-wire input
+context size for the turn (its uncached input plus cache-write plus cache-read
+tokens) — what the next call will actually send. A client deciding when to
+compact should key on this field.
+
+It is optional and is **absent, never zero**, when the agent does not report it
+(a provider with no cache accounting, or an agent predating the field). Treat
+absent as unknown and fall back; reading it as 0 would look like an empty
+context and suppress compaction indefinitely.
 
 ### 11.7 ToolResult
 
