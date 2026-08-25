@@ -11,7 +11,6 @@ import { resolveMcpServerCommandArgs } from './mcp-path-resolution';
 import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import { logger } from '@lace/agent/utils/logger';
 import { personaDirs } from '@lace/agent/plugins';
-import { getEnvVar } from '@lace/agent/config/env-loader';
 import { TemplateEngine, type TemplateContext } from './template-engine';
 
 export interface PersonaInfo {
@@ -689,30 +688,7 @@ function readEmbeddedFileSync(file: unknown): string {
 // Singleton convenience for non-embedder callers; embedders may construct their own registry.
 const bundledPersonasPath = resolveResourcePath(import.meta.url, 'agent-personas');
 
-/**
- * Ordered user-persona search paths, earlier winning.
- *
- * `LACE_USER_PERSONA_DIRS` (colon-separated) lets an embedder DECLARE where its
- * personas live. lace's own convention — `$LACE_DIR/agent-personas` — stays as
- * the last entry so nothing that relies on it breaks.
- *
- * PRI-2943: sen-core keeps personas under `<instance>/user/agent-personas`
- * (user-authored, git-managed) and points LACE_DIR at `<instance>/state/lace`
- * (runtime state). Nothing connected the two except a symlink one host carried
- * over from an older layout. On a host without it, `parsePersona('core')` threw,
- * compaction silently fell back to the unbounded built-in strategy, and the
- * session grew a summary larger than its own context window. An inferred path
- * cannot fail loudly; a declared one can.
- */
-export function userPersonaPaths(): string[] {
-  const declared = (getEnvVar('LACE_USER_PERSONA_DIRS') ?? '')
-    .split(':')
-    .map((d) => d.trim())
-    .filter((d) => d.length > 0);
-  return [...declared, path.join(getLaceDir(), 'agent-personas')];
-}
-
 export const personaRegistry = new PersonaRegistry({
   bundledPersonasPath,
-  userPersonasPaths: userPersonaPaths(),
+  userPersonasPaths: [path.join(getLaceDir(), 'agent-personas')],
 });
