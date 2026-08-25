@@ -932,4 +932,105 @@ describe('ConversationRunner - configurable breakpoints', () => {
     const state = readSessionState(sessionDir);
     expect(state.highestFiredBreakpointAt ?? 0).toBe(0);
   });
+  // -------------------------------------------------------------------------
+  // A compaction that did nothing must not consume the breakpoint (PRI-2945)
+  // -------------------------------------------------------------------------
+  //
+  // Subagent sessions are short. track-based compaction preserves the last ten
+  // turns verbatim, so a session with fewer than ten turns whose durable text
+  // fits the tail budget has no `earlier` slice at all and the strategy returns
+  // a noop. The runner used to latch `highestFiredBreakpointAt` before finding
+  // that out, which spends the breakpoint on a compaction that never happened:
+  // pressure never falls back below the lowest breakpoint, so it never resets,
+  // and no later turn can fire it again. Measured on ada-sen: 427 subagent
+  // sessions, zero `context_compacted` events, including sessions that ran for
+  // twenty turns at 63% of their window.
+
+  /** Seed only the system prompt — a brand-new session, as a subagent starts. */
+  function seedEmptySession(sessionDirPath: string, id: string, workDir: string, persona: string) {
+    const now = new Date().toISOString();
+    writeFileSync(
+      join(sessionDirPath, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: now,
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+      }) + '\n'
+    );
+    writeFileSync(
+      join(sessionDirPath, 'state.json'),
+      JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
+    );
+    writeFileSync(
+      join(sessionDirPath, 'meta.json'),
+      JSON.stringify({ sessionId: id, workDir, created: now, persona })
+    );
+  }
+
+  function subagentRunner(persona: string, promptTokens: number, replyChars: number) {
+    const provider = new ScriptedProvider(
+      [
+        {
+          content: 'y'.repeat(replyChars),
+          toolCalls: [],
+          stopReason: 'stop',
+          usage: { promptTokens, completionTokens: 10, totalTokens: promptTokens + 10 },
+        },
+      ],
+      1_000_000
+    );
+    const executor = new ToolExecutor();
+    executor.registerAllAvailableTools({ skillDirs: [] } as any);
+    return new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve', persona },
+      createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+        createToolExecutor: vi.fn().mockReturnValue({
+          executor,
+          toolsForProvider: executor.getAllTools(),
+        }),
+      })
+    );
+  }
+
+  it('a breakpoint whose compaction was a noop does not latch (PRI-2945)', async () => {
+    mockBreakpoints.mockReturnValue(DEFAULT_BREAKPOINTS);
+    seedEmptySession(sessionDir, sessionId, cwd, 'persistent-box-worker');
+
+    // 63% of a 1M window — past the 0.6 default compact breakpoint. But this is
+    // the session's FIRST turn, so track-based has nothing older than the tail
+    // to summarize and returns a noop.
+    await subagentRunner('persistent-box-worker', 633_419, 20_000).run({
+      content: [{ type: 'text', text: 'hello' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    const { events } = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
+    expect(events.some((e) => e.type === 'context_compacted')).toBe(false);
+    // The breakpoint must still be available to a later turn that CAN compact.
+    expect(readSessionState(sessionDir).highestFiredBreakpointAt ?? 0).toBe(0);
+  });
+
+  it('a multi-turn subagent session compacts once track-based can act (PRI-2945)', async () => {
+    mockBreakpoints.mockReturnValue(DEFAULT_BREAKPOINTS);
+    seedEmptySession(sessionDir, sessionId, cwd, 'persistent-box-worker');
+
+    // Every turn sits at 63% pressure — the shape ada-sen's subagents run at,
+    // where a big system prompt and tool schemas put the session over the
+    // breakpoint from the very first call and it never comes back down.
+    for (let turn = 0; turn < 12; turn++) {
+      await subagentRunner('persistent-box-worker', 633_419, 20_000).run({
+        content: [{ type: 'text', text: `task ${turn}` }],
+        abortController: new AbortController(),
+        turnId: `turn_${turn}_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+    }
+
+    const { events } = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER });
+    expect(events.filter((e) => e.type === 'context_compacted').length).toBeGreaterThan(0);
+  });
 });
