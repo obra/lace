@@ -1483,7 +1483,10 @@ export class ConversationRunner {
         // request compaction at any stop reason).
         let breakpointCompactCrossed = false;
         if (isCleanStop) {
-          const breakpoints = compactionBreakpointsForSession(sessionDir);
+          const breakpoints = compactionBreakpointsForSession(
+            sessionDir,
+            this.deps.personaRegistry
+          );
           const currentHighestFiredAt = readSessionState(sessionDir).highestFiredBreakpointAt ?? 0;
           const ev = evaluateBreakpoints({
             pressure,
@@ -1601,7 +1604,7 @@ export class ConversationRunner {
       limit: Number.MAX_SAFE_INTEGER,
     }).events;
     const strategyName = this.config.persona
-      ? compactionStrategyNameForSession(sessionDir)
+      ? compactionStrategyNameForSession(sessionDir, this.deps.personaRegistry)
       : 'track-based';
     const strategy = resolveCompactionStrategy(strategyName);
     const compactionCtx = buildCompactionContext({

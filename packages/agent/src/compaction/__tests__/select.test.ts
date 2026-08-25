@@ -190,3 +190,62 @@ describe('persona resolution failure is loud (PRI-2943)', () => {
     expect(mockWarn).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// PRI-2943 follow-up: resolve personas through the SESSION's registry.
+//
+// `state.personaRegistry` is documented as "embedder-controlled … replaced by
+// the initialize handler when the client supplies userPersonasPaths", and both
+// sen-core call paths do supply them. But this module reached for the module
+// singleton instead, which is built from LACE_DIR at import time — so an
+// embedder whose personas live outside LACE_DIR silently got the wrong
+// compaction strategy no matter what it declared over the protocol. The
+// workaround was declaring an env var at every child process; the fix is to
+// honour the registry that was already threaded through.
+// ---------------------------------------------------------------------------
+describe('resolves through the supplied registry, not the singleton', () => {
+  const registryWith = (config: unknown) => ({
+    parsePersona: vi.fn().mockReturnValue({ config, body: '' }),
+  });
+
+  it('uses the supplied registry for the strategy', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    const reg = registryWith({ compaction: { strategy: 'sen-multiconv' } });
+    expect(compactionStrategyNameForSession('/some/dir', reg as never)).toBe('sen-multiconv');
+  });
+
+  it('does not touch the module singleton when a registry is supplied', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    const reg = registryWith({ compaction: { strategy: 'sen-multiconv' } });
+    compactionStrategyNameForSession('/some/dir', reg as never);
+    expect(mockParsePersona).not.toHaveBeenCalled();
+  });
+
+  it('uses the supplied registry for breakpoints', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    const bps = [{ at: 0.55, action: 'notify' as const }];
+    const reg = registryWith({ compaction: { breakpoints: bps } });
+    expect(compactionBreakpointsForSession('/some/dir', reg as never)).toEqual(bps);
+  });
+
+  it('falls back to the singleton when no registry is supplied', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    mockParsePersona.mockReturnValue({
+      config: { compaction: { strategy: 'from-singleton' } },
+      body: '',
+    } as never);
+    expect(compactionStrategyNameForSession('/some/dir')).toBe('from-singleton');
+    expect(mockParsePersona).toHaveBeenCalled();
+  });
+
+  it('still warns loudly when the supplied registry cannot parse the persona', () => {
+    mockPersonaForSessionDir.mockReturnValue('core');
+    const reg = {
+      parsePersona: vi.fn().mockImplementation(() => {
+        throw new Error("Persona 'core' not found.");
+      }),
+    };
+    expect(compactionStrategyNameForSession('/some/dir', reg as never)).toBe('track-based');
+    expect(mockWarn).toHaveBeenCalled();
+  });
+});

@@ -427,7 +427,9 @@ async function activateStoredSession(
   // Fail fast if the persona stored in this session selects a compaction strategy
   // whose plugin isn't loaded. Surfaces misconfiguration at session-open time rather
   // than hours later at the first compaction.
-  assertCompactionStrategyRegistered(compactionStrategyNameForSession(loadedWithMcpServers.dir));
+  assertCompactionStrategyRegistered(
+    compactionStrategyNameForSession(loadedWithMcpServers.dir, state.personaRegistry)
+  );
 
   if (switchingSessions) {
     await releaseRunningSessionWork(peer, state, runExclusive);

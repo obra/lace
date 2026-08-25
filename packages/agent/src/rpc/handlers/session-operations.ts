@@ -499,7 +499,8 @@ export function registerSessionOperationHandlers(
       // identical. Same cast pattern is used in slash-commands.ts.
       const events = rawEvents.events as unknown as TypedDurableEvent[];
 
-      const name = parsed?.strategy ?? compactionStrategyNameForSession(sessionDir);
+      const name =
+        parsed?.strategy ?? compactionStrategyNameForSession(sessionDir, state.personaRegistry);
       // Validate the strategy name early so an unknown name produces -32602 (InvalidParams)
       // rather than propagating a RegistryError as an internal error.
       let strategy;

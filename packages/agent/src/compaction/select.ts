@@ -1,6 +1,7 @@
 // ABOUTME: Resolve the compaction strategy NAME and breakpoints for a session from its persona
 import { personaForSessionDir } from '@lace/agent/storage/event-log';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
+import type { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import { logger } from '@lace/agent/utils/logger';
 import { basename } from 'node:path';
 
@@ -21,9 +22,18 @@ export const DEFAULT_BREAKPOINTS: Breakpoint[] = [
  * `catch` turned that into 203 consecutive compactions on the wrong strategy
  * with an unbounded renderer. Nothing logged for four weeks.
  */
+/**
+ * The single method these resolvers need. Narrower than PersonaRegistry so a
+ * caller can pass any resolver and tests need not build a whole registry.
+ */
+export interface PersonaConfigResolver {
+  parsePersona: PersonaRegistry['parsePersona'];
+}
+
 function personaConfigForSession(
   sessionDir: string,
-  what: string
+  what: string,
+  registry: PersonaConfigResolver = personaRegistry
 ): { compaction?: { strategy?: string; breakpoints?: unknown[] } } | null {
   let persona: string | null = null;
   try {
@@ -41,7 +51,7 @@ function personaConfigForSession(
   if (!persona) return null;
 
   try {
-    return personaRegistry.parsePersona(persona).config;
+    return registry.parsePersona(persona).config;
   } catch (err) {
     logger.warn(
       'compaction: session names a persona that failed to parse; falling back to defaults',
@@ -57,11 +67,30 @@ function personaConfigForSession(
   }
 }
 
-export function compactionStrategyNameForSession(sessionDir: string): string {
-  return personaConfigForSession(sessionDir, 'strategy')?.compaction?.strategy ?? 'track-based';
+/**
+ * `registry` is the session's embedder-controlled resolver — `state.personaRegistry`
+ * on the RPC side, `deps.personaRegistry` in the runner. Omit it only where no
+ * session context exists; it then falls back to the module singleton, whose user
+ * paths come from LACE_DIR (plus LACE_USER_PERSONA_DIRS).
+ *
+ * Passing it matters: an embedder that keeps personas outside LACE_DIR declares
+ * them via `userPersonasPaths` at initialize, and the singleton does not know
+ * about that. Resolving against the singleton anyway silently downgraded such a
+ * session to the default strategy for four weeks (PRI-2943).
+ */
+export function compactionStrategyNameForSession(
+  sessionDir: string,
+  registry?: PersonaConfigResolver
+): string {
+  return (
+    personaConfigForSession(sessionDir, 'strategy', registry)?.compaction?.strategy ?? 'track-based'
+  );
 }
 
-export function compactionBreakpointsForSession(sessionDir: string): Breakpoint[] {
-  const bp = personaConfigForSession(sessionDir, 'breakpoints')?.compaction?.breakpoints;
+export function compactionBreakpointsForSession(
+  sessionDir: string,
+  registry?: PersonaConfigResolver
+): Breakpoint[] {
+  const bp = personaConfigForSession(sessionDir, 'breakpoints', registry)?.compaction?.breakpoints;
   return bp && bp.length > 0 ? (bp as Breakpoint[]) : DEFAULT_BREAKPOINTS;
 }

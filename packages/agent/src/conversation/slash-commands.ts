@@ -154,7 +154,7 @@ export async function handleSlashCommand(
 
         const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
-        const name = compactionStrategyNameForSession(sessionDir);
+        const name = compactionStrategyNameForSession(sessionDir, state.personaRegistry);
         // args is the free-text tail after /compact — thread as guidance.
         const guidance = args.trim() || undefined;
         const compactionCtx = await buildCompactionContextForConnection({
