@@ -39,7 +39,8 @@ import {
   estimateProviderTokens,
 } from '../../message-building/message-builder';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
-import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { compactionStrategyNameForPersona } from '@lace/agent/compaction/select';
+import { personaForSessionDir } from '@lace/agent/storage/event-log';
 import { buildCompactionContextForConnection } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
@@ -500,7 +501,10 @@ export function registerSessionOperationHandlers(
       const events = rawEvents.events as unknown as TypedDurableEvent[];
 
       const name =
-        parsed?.strategy ?? compactionStrategyNameForSession(sessionDir, state.personaRegistry);
+        parsed?.strategy ??
+        compactionStrategyNameForPersona(personaForSessionDir(sessionDir), state.personaRegistry, {
+          sessionDir,
+        });
       // Validate the strategy name early so an unknown name produces -32602 (InvalidParams)
       // rather than propagating a RegistryError as an internal error.
       let strategy;

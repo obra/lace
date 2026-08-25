@@ -11,7 +11,8 @@ import {
 } from '@lace/agent/storage/session-store';
 import { validatePersonaName } from '@lace/agent/storage/transcript-paths';
 import { resolveCompactionStrategy, validatePreserved } from '@lace/agent/compaction/strategy';
-import { compactionStrategyNameForSession } from '@lace/agent/compaction/select';
+import { compactionStrategyNameForPersona } from '@lace/agent/compaction/select';
+import { personaForSessionDir } from '@lace/agent/storage/event-log';
 import { buildCompactionContextForConnection } from '@lace/agent/compaction/build-context';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
@@ -154,7 +155,11 @@ export async function handleSlashCommand(
 
         const effectiveConfig = getEffectiveConfig(state.config, state.activeSession.state.config);
 
-        const name = compactionStrategyNameForSession(sessionDir, state.personaRegistry);
+        const name = compactionStrategyNameForPersona(
+          personaForSessionDir(sessionDir),
+          state.personaRegistry,
+          { sessionDir }
+        );
         // args is the free-text tail after /compact — thread as guidance.
         const guidance = args.trim() || undefined;
         const compactionCtx = await buildCompactionContextForConnection({
