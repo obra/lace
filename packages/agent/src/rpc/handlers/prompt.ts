@@ -527,6 +527,13 @@ export function registerPromptHandler(
         ...(result.usage.cacheCreationInputTokens !== undefined
           ? { cacheWriteTokens: result.usage.cacheCreationInputTokens }
           : {}),
+        // The last API call's context size, as opposed to the turn-cumulative
+        // sums above. Emitted only when the runner reported it: absent means
+        // "unknown", where a literal 0 would read as "empty context" and tell
+        // an embedder it never needs to compact.
+        ...(result.usage.lastCallInputContextTokens !== undefined
+          ? { lastCallInputContextTokens: result.usage.lastCallInputContextTokens }
+          : {}),
         ...(result.usage.costUsd !== undefined ? { costUsd: result.usage.costUsd } : {}),
       };
 

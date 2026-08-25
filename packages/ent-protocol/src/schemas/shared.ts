@@ -175,6 +175,21 @@ export const UsageInfoSchema = z
     outputTokens: z.number(),
     cacheReadTokens: z.number().optional(),
     cacheWriteTokens: z.number().optional(),
+    /**
+     * The LAST API call's on-the-wire input context size for this turn: its
+     * uncached input plus cache-write plus cache-read tokens. The
+     * `inputTokens`/`cacheReadTokens`/`cacheWriteTokens` fields above are
+     * turn-CUMULATIVE — a turn with a ten-call tool loop over a 100k context
+     * sums to ~1M — so summing them measures work done, not context occupied.
+     * An embedder deciding when to compact wants this field: it is what the
+     * next API call will actually send.
+     *
+     * Optional, and absent rather than zero when the agent does not report it
+     * (a provider with no cache accounting, or an agent predating the field).
+     * Zero would read as "empty context" and suppress compaction forever, so
+     * consumers must treat absent as unknown and fall back, never as 0.
+     */
+    lastCallInputContextTokens: z.number().optional(),
     thinkingTokens: z.number().optional(),
     totalTokens: z.number().optional(),
     costUsd: z.number().optional(),
