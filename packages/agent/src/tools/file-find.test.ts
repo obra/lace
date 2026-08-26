@@ -921,3 +921,68 @@ describe('FileFindTool tolerates find partial failure (PRI-2975)', () => {
     expect(readdirSpy).toHaveBeenCalled();
   });
 });
+
+// PRI-2975 review follow-up: fastFind has its own deadline handling, and it must
+// tell "our budget expired" apart from "the caller cancelled" — the subtlest
+// branch in the change. The walk's budget test does not reach it.
+describe('FileFindTool fast-path budget (PRI-2975)', () => {
+  const tempDir = createTestTempDir('file_find-fastcap-');
+  let testDir: string;
+  let rtId = 0;
+
+  beforeEach(async () => {
+    testDir = await tempDir.getPath();
+    await writeFile(join(testDir, 'a.ts'), 'x');
+  });
+
+  afterEach(async () => {
+    await tempDir.cleanup();
+  });
+
+  /** A find that never returns on its own; only an abort ends it. */
+  function hangingRuntime() {
+    const runtime = new HostToolRuntime({ id: `rt_fastcap_${rtId++}`, cwd: testDir });
+    vi.spyOn(runtime.process, 'exec').mockImplementation(
+      (_cmd: string[], opts?: { signal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          opts?.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+            once: true,
+          });
+        })
+    );
+    return runtime;
+  }
+
+  it('reports incomplete when its own budget expires, without falling back to the walk', async () => {
+    class TinyBudgetFind extends FileFindTool {
+      protected override budgetMs(): number {
+        return 25;
+      }
+    }
+    const runtime = hangingRuntime();
+    const readdirSpy = vi.spyOn(runtime.fs, 'readdir');
+
+    const result = await new TinyBudgetFind().execute({ pattern: '*.ts', path: testDir }, {
+      signal: new AbortController().signal,
+      runtime,
+    } as ToolContext);
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain('Search stopped early');
+    // Timing out must not send us down the slower path we just removed.
+    expect(readdirSpy).not.toHaveBeenCalled();
+  });
+
+  it('reports caller cancellation as cancelled, not as an exhausted budget', async () => {
+    const runtime = hangingRuntime();
+    const controller = new AbortController();
+    const pending = new FileFindTool().execute({ pattern: '*.ts', path: testDir }, {
+      signal: controller.signal,
+      runtime,
+    } as ToolContext);
+    setTimeout(() => controller.abort(), 25);
+
+    const result = await pending;
+    expect(result.content[0].text).not.toContain('Search stopped early');
+  });
+});

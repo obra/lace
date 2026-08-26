@@ -396,8 +396,12 @@ export class ToolExecutor {
       toolContext = { ...toolContext, jobManager: this.jobManager };
     }
 
-    // Reset the runtime's per-tool-call filesystem budget (PRI-2975), so the
-    // ceiling bounds ONE tool call rather than the lifetime of a session.
+    // Reset the runtime's per-tool-call filesystem budget (PRI-2975).
+    //
+    // Defensive, not load-bearing today: runner.executeToolCall builds a fresh
+    // runtime per call, so the counter already starts at zero. This keeps the
+    // ceiling scoped to one tool call if a runtime is ever cached or pooled,
+    // where otherwise a long session would accumulate its way into a refusal.
     toolContext.runtime?.fs?.beginToolCall?.();
 
     const startedAt = Date.now();

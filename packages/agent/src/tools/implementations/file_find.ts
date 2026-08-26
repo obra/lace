@@ -291,6 +291,11 @@ export class FileFindTool extends Tool {
    * outlier, and on container runtimes each of those calls is a process spawn
    * (PRI-2975). Returns null when the fast path does not apply, and the caller
    * falls back to the walk.
+   *
+   * `-printf` is GNU-only, so on a BSD find (a macOS HostToolRuntime) the exec
+   * fails and the walk takes over. Accepted: the pathological cost this exists
+   * to remove is a container-runtime problem, and locally each fs call is a
+   * cheap syscall rather than a process spawn.
    */
   private async fastFind(
     runtime: ToolRuntime,
