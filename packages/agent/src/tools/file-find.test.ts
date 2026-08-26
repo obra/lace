@@ -9,6 +9,7 @@ import { createTestTempDir } from '@lace/agent/test-utils/temp-directory';
 import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
 import { HostToolRuntime } from './runtime/host';
 import type { ToolContext } from './types';
+import { FilesystemCallCeilingError } from './runtime/types';
 import type { RuntimePath } from './runtime/types';
 
 describe('FileFindTool with schema validation', () => {
@@ -817,5 +818,44 @@ describe('FileFindTool single-exec fast path (PRI-2975)', () => {
     expect(result.status).toBe('completed');
     expect(result.content[0].text).toContain('top.ts');
     expect(readdirSpy).toHaveBeenCalled();
+  });
+});
+
+// PRI-2975: the walk's catch blocks intentionally swallow per-entry errors
+// (permissions, broken symlinks). The call ceiling must NOT be swallowed —
+// otherwise a truncated search is reported as a complete one, and the model
+// concludes the file does not exist.
+describe('FileFindTool honours the runtime call ceiling (PRI-2975)', () => {
+  it('reports the search as incomplete instead of silently returning a partial', async () => {
+    const root: RuntimePath = {
+      original: '.',
+      runtimePath: '/runtime',
+      displayPath: 'project',
+    };
+    const runtime = createFakeRuntime({ resolve: root, statType: 'directory' });
+
+    // No fast path: force the walk.
+    vi.mocked(runtime.process.exec).mockResolvedValue({
+      exitCode: 127,
+      stdout: '',
+      stderr: 'find: not found',
+    });
+    vi.mocked(runtime.fs.readdir).mockResolvedValue([
+      { name: 'a.ts', type: 'file' },
+      { name: 'b.ts', type: 'file' },
+    ]);
+    vi.mocked(runtime.fs.stat).mockImplementation(async (p) => {
+      if (p.runtimePath === root.runtimePath)
+        return { type: 'directory', size: 0, mtime: new Date() };
+      throw new FilesystemCallCeilingError('too many filesystem calls in a single tool call');
+    });
+
+    const result = await new FileFindTool().execute(
+      { pattern: '*.ts', path: '.' },
+      { signal: new AbortController().signal, runtime }
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain('Search stopped early');
   });
 });

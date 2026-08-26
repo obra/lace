@@ -99,6 +99,18 @@ export interface RuntimePathService {
 }
 
 /**
+ * Thrown when one tool call makes more high-latency filesystem calls than the
+ * runtime permits (PRI-2975).
+ *
+ * Distinguishable on purpose: callers that walk trees swallow ordinary per-entry
+ * errors (unreadable directories, broken symlinks) and must NOT swallow this
+ * one, or a truncated result gets reported as a complete one.
+ */
+export class FilesystemCallCeilingError extends Error {
+  readonly name = 'FilesystemCallCeilingError';
+}
+
+/**
  * Filesystem access for the runtime a tool is executing against.
  *
  * COST WARNING: these are node-`fs`-shaped, but they are NOT node `fs`. On a
@@ -118,6 +130,12 @@ export interface RuntimePathService {
  * than looping here.
  */
 export interface RuntimeFileSystem {
+  /**
+   * Reset the per-tool-call call budget, where the implementation enforces one.
+   * The executor calls this before each tool so a long session is not penalised
+   * for the sum of many well-behaved calls.
+   */
+  beginToolCall?(): void;
   stat(path: RuntimePath): Promise<{ type: 'file' | 'directory'; size: number; mtime: Date }>;
   readTextFile(path: RuntimePath): Promise<string>;
   writeTextFile(path: RuntimePath, content: string): Promise<void>;

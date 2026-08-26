@@ -6,6 +6,7 @@ import { join } from 'path';
 import { Tool } from '../tool';
 import { NonEmptyString, FilePath } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import { FilesystemCallCeilingError } from '../runtime/types';
 import type { RuntimePath, ToolRuntime } from '../runtime/types';
 import { formatFileSize } from '@lace/agent/tools/utils/format-file-size';
 
@@ -261,12 +262,21 @@ export class FileFindTool extends Tool {
               return matches;
             }
           }
-        } catch {
-          // Skip items we can't stat (permission issues, broken symlinks, etc.)
+        } catch (error: unknown) {
+          // The call ceiling means the whole walk must stop; everything else
+          // (permissions, broken symlinks) is a per-entry problem to skip.
+          if (error instanceof FilesystemCallCeilingError) {
+            options.budget.exhausted = true;
+            return matches;
+          }
           continue;
         }
       }
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof FilesystemCallCeilingError) {
+        options.budget.exhausted = true;
+        return matches;
+      }
       // Skip directories we can't read
     }
 

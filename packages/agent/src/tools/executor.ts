@@ -396,6 +396,10 @@ export class ToolExecutor {
       toolContext = { ...toolContext, jobManager: this.jobManager };
     }
 
+    // Reset the runtime's per-tool-call filesystem budget (PRI-2975), so the
+    // ceiling bounds ONE tool call rather than the lifetime of a session.
+    toolContext.runtime?.fs?.beginToolCall?.();
+
     const startedAt = Date.now();
     const slowWarning = setTimeout(() => {
       logger.warn('tool call still running', {
