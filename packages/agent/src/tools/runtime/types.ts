@@ -98,6 +98,25 @@ export interface RuntimePathService {
   canonicalKey(path: RuntimePath): string;
 }
 
+/**
+ * Filesystem access for the runtime a tool is executing against.
+ *
+ * COST WARNING: these are node-`fs`-shaped, but they are NOT node `fs`. On a
+ * container-backed runtime every method here is a separate process spawn across
+ * a container boundary — roughly 160ms each, four orders of magnitude more than
+ * a local syscall. The shape invites per-entry loops that are perfectly
+ * reasonable against a local disk and pathological here.
+ *
+ * PRI-2975: file_find called `stat` once per entry while walking. On one
+ * node_modules tree that was 20,821 spawns and 96 minutes, during which the
+ * agent loop — which awaits tool results — was blocked and the coworker was
+ * silent.
+ *
+ * So: treat the call COUNT as a correctness property, not a performance detail.
+ * If you need to traverse or inspect many paths, push the work into a single
+ * `runtime.process.exec` (see file_find's fast path, or ripgrep_search) rather
+ * than looping here.
+ */
 export interface RuntimeFileSystem {
   stat(path: RuntimePath): Promise<{ type: 'file' | 'directory'; size: number; mtime: Date }>;
   readTextFile(path: RuntimePath): Promise<string>;
