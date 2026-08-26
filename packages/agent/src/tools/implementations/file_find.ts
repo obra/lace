@@ -353,7 +353,15 @@ export class FileFindTool extends Tool {
         options.budget.exhausted = true;
         return [];
       }
-      return null;
+      // GNU find exits 1 when it cannot read ANY directory during the
+      // traversal, while still printing correct output for everything it could
+      // read — verified: one chmod-000 subdirectory gives exit 1 plus valid
+      // results. Treating that as "fast path unavailable" would throw away a
+      // good answer and drop to the per-entry walk, reintroducing the exact
+      // pathology this exists to remove, on any tree with a permission problem.
+      // The walk skips unreadable directories silently too, so using the
+      // partial output matches its semantics rather than changing them.
+      if (result.stdout.length === 0) return null;
     }
 
     const matches: FileMatch[] = [];

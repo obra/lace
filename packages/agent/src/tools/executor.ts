@@ -349,10 +349,6 @@ export class ToolExecutor {
   }
 
   /**
-   * Execute a tool directly without approval complexity.
-   * Agent owns approval flow - ToolExecutor just executes when told.
-   */
-  /**
    * Warn when a single tool call has been running this long (PRI-2975).
    *
    * The agent loop awaits tool results, so a call that does not return takes
@@ -365,6 +361,10 @@ export class ToolExecutor {
    */
   static SLOW_TOOL_WARN_MS = 120_000;
 
+  /**
+   * Execute a tool directly without approval complexity.
+   * Agent owns approval flow - ToolExecutor just executes when told.
+   */
   async execute(toolCall: ToolCall, context: ToolContext): Promise<ToolResult> {
     const tool = this.getTool(toolCall.name);
     if (!tool) {

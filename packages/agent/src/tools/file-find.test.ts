@@ -859,3 +859,65 @@ describe('FileFindTool honours the runtime call ceiling (PRI-2975)', () => {
     expect(result.content[0].text).toContain('Search stopped early');
   });
 });
+
+// PRI-2975 review follow-up: GNU find exits 1 when it cannot read ANY
+// subdirectory during traversal, while still printing correct output for
+// everything it could read. Verified: a tree with one chmod-000 directory gives
+// exit=1 and valid stdout. Discarding that output and falling back to the walk
+// would reintroduce the per-entry pathology on any tree with a permission
+// problem — common in node_modules and container mounts.
+describe('FileFindTool tolerates find partial failure (PRI-2975)', () => {
+  const tempDir = createTestTempDir('file_find-partial-');
+  let testDir: string;
+  let rtId = 0;
+
+  beforeEach(async () => {
+    testDir = await tempDir.getPath();
+    await writeFile(join(testDir, 'reachable.ts'), 'x');
+  });
+
+  afterEach(async () => {
+    await tempDir.cleanup();
+  });
+
+  function instrumented() {
+    const runtime = new HostToolRuntime({ id: `rt_partial_${rtId++}`, cwd: testDir });
+    const execSpy = vi.spyOn(runtime.process, 'exec');
+    const readdirSpy = vi.spyOn(runtime.fs, 'readdir');
+    return {
+      context: { signal: new AbortController().signal, runtime } as ToolContext,
+      execSpy,
+      readdirSpy,
+    };
+  }
+
+  it('uses the output when find exits non-zero but still produced results', async () => {
+    const { context, execSpy, readdirSpy } = instrumented();
+    const record = `f\t1\t1700000000\t${join(testDir, 'reachable.ts')}\0`;
+    execSpy.mockResolvedValueOnce({ exitCode: 1, stdout: record, stderr: 'Permission denied' });
+
+    const result = await new FileFindTool().execute(
+      { pattern: '*.ts', path: testDir, maxDepth: 10 },
+      context
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain('reachable.ts');
+    // The whole point: do NOT drop to the per-entry walk.
+    expect(readdirSpy).not.toHaveBeenCalled();
+  });
+
+  it('still falls back when find produced nothing usable', async () => {
+    const { context, execSpy, readdirSpy } = instrumented();
+    execSpy.mockResolvedValueOnce({ exitCode: 127, stdout: '', stderr: 'find: not found' });
+
+    const result = await new FileFindTool().execute(
+      { pattern: '*.ts', path: testDir, maxDepth: 10 },
+      context
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain('reachable.ts');
+    expect(readdirSpy).toHaveBeenCalled();
+  });
+});
