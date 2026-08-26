@@ -205,8 +205,11 @@ describe('FileFindTool with schema validation', () => {
       expect(result.content[0].text).not.toContain('/runtime/src/app.ts');
       expect(runtime.paths.resolve).toHaveBeenCalledTimes(1);
       expect(runtime.paths.resolve).toHaveBeenCalledWith('.');
-      expect(runtime.fs.stat).toHaveBeenCalledWith(expect.objectContaining(srcPath));
+      // Only the MATCHING entry is statted. `src` is a directory that does not
+      // match '*.ts', and statting it merely to learn it is a directory is the
+      // per-entry exec that PRI-2975 removed — readdir already said so.
       expect(runtime.fs.stat).toHaveBeenCalledWith(expect.objectContaining(appPath));
+      expect(runtime.fs.stat).not.toHaveBeenCalledWith(expect.objectContaining(srcPath));
     });
 
     it('should find files by exact name', async () => {
@@ -570,5 +573,138 @@ describe('FileFindTool with schema validation', () => {
 
       expect(result.status).toBe('aborted');
     });
+  });
+});
+
+// PRI-2975: file_find issued one container exec per entry, wedging ada-sen for
+// 96 minutes on a node_modules tree. Every runtime.fs call is a process spawn on
+// container runtimes (~160ms), so the walk's call COUNT is a correctness
+// property, not a performance nicety. These assert the call pattern against a
+// real filesystem.
+describe('FileFindTool call efficiency (PRI-2975)', () => {
+  const tempDir = createTestTempDir('file_find-efficiency-');
+  let tool: FileFindTool;
+  let testDir: string;
+  let rtId = 0;
+
+  beforeEach(async () => {
+    tool = new FileFindTool();
+    testDir = await tempDir.getPath();
+    // 3 directories x 20 files, exactly one of which matches the pattern.
+    for (const d of ['a', 'b', 'c']) {
+      await mkdir(join(testDir, d), { recursive: true });
+      for (let i = 0; i < 20; i++) {
+        await writeFile(join(testDir, d, `filler-${i}.txt`), 'x');
+      }
+    }
+    await writeFile(join(testDir, 'a', 'needle.special'), 'found me');
+  });
+
+  afterEach(async () => {
+    await tempDir.cleanup();
+  });
+
+  function instrumented() {
+    const runtime = new HostToolRuntime({ id: `rt_eff_${rtId++}`, cwd: testDir });
+    const statSpy = vi.spyOn(runtime.fs, 'stat');
+    const readdirSpy = vi.spyOn(runtime.fs, 'readdir');
+    const context: ToolContext = { signal: new AbortController().signal, runtime };
+    return { context, statSpy, readdirSpy };
+  }
+
+  it('does not stat entries whose name cannot match the pattern', async () => {
+    const { context, statSpy } = instrumented();
+
+    const result = await tool.execute(
+      { pattern: '*.special', path: testDir, maxDepth: 10 },
+      context
+    );
+    expect(result.status).not.toBe('failed');
+
+    // 61 files + 3 dirs exist; exactly 1 matches. Statting every entry is the
+    // bug. Allow generous headroom for the root and matched entries.
+    expect(statSpy.mock.calls.length).toBeLessThanOrEqual(10);
+  });
+
+  it('scales with directory count, not entry count', async () => {
+    const { context, statSpy, readdirSpy } = instrumented();
+
+    await tool.execute({ pattern: 'needle.special', path: testDir, maxDepth: 10 }, context);
+
+    // One readdir per directory (root + a + b + c) is inherent to a walk.
+    expect(readdirSpy.mock.calls.length).toBeLessThanOrEqual(5);
+    // stat must not track the 60 non-matching files.
+    expect(statSpy.mock.calls.length).toBeLessThan(20);
+  });
+
+  it('still reports size and mtime for entries that do match', async () => {
+    const { context } = instrumented();
+
+    const result = await tool.execute({ pattern: '*.special', path: testDir }, context);
+
+    expect(result.status).not.toBe('failed');
+    const text = result.content[0].text ?? '';
+    expect(text).toContain('needle.special');
+    // size/mtime come from stat; a match must still carry them.
+    expect(text).toMatch(/\b8\b|bytes|B\b/);
+  });
+});
+
+// PRI-2975 (B2): a walk must be bounded. Before this, file_find would keep
+// walking for as long as the tree took — 96 minutes on ada-sen — with the agent
+// loop blocked the whole time and no partial result.
+describe('FileFindTool search budget (PRI-2975)', () => {
+  // Assert an exact sentinel, not a loose regex: the temp directory name is
+  // interpolated into every result line, so /budget/i matched the PATH and gave
+  // a false pass before the feature existed.
+  const INCOMPLETE_MARKER = 'Search stopped early';
+
+  const tempDir = createTestTempDir('file_find-cap-');
+  let testDir: string;
+  let rtId = 0;
+
+  beforeEach(async () => {
+    testDir = await tempDir.getPath();
+    await mkdir(join(testDir, 'deep'), { recursive: true });
+    for (let i = 0; i < 30; i++) {
+      await writeFile(join(testDir, 'deep', `f-${i}.txt`), 'x');
+    }
+  });
+
+  afterEach(async () => {
+    await tempDir.cleanup();
+  });
+
+  function ctx() {
+    return {
+      signal: new AbortController().signal,
+      runtime: new HostToolRuntime({ id: `rt_cap_${rtId++}`, cwd: testDir }),
+    } as ToolContext;
+  }
+
+  it('stops and says so when the budget is exhausted, instead of running to completion', async () => {
+    class InstantBudgetFind extends FileFindTool {
+      protected override budgetMs(): number {
+        return 0;
+      }
+    }
+
+    const result = await new InstantBudgetFind().execute(
+      { pattern: '*.txt', path: testDir },
+      ctx()
+    );
+
+    // Bounded, not failed: the model gets a usable partial answer plus a clear
+    // signal that it is partial.
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain(INCOMPLETE_MARKER);
+  });
+
+  it('completes normally and says nothing about budgets when it finishes in time', async () => {
+    const result = await new FileFindTool().execute({ pattern: '*.txt', path: testDir }, ctx());
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).not.toContain(INCOMPLETE_MARKER);
+    expect(result.content[0].text).toContain('f-0.txt');
   });
 });
