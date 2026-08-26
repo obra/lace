@@ -171,6 +171,15 @@ describe('FileFindTool with schema validation', () => {
         resolve: rootPath,
         statType: 'directory',
       });
+      // This test is about the recursive walk's display paths, so take the
+      // single-exec fast path out of play. The fake's exec otherwise reports
+      // success with empty output for any command, which reads as "find ran and
+      // matched nothing".
+      vi.mocked(runtime.process.exec).mockResolvedValue({
+        exitCode: 127,
+        stdout: '',
+        stderr: 'find: not found',
+      });
       const mtime = new Date('2026-05-20T00:00:00.000Z');
       vi.mocked(runtime.fs.stat).mockImplementation(async (path) => {
         if (path.runtimePath === rootPath.runtimePath || path.runtimePath === srcPath.runtimePath) {
@@ -706,5 +715,107 @@ describe('FileFindTool search budget (PRI-2975)', () => {
     expect(result.status).toBe('completed');
     expect(result.content[0].text).not.toContain(INCOMPLETE_MARKER);
     expect(result.content[0].text).toContain('f-0.txt');
+  });
+});
+
+// PRI-2975 (A3): one `find` exec instead of a per-directory walk. ripgrep_search
+// already delegates traversal to a single in-container process; file_find was
+// the odd one out.
+describe('FileFindTool single-exec fast path (PRI-2975)', () => {
+  const tempDir = createTestTempDir('file_find-fast-');
+  let testDir: string;
+  let rtId = 0;
+
+  beforeEach(async () => {
+    testDir = await tempDir.getPath();
+    await mkdir(join(testDir, 'nested', 'deeper'), { recursive: true });
+    await mkdir(join(testDir, '.hidden'), { recursive: true });
+    await writeFile(join(testDir, 'top.ts'), 'a');
+    await writeFile(join(testDir, 'nested', 'mid.ts'), 'bb');
+    await writeFile(join(testDir, 'nested', 'deeper', 'low.ts'), 'ccc');
+    await writeFile(join(testDir, 'nested', 'other.js'), 'dddd');
+    await writeFile(join(testDir, '.hidden', 'secret.ts'), 'eeeee');
+    await writeFile(join(testDir, 'weird[1].ts'), 'ffffff');
+  });
+
+  afterEach(async () => {
+    await tempDir.cleanup();
+  });
+
+  function instrumented() {
+    const runtime = new HostToolRuntime({ id: `rt_fast_${rtId++}`, cwd: testDir });
+    const execSpy = vi.spyOn(runtime.process, 'exec');
+    const readdirSpy = vi.spyOn(runtime.fs, 'readdir');
+    return {
+      context: { signal: new AbortController().signal, runtime } as ToolContext,
+      execSpy,
+      readdirSpy,
+    };
+  }
+
+  it('walks the whole tree in a single exec for a simple glob', async () => {
+    const { context, execSpy, readdirSpy } = instrumented();
+
+    const result = await new FileFindTool().execute(
+      { pattern: '*.ts', path: testDir, maxDepth: 10 },
+      context
+    );
+
+    expect(result.status).toBe('completed');
+    const text = result.content[0].text ?? '';
+    expect(text).toContain('top.ts');
+    expect(text).toContain('mid.ts');
+    expect(text).toContain('low.ts');
+    expect(text).not.toContain('other.js');
+    // Hidden entries stay excluded by default, as in the walk.
+    expect(text).not.toContain('secret.ts');
+
+    expect(execSpy).toHaveBeenCalledTimes(1);
+    expect(readdirSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the walk for a pattern where find -iname and our matcher disagree', async () => {
+    const { context, readdirSpy } = instrumented();
+
+    // Our matcher escapes brackets and treats this literally; find -iname would
+    // read [1] as a character class. Different engines, so no fast path.
+    const result = await new FileFindTool().execute(
+      { pattern: 'weird[1].ts', path: testDir, maxDepth: 10 },
+      context
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain('weird[1].ts');
+    expect(readdirSpy).toHaveBeenCalled();
+  });
+
+  // maxDepth counts RECURSION STEPS, not path depth: maxDepth 1 lists the root's
+  // entries AND reaches one subdirectory down. The fast path must reproduce this
+  // exactly, so `find -maxdepth` is maxDepth + 1. (MIN_DEPTH is 1, so 0 is not a
+  // legal input to compare against.)
+  it('honours maxDepth identically to the walk (1 = one level down)', async () => {
+    const { context } = instrumented();
+    const result = await new FileFindTool().execute(
+      { pattern: '*.ts', path: testDir, maxDepth: 1 },
+      context
+    );
+    const text = result.content[0].text ?? '';
+    expect(text).toContain('top.ts');
+    expect(text).toContain('mid.ts');
+    expect(text).not.toContain('low.ts');
+  });
+
+  it('falls back to the walk when the single exec fails', async () => {
+    const { context, execSpy, readdirSpy } = instrumented();
+    execSpy.mockResolvedValueOnce({ exitCode: 127, stdout: '', stderr: 'find: not found' });
+
+    const result = await new FileFindTool().execute(
+      { pattern: '*.ts', path: testDir, maxDepth: 10 },
+      context
+    );
+
+    expect(result.status).toBe('completed');
+    expect(result.content[0].text).toContain('top.ts');
+    expect(readdirSpy).toHaveBeenCalled();
   });
 });
