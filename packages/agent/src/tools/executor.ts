@@ -349,6 +349,19 @@ export class ToolExecutor {
   }
 
   /**
+   * Warn when a single tool call has been running this long (PRI-2975).
+   *
+   * The agent loop awaits tool results, so a call that does not return takes
+   * the coworker offline entirely — ada-sen sat mute for 96 minutes inside one
+   * file_find while Docker still reported healthy. The executor cannot safely
+   * cancel arbitrary tools (delegate and subagent calls legitimately run for
+   * hours), but silence is the symptom, so it must at least name the culprit.
+   *
+   * Public so tests can shorten it.
+   */
+  static SLOW_TOOL_WARN_MS = 120_000;
+
+  /**
    * Execute a tool directly without approval complexity.
    * Agent owns approval flow - ToolExecutor just executes when told.
    */
@@ -383,7 +396,38 @@ export class ToolExecutor {
       toolContext = { ...toolContext, jobManager: this.jobManager };
     }
 
-    const result = await tool.execute(toolCall.arguments, toolContext);
+    // Reset the runtime's per-tool-call filesystem budget (PRI-2975).
+    //
+    // Defensive, not load-bearing today: runner.executeToolCall builds a fresh
+    // runtime per call, so the counter already starts at zero. This keeps the
+    // ceiling scoped to one tool call if a runtime is ever cached or pooled,
+    // where otherwise a long session would accumulate its way into a refusal.
+    toolContext.runtime?.fs?.beginToolCall?.();
+
+    const startedAt = Date.now();
+    const slowWarning = setTimeout(() => {
+      logger.warn('tool call still running', {
+        tool: toolCall.name,
+        toolCallId: toolCall.id,
+        elapsedMs: Date.now() - startedAt,
+        note: 'the agent loop is blocked until this returns',
+      });
+    }, ToolExecutor.SLOW_TOOL_WARN_MS);
+
+    let result: ToolResult;
+    try {
+      result = await tool.execute(toolCall.arguments, toolContext);
+    } finally {
+      clearTimeout(slowWarning);
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs >= ToolExecutor.SLOW_TOOL_WARN_MS) {
+        logger.warn('tool call finished after running long', {
+          tool: toolCall.name,
+          toolCallId: toolCall.id,
+          elapsedMs,
+        });
+      }
+    }
 
     // Ensure the result has the call ID if it wasn't set by the tool
     if (!result.id && toolCall.id) {
