@@ -117,6 +117,13 @@ export interface ContentBlock {
   text?: string;
   data?: string;
   uri?: string;
+  /**
+   * Media type for an `image` block (e.g. 'image/png'), as MCP reports it.
+   * PRI-3078: without this an image could not be rendered for a provider —
+   * every wire format needs the media type alongside the bytes, and the MCP
+   * adapter was discarding it, so the data alone was unusable.
+   */
+  mimeType?: string;
 }
 
 export type ToolResultStatus = 'completed' | 'failed' | 'aborted' | 'denied' | 'pending';

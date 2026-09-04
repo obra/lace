@@ -114,15 +114,20 @@ export class MCPToolAdapter extends Tool {
           type: string;
           text?: string;
           data?: string;
+          mimeType?: string;
           resource?: { uri?: string };
         };
 
         if (typedBlock.type === 'text') {
           return { type: 'text' as const, text: typedBlock.text || '' };
         } else if (typedBlock.type === 'image') {
+          // PRI-3078: carry mimeType through. MCP always sends it with image
+          // content, and a provider cannot build an image block without it —
+          // dropping it here left the bytes technically present but unusable.
           return {
             type: 'image' as const,
             data: typedBlock.data,
+            ...(typedBlock.mimeType !== undefined ? { mimeType: typedBlock.mimeType } : {}),
           };
         } else if (typedBlock.type === 'resource') {
           return {

@@ -2,6 +2,7 @@
 // ABOUTME: Converts generic tool call format to provider-specific native formats
 
 import { ProviderMessage, ContentBlock, type ThinkingBlock } from './base-provider';
+import type { ContentBlock as ToolResultContentBlock } from '../tools/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
@@ -20,6 +21,47 @@ function toAnthropicThinkingBlocks(
       ? { type: 'thinking', thinking: b.thinking, signature: b.signature }
       : { type: 'redacted_thinking', data: b.data }
   );
+}
+
+/**
+ * PRI-3078. A tool result's blocks use the FLAT `tools/types` ContentBlock
+ * (`{type, text?, data?, uri?, mimeType?}`), NOT the provider-side block with a
+ * nested `source`. They are different types with the same name, which is how
+ * the original defect survived: `block.text || ''` is valid on both, and on an
+ * image block it silently yields ''.
+ *
+ * An image needs BOTH bytes and a media type to become a provider block. We do
+ * not guess a media type when it is absent — a wrong one is an API error at
+ * best and a mis-decoded image at worst — so such a block degrades to text that
+ * says so, which is at least honest to the model about what happened.
+ */
+/**
+ * The block-array form is chosen when the result contains ANY image block, not
+ * only a renderable one. Gating on renderable would send an unrenderable image
+ * back down the string path, where `block.text || ''` turns it into '' — the
+ * exact silent drop this change exists to remove, just narrowed to a rarer case.
+ */
+function isRenderableToolResultImage(block: ToolResultContentBlock): boolean {
+  return block.type === 'image' && !!block.data && !!block.mimeType;
+}
+
+function toAnthropicToolResultBlock(
+  block: ToolResultContentBlock
+): Anthropic.TextBlockParam | Anthropic.ImageBlockParam {
+  if (isRenderableToolResultImage(block)) {
+    return {
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: block.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+        data: block.data as string,
+      },
+    };
+  }
+  if (block.type === 'image') {
+    return { type: 'text', text: '[image omitted: no media type reported by the tool]' };
+  }
+  return { type: 'text', text: block.text || '' };
 }
 
 /**
@@ -97,7 +139,17 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
             (result) => ({
               type: 'tool_result',
               tool_use_id: result.id || '',
-              content: result.content.map((block) => block.text || '').join('\n'),
+              // PRI-3078: an image block carries `data`, not `text`, so the old
+              // unconditional `block.text || ''` flattened it to an empty string —
+              // the model received a blank tool result, and an agent that had just
+              // 'read' a screenshot saw nothing. Anthropic accepts tool_result
+              // content as either a string or a block array, so reuse the same
+              // per-block conversion this file already applies to plain user
+              // messages. Text-only results keep the string form byte-for-byte:
+              // the common path does not change shape.
+              content: result.content.some((block) => block.type === 'image')
+                ? result.content.map(toAnthropicToolResultBlock)
+                : result.content.map((block) => block.text || '').join('\n'),
               // Convert our status to Anthropic's is_error flag
               ...(result.status !== 'completed' ? { is_error: true } : {}),
             })
