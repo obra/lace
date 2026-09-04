@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -72,7 +73,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(
@@ -165,7 +166,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(
@@ -244,7 +245,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(
@@ -344,7 +345,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(
@@ -470,7 +471,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       const sessionResult = (await withTimeout(

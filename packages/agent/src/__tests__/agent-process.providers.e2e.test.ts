@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -16,7 +17,7 @@ describe('lace-agent provider config (E2E over stdio)', () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -74,7 +75,7 @@ describe('lace-agent provider config (E2E over stdio)', () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 

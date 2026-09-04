@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -108,7 +109,7 @@ describe('inject-drain prefill wedge (E2E)', () => {
 
       await withTimeout(
         ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        5_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(
@@ -200,7 +201,7 @@ describe('inject-drain prefill wedge (E2E)', () => {
 
       await withTimeout(
         ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        5_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(

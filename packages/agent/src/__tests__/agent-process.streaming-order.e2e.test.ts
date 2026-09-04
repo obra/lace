@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -49,7 +50,7 @@ describe('lace-agent streaming update ordering (E2E over stdio)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(

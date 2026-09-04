@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { mkdirSync } from 'node:fs';
 import { appendDurableEvent } from '../storage/event-log';
 import { ensureSessionFiles, writeSessionMeta, writeSessionState } from '../storage/session-store';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import {
+  AGENT_BOOT_TIMEOUT_MS,
+  spawnAgentProcess,
+  withTimeout,
+  type SpawnedAgent,
+} from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 import * as MethodSchemas from '@lace/ent-protocol';
 
@@ -43,7 +48,10 @@ async function requestOk<T>(options: {
   timeoutMs?: number;
   label?: string;
 }): Promise<T> {
-  const timeoutMs = options.timeoutMs ?? 2_000;
+  // `initialize` is the first request to a just-spawned agent, so its budget has
+  // to cover the child's cold boot, not just the round trip.
+  const timeoutMs =
+    options.timeoutMs ?? (options.method === 'initialize' ? AGENT_BOOT_TIMEOUT_MS : 2_000);
   const label = options.label ?? options.method;
   const parsedParams = parseParams(options.requestSchema, options.params);
   const result = await withTimeout(

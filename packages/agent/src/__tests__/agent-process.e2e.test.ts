@@ -3,6 +3,7 @@ import { writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -21,7 +22,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     await expect(
       withTimeout(
         ctx.agent.peer.request('initialize', { protocolVersion: '1.0' } as any),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       )
     ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
@@ -32,14 +33,14 @@ describe('lace-agent process (E2E over stdio)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
     await expect(
       withTimeout(
         ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize again'
       )
     ).rejects.toMatchObject({
@@ -62,7 +63,7 @@ describe('lace-agent process (E2E over stdio)', () => {
 
       await withTimeout(
         ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -140,7 +141,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -166,7 +167,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize (restart)'
     );
 
@@ -207,7 +208,7 @@ describe('lace-agent process (E2E over stdio)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(
@@ -256,7 +257,7 @@ describe('lace-agent process (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -355,7 +356,7 @@ describe('lace-agent process (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -425,7 +426,7 @@ describe('lace-agent process (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -518,7 +519,7 @@ describe('lace-agent process (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize (restart)'
       );
       await withTimeout(
@@ -600,7 +601,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -658,7 +659,7 @@ describe('lace-agent process (E2E over stdio)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(
@@ -717,7 +718,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -788,7 +789,7 @@ describe('lace-agent process (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
     await withTimeout(
@@ -845,7 +846,7 @@ describe('lace-agent process (E2E over stdio)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'ask' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(

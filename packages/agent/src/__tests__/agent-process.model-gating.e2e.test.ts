@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -42,7 +43,7 @@ describe('ent/models enable/disable (provider-global gating)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'approve', connectionId: instances[0] } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 

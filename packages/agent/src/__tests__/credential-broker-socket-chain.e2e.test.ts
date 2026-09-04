@@ -8,6 +8,7 @@ import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -81,7 +82,7 @@ describe('credentialBrokerSocket full chain (initialize → session/new → prom
           }),
           credentialToolsPaths: [fixtureDir],
         }),
-        5_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 

@@ -17,6 +17,7 @@ import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
 import { registerExecDirInto } from '../tools/exec/register-exec';
 import { registerBuiltinTools } from '../tools/builtins';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -259,7 +260,7 @@ describe('Part B credential integration (lace wiring + subagent path)', () => {
             }),
             credentialToolsPaths: [fixtureDir],
           }),
-          5_000,
+          AGENT_BOOT_TIMEOUT_MS,
           'initialize'
         );
         await withTimeout(

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -64,7 +65,7 @@ describe('lace-agent subagent early-stop bug (kata #31)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(

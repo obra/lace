@@ -6,7 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnAgentProcess, withTimeout, type SpawnedAgent } from './helpers/agent-process';
+import {
+  AGENT_BOOT_TIMEOUT_MS,
+  spawnAgentProcess,
+  withTimeout,
+  type SpawnedAgent,
+} from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/server';
 
@@ -61,7 +66,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -97,7 +102,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -127,7 +132,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -167,7 +172,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -204,7 +209,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -228,7 +233,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -258,7 +263,7 @@ describe('system prompt injection on session/new', () => {
 
     await withTimeout(
       agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 

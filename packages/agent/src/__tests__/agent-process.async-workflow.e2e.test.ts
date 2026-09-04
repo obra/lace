@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { join } from 'node:path';
 import { readDurableEvents } from '../storage/event-log';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -35,7 +36,7 @@ describe('async job workflow (E2E)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -112,7 +113,7 @@ describe('async job workflow (E2E)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -204,7 +205,7 @@ describe('async job workflow (E2E)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -316,7 +317,7 @@ describe('async job workflow (E2E)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -387,7 +388,7 @@ describe('async job workflow (E2E)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -442,7 +443,7 @@ describe('async job workflow (E2E)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize (restart)'
     );
 
@@ -498,7 +499,7 @@ describe('async job workflow (E2E)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -581,7 +582,7 @@ describe('async job workflow (E2E)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -670,7 +671,7 @@ describe('async job workflow (E2E)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -768,7 +769,7 @@ describe('async job workflow (E2E)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'allow' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -871,7 +872,7 @@ describe('async job workflow (E2E)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
