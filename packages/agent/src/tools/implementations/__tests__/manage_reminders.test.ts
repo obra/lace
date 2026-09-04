@@ -2,14 +2,26 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { parseManageRemindersInput, ManageRemindersTool } from '../manage_reminders';
 import { ReminderScheduler, ReminderStore } from '@lace/agent/reminders';
 import type { ReminderRow } from '@lace/agent/reminders';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolContext } from '@lace/agent/tools/types';
 
+// Tempdirs handed out by tempSessionDir, tracked so the file-level afterEach
+// below removes them even when a test throws.
+const tempSessionDirs: string[] = [];
+
 function tempSessionDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-mr-tool-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lace-mr-tool-'));
+  tempSessionDirs.push(dir);
+  return dir;
 }
+
+afterEach(() => {
+  for (const dir of tempSessionDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function ctxWithScheduler(sched: ReminderScheduler): ToolContext {
   return {
@@ -260,7 +272,7 @@ describe('ManageRemindersTool cancel persist_failed', () => {
   });
 
   it('cancel surfaces retry_safe:true on persist_failed', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lace-mr-tool-'));
+    const dir = tempSessionDir();
     const sched = new ReminderScheduler({
       sessionDir: dir,
       now: () => 0,

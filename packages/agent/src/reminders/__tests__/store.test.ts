@@ -1,13 +1,25 @@
-import { describe, it, expect } from 'vitest';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { afterEach, describe, it, expect } from 'vitest';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ReminderStore } from '../store';
 import type { ReminderRow } from '../types';
 
+// Tempdirs handed out by tempSessionDir, tracked so the file-level afterEach
+// below removes them even when a test throws.
+const tempSessionDirs: string[] = [];
+
 function tempSessionDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-reminders-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lace-reminders-'));
+  tempSessionDirs.push(dir);
+  return dir;
 }
+
+afterEach(() => {
+  for (const dir of tempSessionDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function exampleRow(id = 'reminder_abc123abc123'): ReminderRow {
   return {

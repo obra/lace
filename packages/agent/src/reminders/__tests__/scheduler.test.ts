@@ -4,7 +4,7 @@
 // ABOUTME: Also covers schedule/cancel/list APIs (Task 7).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ReminderScheduler } from '../scheduler';
@@ -12,9 +12,21 @@ import { ReminderStore } from '../store';
 import type { ReminderRow } from '../types';
 import { logger } from '@lace/agent/utils/logger';
 
+// Tempdirs handed out by tempSessionDir, tracked so the file-level afterEach
+// below removes them even when a test throws.
+const tempSessionDirs: string[] = [];
+
 function tempSessionDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-rsched-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lace-rsched-'));
+  tempSessionDirs.push(dir);
+  return dir;
 }
+
+afterEach(() => {
+  for (const dir of tempSessionDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function makeRow(overrides: Partial<ReminderRow> = {}): ReminderRow {
   return {

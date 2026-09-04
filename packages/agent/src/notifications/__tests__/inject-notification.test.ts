@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for injectNotification — writes context_injected event with
 // ABOUTME: priority='immediate' and triggers idle-wake when targeting active session.
 
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -9,8 +9,19 @@ import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { injectNotification } from '../inject-notification';
 import { readDurableEvents, invalidatePersonaCache } from '../../storage/event-log';
 
+// Lace dirs handed out by tempSessionDir, tracked so the file-level afterEach
+// below removes them even when a test throws.
+const tempLaceDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of tempLaceDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 function tempSessionDir(): { laceDir: string; sessionDir: string } {
   const laceDir = mkdtempSync(join(tmpdir(), 'lace-inject-test-'));
+  tempLaceDirs.push(laceDir);
   const sessionId = `sess_${randomUUID()}`;
   const sessionDir = join(laceDir, 'agent-sessions', sessionId);
   mkdirSync(sessionDir, { recursive: true });

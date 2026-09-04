@@ -23,12 +23,12 @@ process.stdin.on('end', () => {
 });
 `;
 
-function makeBin(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'lace-cwd-bin-'));
-  const bin = join(dir, 'echo-cwd');
+function makeBin(): { binDir: string; bin: string } {
+  const binDir = mkdtempSync(join(tmpdir(), 'lace-cwd-bin-'));
+  const bin = join(binDir, 'echo-cwd');
   writeFileSync(bin, CWD_ECHO_SCRIPT);
   chmodSync(bin, 0o755);
-  return bin;
+  return { binDir, bin };
 }
 
 const credentialDescriptor: ExecToolDescriptor = {
@@ -49,18 +49,30 @@ function resultText(result: ToolResult): string {
 }
 
 describe('ExecToolAdapter spawn cwd (M1)', () => {
+  let binDir: string;
   let binPath: string;
   let hostTmp: string;
+  // Extra tempdirs a single test creates, removed by afterEach even on failure.
+  const extraTempDirs: string[] = [];
 
   beforeEach(() => {
-    binPath = makeBin();
+    ({ binDir, bin: binPath } = makeBin());
     hostTmp = realpathSync(mkdtempSync(join(tmpdir(), 'lace-cwd-tmp-')));
   });
 
   afterEach(() => {
-    rmSync(binPath, { recursive: true, force: true });
+    rmSync(binDir, { recursive: true, force: true });
     rmSync(hostTmp, { recursive: true, force: true });
+    for (const dir of extraTempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
+
+  function makeOtherToolTempDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'lace-cwd-other-'));
+    extraTempDirs.push(dir);
+    return realpathSync(dir);
+  }
 
   it('uses host-valid toolTempDir (not the container workingDirectory) for a trusted credential tool', async () => {
     const adapter = new ExecToolAdapter(binPath, credentialDescriptor, 'request_credential', true);
@@ -87,7 +99,7 @@ describe('ExecToolAdapter spawn cwd (M1)', () => {
         activeSessionId: 'sess-1',
         persona: 'engineer',
         workingDirectory: hostTmp, // host-valid working dir
-        toolTempDir: realpathSync(mkdtempSync(join(tmpdir(), 'lace-cwd-other-'))),
+        toolTempDir: makeOtherToolTempDir(),
       }
     );
     const cwd = realpathSync(resultText(result));

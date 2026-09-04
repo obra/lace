@@ -12,11 +12,16 @@ import { DelegateTool } from '../implementations/delegate';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
 
+// Tempdirs created by makePersonaRegistry within a single test, so afterEach
+// can clean them up. Reset per-test in beforeEach.
+let bundleTempdirs: string[] = [];
+
 function makePersonaRegistry(userPersonasDir: string): PersonaRegistry {
   // bundledPersonasPath points at a real directory containing only system
   // personas — pointing it at userPersonasDir would shadow what we're trying
   // to assert. The registry tolerates an empty bundled path.
   const emptyBundle = mkdtempSync(join(tmpdir(), 'lace-bundle-empty-'));
+  bundleTempdirs.push(emptyBundle);
   return new PersonaRegistry({
     bundledPersonasPath: emptyBundle,
     userPersonasPaths: [userPersonasDir],
@@ -28,6 +33,7 @@ describe('ToolExecutor.registerAllAvailableTools threads PersonaRegistry into De
   let userPersonasDir: string;
 
   beforeEach(() => {
+    bundleTempdirs = [];
     tempDir = mkdtempSync(join(tmpdir(), 'lace-tool-persona-'));
     userPersonasDir = join(tempDir, 'personas');
     mkdirSync(userPersonasDir, { recursive: true });
@@ -35,7 +41,9 @@ describe('ToolExecutor.registerAllAvailableTools threads PersonaRegistry into De
   });
 
   afterEach(() => {
-    rmSync(tempDir, { recursive: true, force: true });
+    for (const dir of [tempDir, ...bundleTempdirs]) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('DelegateTool resolves a user persona that only exists in the supplied registry', async () => {

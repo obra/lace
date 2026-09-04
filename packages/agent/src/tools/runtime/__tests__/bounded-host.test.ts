@@ -1,19 +1,38 @@
-import { access, mkdtemp, mkdir, realpath, symlink, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { BoundedHostToolRuntime } from '../bounded-host';
 
+// Tempdirs created by makeRuntime and makeOutsideDir, tracked so afterEach
+// removes them even when a test throws.
+const tempDirs: string[] = [];
+
+async function makeOutsideDir(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+  tempDirs.push(dir);
+  return dir;
+}
+
 describe('BoundedHostToolRuntime', () => {
+  afterEach(async () => {
+    for (const dir of tempDirs.splice(0)) {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   function makeRuntime(prefix = 'lace-bounded-host-runtime-') {
-    return mkdtemp(join(tmpdir(), prefix)).then((root) => ({
-      root,
-      runtime: new BoundedHostToolRuntime({
-        id: 'rt_bounded',
+    return mkdtemp(join(tmpdir(), prefix)).then((root) => {
+      tempDirs.push(root);
+      return {
         root,
-        cwd: root,
-      }),
-    }));
+        runtime: new BoundedHostToolRuntime({
+          id: 'rt_bounded',
+          root,
+          cwd: root,
+        }),
+      };
+    });
   }
 
   it('resolves relative paths against cwd', async () => {
@@ -41,7 +60,7 @@ describe('BoundedHostToolRuntime', () => {
 
   it('rejects absolute paths outside the bounded root', async () => {
     const { runtime } = await makeRuntime();
-    const outside = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+    const outside = await makeOutsideDir();
 
     await expect(runtime.paths.resolve(outside)).rejects.toThrow(/outside bounded host root/i);
   });
@@ -56,7 +75,7 @@ describe('BoundedHostToolRuntime', () => {
 
   it('rejects symlink reads that escape the bounded root', async () => {
     const { runtime, root } = await makeRuntime();
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+    const outsideRoot = await makeOutsideDir();
     const outsideFile = join(outsideRoot, 'secret.txt');
     await writeFile(outsideFile, 'outside secret', 'utf8');
     await symlink(outsideFile, join(root, 'secret-link.txt'));
@@ -68,7 +87,7 @@ describe('BoundedHostToolRuntime', () => {
 
   it('rejects symlink stats that escape the bounded root', async () => {
     const { runtime, root } = await makeRuntime();
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+    const outsideRoot = await makeOutsideDir();
     const outsideFile = join(outsideRoot, 'secret.txt');
     await writeFile(outsideFile, 'outside secret', 'utf8');
     await symlink(outsideFile, join(root, 'secret-link.txt'));
@@ -80,7 +99,7 @@ describe('BoundedHostToolRuntime', () => {
 
   it('rejects symlink readdir that escape the bounded root', async () => {
     const { runtime, root } = await makeRuntime();
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+    const outsideRoot = await makeOutsideDir();
     const outsideDir = join(outsideRoot, 'nested');
     await mkdir(outsideDir);
     await symlink(outsideDir, join(root, 'outside-link'));
@@ -92,7 +111,7 @@ describe('BoundedHostToolRuntime', () => {
 
   it('rejects symlinked writes that escape the bounded root', async () => {
     const { runtime, root } = await makeRuntime();
-    const outsideRoot = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+    const outsideRoot = await makeOutsideDir();
     await symlink(outsideRoot, join(root, 'outside-link'));
 
     const path = await runtime.paths.resolve('outside-link/new.txt');
@@ -105,7 +124,7 @@ describe('BoundedHostToolRuntime', () => {
 
   it('rejects process cwd overrides that escape bounded root', async () => {
     const { runtime } = await makeRuntime();
-    const outside = await mkdtemp(join(tmpdir(), 'lace-bounded-host-outside-'));
+    const outside = await makeOutsideDir();
 
     await expect(
       runtime.process.exec(['node', '-e', "process.stdout.write('spawned')"], { cwd: outside })

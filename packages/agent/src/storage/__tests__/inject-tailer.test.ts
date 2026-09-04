@@ -45,11 +45,13 @@ function writeShard(
 }
 
 describe('readNewCompleteLines', () => {
+  let dir: string;
   let f: string;
   beforeEach(() => {
-    f = join(mkdtempSync(join(tmpdir(), 'lace-tail-')), 'events.jsonl');
+    dir = mkdtempSync(join(tmpdir(), 'lace-tail-'));
+    f = join(dir, 'events.jsonl');
   });
-  afterEach(() => rmSync(f, { recursive: true, force: true }));
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
   it('returns only newline-terminated lines and advances the offset past them', () => {
     writeFileSync(f, 'a\nb\n', 'utf8');
