@@ -8,7 +8,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
 import type {
   ResponseFunctionCallOutputItem,
+  ResponseInputContent,
   ResponseInputItem,
+  ResponseInputMessageContentList,
 } from 'openai/resources/responses/responses';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
@@ -57,6 +59,35 @@ function unrenderableImageReason(block: ToolResultContentBlock): string | null {
 }
 
 /**
+ * A tool-result block that is not an image, rendered as text.
+ *
+ * PRI-3079 follow-up: a `resource` block carries a `uri` and no `text` (see
+ * `mcp/tool-adapter.ts`), so the unconditional `block.text || ''` flattened an
+ * MCP resource link to '' — the same silent drop as the image case, one enum
+ * member over. The uri is itself optional in the MCP payload, so a missing one
+ * is reported rather than emitted as '' or the string 'undefined'.
+ */
+function nonImageToolResultBlockAsText(block: ToolResultContentBlock): string {
+  if (block.type === 'resource') {
+    return block.uri
+      ? `[resource: ${block.uri}]`
+      : '[resource omitted: no uri reported by the tool]';
+  }
+  return block.text || '';
+}
+
+/**
+ * An empty text block carries no information on any path, and Anthropic is
+ * reported to reject one outright ("text content blocks must be non-empty"),
+ * which would turn a degraded block into a 400 for the whole request. Not
+ * confirmed against the live API — the SDK types do not encode the constraint —
+ * but there is nothing to lose by dropping it from the array forms.
+ */
+function hasText(block: { type: string; text?: string }): boolean {
+  return block.type !== 'text' || (block.text ?? '').length > 0;
+}
+
+/**
  * PRI-3079. Some tool-result wire formats are text-only: OpenAI's
  * `ChatCompletionToolMessageParam.content` is `string | ContentPartText[]`, and
  * `@google/genai@1.x` `FunctionResponse` carries only a JSON `response` object.
@@ -84,7 +115,7 @@ function describeOmittedToolResultImage(block: ToolResultContentBlock, reason: s
  * Missing bytes is worth reporting, because then there was no image at all.
  */
 function toolResultBlockAsText(block: ToolResultContentBlock): string {
-  if (block.type !== 'image') return block.text || '';
+  if (block.type !== 'image') return nonImageToolResultBlockAsText(block);
   const reason = block.data ? TOOL_RESULT_IMAGE_UNSUPPORTED : 'no image data reported by the tool';
   return describeOmittedToolResultImage(block, reason);
 }
@@ -92,7 +123,7 @@ function toolResultBlockAsText(block: ToolResultContentBlock): string {
 function toAnthropicToolResultBlock(
   block: ToolResultContentBlock
 ): Anthropic.TextBlockParam | Anthropic.ImageBlockParam {
-  if (block.type !== 'image') return { type: 'text', text: block.text || '' };
+  if (block.type !== 'image') return { type: 'text', text: nonImageToolResultBlockAsText(block) };
   const reason = unrenderableImageReason(block);
   if (reason) return { type: 'text', text: describeOmittedToolResultImage(block, reason) };
   return {
@@ -126,19 +157,57 @@ export function toOpenAIResponsesToolOutput(
   content: ToolResultContentBlock[]
 ): ResponseInputItem.FunctionCallOutput['output'] {
   if (!content.some((block) => block.type === 'image')) {
-    return content.map((block) => block.text || '').join('\n');
+    return content.map(nonImageToolResultBlockAsText).join('\n');
   }
-  return content.map((block): ResponseFunctionCallOutputItem => {
-    if (block.type !== 'image') return { type: 'input_text', text: block.text || '' };
-    const reason = unrenderableImageReason(block);
-    if (reason) {
-      return { type: 'input_text', text: describeOmittedToolResultImage(block, reason) };
-    }
-    return {
-      type: 'input_image',
-      image_url: `data:${block.mimeType as string};base64,${block.data as string}`,
-    };
-  });
+  return content
+    .map((block): ResponseFunctionCallOutputItem => {
+      if (block.type !== 'image') {
+        return { type: 'input_text', text: nonImageToolResultBlockAsText(block) };
+      }
+      const reason = unrenderableImageReason(block);
+      if (reason) {
+        return { type: 'input_text', text: describeOmittedToolResultImage(block, reason) };
+      }
+      return {
+        type: 'input_image',
+        image_url: `data:${block.mimeType as string};base64,${block.data as string}`,
+      };
+    })
+    .filter((item) => item.type !== 'input_text' || item.text.length > 0);
+}
+
+/**
+ * PRI-3079. Message content for a Responses-API user turn.
+ *
+ * The Responses path is the default for real OpenAI, and it extracted text
+ * blocks only (`getTextContent`), so a user's attached image was dropped — and
+ * an image-only message was dropped whole, because the extracted text was empty
+ * and nothing got pushed. Anthropic, Gemini and OpenAI chat completions all
+ * carry user images; this path has to as well.
+ *
+ * These blocks are the PROVIDER-side `ContentBlock` with a nested `source`, not
+ * the flat `tools/types` one a tool result carries. The return type is the SDK's
+ * own so tsc checks the item shapes — `ResponseInputImage.detail` is required.
+ *
+ * Text-only content keeps the flat string form byte-for-byte.
+ */
+export function toOpenAIResponsesMessageContent(
+  content: string | ContentBlock[]
+): string | ResponseInputMessageContentList {
+  if (typeof content === 'string') return content;
+  if (!content.some((block) => block.type === 'image')) return getTextContent(content);
+  return content
+    .map(
+      (block): ResponseInputContent =>
+        block.type === 'text'
+          ? { type: 'input_text', text: block.text }
+          : {
+              type: 'input_image',
+              detail: 'auto',
+              image_url: `data:${block.source.media_type};base64,${block.source.data}`,
+            }
+    )
+    .filter((item) => item.type !== 'input_text' || item.text.length > 0);
 }
 
 /**
@@ -225,8 +294,8 @@ export function convertToAnthropicFormat(messages: ProviderMessage[]): Anthropic
               // messages. Text-only results keep the string form byte-for-byte:
               // the common path does not change shape.
               content: result.content.some((block) => block.type === 'image')
-                ? result.content.map(toAnthropicToolResultBlock)
-                : result.content.map((block) => block.text || '').join('\n'),
+                ? result.content.map(toAnthropicToolResultBlock).filter(hasText)
+                : result.content.map(nonImageToolResultBlockAsText).join('\n'),
               // Convert our status to Anthropic's is_error flag
               ...(result.status !== 'completed' ? { is_error: true } : {}),
             })
