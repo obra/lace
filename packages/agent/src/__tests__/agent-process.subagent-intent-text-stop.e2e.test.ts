@@ -18,6 +18,8 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 
 interface JobUpdate {
@@ -28,46 +30,46 @@ interface JobUpdate {
   outcome?: string;
 }
 
-describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
-  const ctx = createE2EContext({ prefix: 'lace-agent-subagent-intent-text-stop' });
+describe(
+  'lace-agent subagent intent-text-stop (kata #31 round 2)',
+  { timeout: E2E_TEST_TIMEOUT_MS },
+  () => {
+    const ctx = createE2EContext({ prefix: 'lace-agent-subagent-intent-text-stop' });
 
-  beforeEach(() => ctx.setup());
-  afterEach(() => ctx.teardown());
+    beforeEach(() => ctx.setup());
+    afterEach(() => ctx.teardown());
 
-  /**
-   * Production parallel:
-   *   • Persona "therapist" has tools: [file_read, file_write].
-   *   • Subagent prompt: "read file persona/persona.md" — model emits
-   *     file_read tool_use on turn 1.
-   *   • file_read returns content (here, an empty file).
-   *   • Turn 2: the model returns text-only "I'll add a brief note at the
-   *     end in Ada's voice." with stopReason='end_turn' and NO tool_use.
-   *   • Production observed: subagent terminates as status='completed' with
-   *     that intent text as final output. The host-side persona.md is never
-   *     written; the work the model declared never happens.
-   *
-   * What this test pins:
-   *   When the subagent's turn following a tool round-trip produces intent
-   *   text with no tool call, the subagent's job must NOT report
-   *   status='completed' with that intent text as its sole output. The
-   *   parent should be able to distinguish "subagent did the work" from
-   *   "subagent declared work and didn't do it".
-   *
-   * What a fix needs to change:
-   *   Either the subagent's runner re-prompts more aggressively until a tool
-   *   actually fires (bounded by max-turns), or the subagent job surfaces a
-   *   non-'completed' status to its parent so the parent can react.
-   *
-   * Driving knob:
-   *   The TestAgentProvider env var
-   *   LACE_TEST_PROVIDER_INTENT_AFTER_TOOL_RESULT replaces the usual
-   *   "Result:\n…" turn-2 summary with the configured intent string, so the
-   *   subagent observes the production-shape Turn-2 response.
-   */
-  it(
-    'FAILING — subagent with intent-only turn-2 should NOT report status=completed with intent text as final output',
-    { timeout: 30_000 },
-    async () => {
+    /**
+     * Production parallel:
+     *   • Persona "therapist" has tools: [file_read, file_write].
+     *   • Subagent prompt: "read file persona/persona.md" — model emits
+     *     file_read tool_use on turn 1.
+     *   • file_read returns content (here, an empty file).
+     *   • Turn 2: the model returns text-only "I'll add a brief note at the
+     *     end in Ada's voice." with stopReason='end_turn' and NO tool_use.
+     *   • Production observed: subagent terminates as status='completed' with
+     *     that intent text as final output. The host-side persona.md is never
+     *     written; the work the model declared never happens.
+     *
+     * What this test pins:
+     *   When the subagent's turn following a tool round-trip produces intent
+     *   text with no tool call, the subagent's job must NOT report
+     *   status='completed' with that intent text as its sole output. The
+     *   parent should be able to distinguish "subagent did the work" from
+     *   "subagent declared work and didn't do it".
+     *
+     * What a fix needs to change:
+     *   Either the subagent's runner re-prompts more aggressively until a tool
+     *   actually fires (bounded by max-turns), or the subagent job surfaces a
+     *   non-'completed' status to its parent so the parent can react.
+     *
+     * Driving knob:
+     *   The TestAgentProvider env var
+     *   LACE_TEST_PROVIDER_INTENT_AFTER_TOOL_RESULT replaces the usual
+     *   "Result:\n…" turn-2 summary with the configured intent string, so the
+     *   subagent observes the production-shape Turn-2 response.
+     */
+    it('FAILING — subagent with intent-only turn-2 should NOT report status=completed with intent text as final output', async () => {
       // Persona declares both read and write tools so the model is *allowed*
       // to call file_write on turn 2 — it simply chooses not to (modeled by
       // the env-injected intent text). This matches the production therapist
@@ -142,7 +144,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
         ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'subagent persona=therapist: read file persona.md' }],
         }),
-        20_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'session/prompt'
       );
 
@@ -159,7 +161,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
             }
           }, 10);
         }),
-        20_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'job_finished update'
       );
 
@@ -218,24 +220,20 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
         outputContainsUnfulfilledIntent: finalOutputContainsIntent,
         completedWithIntentOnly,
       }).toMatchObject({ completedWithIntentOnly: false });
-    }
-  );
+    });
 
-  /**
-   * Negative companion: a subagent that responds with pure text (no prior
-   * tool call) is fine — pure-text answers to non-tool-requiring prompts
-   * are legitimate. The fix for the bug above must NOT cause this to
-   * regress.
-   *
-   * This test does NOT use LACE_TEST_PROVIDER_INTENT_AFTER_TOOL_RESULT (the
-   * env switch only activates when a tool result is present in the
-   * conversation), so the parent agent's first turn goes straight to a
-   * pure-text response.
-   */
-  it(
-    'PASSING — subagent without any tool call (legit pure-text answer) completes cleanly',
-    { timeout: 20_000 },
-    async () => {
+    /**
+     * Negative companion: a subagent that responds with pure text (no prior
+     * tool call) is fine — pure-text answers to non-tool-requiring prompts
+     * are legitimate. The fix for the bug above must NOT cause this to
+     * regress.
+     *
+     * This test does NOT use LACE_TEST_PROVIDER_INTENT_AFTER_TOOL_RESULT (the
+     * env switch only activates when a tool result is present in the
+     * conversation), so the parent agent's first turn goes straight to a
+     * pure-text response.
+     */
+    it('PASSING — subagent without any tool call (legit pure-text answer) completes cleanly', async () => {
       const personasDir = join(ctx.laceDir, 'agent-personas');
       mkdirSync(personasDir, { recursive: true });
       writeFileSync(
@@ -294,7 +292,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
             },
           ],
         }),
-        10_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'session/prompt'
       );
 
@@ -311,7 +309,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
             }
           }, 10);
         }),
-        10_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'job_finished update'
       );
 
@@ -325,6 +323,6 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
       // is a clean completion. The fix for the FAILING test above must not
       // regress this path.
       expect(output.status).toBe('completed');
-    }
-  );
-});
+    });
+  }
+);

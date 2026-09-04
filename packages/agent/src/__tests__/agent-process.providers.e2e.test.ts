@@ -5,15 +5,16 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent provider config (E2E over stdio)', () => {
+describe('lace-agent provider config (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-provider', enableTestProvider: false });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it('can create a connection and rotate credentials', { timeout: 15_000 }, async () => {
+  it('can create a connection and rotate credentials', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
@@ -71,7 +72,7 @@ describe('lace-agent provider config (E2E over stdio)', () => {
     expect(status.state).toBe('ready');
   });
 
-  it('rejects ent/connections/upsert with invalid config', { timeout: 15_000 }, async () => {
+  it('rejects ent/connections/upsert with invalid config', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),

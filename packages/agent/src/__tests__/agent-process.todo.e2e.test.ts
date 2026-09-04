@@ -10,9 +10,10 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent todo tools (E2E over stdio)', () => {
+describe('lace-agent todo tools (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-todo' });
 
   beforeEach(() => ctx.setup());
@@ -26,7 +27,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     return join(ctx.laceDir, 'agent-sessions', sessionId);
   }
 
-  it('creates todo.md when agent uses todo_write', { timeout: 20_000 }, async () => {
+  it('creates todo.md when agent uses todo_write', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -95,7 +96,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     expect(todoContent).toMatch(/`t_\w{3}`/); // Has an ID like t_abc
   });
 
-  it('reads existing todos with todo_read', { timeout: 20_000 }, async () => {
+  it('reads existing todos with todo_read', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -168,7 +169,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     expect(textContent).toContain('t_xyz');
   });
 
-  it('marks tasks done with todo_write', { timeout: 20_000 }, async () => {
+  it('marks tasks done with todo_write', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -237,7 +238,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
     expect(todoContent).toContain('t_abc');
   });
 
-  it('does not prompt for permission when using todo tools', { timeout: 20_000 }, async () => {
+  it('does not prompt for permission when using todo tools', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let permissionRequested = false;
