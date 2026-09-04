@@ -12,6 +12,16 @@ import { resolve } from 'path';
 // serialization is therefore done in the package.json `test` script, which runs the
 // fast unit tests in parallel first, then the subprocess-heavy tests in a second
 // `vitest run --no-file-parallelism` pass.
+//
+// Those same tests must NOT inherit vitest's 5s default `testTimeout`: at the
+// concurrency a fully parallel run produces, the child agent's cold boot alone
+// eats most of that budget, and the test dies before its own `withTimeout`
+// guards — the ones that name which call hung — can fire. They declare
+// `E2E_TEST_TIMEOUT_MS` on their describe instead (see
+// src/__tests__/helpers/agent-process.ts), which keeps the ordering
+// 5s default < AGENT_BOOT_TIMEOUT_MS < E2E_TEST_TIMEOUT_MS. The default is left
+// alone here so the ~3900 fast unit tests keep their tight guard. A new
+// agent-spawning test file has to opt in the same way.
 
 export default defineConfig({
   root: __dirname,

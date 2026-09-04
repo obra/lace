@@ -8,15 +8,16 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('agent retry behavior (E2E)', () => {
+describe('agent retry behavior (E2E)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-retry' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it('retries on provider rate limit error (429) and succeeds', { timeout: 30_000 }, async () => {
+  it('retries on provider rate limit error (429) and succeeds', async () => {
     // Setup: Fail first 2 calls with 429, then succeed
     ctx.agent = spawnAgentProcess({
       laceDir: ctx.laceDir,
@@ -59,7 +60,7 @@ describe('agent retry behavior (E2E)', () => {
     expect(result.turnId).toBeDefined();
   });
 
-  it('retries on provider temporary error (500) and succeeds', { timeout: 30_000 }, async () => {
+  it('retries on provider temporary error (500) and succeeds', async () => {
     // Setup: Fail first call with 500, then succeed
     ctx.agent = spawnAgentProcess({
       laceDir: ctx.laceDir,
@@ -95,7 +96,7 @@ describe('agent retry behavior (E2E)', () => {
     expect(result.turnId).toBeDefined();
   });
 
-  it('fails after max retries exceeded on persistent 429', { timeout: 30_000 }, async () => {
+  it('fails after max retries exceeded on persistent 429', async () => {
     // Setup: Always fail with 429 (more failures than max retries)
     // Use very low retry delays for faster test execution
     ctx.agent = spawnAgentProcess({
@@ -135,7 +136,7 @@ describe('agent retry behavior (E2E)', () => {
     });
   });
 
-  it('does not retry on non-retryable errors (400)', { timeout: 15_000 }, async () => {
+  it('does not retry on non-retryable errors (400)', async () => {
     // Setup: Fail with 400 (client error - not retryable)
     ctx.agent = spawnAgentProcess({
       laceDir: ctx.laceDir,
@@ -172,7 +173,7 @@ describe('agent retry behavior (E2E)', () => {
     });
   });
 
-  it('preserves conversation state after successful retry', { timeout: 30_000 }, async () => {
+  it('preserves conversation state after successful retry', async () => {
     // Setup: Fail first call with 500, then succeed
     ctx.agent = spawnAgentProcess({
       laceDir: ctx.laceDir,

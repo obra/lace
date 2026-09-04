@@ -5,18 +5,20 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent durable event sequencing (E2E over stdio)', () => {
-  const ctx = createE2EContext({ prefix: 'lace-agent-event-seq' });
+describe(
+  'lace-agent durable event sequencing (E2E over stdio)',
+  { timeout: E2E_TEST_TIMEOUT_MS },
+  () => {
+    const ctx = createE2EContext({ prefix: 'lace-agent-event-seq' });
 
-  beforeEach(() => ctx.setup());
-  afterEach(() => ctx.teardown());
+    beforeEach(() => ctx.setup());
+    afterEach(() => ctx.teardown());
 
-  it(
-    'maintains strictly increasing eventSeq across delegate job creation',
-    { timeout: 20_000 },
-    async () => {
+    it('maintains strictly increasing eventSeq across delegate job creation', async () => {
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       ctx.agent.peer.onRequest('session/update', async () => undefined);
@@ -40,7 +42,7 @@ describe('lace-agent durable event sequencing (E2E over stdio)', () => {
         ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'delegate hi' }],
         }),
-        10_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'session/prompt delegate'
       );
 
@@ -55,6 +57,6 @@ describe('lace-agent durable event sequencing (E2E over stdio)', () => {
       for (let i = 1; i < history.events.length; i++) {
         expect(history.events[i]!.eventSeq).toBeGreaterThan(history.events[i - 1]!.eventSeq);
       }
-    }
-  );
-});
+    });
+  }
+);

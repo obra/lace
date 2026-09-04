@@ -13,6 +13,7 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
 // A tiny exec-tool that answers `lace-tool-schema` with a request_credential descriptor
@@ -46,24 +47,24 @@ function makeFixtureDir(): string {
   return dir;
 }
 
-describe('credentialBrokerSocket full chain (initialize → session/new → prompt → envelope)', () => {
-  const ctx = createE2EContext({ prefix: 'lace-cred-chain' });
-  let fixtureDir: string;
+describe(
+  'credentialBrokerSocket full chain (initialize → session/new → prompt → envelope)',
+  { timeout: E2E_TEST_TIMEOUT_MS },
+  () => {
+    const ctx = createE2EContext({ prefix: 'lace-cred-chain' });
+    let fixtureDir: string;
 
-  beforeEach(() => {
-    ctx.setup();
-    fixtureDir = makeFixtureDir();
-  });
+    beforeEach(() => {
+      ctx.setup();
+      fixtureDir = makeFixtureDir();
+    });
 
-  afterEach(async () => {
-    await ctx.teardown();
-    rmSync(fixtureDir, { recursive: true, force: true });
-  });
+    afterEach(async () => {
+      await ctx.teardown();
+      rmSync(fixtureDir, { recursive: true, force: true });
+    });
 
-  it(
-    'stamps the initialize-config broker socket into the credential tool envelope',
-    { timeout: 20_000 },
-    async () => {
+    it('stamps the initialize-config broker socket into the credential tool envelope', async () => {
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
       const updates: Array<Record<string, unknown>> = [];
@@ -134,6 +135,6 @@ describe('credentialBrokerSocket full chain (initialize → session/new → prom
       const envelopeContext = JSON.parse(text) as Record<string, unknown>;
 
       expect(envelopeContext.credentialBrokerSocket).toBe('/tmp/x.sock');
-    }
-  );
-});
+    });
+  }
+);

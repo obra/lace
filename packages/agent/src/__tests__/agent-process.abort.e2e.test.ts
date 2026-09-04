@@ -10,15 +10,16 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('agent abort reliability (E2E)', () => {
+describe('agent abort reliability (E2E)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-abort' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it('aborts cleanly during LLM streaming', { timeout: 15_000 }, async () => {
+  it('aborts cleanly during LLM streaming', async () => {
     // Setup: Use test provider with streaming delay to give us time to cancel
     ctx.agent = spawnAgentProcess({
       laceDir: ctx.laceDir,
@@ -88,7 +89,7 @@ describe('agent abort reliability (E2E)', () => {
     expect(status.pendingPermissions).toEqual([]);
   });
 
-  it('aborts cleanly during tool execution', { timeout: 20_000 }, async () => {
+  it('aborts cleanly during tool execution', async () => {
     // Setup: Use test provider to trigger bash tool with a slow command
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
@@ -169,7 +170,7 @@ describe('agent abort reliability (E2E)', () => {
     expect(status.pendingPermissions).toEqual([]);
   });
 
-  it('aborts cleanly while awaiting permission', { timeout: 15_000 }, async () => {
+  it('aborts cleanly while awaiting permission', async () => {
     // Setup: Trigger tool requiring permission, never respond
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
@@ -248,7 +249,7 @@ describe('agent abort reliability (E2E)', () => {
     expect(status.currentTurn).toBeUndefined();
   });
 
-  it('handles abort when no turn is active', { timeout: 10_000 }, async () => {
+  it('handles abort when no turn is active', async () => {
     // Setup: Agent is idle
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
@@ -302,7 +303,7 @@ describe('agent abort reliability (E2E)', () => {
     expect(result.stopReason).toBe('end_turn');
   });
 
-  it('allows new turn after abort', { timeout: 20_000 }, async () => {
+  it('allows new turn after abort', async () => {
     // Setup: Start and abort a turn, then start a new one
     ctx.agent = spawnAgentProcess({
       laceDir: ctx.laceDir,

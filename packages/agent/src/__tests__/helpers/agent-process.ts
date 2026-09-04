@@ -25,6 +25,44 @@ import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
  */
 export const AGENT_BOOT_TIMEOUT_MS = 30_000;
 
+/**
+ * Budget for a whole E2E test that spawns a real agent child.
+ *
+ * These tests inherited vitest's 5s default `testTimeout`, which is the same
+ * mistake AGENT_BOOT_TIMEOUT_MS documents, one layer up: the budget has to cover
+ * the child's cold boot before any of the test's own work starts. At the 48-way
+ * concurrency a fully parallel `vitest run` produces, boot alone costs p50 3.3s /
+ * max 3.6s, so most of the 5s was gone before the first RPC.
+ *
+ * The number is derived from the guards it has to contain, not from observed
+ * durations. Every request in these tests is already wrapped in a `withTimeout`
+ * whose label says what hung; the longest of those is AGENT_BOOT_TIMEOUT_MS
+ * (30s). For that guard to ever fire — and for a failure to say "initialize" and
+ * not the useless "Test timed out" — the surrounding test budget must be
+ * strictly larger than it, with room for the RPCs that follow the boot. 60s is
+ * double the largest inner guard and roughly four times the slowest E2E test
+ * observed under full parallelism (13s). Like the inner guards, it exists to
+ * catch a test that will never finish, not to police how long one takes.
+ */
+export const E2E_TEST_TIMEOUT_MS = 60_000;
+
+/**
+ * Budget for waiting on a delegate/subagent job to reach `job_finished`.
+ *
+ * A delegate job spawns a *second* lace-agent process, so this wait contains an
+ * entire additional cold boot — the same p50 3.3s / max 3.6s at 48-way
+ * concurrency — before the subagent does any work of its own. The 10-15s these
+ * call sites carried was sized as if the job were boot-free, and it blew under
+ * suite load the same way the 2s `initialize` budgets did. Sized to match
+ * AGENT_BOOT_TIMEOUT_MS: one cold boot plus real work, far above the measured
+ * worst case, and still under E2E_TEST_TIMEOUT_MS so this guard fires first and
+ * names what it was waiting for.
+ *
+ * Waits on plain *shell* jobs deliberately keep their smaller budgets — they
+ * spawn no agent, so they have no boot to absorb.
+ */
+export const SUBAGENT_JOB_TIMEOUT_MS = 30_000;
+
 export type SpawnedAgent = {
   peer: JsonRpcPeer;
   proc: ChildProcessWithoutNullStreams;

@@ -10,59 +10,56 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent session metrics (E2E)', () => {
+describe('lace-agent session metrics (E2E)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-metrics' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it(
-    'returns actual token usage in ent/agent/status after prompt',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('returns actual token usage in ent/agent/status after prompt', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      await withTimeout(
-        ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
-      // Send a prompt
-      await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'read file hello.txt' }],
-        }),
-        10_000,
-        'session/prompt'
-      );
+    // Send a prompt
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'read file hello.txt' }],
+      }),
+      10_000,
+      'session/prompt'
+    );
 
-      // Check status - tokensUsed should be non-zero
-      // Test provider returns 100 input + 50 output = 150 tokens per turn
-      const status = (await withTimeout(
-        ctx.agent.peer.request('ent/agent/status'),
-        2_000,
-        'ent/agent/status'
-      )) as { currentSession: { tokensUsed: number } };
+    // Check status - tokensUsed should be non-zero
+    // Test provider returns 100 input + 50 output = 150 tokens per turn
+    const status = (await withTimeout(
+      ctx.agent.peer.request('ent/agent/status'),
+      2_000,
+      'ent/agent/status'
+    )) as { currentSession: { tokensUsed: number } };
 
-      expect(status.currentSession.tokensUsed).toBeGreaterThan(0);
-      // Test provider returns 100 input + 50 output = 150 tokens per LLM call
-      // With tool use, there may be multiple calls, so just verify it's a multiple of 150
-      expect(status.currentSession.tokensUsed % 150).toBe(0);
-    }
-  );
+    expect(status.currentSession.tokensUsed).toBeGreaterThan(0);
+    // Test provider returns 100 input + 50 output = 150 tokens per LLM call
+    // With tool use, there may be multiple calls, so just verify it's a multiple of 150
+    expect(status.currentSession.tokensUsed % 150).toBe(0);
+  });
 
-  it('returns actual cost in ent/agent/status after prompt', { timeout: 15_000 }, async () => {
+  it('returns actual cost in ent/agent/status after prompt', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
@@ -100,7 +97,7 @@ describe('lace-agent session metrics (E2E)', () => {
     expect(status.currentSession.costUsd).toBe(status.limits.budgetUsedUsd);
   });
 
-  it('returns turnCount in ent/agent/status after prompts', { timeout: 20_000 }, async () => {
+  it('returns turnCount in ent/agent/status after prompts', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(

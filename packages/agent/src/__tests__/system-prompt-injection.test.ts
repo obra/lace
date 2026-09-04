@@ -11,6 +11,7 @@ import {
   spawnAgentProcess,
   withTimeout,
   type SpawnedAgent,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 import { buildProviderMessagesFromDurableEvents } from '@lace/agent/server';
@@ -36,7 +37,7 @@ function readSessionEventsFromDisk(laceDir: string, sessionId: string): string[]
   return [];
 }
 
-describe('system prompt injection on session/new', () => {
+describe('system prompt injection on session/new', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   let originalLaceDir: string | undefined;
   let laceDir: string;
   let workDir: string;

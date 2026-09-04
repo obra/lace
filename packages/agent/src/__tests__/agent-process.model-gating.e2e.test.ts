@@ -5,6 +5,7 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 import {
   createTestProviderInstance,
@@ -15,85 +16,94 @@ const PROVIDER_ID = 'openai';
 const MODEL_A = 'gpt-4o';
 const MODEL_B = 'gpt-4.1-mini';
 
-describe('ent/models enable/disable (provider-global gating)', () => {
-  const ctx = createE2EContext({ prefix: 'lace-agent-gating', enableTestProvider: false });
-  const instances: string[] = [];
+describe(
+  'ent/models enable/disable (provider-global gating)',
+  { timeout: E2E_TEST_TIMEOUT_MS },
+  () => {
+    const ctx = createE2EContext({ prefix: 'lace-agent-gating', enableTestProvider: false });
+    const instances: string[] = [];
 
-  beforeEach(async () => {
-    ctx.setup();
+    beforeEach(async () => {
+      ctx.setup();
 
-    const instanceId = await createTestProviderInstance({
-      catalogId: PROVIDER_ID,
-      models: [MODEL_A, MODEL_B],
+      const instanceId = await createTestProviderInstance({
+        catalogId: PROVIDER_ID,
+        models: [MODEL_A, MODEL_B],
+      });
+      instances.push(instanceId);
     });
-    instances.push(instanceId);
-  });
 
-  afterEach(async () => {
-    await cleanupTestProviderInstances(instances);
-    instances.length = 0;
-    await ctx.teardown();
-  });
+    afterEach(async () => {
+      await cleanupTestProviderInstances(instances);
+      instances.length = 0;
+      await ctx.teardown();
+    });
 
-  it('disables and re-enables models globally for the provider', async () => {
-    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+    it('disables and re-enables models globally for the provider', async () => {
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-    await withTimeout(
-      ctx.agent.peer.request(
-        'initialize',
-        defaultInitializeParams({ config: { approvalMode: 'approve', connectionId: instances[0] } })
-      ),
-      AGENT_BOOT_TIMEOUT_MS,
-      'initialize'
-    );
+      await withTimeout(
+        ctx.agent.peer.request(
+          'initialize',
+          defaultInitializeParams({
+            config: { approvalMode: 'approve', connectionId: instances[0] },
+          })
+        ),
+        AGENT_BOOT_TIMEOUT_MS,
+        'initialize'
+      );
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-      2_000,
-      'session/new'
-    );
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+        2_000,
+        'session/new'
+      );
 
-    const initialList = (await withTimeout(
-      ctx.agent.peer.request('ent/models/list', { connectionId: instances[0] }),
-      2_000,
-      'ent/models/list'
-    )) as { models: Array<{ modelId: string }> };
+      const initialList = (await withTimeout(
+        ctx.agent.peer.request('ent/models/list', { connectionId: instances[0] }),
+        2_000,
+        'ent/models/list'
+      )) as { models: Array<{ modelId: string }> };
 
-    const initialIds = initialList.models.map((m) => m.modelId);
-    expect(initialIds).toEqual(expect.arrayContaining([MODEL_A, MODEL_B]));
+      const initialIds = initialList.models.map((m) => m.modelId);
+      expect(initialIds).toEqual(expect.arrayContaining([MODEL_A, MODEL_B]));
 
-    const disabled = (await withTimeout(
-      ctx.agent.peer.request('ent/models/disable', {
-        providerId: PROVIDER_ID,
-        modelIds: [MODEL_B],
-      }),
-      2_000,
-      'ent/models/disable'
-    )) as { disabled: string[] };
-    expect(disabled.disabled).toContain(MODEL_B);
+      const disabled = (await withTimeout(
+        ctx.agent.peer.request('ent/models/disable', {
+          providerId: PROVIDER_ID,
+          modelIds: [MODEL_B],
+        }),
+        2_000,
+        'ent/models/disable'
+      )) as { disabled: string[] };
+      expect(disabled.disabled).toContain(MODEL_B);
 
-    const afterDisable = (await withTimeout(
-      ctx.agent.peer.request('ent/models/list', { connectionId: instances[0] }),
-      2_000,
-      'ent/models/list after disable'
-    )) as { models: Array<{ modelId: string; disabled?: boolean }> };
-    const modelB = afterDisable.models.find((m) => m.modelId === MODEL_B);
-    expect(modelB).toBeDefined();
-    expect(modelB?.disabled).toBe(true);
+      const afterDisable = (await withTimeout(
+        ctx.agent.peer.request('ent/models/list', { connectionId: instances[0] }),
+        2_000,
+        'ent/models/list after disable'
+      )) as { models: Array<{ modelId: string; disabled?: boolean }> };
+      const modelB = afterDisable.models.find((m) => m.modelId === MODEL_B);
+      expect(modelB).toBeDefined();
+      expect(modelB?.disabled).toBe(true);
 
-    const enabled = (await withTimeout(
-      ctx.agent.peer.request('ent/models/enable', { providerId: PROVIDER_ID, modelIds: [MODEL_B] }),
-      2_000,
-      'ent/models/enable'
-    )) as { enabled: string[] };
-    expect(enabled.enabled).toContain(MODEL_B);
+      const enabled = (await withTimeout(
+        ctx.agent.peer.request('ent/models/enable', {
+          providerId: PROVIDER_ID,
+          modelIds: [MODEL_B],
+        }),
+        2_000,
+        'ent/models/enable'
+      )) as { enabled: string[] };
+      expect(enabled.enabled).toContain(MODEL_B);
 
-    const afterEnable = (await withTimeout(
-      ctx.agent.peer.request('ent/models/list', { connectionId: instances[0] }),
-      2_000,
-      'ent/models/list after enable'
-    )) as { models: Array<{ modelId: string; disabled?: boolean }> };
-    const modelBAfter = afterEnable.models.find((m) => m.modelId === MODEL_B);
-    expect(modelBAfter?.disabled).not.toBe(true);
-  });
-});
+      const afterEnable = (await withTimeout(
+        ctx.agent.peer.request('ent/models/list', { connectionId: instances[0] }),
+        2_000,
+        'ent/models/list after enable'
+      )) as { models: Array<{ modelId: string; disabled?: boolean }> };
+      const modelBAfter = afterEnable.models.find((m) => m.modelId === MODEL_B);
+      expect(modelBAfter?.disabled).not.toBe(true);
+    });
+  }
+);

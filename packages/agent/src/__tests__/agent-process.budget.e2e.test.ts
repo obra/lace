@@ -10,15 +10,16 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent token budget tracking (E2E)', () => {
+describe('lace-agent token budget tracking (E2E)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-budget' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it('returns token usage in prompt response', { timeout: 15_000 }, async () => {
+  it('returns token usage in prompt response', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
@@ -49,7 +50,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
     expect(promptResult.usage.outputTokens).toBeGreaterThan(0);
   });
 
-  it('tracks budgetUsedUsd in agent status', { timeout: 15_000 }, async () => {
+  it('tracks budgetUsedUsd in agent status', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
@@ -102,7 +103,7 @@ describe('lace-agent token budget tracking (E2E)', () => {
     expect(statusAfter.limits.budgetUsedUsd).toBeGreaterThan(0);
   });
 
-  it('stops turn with budget_exceeded when budget is exhausted', { timeout: 15_000 }, async () => {
+  it('stops turn with budget_exceeded when budget is exhausted', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
@@ -154,47 +155,43 @@ describe('lace-agent token budget tracking (E2E)', () => {
     }
   });
 
-  it(
-    'continues normally when maxBudgetUsd is 0 (budget disabled)',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('continues normally when maxBudgetUsd is 0 (budget disabled)', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      await withTimeout(
-        ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      // Configure budget to 0 (should disable budget enforcement)
-      await withTimeout(
-        ctx.agent.peer.request('ent/session/configure', { maxBudgetUsd: 0 }),
-        2_000,
-        'ent/session/configure'
-      );
+    // Configure budget to 0 (should disable budget enforcement)
+    await withTimeout(
+      ctx.agent.peer.request('ent/session/configure', { maxBudgetUsd: 0 }),
+      2_000,
+      'ent/session/configure'
+    );
 
-      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hello world\n', 'utf8');
 
-      const promptResult = (await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'read file hello.txt' }],
-        }),
-        10_000,
-        'session/prompt'
-      )) as { stopReason: string };
+    const promptResult = (await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'read file hello.txt' }],
+      }),
+      10_000,
+      'session/prompt'
+    )) as { stopReason: string };
 
-      // Should complete normally, not budget_exceeded
-      expect(promptResult.stopReason).not.toBe('budget_exceeded');
-    }
-  );
+    // Should complete normally, not budget_exceeded
+    expect(promptResult.stopReason).not.toBe('budget_exceeded');
+  });
 
-  it('accumulates budgetUsedUsd across multiple prompts', { timeout: 20_000 }, async () => {
+  it('accumulates budgetUsedUsd across multiple prompts', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(

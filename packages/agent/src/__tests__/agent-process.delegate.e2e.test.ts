@@ -7,6 +7,8 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 import { readSessionState } from '../storage/session-store';
 
@@ -32,13 +34,13 @@ function readTranscriptEvents(laceDir: string, sessionId: string): unknown[] {
   return [];
 }
 
-describe('lace-agent delegate tool (E2E over stdio)', () => {
+describe('lace-agent delegate tool (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-delegate' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it('spawns a subagent job via delegate and returns its report', { timeout: 20_000 }, async () => {
+  it('spawns a subagent job via delegate and returns its report', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -86,7 +88,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'delegate hi' }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'session/prompt'
     );
 
@@ -103,7 +105,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           resolve();
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'delegate job completion'
     );
 
@@ -131,92 +133,88 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     expect(output.output).toContain('No tool result found');
   });
 
-  it(
-    'flattens nested delegate subagents with correct parentJobId',
-    { timeout: 20_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('flattens nested delegate subagents with correct parentJobId', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      const started: Array<{ jobId: string; parentJobId?: string; jobType: string }> = [];
-      const finished = new Set<string>();
+    const started: Array<{ jobId: string; parentJobId?: string; jobType: string }> = [];
+    const finished = new Set<string>();
 
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        const p = params as Record<string, unknown>;
-        if (
-          p.type === 'job_started' &&
-          typeof p.jobId === 'string' &&
-          typeof p.jobType === 'string'
-        ) {
-          started.push({
-            jobId: p.jobId,
-            parentJobId: typeof p.parentJobId === 'string' ? p.parentJobId : undefined,
-            jobType: p.jobType,
-          });
-        }
-        if (p.type === 'job_finished' && typeof p.jobId === 'string') {
-          finished.add(p.jobId);
-        }
-        return undefined;
-      });
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (
+        p.type === 'job_started' &&
+        typeof p.jobId === 'string' &&
+        typeof p.jobType === 'string'
+      ) {
+        started.push({
+          jobId: p.jobId,
+          parentJobId: typeof p.parentJobId === 'string' ? p.parentJobId : undefined,
+          jobType: p.jobType,
+        });
+      }
+      if (p.type === 'job_finished' && typeof p.jobId === 'string') {
+        finished.add(p.jobId);
+      }
+      return undefined;
+    });
 
-      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'delegate delegate write file nested.txt' }],
-        }),
-        10_000,
-        'session/prompt'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'delegate delegate write file nested.txt' }],
+      }),
+      SUBAGENT_JOB_TIMEOUT_MS,
+      'session/prompt'
+    );
 
-      // Under async-only delegation a subagent is single-turn: the outer
-      // subagent dispatches the inner delegate (which is flattened onto the root
-      // with the correct parentJobId), returns the started-shape, and is torn
-      // down — it has no future turn to await the inner job. So we verify the
-      // flattening from job_started events and the OUTER job's completion; the
-      // inner job's terminal delivery is not part of this contract (nested
-      // inline delegation is intentionally unsupported).
-      const { outerJobId, innerJobId } = await withTimeout(
-        new Promise<{ outerJobId: string; innerJobId: string }>((resolve) => {
-          const interval = setInterval(() => {
-            const subagents = started.filter((s) => s.jobType === 'delegate');
-            if (subagents.length < 2) return;
+    // Under async-only delegation a subagent is single-turn: the outer
+    // subagent dispatches the inner delegate (which is flattened onto the root
+    // with the correct parentJobId), returns the started-shape, and is torn
+    // down — it has no future turn to await the inner job. So we verify the
+    // flattening from job_started events and the OUTER job's completion; the
+    // inner job's terminal delivery is not part of this contract (nested
+    // inline delegation is intentionally unsupported).
+    const { outerJobId, innerJobId } = await withTimeout(
+      new Promise<{ outerJobId: string; innerJobId: string }>((resolve) => {
+        const interval = setInterval(() => {
+          const subagents = started.filter((s) => s.jobType === 'delegate');
+          if (subagents.length < 2) return;
 
-            const outerJobId = subagents[0]!.jobId;
-            const inner = subagents.find(
-              (s) => s.jobId !== outerJobId && s.parentJobId === outerJobId
-            );
-            if (!inner) return;
+          const outerJobId = subagents[0]!.jobId;
+          const inner = subagents.find(
+            (s) => s.jobId !== outerJobId && s.parentJobId === outerJobId
+          );
+          if (!inner) return;
 
-            if (!finished.has(outerJobId)) return;
+          if (!finished.has(outerJobId)) return;
 
-            clearInterval(interval);
-            resolve({ outerJobId, innerJobId: inner.jobId });
-          }, 10);
-        }),
-        10_000,
-        'nested job flattening'
-      );
+          clearInterval(interval);
+          resolve({ outerJobId, innerJobId: inner.jobId });
+        }, 10);
+      }),
+      SUBAGENT_JOB_TIMEOUT_MS,
+      'nested job flattening'
+    );
 
-      expect(outerJobId).not.toBe(innerJobId);
-    }
-  );
+    expect(outerJobId).not.toBe(innerJobId);
+  });
 
-  it('can resume a completed delegate job', { timeout: 20_000 }, async () => {
+  it('can resume a completed delegate job', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -259,7 +257,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'delegate say hello' }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'first delegate'
     );
 
@@ -275,7 +273,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'first job completion'
     );
 
@@ -286,7 +284,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: `delegate resume=${firstJobId} now say goodbye` }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'resume delegate'
     );
 
@@ -304,7 +302,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'resume job completion'
     );
 
@@ -321,7 +319,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     expect(output.status).toBe('completed');
   });
 
-  it('can chain resumes (resume a resumed job)', { timeout: 30_000 }, async () => {
+  it('can chain resumes (resume a resumed job)', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -359,7 +357,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'delegate say 1' }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'first delegate'
     );
 
@@ -377,7 +375,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'first job completion'
     );
 
@@ -386,7 +384,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: `delegate resume=${delegateJobs[0]} say 2` }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'first resume'
     );
 
@@ -404,7 +402,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'second job completion'
     );
 
@@ -413,7 +411,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: `delegate resume=${delegateJobs[1]} say 3` }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'second resume (chained)'
     );
 
@@ -431,7 +429,7 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'third job completion'
     );
 
@@ -448,94 +446,90 @@ describe('lace-agent delegate tool (E2E over stdio)', () => {
     expect(output.status).toBe('completed');
   });
 
-  it(
-    'persists job_session_assigned event and exposes subagentSessionId via ent/job/list',
-    { timeout: 20_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('persists job_session_assigned event and exposes subagentSessionId via ent/job/list', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      let delegateJobId: string | undefined;
+    let delegateJobId: string | undefined;
 
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        const p = params as Record<string, unknown>;
-        if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
-          delegateJobId = p.jobId;
-        }
-        return undefined;
-      });
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
+        delegateJobId = p.jobId;
+      }
+      return undefined;
+    });
 
-      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
-      const sessionResult = (await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      )) as { sessionId: string };
-      const sessionId = sessionResult.sessionId;
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
+    const sessionResult = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
+    const sessionId = sessionResult.sessionId;
 
-      // Run a delegate
-      await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'delegate say hi' }],
-        }),
-        10_000,
-        'delegate prompt'
-      );
+    // Run a delegate
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'delegate say hi' }],
+      }),
+      SUBAGENT_JOB_TIMEOUT_MS,
+      'delegate prompt'
+    );
 
-      // Wait for job to complete
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(async () => {
-            if (!delegateJobId) return;
-            const jobs = (await ctx.agent!.peer.request('ent/job/list', {})) as {
-              jobs: Array<{ jobId: string; status: string }>;
-            };
-            const job = jobs.jobs.find((j) => j.jobId === delegateJobId);
-            if (job && job.status !== 'running') {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 50);
-        }),
-        10_000,
-        'job completion'
-      );
+    // Wait for job to complete
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(async () => {
+          if (!delegateJobId) return;
+          const jobs = (await ctx.agent!.peer.request('ent/job/list', {})) as {
+            jobs: Array<{ jobId: string; status: string }>;
+          };
+          const job = jobs.jobs.find((j) => j.jobId === delegateJobId);
+          if (job && job.status !== 'running') {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 50);
+      }),
+      SUBAGENT_JOB_TIMEOUT_MS,
+      'job completion'
+    );
 
-      // Check the transcript for job_session_assigned
-      const sessionsDir = join(ctx.laceDir, 'agent-sessions');
-      const events = readTranscriptEvents(ctx.laceDir, sessionId) as Array<{
-        type?: string;
-        data?: { jobId?: string; subagentSessionId?: string };
-      }>;
+    // Check the transcript for job_session_assigned
+    const sessionsDir = join(ctx.laceDir, 'agent-sessions');
+    const events = readTranscriptEvents(ctx.laceDir, sessionId) as Array<{
+      type?: string;
+      data?: { jobId?: string; subagentSessionId?: string };
+    }>;
 
-      const sessionAssignedEvent = events.find(
-        (e) => e.type === 'job_session_assigned' && e.data?.jobId === delegateJobId
-      );
-      expect(sessionAssignedEvent).toBeDefined();
-      expect(sessionAssignedEvent!.data!.subagentSessionId).toBeDefined();
-      expect(typeof sessionAssignedEvent!.data!.subagentSessionId).toBe('string');
+    const sessionAssignedEvent = events.find(
+      (e) => e.type === 'job_session_assigned' && e.data?.jobId === delegateJobId
+    );
+    expect(sessionAssignedEvent).toBeDefined();
+    expect(sessionAssignedEvent!.data!.subagentSessionId).toBeDefined();
+    expect(typeof sessionAssignedEvent!.data!.subagentSessionId).toBe('string');
 
-      const subagentSessionDir = join(sessionsDir, sessionAssignedEvent!.data!.subagentSessionId!);
-      expect(readSessionState(subagentSessionDir).config?.runtimeBinding).toMatchObject({
-        schemaVersion: 1,
-        toolRuntime: { type: 'boundedHost', root: ctx.workDir, cwd: ctx.workDir },
-      });
+    const subagentSessionDir = join(sessionsDir, sessionAssignedEvent!.data!.subagentSessionId!);
+    expect(readSessionState(subagentSessionDir).config?.runtimeBinding).toMatchObject({
+      schemaVersion: 1,
+      toolRuntime: { type: 'boundedHost', root: ctx.workDir, cwd: ctx.workDir },
+    });
 
-      // Verify ent/job/list returns the subagentSessionId
-      const jobList = (await ctx.agent.peer.request('ent/job/list', {})) as {
-        jobs: Array<{ jobId: string; subagentSessionId?: string }>;
-      };
-      const job = jobList.jobs.find((j) => j.jobId === delegateJobId);
-      expect(job).toBeDefined();
-      expect(job!.subagentSessionId).toBe(sessionAssignedEvent!.data!.subagentSessionId);
-    }
-  );
+    // Verify ent/job/list returns the subagentSessionId
+    const jobList = (await ctx.agent.peer.request('ent/job/list', {})) as {
+      jobs: Array<{ jobId: string; subagentSessionId?: string }>;
+    };
+    const job = jobList.jobs.find((j) => j.jobId === delegateJobId);
+    expect(job).toBeDefined();
+    expect(job!.subagentSessionId).toBe(sessionAssignedEvent!.data!.subagentSessionId);
+  });
 });
