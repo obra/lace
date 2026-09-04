@@ -39,7 +39,7 @@ import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
-import { convertToOpenAIFormat } from './format-converters';
+import { convertToOpenAIFormat, toOpenAIResponsesToolOutput } from './format-converters';
 
 interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -413,7 +413,9 @@ export class OpenAIProvider extends AIProvider {
             inputItems.push({
               type: 'function_call_output',
               call_id: result.id,
-              output: result.content.map((c) => c.text || '').join('\n'),
+              // PRI-3079: the Responses API accepts an item list here, so a
+              // tool-result image reaches the model instead of flattening to ''.
+              output: toOpenAIResponsesToolOutput(result.content),
             });
           }
         }

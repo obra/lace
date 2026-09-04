@@ -6,6 +6,10 @@ import type { ContentBlock as ToolResultContentBlock } from '../tools/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Content, Part } from '@google/genai';
+import type {
+  ResponseFunctionCallOutputItem,
+  ResponseInputItem,
+} from 'openai/resources/responses/responses';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 
 /**
@@ -34,34 +38,107 @@ function toAnthropicThinkingBlocks(
  * not guess a media type when it is absent — a wrong one is an API error at
  * best and a mis-decoded image at worst — so such a block degrades to text that
  * says so, which is at least honest to the model about what happened.
- */
-/**
+ *
  * The block-array form is chosen when the result contains ANY image block, not
  * only a renderable one. Gating on renderable would send an unrenderable image
  * back down the string path, where `block.text || ''` turns it into '' — the
  * exact silent drop this change exists to remove, just narrowed to a rarer case.
  */
-function isRenderableToolResultImage(block: ToolResultContentBlock): boolean {
-  return block.type === 'image' && !!block.data && !!block.mimeType;
+
+/**
+ * Why an image block cannot become a provider image block, or null if it can.
+ * Both halves matter: bytes with no media type are undecodable, and a media
+ * type with no bytes is nothing at all.
+ */
+function unrenderableImageReason(block: ToolResultContentBlock): string | null {
+  if (!block.data) return 'no image data reported by the tool';
+  if (!block.mimeType) return 'no media type reported by the tool';
+  return null;
+}
+
+/**
+ * PRI-3079. Some tool-result wire formats are text-only: OpenAI's
+ * `ChatCompletionToolMessageParam.content` is `string | ContentPartText[]`, and
+ * `@google/genai@1.x` `FunctionResponse` carries only a JSON `response` object.
+ * An image cannot travel through those at all.
+ */
+const TOOL_RESULT_IMAGE_UNSUPPORTED = 'this provider cannot carry an image in a tool result';
+
+/**
+ * Text stand-in for an image block that is not being sent as an image. The
+ * result is never '' — an empty string is exactly the silent drop PRI-3078
+ * removed, and the model has to be told an image existed. The media type is
+ * reported when known and never guessed.
+ */
+function describeOmittedToolResultImage(block: ToolResultContentBlock, reason: string): string {
+  const mediaType = block.mimeType ? ` (${block.mimeType})` : '';
+  return `[image omitted: ${reason}${mediaType}]`;
+}
+
+/**
+ * Flatten a tool-result block to text for a provider whose tool-result format
+ * cannot carry images at all. Image blocks become an explanation rather than ''.
+ *
+ * A missing media type is NOT the reason to report here: it would imply the
+ * image would otherwise have gone through, which is false for these providers.
+ * Missing bytes is worth reporting, because then there was no image at all.
+ */
+function toolResultBlockAsText(block: ToolResultContentBlock): string {
+  if (block.type !== 'image') return block.text || '';
+  const reason = block.data ? TOOL_RESULT_IMAGE_UNSUPPORTED : 'no image data reported by the tool';
+  return describeOmittedToolResultImage(block, reason);
 }
 
 function toAnthropicToolResultBlock(
   block: ToolResultContentBlock
 ): Anthropic.TextBlockParam | Anthropic.ImageBlockParam {
-  if (isRenderableToolResultImage(block)) {
+  if (block.type !== 'image') return { type: 'text', text: block.text || '' };
+  const reason = unrenderableImageReason(block);
+  if (reason) return { type: 'text', text: describeOmittedToolResultImage(block, reason) };
+  return {
+    type: 'image',
+    source: {
+      type: 'base64',
+      media_type: block.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+      data: block.data as string,
+    },
+  };
+}
+
+/**
+ * PRI-3079. The Responses API is the one tool-result format among OpenAI's and
+ * Gemini's that CAN carry an image, so it gets the real bytes.
+ *
+ * The return type is the SDK's own, deliberately: `ResponseInputItem.FunctionCallOutput`
+ * declares `output: string | ResponseFunctionCallOutputItemList`, whose items are
+ * `ResponseInputTextContent | ResponseInputImageContent | ResponseInputFileContent`,
+ * and `ResponseInputImageContent.image_url` documents itself as "a fully qualified
+ * URL or base64 encoded image in a data URL". The provider pushes these items into
+ * an `Array<unknown>`, so nothing downstream would catch an invented field name —
+ * annotating here is what makes tsc check the shape against the SDK.
+ *
+ * As on the Anthropic path, the item-list form is chosen when the result holds
+ * ANY image block, not only a renderable one: gating on renderable would push an
+ * unrenderable image back down the string path, where `block.text || ''` turns
+ * it into '' and recreates the silent drop in a rarer case.
+ */
+export function toOpenAIResponsesToolOutput(
+  content: ToolResultContentBlock[]
+): ResponseInputItem.FunctionCallOutput['output'] {
+  if (!content.some((block) => block.type === 'image')) {
+    return content.map((block) => block.text || '').join('\n');
+  }
+  return content.map((block): ResponseFunctionCallOutputItem => {
+    if (block.type !== 'image') return { type: 'input_text', text: block.text || '' };
+    const reason = unrenderableImageReason(block);
+    if (reason) {
+      return { type: 'input_text', text: describeOmittedToolResultImage(block, reason) };
+    }
     return {
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: block.mimeType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-        data: block.data as string,
-      },
+      type: 'input_image',
+      image_url: `data:${block.mimeType as string};base64,${block.data as string}`,
     };
-  }
-  if (block.type === 'image') {
-    return { type: 'text', text: '[image omitted: no media type reported by the tool]' };
-  }
-  return { type: 'text', text: block.text || '' };
+  });
 }
 
 /**
@@ -315,7 +392,11 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
             .map((result) => ({
               role: 'tool',
               tool_call_id: result.id!, // Safe to use ! since we filtered
-              content: result.content.map((block) => block.text || '').join('\n'),
+              // PRI-3079: `ChatCompletionToolMessageParam.content` is
+              // `string | ChatCompletionContentPartText[]` — text only, so an image
+              // genuinely cannot travel in a chat-completions tool message. Say so
+              // rather than flattening the block to '' and telling the model nothing.
+              content: result.content.map(toolResultBlockAsText).join('\n'),
             }));
 
           // If there's also text/image content, include the user message first
@@ -484,7 +565,13 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
               name: toolName, // Function name for Gemini API
               id: correlationId, // Tool call ID for correlation
               response: {
-                output: result.content.map((c) => c.text || '').join('\n'),
+                // PRI-3079: `@google/genai@1.x` FunctionResponse is
+                // `{id?, name?, response?: Record<string, unknown>, ...}` — no `parts`
+                // field, so inline image bytes cannot be expressed in a function
+                // response with the SDK in use. (Gemini 3 plus a 2.x SDK adds
+                // `functionResponse.parts[].inlineData`; adopting it is an SDK major
+                // bump, not this change.) Report the image instead of dropping it to ''.
+                output: result.content.map(toolResultBlockAsText).join('\n'),
                 ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
               },
             },
