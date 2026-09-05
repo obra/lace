@@ -3,6 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -34,7 +35,7 @@ describe('agent retry behavior (E2E)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -71,7 +72,7 @@ describe('agent retry behavior (E2E)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -110,7 +111,7 @@ describe('agent retry behavior (E2E)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -147,7 +148,7 @@ describe('agent retry behavior (E2E)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -184,7 +185,7 @@ describe('agent retry behavior (E2E)', () => {
 
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 

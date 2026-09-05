@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -32,7 +33,7 @@ describe('lace-agent error recovery (E2E)', () => {
 
       await withTimeout(
         ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 
@@ -119,7 +120,7 @@ describe('lace-agent error recovery (E2E)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -204,7 +205,7 @@ describe('lace-agent error recovery (E2E)', () => {
 
       await withTimeout(
         ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
 

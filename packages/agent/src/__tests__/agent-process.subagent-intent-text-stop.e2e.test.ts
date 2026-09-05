@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -116,7 +117,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(
@@ -271,7 +272,7 @@ describe('lace-agent subagent intent-text-stop (kata #31 round 2)', () => {
           'initialize',
           defaultInitializeParams({ config: { approvalMode: 'allow' } })
         ),
-        2_000,
+        AGENT_BOOT_TIMEOUT_MS,
         'initialize'
       );
       await withTimeout(

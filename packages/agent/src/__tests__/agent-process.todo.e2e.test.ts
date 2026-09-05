@@ -5,6 +5,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
   spawnAgentProcess,
   withTimeout,
@@ -50,7 +51,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -118,7 +119,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -191,7 +192,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
@@ -264,7 +265,7 @@ describe('lace-agent todo tools (E2E over stdio)', () => {
         'initialize',
         defaultInitializeParams({ config: { approvalMode: 'ask' } })
       ),
-      2_000,
+      AGENT_BOOT_TIMEOUT_MS,
       'initialize'
     );
 
