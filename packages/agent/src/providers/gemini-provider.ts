@@ -52,7 +52,7 @@ export class GeminiProvider extends AIProvider {
 
   private _createRequestPayload(messages: ProviderMessage[], tools: WireTool[], model: string) {
     // Convert our enhanced generic messages to Gemini format
-    const contents = convertToGeminiFormat(messages);
+    const contents = convertToGeminiFormat(messages, model);
 
     // Extract system message if present
     const systemInstruction = this.getEffectiveSystemPrompt(messages);

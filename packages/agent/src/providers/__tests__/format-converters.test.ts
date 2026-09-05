@@ -31,7 +31,7 @@ describe('Format Converters', () => {
         },
       ];
 
-      const result = convertToGeminiFormat(messages);
+      const result = convertToGeminiFormat(messages, 'gemini-3-pro-preview');
 
       expect(result).toHaveLength(1);
       expect(result[0].role).toBe('user');
@@ -67,7 +67,7 @@ describe('Format Converters', () => {
         },
       ];
 
-      const result = convertToGeminiFormat(messages);
+      const result = convertToGeminiFormat(messages, 'gemini-3-pro-preview');
 
       expect(result).toHaveLength(1);
       expect(result[0].parts).toHaveLength(1);
@@ -92,7 +92,7 @@ describe('Format Converters', () => {
         },
       ];
 
-      const result = convertToGeminiFormat(messages);
+      const result = convertToGeminiFormat(messages, 'gemini-3-pro-preview');
 
       expect(result[0].parts[0].functionResponse?.name).toBe('file_write');
       expect(result[0].parts[0].functionResponse?.response?.error).toBe('Tool execution failed');
@@ -119,7 +119,7 @@ describe('Format Converters', () => {
         },
       ];
 
-      const result = convertToGeminiFormat(messages);
+      const result = convertToGeminiFormat(messages, 'gemini-3-pro-preview');
 
       expect(result).toHaveLength(1);
       expect(result[0].role).toBe('user');
