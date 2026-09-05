@@ -23,6 +23,22 @@ const execFileAsync = promisify(execFile);
 
 const LACE_PREFIX = 'lace-';
 
+/**
+ * `docker rm -f` returns as soon as the daemon accepts the removal request, but
+ * the container's NAME stays reserved in the daemon's registry until the
+ * removal actually finishes. Re-creating under the same name inside that window
+ * fails with `Conflict. The container name "/lace-..." is already in use`, which
+ * is exactly what the create/destroy/re-create resume-after-TTL path does. So
+ * `remove()` polls the name until the daemon lets it go, bounded by this
+ * timeout so a stuck removal surfaces as an error instead of a hang.
+ */
+export const NAME_RELEASE_TIMEOUT_MS = 30_000;
+const NAME_RELEASE_POLL_INTERVAL_MS = 50;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 type ExecFileError = Error & {
   code?: number | string;
   signal?: string;
@@ -298,6 +314,11 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
   }
 
   async remove(containerId: string): Promise<void> {
+    // Resolve the daemon-side NAME before removing. `containerId` may be a name
+    // or a raw docker id, and it is the name — not the id — that a subsequent
+    // create collides on, so the name is what we have to wait on afterwards.
+    const containerName = await this.lookupContainerName(containerId);
+
     // Cache may be empty after a parent restart; `docker rm -f` is idempotent
     // and the NotFound branch below handles the daemon-side "no such container".
     try {
@@ -316,6 +337,67 @@ export class DockerContainerRuntime extends BaseContainerRuntime {
 
     this.containers.delete(containerId);
     this.unregisterMounts(containerId);
+
+    // Local state is already clean, so a caller that ignores the wait still sees
+    // an idempotent remove. The wait exists so the next create under this name
+    // does not race the daemon's asynchronous name release.
+    if (containerName) {
+      await this.waitForNameRelease(containerName);
+    }
+  }
+
+  /**
+   * The daemon-side name of a container, without docker's leading `/`, or null
+   * when the daemon does not know it (already gone, or docker unreachable).
+   */
+  private async lookupContainerName(containerId: string): Promise<string | null> {
+    try {
+      const { stdout } = await execFileAsync(this.dockerBin, [
+        'inspect',
+        '--format',
+        '{{.Name}}',
+        containerId,
+      ]);
+      const name = stdout.trim().replace(/^\//, '');
+      return name.length > 0 ? name : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Poll until the daemon no longer resolves `containerName`. Inspecting by name
+   * goes through the same name registry a create checks, so a NotFound here
+   * means the name is genuinely reusable.
+   */
+  private async waitForNameRelease(containerName: string): Promise<void> {
+    const deadline = Date.now() + NAME_RELEASE_TIMEOUT_MS;
+
+    for (;;) {
+      try {
+        await execFileAsync(this.dockerBin, ['inspect', '--format', '{{.Id}}', containerName]);
+      } catch (error: unknown) {
+        if (this.isNotFoundError(error)) return;
+        // Docker itself is unhappy (missing binary, daemon down). Removal state
+        // is unknowable; don't spin, and don't turn that into a hang.
+        const stderr = (error as ExecFileError).stderr || '';
+        const errMessage = error instanceof Error ? error.message : String(error);
+        logger.warn('docker inspect failed while waiting for name release', {
+          containerId: containerName,
+          error: stderr || errMessage,
+        });
+        return;
+      }
+
+      if (Date.now() >= deadline) {
+        throw new ContainerError(
+          `Timed out after ${NAME_RELEASE_TIMEOUT_MS}ms waiting for docker to release the container name ${containerName}`,
+          containerName
+        );
+      }
+
+      await delay(NAME_RELEASE_POLL_INTERVAL_MS);
+    }
   }
 
   async exec(containerId: string, options: ExecOptions): Promise<ExecResult> {

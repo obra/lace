@@ -47,7 +47,7 @@ vi.mock('child_process', () => ({
   spawn: mockSpawn,
 }));
 
-import { DockerContainerRuntime } from '../docker-container';
+import { DockerContainerRuntime, NAME_RELEASE_TIMEOUT_MS } from '../docker-container';
 import { ContainerError, ContainerNotFoundError } from '../types';
 
 function findCallWithSubcommand(sub: string): string[] | undefined {
@@ -354,6 +354,96 @@ describe('DockerContainerRuntime', () => {
 
     it('start throws ContainerNotFoundError on unknown container id', async () => {
       await expect(runtime.start('lace-unknown')).rejects.toBeInstanceOf(ContainerNotFoundError);
+    });
+
+    it('remove does not return until the daemon has released the container name', async () => {
+      // `docker rm -f` returns as soon as the daemon accepts the removal, but the
+      // NAME stays reserved until the removal completes. A re-create in that
+      // window fails with a name Conflict, so remove() must poll the name.
+      const id = await runtime.create({
+        name: 'svc',
+        image: 'alpine:latest',
+        workingDirectory: '/w',
+        mounts: [],
+      });
+
+      // Fake daemon: the name resolves for two more inspects after `rm -f`.
+      let nameLookupsAfterRm = 0;
+      let removed = false;
+      mockExecFile.mockImplementation((...allArgs: unknown[]) => {
+        const args = allArgs[1] as string[];
+        const last = allArgs[allArgs.length - 1] as Callback;
+        if (args[0] === 'rm') {
+          removed = true;
+          last(null, { stdout: '', stderr: '' });
+          return;
+        }
+        if (args[0] === 'inspect') {
+          if (!removed) {
+            last(null, { stdout: `/${id}\n`, stderr: '' });
+            return;
+          }
+          nameLookupsAfterRm += 1;
+          if (nameLookupsAfterRm <= 2) {
+            last(null, { stdout: `${id}\n`, stderr: '' });
+            return;
+          }
+          last(
+            Object.assign(new Error('inspect failed'), {
+              code: 1,
+              stderr: `Error: No such object: ${id}`,
+            })
+          );
+          return;
+        }
+        last(null, { stdout: '', stderr: '' });
+      });
+
+      await runtime.remove(id);
+
+      // It polled until the name was gone rather than returning on the first look.
+      expect(nameLookupsAfterRm).toBe(3);
+      const nameProbes = mockExecFile.mock.calls
+        .map((call) => call[1] as string[])
+        .filter((args) => args[0] === 'inspect' && args.includes(id));
+      expect(nameProbes.length).toBeGreaterThan(1);
+    });
+
+    it('remove throws a bounded timeout error when the name is never released', async () => {
+      vi.useFakeTimers();
+      try {
+        const id = await runtime.create({
+          name: 'svc',
+          image: 'alpine:latest',
+          workingDirectory: '/w',
+          mounts: [],
+        });
+
+        // Fake daemon: the name is held forever.
+        mockExecFile.mockImplementation((...allArgs: unknown[]) => {
+          const args = allArgs[1] as string[];
+          const last = allArgs[allArgs.length - 1] as Callback;
+          if (args[0] === 'inspect') {
+            last(null, { stdout: `/${id}\n`, stderr: '' });
+            return;
+          }
+          last(null, { stdout: '', stderr: '' });
+        });
+
+        const settled = runtime.remove(id).then(
+          () => null,
+          (error: unknown) => error
+        );
+        await vi.advanceTimersByTimeAsync(NAME_RELEASE_TIMEOUT_MS + 1000);
+
+        const error = await settled;
+        expect(error).toBeInstanceOf(ContainerError);
+        expect((error as Error).message).toMatch(
+          /waiting for docker to release the container name/
+        );
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('stop and remove are idempotent when the in-process cache is empty', async () => {
