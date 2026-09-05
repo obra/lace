@@ -7,18 +7,20 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
-  const ctx = createE2EContext({ prefix: 'lace-agent-delegate-config' });
+describe(
+  'lace-agent delegate connectionId/modelId (E2E over stdio)',
+  { timeout: E2E_TEST_TIMEOUT_MS },
+  () => {
+    const ctx = createE2EContext({ prefix: 'lace-agent-delegate-config' });
 
-  beforeEach(() => ctx.setup());
-  afterEach(() => ctx.teardown());
+    beforeEach(() => ctx.setup());
+    afterEach(() => ctx.teardown());
 
-  it(
-    'spawns a subagent with connectionId and modelId configuration',
-    { timeout: 30_000 },
-    async () => {
+    it('spawns a subagent with connectionId and modelId configuration', async () => {
       process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG = '1';
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
@@ -87,7 +89,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
             },
           ],
         }),
-        15_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'session/prompt (with config)'
       );
 
@@ -101,7 +103,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
             }
           }, 10);
         }),
-        10_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'job_started update'
       );
 
@@ -120,7 +122,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
             }
           }, 10);
         }),
-        15_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'job_finished update'
       );
 
@@ -132,83 +134,79 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       )) as { status: string; output: string };
 
       expect(output.status).toBe('completed');
-    }
-  );
-
-  it('spawns a subagent with only modelId (no connectionId)', { timeout: 30_000 }, async () => {
-    process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG = '1';
-    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
-
-    const updates: Array<Record<string, unknown>> = [];
-    let subagentJobId: string | undefined;
-
-    ctx.agent.peer.onRequest('session/update', async (params) => {
-      const p = params as Record<string, unknown>;
-      updates.push(p);
-      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
-        subagentJobId = p.jobId;
-      }
-      return undefined;
     });
 
-    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    it('spawns a subagent with only modelId (no connectionId)', async () => {
+      process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG = '1';
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-    await withTimeout(
-      ctx.agent.peer.request(
-        'initialize',
-        defaultInitializeParams({ config: { approvalMode: 'ask' } })
-      ),
-      AGENT_BOOT_TIMEOUT_MS,
-      'initialize'
-    );
+      const updates: Array<Record<string, unknown>> = [];
+      let subagentJobId: string | undefined;
 
-    await withTimeout(
-      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-      2_000,
-      'session/new'
-    );
+      ctx.agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        updates.push(p);
+        if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
+          subagentJobId = p.jobId;
+        }
+        return undefined;
+      });
 
-    // Send a prompt that triggers delegate tool with just modelId
-    // The test provider syntax: "subagent config=,modelId: prompt" (empty connectionId)
-    await withTimeout(
-      ctx.agent.peer.request('session/prompt', {
-        content: [{ type: 'text', text: 'subagent config=,gpt-4o-mini: say hi' }],
-      }),
-      15_000,
-      'session/prompt'
-    );
+      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
-    // Wait for job to finish
-    await withTimeout(
-      new Promise<void>((resolve) => {
-        const interval = setInterval(() => {
-          if (!subagentJobId) return;
-          const finished = updates.find(
-            (u) => u.type === 'job_finished' && u.jobId === subagentJobId
-          );
-          if (finished) {
-            clearInterval(interval);
-            resolve();
-          }
-        }, 10);
-      }),
-      15_000,
-      'job_finished update'
-    );
+      await withTimeout(
+        ctx.agent.peer.request(
+          'initialize',
+          defaultInitializeParams({ config: { approvalMode: 'ask' } })
+        ),
+        AGENT_BOOT_TIMEOUT_MS,
+        'initialize'
+      );
 
-    const output = (await withTimeout(
-      ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
-      2_000,
-      'ent/job/output'
-    )) as { status: string; output: string };
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+        2_000,
+        'session/new'
+      );
 
-    expect(output.status).toBe('completed');
-  });
+      // Send a prompt that triggers delegate tool with just modelId
+      // The test provider syntax: "subagent config=,modelId: prompt" (empty connectionId)
+      await withTimeout(
+        ctx.agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'subagent config=,gpt-4o-mini: say hi' }],
+        }),
+        SUBAGENT_JOB_TIMEOUT_MS,
+        'session/prompt'
+      );
 
-  it(
-    'inherits connectionId/modelId from effective config when delegate provides none',
-    { timeout: 30_000 },
-    async () => {
+      // Wait for job to finish
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (!subagentJobId) return;
+            const finished = updates.find(
+              (u) => u.type === 'job_finished' && u.jobId === subagentJobId
+            );
+            if (finished) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        SUBAGENT_JOB_TIMEOUT_MS,
+        'job_finished update'
+      );
+
+      const output = (await withTimeout(
+        ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
+        2_000,
+        'ent/job/output'
+      )) as { status: string; output: string };
+
+      expect(output.status).toBe('completed');
+    });
+
+    it('inherits connectionId/modelId from effective config when delegate provides none', async () => {
       process.env.LACE_AGENT_TEST_PROVIDER_STRICT_CONFIG = '1';
       ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
@@ -274,7 +272,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
         ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: 'subagent: say hi' }],
         }),
-        15_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'session/prompt'
       );
 
@@ -291,7 +289,7 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
             }
           }, 10);
         }),
-        15_000,
+        SUBAGENT_JOB_TIMEOUT_MS,
         'job_finished update'
       );
 
@@ -302,6 +300,6 @@ describe('lace-agent delegate connectionId/modelId (E2E over stdio)', () => {
       )) as { status: string; output: string };
 
       expect(output.status).toBe('completed');
-    }
-  );
-});
+    });
+  }
+);

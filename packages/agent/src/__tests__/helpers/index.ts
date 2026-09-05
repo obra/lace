@@ -4,6 +4,8 @@ export {
   spawnAgentProcess,
   withTimeout,
   AGENT_BOOT_TIMEOUT_MS,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
   type SpawnedAgent,
 } from './agent-process';
 export { createE2EContext, type E2ETestContext, type E2EContextOptions } from './e2e-context';

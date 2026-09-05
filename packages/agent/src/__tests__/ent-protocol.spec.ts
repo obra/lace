@@ -10,6 +10,7 @@ import {
   spawnAgentProcess,
   withTimeout,
   type SpawnedAgent,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers/agent-process';
 import { defaultInitializeParams } from './helpers/initialize';
 import * as MethodSchemas from '@lace/ent-protocol';
@@ -94,7 +95,7 @@ function notifyOk(options: {
  * Contract-style coverage for key Ent protocol methods.
  * These tests exercise stdio JSON-RPC end-to-end against the built agent.
  */
-describe('Ent protocol contract (selected coverage)', () => {
+describe('Ent protocol contract (selected coverage)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   let laceDir: string;
   let workDir: string;
   let agent: SpawnedAgent | undefined;
@@ -118,177 +119,173 @@ describe('Ent protocol contract (selected coverage)', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
-  it(
-    'supports provider catalog, connections, models (enable/disable) and session configure',
-    { timeout: 25_000 },
-    async () => {
-      agent = spawnAgentProcess({ laceDir });
+  it('supports provider catalog, connections, models (enable/disable) and session configure', async () => {
+    agent = spawnAgentProcess({ laceDir });
 
-      await requestOk({
-        agent,
-        method: 'initialize',
-        requestSchema: MethodSchemas.InitializeRequestSchema,
-        responseSchema: MethodSchemas.InitializeResponseSchema,
-        params: defaultInitializeParams(),
-        label: 'init',
-      });
+    await requestOk({
+      agent,
+      method: 'initialize',
+      requestSchema: MethodSchemas.InitializeRequestSchema,
+      responseSchema: MethodSchemas.InitializeResponseSchema,
+      params: defaultInitializeParams(),
+      label: 'init',
+    });
 
-      const catalog = await requestOk<{ providers: Array<{ id: string; models: unknown[] }> }>({
-        agent,
-        method: 'ent/providers/catalog',
-        requestSchema: MethodSchemas.EntProvidersCatalogRequestSchema,
-        responseSchema: MethodSchemas.EntProvidersCatalogResponseSchema,
-        label: 'providers/catalog',
-      });
-      expect(catalog.providers.length).toBeGreaterThan(0);
-      expect(Array.isArray(catalog.providers[0]?.models)).toBe(true);
+    const catalog = await requestOk<{ providers: Array<{ id: string; models: unknown[] }> }>({
+      agent,
+      method: 'ent/providers/catalog',
+      requestSchema: MethodSchemas.EntProvidersCatalogRequestSchema,
+      responseSchema: MethodSchemas.EntProvidersCatalogResponseSchema,
+      label: 'providers/catalog',
+    });
+    expect(catalog.providers.length).toBeGreaterThan(0);
+    expect(Array.isArray(catalog.providers[0]?.models)).toBe(true);
 
-      // providers list
-      const { providers } = await requestOk<{
-        providers: Array<{ providerId: string; displayName?: string }>;
-      }>({
-        agent,
-        method: 'ent/providers/list',
-        requestSchema: MethodSchemas.EntProvidersListRequestSchema,
-        responseSchema: MethodSchemas.EntProvidersListResponseSchema,
-        label: 'providers/list',
-      });
-      expect(providers.length).toBeGreaterThan(0);
+    // providers list
+    const { providers } = await requestOk<{
+      providers: Array<{ providerId: string; displayName?: string }>;
+    }>({
+      agent,
+      method: 'ent/providers/list',
+      requestSchema: MethodSchemas.EntProvidersListRequestSchema,
+      responseSchema: MethodSchemas.EntProvidersListResponseSchema,
+      label: 'providers/list',
+    });
+    expect(providers.length).toBeGreaterThan(0);
 
-      const providerId =
-        providers.find((p) => p.providerId === 'openai')?.providerId ?? providers[0].providerId;
+    const providerId =
+      providers.find((p) => p.providerId === 'openai')?.providerId ?? providers[0].providerId;
 
-      // connections upsert
-      const { connectionId } = await requestOk<{ connectionId: string }>({
-        agent,
-        method: 'ent/connections/upsert',
-        requestSchema: MethodSchemas.EntConnectionsUpsertRequestSchema,
-        responseSchema: MethodSchemas.EntConnectionsUpsertResponseSchema,
-        params: { providerId, connection: { name: 'ent-spec', config: {} } },
-        label: 'connections/upsert',
-      });
-      expect(connectionId).toBeTruthy();
+    // connections upsert
+    const { connectionId } = await requestOk<{ connectionId: string }>({
+      agent,
+      method: 'ent/connections/upsert',
+      requestSchema: MethodSchemas.EntConnectionsUpsertRequestSchema,
+      responseSchema: MethodSchemas.EntConnectionsUpsertResponseSchema,
+      params: { providerId, connection: { name: 'ent-spec', config: {} } },
+      label: 'connections/upsert',
+    });
+    expect(connectionId).toBeTruthy();
 
-      // models list
-      const modelsResp = await requestOk<{
-        providerId: string;
-        models: Array<{
-          modelId: string;
-          disabled?: boolean;
-          disabledState?: 'enabled' | 'disabled';
-        }>;
-      }>({
-        agent,
-        method: 'ent/models/list',
-        requestSchema: MethodSchemas.EntModelsListRequestSchema,
-        responseSchema: MethodSchemas.EntModelsListResponseSchema,
-        params: { connectionId },
-        label: 'models/list',
-      });
-      expect(modelsResp.providerId).toBe(providerId);
-      expect(modelsResp.models.length).toBeGreaterThan(0);
-      expect(modelsResp.models[0]?.disabledState).toBeDefined();
+    // models list
+    const modelsResp = await requestOk<{
+      providerId: string;
+      models: Array<{
+        modelId: string;
+        disabled?: boolean;
+        disabledState?: 'enabled' | 'disabled';
+      }>;
+    }>({
+      agent,
+      method: 'ent/models/list',
+      requestSchema: MethodSchemas.EntModelsListRequestSchema,
+      responseSchema: MethodSchemas.EntModelsListResponseSchema,
+      params: { connectionId },
+      label: 'models/list',
+    });
+    expect(modelsResp.providerId).toBe(providerId);
+    expect(modelsResp.models.length).toBeGreaterThan(0);
+    expect(modelsResp.models[0]?.disabledState).toBeDefined();
 
-      const targetModel = modelsResp.models[0].modelId;
+    const targetModel = modelsResp.models[0].modelId;
 
-      // disable + verify disabled flag appears
-      await requestOk({
-        agent,
-        method: 'ent/models/disable',
-        requestSchema: MethodSchemas.EntModelsDisableRequestSchema,
-        responseSchema: MethodSchemas.EntModelsDisableResponseSchema,
-        params: { providerId, modelIds: [targetModel] },
-        label: 'models/disable',
-      });
-      const afterDisable = await requestOk<{
-        models: Array<{
-          modelId: string;
-          disabled?: boolean;
-          disabledState?: 'enabled' | 'disabled';
-        }>;
-      }>({
-        agent,
-        method: 'ent/models/list',
-        requestSchema: MethodSchemas.EntModelsListRequestSchema,
-        responseSchema: MethodSchemas.EntModelsListResponseSchema,
-        params: { connectionId },
-        label: 'models/list after disable',
-      });
-      const disabledEntry = afterDisable.models.find((m) => m.modelId === targetModel);
-      expect(disabledEntry?.disabled).toBe(true);
-      expect(disabledEntry?.disabledState).toBe('disabled');
+    // disable + verify disabled flag appears
+    await requestOk({
+      agent,
+      method: 'ent/models/disable',
+      requestSchema: MethodSchemas.EntModelsDisableRequestSchema,
+      responseSchema: MethodSchemas.EntModelsDisableResponseSchema,
+      params: { providerId, modelIds: [targetModel] },
+      label: 'models/disable',
+    });
+    const afterDisable = await requestOk<{
+      models: Array<{
+        modelId: string;
+        disabled?: boolean;
+        disabledState?: 'enabled' | 'disabled';
+      }>;
+    }>({
+      agent,
+      method: 'ent/models/list',
+      requestSchema: MethodSchemas.EntModelsListRequestSchema,
+      responseSchema: MethodSchemas.EntModelsListResponseSchema,
+      params: { connectionId },
+      label: 'models/list after disable',
+    });
+    const disabledEntry = afterDisable.models.find((m) => m.modelId === targetModel);
+    expect(disabledEntry?.disabled).toBe(true);
+    expect(disabledEntry?.disabledState).toBe('disabled');
 
-      // configure provider connection/env via Ent and model/permission mode via ACP config options
-      const { sessionId } = await requestOk<{ sessionId: string }>({
-        agent,
-        method: 'session/new',
-        requestSchema: MethodSchemas.SessionNewRequestSchema,
-        responseSchema: MethodSchemas.SessionNewResponseSchema,
-        params: { cwd: workDir, mcpServers: [] },
-        label: 'session/new',
-      });
-      expect(sessionId).toBeTruthy();
+    // configure provider connection/env via Ent and model/permission mode via ACP config options
+    const { sessionId } = await requestOk<{ sessionId: string }>({
+      agent,
+      method: 'session/new',
+      requestSchema: MethodSchemas.SessionNewRequestSchema,
+      responseSchema: MethodSchemas.SessionNewResponseSchema,
+      params: { cwd: workDir, mcpServers: [] },
+      label: 'session/new',
+    });
+    expect(sessionId).toBeTruthy();
 
-      const configureResult = await requestOk<{
-        applied: string[];
-        config: Record<string, unknown>;
-      }>({
-        agent,
-        method: 'ent/session/configure',
-        requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
-        responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
-        params: {
-          connectionId,
-          environment: { HELLO: 'WORLD' },
-        },
-        label: 'session/configure',
-      });
-
-      expect(configureResult.applied).toEqual(
-        expect.arrayContaining(['connectionId', 'environment'])
-      );
-      expect(configureResult.config).toMatchObject({
+    const configureResult = await requestOk<{
+      applied: string[];
+      config: Record<string, unknown>;
+    }>({
+      agent,
+      method: 'ent/session/configure',
+      requestSchema: MethodSchemas.EntSessionConfigureRequestSchema,
+      responseSchema: MethodSchemas.EntSessionConfigureResponseSchema,
+      params: {
         connectionId,
         environment: { HELLO: 'WORLD' },
-      });
+      },
+      label: 'session/configure',
+    });
 
-      const modelResult = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
-        agent,
-        method: 'session/set_config_option',
-        requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
-        responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
-        params: { sessionId, configId: 'model', value: targetModel },
-        label: 'session/set_config_option model',
-      });
-      expect(modelResult.configOptions).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: 'model',
-            category: 'model',
-            currentValue: targetModel,
-          }),
-        ])
-      );
+    expect(configureResult.applied).toEqual(
+      expect.arrayContaining(['connectionId', 'environment'])
+    );
+    expect(configureResult.config).toMatchObject({
+      connectionId,
+      environment: { HELLO: 'WORLD' },
+    });
 
-      const approvalResult = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
-        agent,
-        method: 'session/set_config_option',
-        requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
-        responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
-        params: { sessionId, configId: 'approvalMode', value: 'approveReads' },
-        label: 'session/set_config_option approvalMode',
-      });
-      expect(approvalResult.configOptions).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            id: 'approvalMode',
-            category: '_permission_mode',
-            currentValue: 'approveReads',
-          }),
-        ])
-      );
-    }
-  );
+    const modelResult = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'model', value: targetModel },
+      label: 'session/set_config_option model',
+    });
+    expect(modelResult.configOptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'model',
+          category: 'model',
+          currentValue: targetModel,
+        }),
+      ])
+    );
+
+    const approvalResult = await requestOk<{ configOptions: Array<Record<string, unknown>> }>({
+      agent,
+      method: 'session/set_config_option',
+      requestSchema: (MethodSchemas as any).SessionSetConfigOptionRequestSchema,
+      responseSchema: (MethodSchemas as any).SessionSetConfigOptionResponseSchema,
+      params: { sessionId, configId: 'approvalMode', value: 'approveReads' },
+      label: 'session/set_config_option approvalMode',
+    });
+    expect(approvalResult.configOptions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'approvalMode',
+          category: '_permission_mode',
+          currentValue: 'approveReads',
+        }),
+      ])
+    );
+  });
 
   it('handles concurrent ent/providers/refresh and ent/models/list without transient Unknown providerId', async () => {
     agent = spawnAgentProcess({ laceDir });

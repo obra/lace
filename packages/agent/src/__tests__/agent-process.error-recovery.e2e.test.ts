@@ -11,97 +11,94 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent error recovery (E2E)', () => {
+describe('lace-agent error recovery (E2E)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-error-recovery' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it(
-    'continues turn after recoverable tool error (file not found), model sees error and responds',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('continues turn after recoverable tool error (file not found), model sees error and responds', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      const updates: unknown[] = [];
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        updates.push(params);
-        return undefined;
-      });
+    const updates: unknown[] = [];
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      updates.push(params);
+      return undefined;
+    });
 
-      await withTimeout(
-        ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      // Ask to read a non-existent file - this will fail with "file not found"
-      // The key behavior: the turn should CONTINUE, allowing the model to see the error
-      // and respond (instead of stopping the turn on failure)
-      const promptResult = (await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'read file nonexistent.txt' }],
-        }),
-        10_000,
-        'session/prompt'
-      )) as { turnId: string; stopReason: string };
+    // Ask to read a non-existent file - this will fail with "file not found"
+    // The key behavior: the turn should CONTINUE, allowing the model to see the error
+    // and respond (instead of stopping the turn on failure)
+    const promptResult = (await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'read file nonexistent.txt' }],
+      }),
+      10_000,
+      'session/prompt'
+    )) as { turnId: string; stopReason: string };
 
-      // Wait for turn to complete
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            const turnEnd = updates.find((u) => {
-              const p = u as Record<string, unknown>;
-              return p?.type === 'turn_end' && p?.turnId === promptResult.turnId;
-            });
-            if (turnEnd) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        8_000,
-        'turn_end'
-      );
+    // Wait for turn to complete
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const turnEnd = updates.find((u) => {
+            const p = u as Record<string, unknown>;
+            return p?.type === 'turn_end' && p?.turnId === promptResult.turnId;
+          });
+          if (turnEnd) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      8_000,
+      'turn_end'
+    );
 
-      // Get events to verify the sequence
-      const durable = (await withTimeout(
-        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
-        2_000,
-        'ent/session/events'
-      )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };
+    // Get events to verify the sequence
+    const durable = (await withTimeout(
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };
 
-      // Should see: context_injected, prompt, turn_start, message, tool_use (failed), message (model's response to error), turn_end
-      const eventTypes = durable.events.map((e) => e.type);
+    // Should see: context_injected, prompt, turn_start, message, tool_use (failed), message (model's response to error), turn_end
+    const eventTypes = durable.events.map((e) => e.type);
 
-      // The tool_use event should have failed status
-      const toolUseEvents = durable.events.filter((e) => e.type === 'tool_use');
-      expect(toolUseEvents.length).toBe(1);
+    // The tool_use event should have failed status
+    const toolUseEvents = durable.events.filter((e) => e.type === 'tool_use');
+    expect(toolUseEvents.length).toBe(1);
 
-      const toolData = toolUseEvents[0].data as Record<string, unknown>;
-      const result = toolData.result as Record<string, unknown>;
-      expect(result.outcome).toBe('failed');
+    const toolData = toolUseEvents[0].data as Record<string, unknown>;
+    const result = toolData.result as Record<string, unknown>;
+    expect(result.outcome).toBe('failed');
 
-      // CRITICAL: There should be a message AFTER the failed tool_use
-      // This proves the turn continued and the model got to respond
-      const toolUseIndex = eventTypes.indexOf('tool_use');
-      const messageAfterTool = eventTypes.slice(toolUseIndex + 1).includes('message');
-      expect(messageAfterTool).toBe(true);
+    // CRITICAL: There should be a message AFTER the failed tool_use
+    // This proves the turn continued and the model got to respond
+    const toolUseIndex = eventTypes.indexOf('tool_use');
+    const messageAfterTool = eventTypes.slice(toolUseIndex + 1).includes('message');
+    expect(messageAfterTool).toBe(true);
 
-      // Turn should complete normally (not stopped by the error)
-      expect(promptResult.stopReason).toBe('end_turn');
-    }
-  );
+    // Turn should complete normally (not stopped by the error)
+    expect(promptResult.stopReason).toBe('end_turn');
+  });
 
-  it('stops turn immediately on permission denied (fatal error)', { timeout: 15_000 }, async () => {
+  it('stops turn immediately on permission denied (fatal error)', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: unknown[] = [];
@@ -185,89 +182,85 @@ describe('lace-agent error recovery (E2E)', () => {
     expect(promptResult.stopReason).toBe('end_turn');
   });
 
-  it(
-    'model can retry with corrected parameters after seeing recoverable error',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({
-        laceDir: ctx.laceDir,
-        env: {
-          // Enable retry behavior: test provider will retry with fallback.txt after seeing error
-          LACE_TEST_PROVIDER_RETRY_ON_ERROR: '1',
-        },
-      });
+  it('model can retry with corrected parameters after seeing recoverable error', async () => {
+    ctx.agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
+      env: {
+        // Enable retry behavior: test provider will retry with fallback.txt after seeing error
+        LACE_TEST_PROVIDER_RETRY_ON_ERROR: '1',
+      },
+    });
 
-      const updates: unknown[] = [];
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        updates.push(params);
-        return undefined;
-      });
+    const updates: unknown[] = [];
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      updates.push(params);
+      return undefined;
+    });
 
-      await withTimeout(
-        ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      // Create a fallback file that the model will try after the first one fails
-      writeFileSync(join(ctx.workDir, 'fallback.txt'), 'fallback content\n', 'utf8');
+    // Create a fallback file that the model will try after the first one fails
+    writeFileSync(join(ctx.workDir, 'fallback.txt'), 'fallback content\n', 'utf8');
 
-      // First file doesn't exist - model will try it, see error, retry with fallback.txt
-      const promptResult = (await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'read file wrong.txt' }],
-        }),
-        10_000,
-        'session/prompt'
-      )) as { turnId: string; stopReason: string };
+    // First file doesn't exist - model will try it, see error, retry with fallback.txt
+    const promptResult = (await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'read file wrong.txt' }],
+      }),
+      10_000,
+      'session/prompt'
+    )) as { turnId: string; stopReason: string };
 
-      // Wait for turn to complete
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            const turnEnd = updates.find((u) => {
-              const p = u as Record<string, unknown>;
-              return p?.type === 'turn_end' && p?.turnId === promptResult.turnId;
-            });
-            if (turnEnd) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        8_000,
-        'turn_end'
-      );
+    // Wait for turn to complete
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const turnEnd = updates.find((u) => {
+            const p = u as Record<string, unknown>;
+            return p?.type === 'turn_end' && p?.turnId === promptResult.turnId;
+          });
+          if (turnEnd) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      8_000,
+      'turn_end'
+    );
 
-      // Get events to verify the sequence
-      const durable = (await withTimeout(
-        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
-        2_000,
-        'ent/session/events'
-      )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };
+    // Get events to verify the sequence
+    const durable = (await withTimeout(
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as { events: Array<{ eventSeq: number; type: string; data?: unknown }>; hasMore: boolean };
 
-      // Should see TWO tool_use events: first fails, second succeeds
-      const toolUseEvents = durable.events.filter((e) => e.type === 'tool_use');
-      expect(toolUseEvents.length).toBe(2);
+    // Should see TWO tool_use events: first fails, second succeeds
+    const toolUseEvents = durable.events.filter((e) => e.type === 'tool_use');
+    expect(toolUseEvents.length).toBe(2);
 
-      // First tool use should have failed status (file not found)
-      const firstToolData = toolUseEvents[0].data as Record<string, unknown>;
-      const firstResult = firstToolData.result as Record<string, unknown>;
-      expect(firstResult.outcome).toBe('failed');
+    // First tool use should have failed status (file not found)
+    const firstToolData = toolUseEvents[0].data as Record<string, unknown>;
+    const firstResult = firstToolData.result as Record<string, unknown>;
+    expect(firstResult.outcome).toBe('failed');
 
-      // Second tool use should have completed status (fallback file)
-      const secondToolData = toolUseEvents[1].data as Record<string, unknown>;
-      const secondResult = secondToolData.result as Record<string, unknown>;
-      expect(secondResult.outcome).toBe('completed');
+    // Second tool use should have completed status (fallback file)
+    const secondToolData = toolUseEvents[1].data as Record<string, unknown>;
+    const secondResult = secondToolData.result as Record<string, unknown>;
+    expect(secondResult.outcome).toBe('completed');
 
-      // Turn should complete normally
-      expect(promptResult.stopReason).toBe('end_turn');
-    }
-  );
+    // Turn should complete normally
+    expect(promptResult.stopReason).toBe('end_turn');
+  });
 });

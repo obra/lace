@@ -5,85 +5,83 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent subagents (E2E over stdio)', () => {
+describe('lace-agent subagents (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-subagent' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it(
-    'spawns a subagent job and exposes its output via ent/job/output',
-    { timeout: 20_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('spawns a subagent job and exposes its output via ent/job/output', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      const updates: Array<Record<string, unknown>> = [];
-      let subagentJobId: string | undefined;
+    const updates: Array<Record<string, unknown>> = [];
+    let subagentJobId: string | undefined;
 
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        const p = params as Record<string, unknown>;
-        updates.push(p);
-        if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
-          subagentJobId = p.jobId;
-        }
-        return undefined;
-      });
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      const p = params as Record<string, unknown>;
+      updates.push(p);
+      if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
+        subagentJobId = p.jobId;
+      }
+      return undefined;
+    });
 
-      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'subagent: hi' }],
-        }),
-        10_000,
-        'session/prompt'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'subagent: hi' }],
+      }),
+      SUBAGENT_JOB_TIMEOUT_MS,
+      'session/prompt'
+    );
 
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            if (!subagentJobId) return;
-            const finished = updates.find(
-              (u) => u.type === 'job_finished' && u.jobId === subagentJobId
-            );
-            if (finished) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        10_000,
-        'job_finished update'
-      );
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (!subagentJobId) return;
+          const finished = updates.find(
+            (u) => u.type === 'job_finished' && u.jobId === subagentJobId
+          );
+          if (finished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      SUBAGENT_JOB_TIMEOUT_MS,
+      'job_finished update'
+    );
 
-      const output = (await withTimeout(
-        ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
-        2_000,
-        'ent/job/output'
-      )) as { status: string; output: string };
+    const output = (await withTimeout(
+      ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
+      2_000,
+      'ent/job/output'
+    )) as { status: string; output: string };
 
-      expect(output.status).toBe('completed');
-      expect(output.output).toContain('No tool result found');
-    }
-  );
+    expect(output.status).toBe('completed');
+    expect(output.output).toContain('No tool result found');
+  });
 
-  it('forwards subagent permission requests with jobId', { timeout: 20_000 }, async () => {
+  it('forwards subagent permission requests with jobId', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let subagentJobId: string | undefined;
@@ -120,7 +118,7 @@ describe('lace-agent subagents (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'subagent: run: echo hi' }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'session/prompt'
     );
 
@@ -133,7 +131,7 @@ describe('lace-agent subagents (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'permission request forwarded'
     );
 

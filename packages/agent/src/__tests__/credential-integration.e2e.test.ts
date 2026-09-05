@@ -22,6 +22,8 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 
 // A tiny exec-tool that advertises request_credential (with the credentials
@@ -66,175 +68,177 @@ function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   return { client, server };
 }
 
-describe('Part B credential integration (lace wiring + subagent path)', () => {
-  // (i)-(iii) drive an in-process agent server over paired peers; (iv) spawns a
-  // real subagent child process. Both touch the process-global tool registry, so
-  // this file runs serial (--no-file-parallelism, per the lace src/__tests__ convention).
+describe(
+  'Part B credential integration (lace wiring + subagent path)',
+  { timeout: E2E_TEST_TIMEOUT_MS },
+  () => {
+    // (i)-(iii) drive an in-process agent server over paired peers; (iv) spawns a
+    // real subagent child process. Both touch the process-global tool registry, so
+    // this file runs serial (--no-file-parallelism, per the lace src/__tests__ convention).
 
-  describe('(i) request_credential is advertised only to a persona that lists it', () => {
-    let fixtureDir: string;
+    describe('(i) request_credential is advertised only to a persona that lists it', () => {
+      let fixtureDir: string;
 
-    beforeEach(() => {
-      resetRegistriesForTest();
-      registerBuiltinTools();
-      fixtureDir = makeFixtureDir();
-      // Global, trusted registration — exactly what initialize.ts does from
-      // credentialToolsPaths (owner 'credential' carves the reserved-name throw).
-      registerExecDirInto(fixtureDir, { owner: 'credential', trustedCredentialProvenance: true });
-    });
-
-    afterEach(() => {
-      rmSync(fixtureDir, { recursive: true, force: true });
-      resetRegistriesForTest();
-    });
-
-    it('survives executor construction and is advertised when toolScope lists it', async () => {
-      expect(registries.tools.has('request_credential')).toBe(true);
-
-      // A box-worker persona's toolScope lists request_credential → advertised.
-      const { toolsForProvider } = await createToolExecutorForMode(
-        'execute',
-        undefined,
-        undefined,
-        undefined,
-        ['bash', 'request_credential']
-      );
-      expect(toolsForProvider.map((t) => t.name)).toContain('request_credential');
-    });
-
-    it('is NOT advertised to a persona whose toolScope omits it', async () => {
-      // core-like persona: lists tools but not request_credential. The broker is
-      // the real boundary, but availability gating still must not surface it here.
-      const { toolsForProvider } = await createToolExecutorForMode(
-        'execute',
-        undefined,
-        undefined,
-        undefined,
-        ['bash', 'file_read']
-      );
-      expect(toolsForProvider.map((t) => t.name)).not.toContain('request_credential');
-    });
-  });
-
-  describe('(ii) untrusted provenance does not forward the broker socket', () => {
-    let fixtureDir: string;
-
-    beforeEach(() => {
-      fixtureDir = makeFixtureDir();
-    });
-
-    afterEach(() => {
-      rmSync(fixtureDir, { recursive: true, force: true });
-      resetRegistriesForTest();
-    });
-
-    const invokeAndReadContext = async (): Promise<Record<string, unknown>> => {
-      const { executor } = await createToolExecutorForMode('execute');
-      const result = await executor.execute(
-        { id: 't1', name: 'request_credential', arguments: {} },
-        {
-          activeSessionId: 'sess-1',
-          persona: 'engineer',
-          credentialBrokerSocket: '/run/cred.sock',
-          roleEnvironment: 'prod',
-        }
-      );
-      const text = result.content.map((b) => b.text ?? '').join('');
-      return JSON.parse(text) as Record<string, unknown>;
-    };
-
-    it('forwards the socket with trusted provenance, withholds it without', async () => {
-      resetRegistriesForTest();
-      registerBuiltinTools();
-      registerExecDirInto(fixtureDir, { owner: 'credential', trustedCredentialProvenance: true });
-      const trustedCtx = await invokeAndReadContext();
-      expect(trustedCtx.credentialBrokerSocket).toBe('/run/cred.sock');
-
-      resetRegistriesForTest();
-      registerBuiltinTools();
-      // Same dir, same self-declared credentials capability — but NOT trusted.
-      registerExecDirInto(fixtureDir, { owner: 'credential' });
-      const untrustedCtx = await invokeAndReadContext();
-      expect(untrustedCtx.credentialBrokerSocket).toBeUndefined();
-    });
-  });
-
-  describe('(iii) the main-agent envelope carries credentialBrokerSocket + role', () => {
-    let originalLaceDir: string | undefined;
-    let tempDir: string;
-    let fixtureDir: string;
-
-    beforeEach(() => {
-      resetRegistriesForTest();
-      originalLaceDir = process.env.LACE_DIR;
-      tempDir = mkdtempSync(join(tmpdir(), 'lace-cred-mainagent-'));
-      process.env.LACE_DIR = tempDir;
-      fixtureDir = makeFixtureDir();
-    });
-
-    afterEach(() => {
-      if (originalLaceDir === undefined) delete process.env.LACE_DIR;
-      else process.env.LACE_DIR = originalLaceDir;
-      rmSync(tempDir, { recursive: true, force: true });
-      rmSync(fixtureDir, { recursive: true, force: true });
-      resetRegistriesForTest();
-    });
-
-    it('stamps the initialize-config socket and a role into the credential tool envelope', async () => {
-      const state = createAgentServerState();
-      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
-
-      await client.request('initialize', {
-        ...defaultInitializeParams({
-          config: { credentialBrokerSocket: '/run/role.sock' },
-        }),
-        credentialToolsPaths: [fixtureDir],
+      beforeEach(() => {
+        resetRegistriesForTest();
+        registerBuiltinTools();
+        fixtureDir = makeFixtureDir();
+        // Global, trusted registration — exactly what initialize.ts does from
+        // credentialToolsPaths (owner 'credential' carves the reserved-name throw).
+        registerExecDirInto(fixtureDir, { owner: 'credential', trustedCredentialProvenance: true });
       });
 
-      // Invoke the registered credential tool with a session-stamped role +
-      // broker socket (the runner's effectiveConfig provides both). The fixture
-      // echoes the envelope context back as its tool result.
-      const { executor } = await createToolExecutorForMode('execute');
-      const result = await executor.execute(
-        { id: 't1', name: 'request_credential', arguments: {} },
-        {
-          activeSessionId: 'sess-1',
-          persona: 'persistent-box-worker',
-          credentialBrokerSocket: '/run/role.sock',
-          roleEnvironment: 'persistent-box',
-        }
-      );
-      const text = result.content.map((b) => b.text ?? '').join('');
-      const envelopeContext = JSON.parse(text) as Record<string, unknown>;
+      afterEach(() => {
+        rmSync(fixtureDir, { recursive: true, force: true });
+        resetRegistriesForTest();
+      });
 
-      expect(envelopeContext.credentialBrokerSocket).toBe('/run/role.sock');
-      // The role is stamped from session state, not model args — a prompt-injected
-      // persona cannot forge it.
-      expect(envelopeContext.role).toBe('persistent-box-worker');
+      it('survives executor construction and is advertised when toolScope lists it', async () => {
+        expect(registries.tools.has('request_credential')).toBe(true);
 
-      client.close();
-      server.close();
-    });
-  });
+        // A box-worker persona's toolScope lists request_credential → advertised.
+        const { toolsForProvider } = await createToolExecutorForMode(
+          'execute',
+          undefined,
+          undefined,
+          undefined,
+          ['bash', 'request_credential']
+        );
+        expect(toolsForProvider.map((t) => t.name)).toContain('request_credential');
+      });
 
-  describe('(iv) subagent child path — the W5c gap (spawned agent process)', () => {
-    const ctx = createE2EContext({ prefix: 'lace-cred-subagent' });
-    let fixtureDir: string;
-
-    beforeEach(() => {
-      ctx.setup();
-      fixtureDir = makeFixtureDir();
+      it('is NOT advertised to a persona whose toolScope omits it', async () => {
+        // core-like persona: lists tools but not request_credential. The broker is
+        // the real boundary, but availability gating still must not surface it here.
+        const { toolsForProvider } = await createToolExecutorForMode(
+          'execute',
+          undefined,
+          undefined,
+          undefined,
+          ['bash', 'file_read']
+        );
+        expect(toolsForProvider.map((t) => t.name)).not.toContain('request_credential');
+      });
     });
 
-    afterEach(async () => {
-      await ctx.teardown();
-      rmSync(fixtureDir, { recursive: true, force: true });
+    describe('(ii) untrusted provenance does not forward the broker socket', () => {
+      let fixtureDir: string;
+
+      beforeEach(() => {
+        fixtureDir = makeFixtureDir();
+      });
+
+      afterEach(() => {
+        rmSync(fixtureDir, { recursive: true, force: true });
+        resetRegistriesForTest();
+      });
+
+      const invokeAndReadContext = async (): Promise<Record<string, unknown>> => {
+        const { executor } = await createToolExecutorForMode('execute');
+        const result = await executor.execute(
+          { id: 't1', name: 'request_credential', arguments: {} },
+          {
+            activeSessionId: 'sess-1',
+            persona: 'engineer',
+            credentialBrokerSocket: '/run/cred.sock',
+            roleEnvironment: 'prod',
+          }
+        );
+        const text = result.content.map((b) => b.text ?? '').join('');
+        return JSON.parse(text) as Record<string, unknown>;
+      };
+
+      it('forwards the socket with trusted provenance, withholds it without', async () => {
+        resetRegistriesForTest();
+        registerBuiltinTools();
+        registerExecDirInto(fixtureDir, { owner: 'credential', trustedCredentialProvenance: true });
+        const trustedCtx = await invokeAndReadContext();
+        expect(trustedCtx.credentialBrokerSocket).toBe('/run/cred.sock');
+
+        resetRegistriesForTest();
+        registerBuiltinTools();
+        // Same dir, same self-declared credentials capability — but NOT trusted.
+        registerExecDirInto(fixtureDir, { owner: 'credential' });
+        const untrustedCtx = await invokeAndReadContext();
+        expect(untrustedCtx.credentialBrokerSocket).toBeUndefined();
+      });
     });
 
-    it(
-      'a delegated child registers request_credential and its envelope forwards the broker socket',
-      { timeout: 20_000 },
-      async () => {
+    describe('(iii) the main-agent envelope carries credentialBrokerSocket + role', () => {
+      let originalLaceDir: string | undefined;
+      let tempDir: string;
+      let fixtureDir: string;
+
+      beforeEach(() => {
+        resetRegistriesForTest();
+        originalLaceDir = process.env.LACE_DIR;
+        tempDir = mkdtempSync(join(tmpdir(), 'lace-cred-mainagent-'));
+        process.env.LACE_DIR = tempDir;
+        fixtureDir = makeFixtureDir();
+      });
+
+      afterEach(() => {
+        if (originalLaceDir === undefined) delete process.env.LACE_DIR;
+        else process.env.LACE_DIR = originalLaceDir;
+        rmSync(tempDir, { recursive: true, force: true });
+        rmSync(fixtureDir, { recursive: true, force: true });
+        resetRegistriesForTest();
+      });
+
+      it('stamps the initialize-config socket and a role into the credential tool envelope', async () => {
+        const state = createAgentServerState();
+        const { client, server } = createPairedPeers((peer) =>
+          registerAgentRpcMethods(peer, state)
+        );
+
+        await client.request('initialize', {
+          ...defaultInitializeParams({
+            config: { credentialBrokerSocket: '/run/role.sock' },
+          }),
+          credentialToolsPaths: [fixtureDir],
+        });
+
+        // Invoke the registered credential tool with a session-stamped role +
+        // broker socket (the runner's effectiveConfig provides both). The fixture
+        // echoes the envelope context back as its tool result.
+        const { executor } = await createToolExecutorForMode('execute');
+        const result = await executor.execute(
+          { id: 't1', name: 'request_credential', arguments: {} },
+          {
+            activeSessionId: 'sess-1',
+            persona: 'persistent-box-worker',
+            credentialBrokerSocket: '/run/role.sock',
+            roleEnvironment: 'persistent-box',
+          }
+        );
+        const text = result.content.map((b) => b.text ?? '').join('');
+        const envelopeContext = JSON.parse(text) as Record<string, unknown>;
+
+        expect(envelopeContext.credentialBrokerSocket).toBe('/run/role.sock');
+        // The role is stamped from session state, not model args — a prompt-injected
+        // persona cannot forge it.
+        expect(envelopeContext.role).toBe('persistent-box-worker');
+
+        client.close();
+        server.close();
+      });
+    });
+
+    describe('(iv) subagent child path — the W5c gap (spawned agent process)', () => {
+      const ctx = createE2EContext({ prefix: 'lace-cred-subagent' });
+      let fixtureDir: string;
+
+      beforeEach(() => {
+        ctx.setup();
+        fixtureDir = makeFixtureDir();
+      });
+
+      afterEach(async () => {
+        await ctx.teardown();
+        rmSync(fixtureDir, { recursive: true, force: true });
+      });
+
+      it('a delegated child registers request_credential and its envelope forwards the broker socket', async () => {
         ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
         const updates: Array<Record<string, unknown>> = [];
@@ -293,7 +297,7 @@ describe('Part B credential integration (lace wiring + subagent path)', () => {
               }
             }, 10);
           }),
-          12_000,
+          SUBAGENT_JOB_TIMEOUT_MS,
           'delegate job completion'
         );
 
@@ -309,10 +313,10 @@ describe('Part B credential integration (lace wiring + subagent path)', () => {
         // the socket value proves the child stamped it (broker socket reached the child).
         const childContext = extractCredentialEnvelopeContext(output.output);
         expect(childContext.credentialBrokerSocket).toBe('/run/child-role.sock');
-      }
-    );
-  });
-});
+      });
+    });
+  }
+);
 
 // The subagent's job output embeds the fixture's echoed envelope-context JSON in
 // a "[tool_result: request_credential → {…}]" segment. Parse that first complete

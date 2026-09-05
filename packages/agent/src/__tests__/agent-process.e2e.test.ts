@@ -8,9 +8,10 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent process (E2E over stdio)', () => {
+describe('lace-agent process (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-e2e' });
 
   beforeEach(() => ctx.setup());
@@ -49,95 +50,91 @@ describe('lace-agent process (E2E over stdio)', () => {
     });
   });
 
-  it(
-    'initializes, creates a session, streams updates, and persists durable events',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('initializes, creates a session, streams updates, and persists durable events', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      const updates: unknown[] = [];
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        updates.push(params);
-        return undefined;
-      });
+    const updates: unknown[] = [];
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      updates.push(params);
+      return undefined;
+    });
 
-      await withTimeout(
-        ctx.agent.peer.request('initialize', defaultInitializeParams()),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('initialize', defaultInitializeParams()),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      const created = (await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      )) as { sessionId: string };
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
 
-      writeFileSync(join(ctx.workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
+    writeFileSync(join(ctx.workDir, 'hello.txt'), 'hi from disk\n', 'utf8');
 
-      const promptResult = (await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'read file hello.txt' }],
-        }),
-        10_000,
-        'session/prompt'
-      )) as { turnId: string };
+    const promptResult = (await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'read file hello.txt' }],
+      }),
+      10_000,
+      'session/prompt'
+    )) as { turnId: string };
 
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            const match = updates.find((u) => {
-              const p = u as Record<string, unknown>;
-              return (
-                p?.type === 'tool_use' &&
-                p?.name === 'file_read' &&
-                p?.status === 'completed' &&
-                p?.turnId === promptResult.turnId
-              );
-            });
-            if (match) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        5_000,
-        'session/update tool_use stream'
-      );
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const match = updates.find((u) => {
+            const p = u as Record<string, unknown>;
+            return (
+              p?.type === 'tool_use' &&
+              p?.name === 'file_read' &&
+              p?.status === 'completed' &&
+              p?.turnId === promptResult.turnId
+            );
+          });
+          if (match) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'session/update tool_use stream'
+    );
 
-      const durable = (await withTimeout(
-        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
-        2_000,
-        'ent/session/events'
-      )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
+    const durable = (await withTimeout(
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
 
-      expect(durable.hasMore).toBe(false);
-      // system_prompt_set is written on session creation with the rendered system prompt
-      // After the tool result, the LLM returns bare text which triggers a
-      // tool_choice=required retry, producing an extra message event
-      expect(durable.events.map((e) => e.type)).toEqual([
-        'system_prompt_set',
-        'prompt',
-        'turn_start',
-        'message',
-        'tool_use',
-        'message', // LLM's response after tool result (bare text)
-        'message', // bare text retry response
-        'turn_end',
-      ]);
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(durable.hasMore).toBe(false);
+    // system_prompt_set is written on session creation with the rendered system prompt
+    // After the tool result, the LLM returns bare text which triggers a
+    // tool_choice=required retry, producing an extra message event
+    expect(durable.events.map((e) => e.type)).toEqual([
+      'system_prompt_set',
+      'prompt',
+      'turn_start',
+      'message',
+      'tool_use',
+      'message', // LLM's response after tool result (bare text)
+      'message', // bare text retry response
+      'turn_end',
+    ]);
+    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
 
-      const list = (await withTimeout(
-        ctx.agent.peer.request('session/list', { cwd: ctx.workDir }),
-        2_000,
-        'session/list'
-      )) as { sessions: Array<{ sessionId: string }> };
+    const list = (await withTimeout(
+      ctx.agent.peer.request('session/list', { cwd: ctx.workDir }),
+      2_000,
+      'session/list'
+    )) as { sessions: Array<{ sessionId: string }> };
 
-      expect(list.sessions.map((s) => s.sessionId)).toContain(created.sessionId);
-    }
-  );
+    expect(list.sessions.map((s) => s.sessionId)).toContain(created.sessionId);
+  });
 
-  it('keeps JSONL session history across agent restarts', { timeout: 15_000 }, async () => {
+  it('keeps JSONL session history across agent restarts', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
     await withTimeout(
       ctx.agent.peer.request('initialize', defaultInitializeParams()),
@@ -203,7 +200,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
-  it('reports currentSession.messageCount in ent/agent/status', { timeout: 15_000 }, async () => {
+  it('reports currentSession.messageCount in ent/agent/status', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     await withTimeout(
@@ -234,364 +231,350 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(status.currentSession?.messageCount ?? 0).toBeGreaterThan(0);
   });
 
-  it(
-    'requests permission before running bash and records a tool_use event',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('requests permission before running bash and records a tool_use event', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      const updates: unknown[] = [];
-      ctx.agent.peer.onRequest('session/update', async (params) => {
-        updates.push(params);
-        return undefined;
+    const updates: unknown[] = [];
+    ctx.agent.peer.onRequest('session/update', async (params) => {
+      updates.push(params);
+      return undefined;
+    });
+
+    let lastPermissionParams: Record<string, unknown> | undefined;
+    ctx.agent.peer.onRequest('session/request_permission', async (params) => {
+      lastPermissionParams = params as Record<string, unknown>;
+      return { decision: 'allow' };
+    });
+
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
+
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
+
+    const promptResult = (await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'run: echo hi' }],
+      }),
+      10_000,
+      'session/prompt'
+    )) as { turnId: string };
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          const toolFinished = updates.find((u) => {
+            const p = u as Record<string, unknown>;
+            const result = p?.result as Record<string, unknown> | undefined;
+            return (
+              p?.type === 'tool_use' && p?.status === 'completed' && result?.outcome === 'completed'
+            );
+          });
+          if (toolFinished) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'tool_use completed update'
+    );
+
+    expect(lastPermissionParams).toMatchObject({
+      tool: 'bash',
+      resource: 'echo hi',
+      sessionId: expect.any(String),
+      turnId: promptResult.turnId,
+      toolCallId: expect.any(String),
+    });
+
+    const durable = (await withTimeout(
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events'
+    )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
+
+    // system_prompt_set is written on session creation with the rendered system prompt
+    // The LLM (test provider) emits a message before the tool call ("Running echo hi..."),
+    // so we expect an extra message event before permission_requested.
+    // After the tool result, the LLM returns bare text which triggers a
+    // tool_choice=required retry, producing an extra message event.
+    expect(durable.events.map((e) => e.type)).toEqual([
+      'system_prompt_set',
+      'prompt',
+      'turn_start',
+      'message', // LLM's initial response before tool call
+      'permission_requested',
+      'permission_decided',
+      'tool_use',
+      'message', // LLM's response after tool result (bare text)
+      'message', // bare text retry response
+      'turn_end',
+    ]);
+
+    expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  });
+
+  it('requests permission before running file_write and exposes pending permissions via ent/agent/status', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+
+    let permissionParams: Record<string, unknown> | undefined;
+    let resolvePermission:
+      | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
+      | undefined;
+
+    ctx.agent.peer.onRequest('session/request_permission', async (params) => {
+      permissionParams = params as Record<string, unknown>;
+      return await new Promise((resolve) => {
+        resolvePermission = resolve as any;
       });
+    });
 
-      let lastPermissionParams: Record<string, unknown> | undefined;
-      ctx.agent.peer.onRequest('session/request_permission', async (params) => {
-        lastPermissionParams = params as Record<string, unknown>;
-        return { decision: 'allow' };
-      });
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    const promptPromise = ctx.agent.peer.request('session/prompt', {
+      content: [{ type: 'text', text: 'write file out.txt' }],
+    });
 
-      const promptResult = (await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'run: echo hi' }],
-        }),
-        10_000,
-        'session/prompt'
-      )) as { turnId: string };
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (permissionParams) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'permission request'
+    );
 
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            const toolFinished = updates.find((u) => {
-              const p = u as Record<string, unknown>;
-              const result = p?.result as Record<string, unknown> | undefined;
-              return (
-                p?.type === 'tool_use' &&
-                p?.status === 'completed' &&
-                result?.outcome === 'completed'
-              );
-            });
-            if (toolFinished) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        5_000,
-        'tool_use completed update'
-      );
+    expect(permissionParams).toMatchObject({
+      tool: 'file_write',
+      sessionId: expect.any(String),
+      turnId: expect.any(String),
+      toolCallId: expect.any(String),
+    });
 
-      expect(lastPermissionParams).toMatchObject({
-        tool: 'bash',
-        resource: 'echo hi',
-        sessionId: expect.any(String),
-        turnId: promptResult.turnId,
-        toolCallId: expect.any(String),
-      });
+    const status = (await withTimeout(
+      ctx.agent.peer.request('ent/agent/status', {}),
+      2_000,
+      'ent/agent/status'
+    )) as { pendingPermissions: Array<{ tool: string }> };
 
-      const durable = (await withTimeout(
-        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
-        2_000,
-        'ent/session/events'
-      )) as { events: Array<{ eventSeq: number; type: string }>; hasMore: boolean };
+    expect(status.pendingPermissions.find((p) => p.tool === 'file_write')).toBeTruthy();
 
-      // system_prompt_set is written on session creation with the rendered system prompt
-      // The LLM (test provider) emits a message before the tool call ("Running echo hi..."),
-      // so we expect an extra message event before permission_requested.
-      // After the tool result, the LLM returns bare text which triggers a
-      // tool_choice=required retry, producing an extra message event.
-      expect(durable.events.map((e) => e.type)).toEqual([
-        'system_prompt_set',
-        'prompt',
-        'turn_start',
-        'message', // LLM's initial response before tool call
-        'permission_requested',
-        'permission_decided',
-        'tool_use',
-        'message', // LLM's response after tool result (bare text)
-        'message', // bare text retry response
-        'turn_end',
-      ]);
+    resolvePermission?.({ decision: 'allow' });
 
-      expect(durable.events.map((e) => e.eventSeq)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    }
-  );
+    await withTimeout(promptPromise, 10_000, 'session/prompt (write)');
 
-  it(
-    'requests permission before running file_write and exposes pending permissions via ent/agent/status',
-    { timeout: 20_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+    expect(existsSync(join(ctx.workDir, 'out.txt'))).toBe(true);
+    expect(readFileSync(join(ctx.workDir, 'out.txt'), 'utf8')).toContain(
+      'written by test provider'
+    );
+  });
 
-      let permissionParams: Record<string, unknown> | undefined;
-      let resolvePermission:
-        | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
-        | undefined;
+  it('reissues pending permission prompts after agent restart (derived from events.jsonl)', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      ctx.agent.peer.onRequest('session/request_permission', async (params) => {
-        permissionParams = params as Record<string, unknown>;
-        return await new Promise((resolve) => {
-          resolvePermission = resolve as any;
-        });
-      });
+    let sawPermissionRequest = false;
+    ctx.agent.peer.onRequest('session/request_permission', async () => {
+      sawPermissionRequest = true;
+      return await new Promise(() => undefined);
+    });
 
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    const created = (await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    )) as { sessionId: string };
 
-      const promptPromise = ctx.agent.peer.request('session/prompt', {
-        content: [{ type: 'text', text: 'write file out.txt' }],
-      });
+    const promptPromise = ctx.agent.peer.request('session/prompt', {
+      content: [{ type: 'text', text: 'run: echo pending' }],
+    });
 
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            if (permissionParams) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        5_000,
-        'permission request'
-      );
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (sawPermissionRequest) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'permission request received'
+    );
 
-      expect(permissionParams).toMatchObject({
-        tool: 'file_write',
-        sessionId: expect.any(String),
-        turnId: expect.any(String),
-        toolCallId: expect.any(String),
-      });
+    const beforeCrash = (await withTimeout(
+      ctx.agent.peer.request('ent/agent/status'),
+      2_000,
+      'ent/agent/status (before crash)'
+    )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
 
-      const status = (await withTimeout(
-        ctx.agent.peer.request('ent/agent/status', {}),
-        2_000,
-        'ent/agent/status'
-      )) as { pendingPermissions: Array<{ tool: string }> };
+    expect(beforeCrash.pendingPermissions).toHaveLength(1);
+    const [{ requestId: requestIdBefore, toolCallId }] = beforeCrash.pendingPermissions;
+    expect(requestIdBefore).toEqual(expect.any(String));
+    expect(toolCallId).toEqual(expect.any(String));
 
-      expect(status.pendingPermissions.find((p) => p.tool === 'file_write')).toBeTruthy();
+    const stateRaw = readFileSync(
+      join(ctx.laceDir, 'agent-sessions', created.sessionId, 'state.json'),
+      'utf8'
+    );
+    expect((JSON.parse(stateRaw) as any).pendingPermissions).toBeUndefined();
 
-      resolvePermission?.({ decision: 'allow' });
-
-      await withTimeout(promptPromise, 10_000, 'session/prompt (write)');
-
-      expect(existsSync(join(ctx.workDir, 'out.txt'))).toBe(true);
-      expect(readFileSync(join(ctx.workDir, 'out.txt'), 'utf8')).toContain(
-        'written by test provider'
-      );
-    }
-  );
-
-  it(
-    'reissues pending permission prompts after agent restart (derived from events.jsonl)',
-    { timeout: 25_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
-
-      let sawPermissionRequest = false;
-      ctx.agent.peer.onRequest('session/request_permission', async () => {
-        sawPermissionRequest = true;
-        return await new Promise(() => undefined);
-      });
-
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
-
-      const created = (await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      )) as { sessionId: string };
-
-      const promptPromise = ctx.agent.peer.request('session/prompt', {
-        content: [{ type: 'text', text: 'run: echo pending' }],
-      });
-
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            if (sawPermissionRequest) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        5_000,
-        'permission request received'
-      );
-
-      const beforeCrash = (await withTimeout(
-        ctx.agent.peer.request('ent/agent/status'),
-        2_000,
-        'ent/agent/status (before crash)'
-      )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
-
-      expect(beforeCrash.pendingPermissions).toHaveLength(1);
-      const [{ requestId: requestIdBefore, toolCallId }] = beforeCrash.pendingPermissions;
-      expect(requestIdBefore).toEqual(expect.any(String));
-      expect(toolCallId).toEqual(expect.any(String));
-
-      const stateRaw = readFileSync(
-        join(ctx.laceDir, 'agent-sessions', created.sessionId, 'state.json'),
-        'utf8'
-      );
-      expect((JSON.parse(stateRaw) as any).pendingPermissions).toBeUndefined();
-
-      // Transcript files now live under <laceDir>/transcripts/<persona>/<date>/.
-      // Read every line from the session's transcript and verify the events.
-      const transcriptsRoot = join(ctx.laceDir, 'transcripts');
-      let allTranscriptText = '';
-      if (existsSync(transcriptsRoot)) {
-        for (const persona of readdirSync(transcriptsRoot)) {
-          const personaDir = join(transcriptsRoot, persona);
-          for (const date of readdirSync(personaDir)) {
-            const candidate = join(personaDir, date, `${created.sessionId}.jsonl`);
-            if (existsSync(candidate)) {
-              allTranscriptText += readFileSync(candidate, 'utf8');
-            }
+    // Transcript files now live under <laceDir>/transcripts/<persona>/<date>/.
+    // Read every line from the session's transcript and verify the events.
+    const transcriptsRoot = join(ctx.laceDir, 'transcripts');
+    let allTranscriptText = '';
+    if (existsSync(transcriptsRoot)) {
+      for (const persona of readdirSync(transcriptsRoot)) {
+        const personaDir = join(transcriptsRoot, persona);
+        for (const date of readdirSync(personaDir)) {
+          const candidate = join(personaDir, date, `${created.sessionId}.jsonl`);
+          if (existsSync(candidate)) {
+            allTranscriptText += readFileSync(candidate, 'utf8');
           }
         }
       }
-      expect(allTranscriptText).toContain('"permission_requested"');
-      expect(allTranscriptText).not.toContain('"permission_decided"');
-
-      ctx.agent.proc.kill('SIGKILL');
-      await withTimeout(
-        new Promise<void>((resolve) => ctx.agent!.proc.once('exit', () => resolve())),
-        2_000,
-        'agent process exit'
-      );
-      ctx.agent.peer.close();
-      ctx.agent = undefined;
-
-      await expect(
-        withTimeout(promptPromise as Promise<unknown>, 2_000, 'prompt crashed')
-      ).rejects.toBeDefined();
-
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
-
-      const reissued: Array<Record<string, unknown>> = [];
-      let resolveReissue:
-        | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
-        | undefined;
-      ctx.agent.peer.onRequest('session/request_permission', async (params) => {
-        reissued.push(params as Record<string, unknown>);
-        return await new Promise((resolve) => {
-          resolveReissue = resolve as any;
-        });
-      });
-
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize (restart)'
-      );
-      await withTimeout(
-        ctx.agent.peer.request('session/load', {
-          sessionId: created.sessionId,
-          cwd: ctx.workDir,
-          mcpServers: [],
-        }),
-        2_000,
-        'session/load (restart)'
-      );
-
-      await withTimeout(
-        new Promise<void>((resolve) => {
-          const interval = setInterval(() => {
-            if (reissued.length > 0) {
-              clearInterval(interval);
-              resolve();
-            }
-          }, 10);
-        }),
-        5_000,
-        'permission request reissued'
-      );
-
-      expect(reissued[0]).toMatchObject({ toolCallId });
-
-      const afterRestart = (await withTimeout(
-        ctx.agent.peer.request('ent/agent/status'),
-        2_000,
-        'ent/agent/status (after restart)'
-      )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
-
-      expect(afterRestart.pendingPermissions).toHaveLength(1);
-      expect(afterRestart.pendingPermissions[0]?.toolCallId).toBe(toolCallId);
-      expect(afterRestart.pendingPermissions[0]?.requestId).toEqual(expect.any(String));
-
-      resolveReissue?.({ decision: 'deny' });
-
-      await withTimeout(
-        new Promise<void>((resolve, reject) => {
-          const interval = setInterval(() => {
-            void ctx
-              .agent!.peer.request('ent/agent/status')
-              .then((status) => {
-                const p = status as { pendingPermissions?: unknown[] };
-                if ((p.pendingPermissions ?? []).length === 0) {
-                  clearInterval(interval);
-                  resolve();
-                }
-              })
-              .catch((err) => {
-                clearInterval(interval);
-                reject(err);
-              });
-          }, 25);
-        }),
-        5_000,
-        'pending permissions cleared after decision'
-      );
-
-      const durable = (await withTimeout(
-        ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
-        2_000,
-        'ent/session/events (after restart)'
-      )) as { events: Array<{ type: string }> };
-
-      expect(durable.events.map((e) => e.type)).toEqual(
-        expect.arrayContaining(['permission_requested', 'permission_decided'])
-      );
     }
-  );
+    expect(allTranscriptText).toContain('"permission_requested"');
+    expect(allTranscriptText).not.toContain('"permission_decided"');
+
+    ctx.agent.proc.kill('SIGKILL');
+    await withTimeout(
+      new Promise<void>((resolve) => ctx.agent!.proc.once('exit', () => resolve())),
+      2_000,
+      'agent process exit'
+    );
+    ctx.agent.peer.close();
+    ctx.agent = undefined;
+
+    await expect(
+      withTimeout(promptPromise as Promise<unknown>, 2_000, 'prompt crashed')
+    ).rejects.toBeDefined();
+
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+
+    const reissued: Array<Record<string, unknown>> = [];
+    let resolveReissue:
+      | ((value: { decision: string; updatedInput?: Record<string, unknown> }) => void)
+      | undefined;
+    ctx.agent.peer.onRequest('session/request_permission', async (params) => {
+      reissued.push(params as Record<string, unknown>);
+      return await new Promise((resolve) => {
+        resolveReissue = resolve as any;
+      });
+    });
+
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize (restart)'
+    );
+    await withTimeout(
+      ctx.agent.peer.request('session/load', {
+        sessionId: created.sessionId,
+        cwd: ctx.workDir,
+        mcpServers: [],
+      }),
+      2_000,
+      'session/load (restart)'
+    );
+
+    await withTimeout(
+      new Promise<void>((resolve) => {
+        const interval = setInterval(() => {
+          if (reissued.length > 0) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 10);
+      }),
+      5_000,
+      'permission request reissued'
+    );
+
+    expect(reissued[0]).toMatchObject({ toolCallId });
+
+    const afterRestart = (await withTimeout(
+      ctx.agent.peer.request('ent/agent/status'),
+      2_000,
+      'ent/agent/status (after restart)'
+    )) as { pendingPermissions: Array<{ requestId: string; toolCallId: string }> };
+
+    expect(afterRestart.pendingPermissions).toHaveLength(1);
+    expect(afterRestart.pendingPermissions[0]?.toolCallId).toBe(toolCallId);
+    expect(afterRestart.pendingPermissions[0]?.requestId).toEqual(expect.any(String));
+
+    resolveReissue?.({ decision: 'deny' });
+
+    await withTimeout(
+      new Promise<void>((resolve, reject) => {
+        const interval = setInterval(() => {
+          void ctx
+            .agent!.peer.request('ent/agent/status')
+            .then((status) => {
+              const p = status as { pendingPermissions?: unknown[] };
+              if ((p.pendingPermissions ?? []).length === 0) {
+                clearInterval(interval);
+                resolve();
+              }
+            })
+            .catch((err) => {
+              clearInterval(interval);
+              reject(err);
+            });
+        }, 25);
+      }),
+      5_000,
+      'pending permissions cleared after decision'
+    );
+
+    const durable = (await withTimeout(
+      ctx.agent.peer.request('ent/session/events', { afterEventSeq: 0, limit: 100 }),
+      2_000,
+      'ent/session/events (after restart)'
+    )) as { events: Array<{ type: string }> };
+
+    expect(durable.events.map((e) => e.type)).toEqual(
+      expect.arrayContaining(['permission_requested', 'permission_decided'])
+    );
+  });
 
   it('supports ent/session/configure and reports config via ent/agent/status', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
@@ -698,7 +681,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(injectEvent!.data.priority).toBe('normal');
   });
 
-  it('can cancel a turn that is awaiting permission', { timeout: 15_000 }, async () => {
+  it('can cancel a turn that is awaiting permission', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: unknown[] = [];
@@ -779,7 +762,7 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(status.currentTurn).toBeUndefined();
   });
 
-  it('creates a checkpoint and can rewind files', { timeout: 15_000 }, async () => {
+  it('creates a checkpoint and can rewind files', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
@@ -833,44 +816,40 @@ describe('lace-agent process (E2E over stdio)', () => {
     expect(readFileSync(join(ctx.workDir, 'foo.txt'), 'utf8')).toBe(original);
   });
 
-  it(
-    'returns CheckpointNotFound for ent/session/rewind without a checkpoint',
-    { timeout: 15_000 },
-    async () => {
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+  it('returns CheckpointNotFound for ent/session/rewind without a checkpoint', async () => {
+    ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
-      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+    ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
 
-      await withTimeout(
-        ctx.agent.peer.request(
-          'initialize',
-          defaultInitializeParams({ config: { approvalMode: 'ask' } })
-        ),
-        AGENT_BOOT_TIMEOUT_MS,
-        'initialize'
-      );
-      await withTimeout(
-        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
-        2_000,
-        'session/new'
-      );
+    await withTimeout(
+      ctx.agent.peer.request(
+        'initialize',
+        defaultInitializeParams({ config: { approvalMode: 'ask' } })
+      ),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize'
+    );
+    await withTimeout(
+      ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+      2_000,
+      'session/new'
+    );
 
-      await withTimeout(
-        ctx.agent.peer.request('session/prompt', {
-          content: [{ type: 'text', text: 'write file foo.txt' }],
-        }),
-        10_000,
-        'session/prompt write foo.txt'
-      );
+    await withTimeout(
+      ctx.agent.peer.request('session/prompt', {
+        content: [{ type: 'text', text: 'write file foo.txt' }],
+      }),
+      10_000,
+      'session/prompt write foo.txt'
+    );
 
-      await expect(
-        ctx.agent.peer.request('ent/session/rewind', { toEventSeq: 1 })
-      ).rejects.toMatchObject({
-        code: EntErrorCodes.CheckpointNotFound,
-        message: 'CheckpointNotFound',
-      });
-    }
-  );
+    await expect(
+      ctx.agent.peer.request('ent/session/rewind', { toEventSeq: 1 })
+    ).rejects.toMatchObject({
+      code: EntErrorCodes.CheckpointNotFound,
+      message: 'CheckpointNotFound',
+    });
+  });
 });
 // Note: e2e tests for 'trim-tool-results' and 'summarize' compact strategies were deleted
 // in task 10 (Task 10: remove legacy strategies). Those strategies no longer exist —

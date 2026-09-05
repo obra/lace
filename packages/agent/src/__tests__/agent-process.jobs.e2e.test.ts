@@ -5,15 +5,17 @@ import {
   spawnAgentProcess,
   withTimeout,
   defaultInitializeParams,
+  E2E_TEST_TIMEOUT_MS,
+  SUBAGENT_JOB_TIMEOUT_MS,
 } from './helpers';
 
-describe('lace-agent jobs (E2E over stdio)', () => {
+describe('lace-agent jobs (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }, () => {
   const ctx = createE2EContext({ prefix: 'lace-agent-jobs' });
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
 
-  it('spawns a shell job, streams updates, and persists output', { timeout: 20_000 }, async () => {
+  it('spawns a shell job, streams updates, and persists output', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -130,7 +132,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
     expect(outputAfterRestart.output).toContain('hi');
   });
 
-  it('can cancel a job while it is awaiting permission', { timeout: 20_000 }, async () => {
+  it('can cancel a job while it is awaiting permission', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     let observedJobId: string | undefined;
@@ -205,7 +207,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
     expect(output.status).toBe('cancelled');
   });
 
-  it('job record includes subagentSessionId for subagent jobs', { timeout: 20_000 }, async () => {
+  it('job record includes subagentSessionId for subagent jobs', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
 
     const updates: Array<Record<string, unknown>> = [];
@@ -241,7 +243,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
       ctx.agent.peer.request('session/prompt', {
         content: [{ type: 'text', text: 'subagent: hi' }],
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'session/prompt'
     );
 
@@ -259,7 +261,7 @@ describe('lace-agent jobs (E2E over stdio)', () => {
           }
         }, 10);
       }),
-      10_000,
+      SUBAGENT_JOB_TIMEOUT_MS,
       'job_finished update'
     );
 
