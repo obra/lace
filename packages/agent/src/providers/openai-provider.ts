@@ -39,7 +39,11 @@ import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
-import { convertToOpenAIFormat } from './format-converters';
+import {
+  convertToOpenAIFormat,
+  toOpenAIResponsesMessageContent,
+  toOpenAIResponsesToolOutput,
+} from './format-converters';
 
 interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -385,12 +389,20 @@ export class OpenAIProvider extends AIProvider {
 
     for (const msg of messages) {
       if (msg.role === 'user' || msg.role === 'assistant') {
-        const textContent = getTextContent(msg.content);
-        // Add text message if it has content
-        if (textContent.trim()) {
+        // PRI-3079: a user turn's images have to travel as `input_image` items.
+        // `getTextContent` keeps text blocks only, which dropped a pasted image and
+        // dropped an image-only turn entirely (its extracted text is empty, so
+        // nothing was pushed at all). Assistant turns carry no images here, so they
+        // keep the text extraction.
+        const content =
+          msg.role === 'user'
+            ? toOpenAIResponsesMessageContent(msg.content)
+            : getTextContent(msg.content);
+        // Add message if it has content
+        if (typeof content === 'string' ? content.trim() : content.length > 0) {
           inputItems.push({
             role: msg.role,
-            content: textContent,
+            content,
           });
         }
 
@@ -413,7 +425,9 @@ export class OpenAIProvider extends AIProvider {
             inputItems.push({
               type: 'function_call_output',
               call_id: result.id,
-              output: result.content.map((c) => c.text || '').join('\n'),
+              // PRI-3079: the Responses API accepts an item list here, so a
+              // tool-result image reaches the model instead of flattening to ''.
+              output: toOpenAIResponsesToolOutput(result.content),
             });
           }
         }
