@@ -2,7 +2,7 @@
 // ABOUTME: → notifier composes a valid <notification kind="reminder"> via wrapper.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ReminderScheduler } from '../scheduler';
@@ -10,9 +10,21 @@ import { ManageRemindersTool } from '@lace/agent/tools/implementations/manage_re
 import { buildNotification, composeReminderBody } from '@lace/agent/notifications';
 import type { ToolContext } from '@lace/agent/tools/types';
 
+// Tempdirs handed out by tempSessionDir, tracked so the file-level afterEach
+// below removes them even when a test throws.
+const tempSessionDirs: string[] = [];
+
 function tempSessionDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-reminders-e2e-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lace-reminders-e2e-'));
+  tempSessionDirs.push(dir);
+  return dir;
 }
+
+afterEach(() => {
+  for (const dir of tempSessionDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 describe('Reminders end-to-end (tool → scheduler → notifier)', () => {
   const origTZ = process.env.TZ;

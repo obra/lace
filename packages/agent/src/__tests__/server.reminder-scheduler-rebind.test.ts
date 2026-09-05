@@ -2,15 +2,27 @@
 // ABOUTME: when the timezone is unset, per spec §1.4.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ensureReminderSchedulerForActiveSession } from '../server';
 import type { AgentServerState } from '../server-types';
 
+// Tempdirs handed out by tempSessionDir, tracked so the file-level afterEach
+// below removes them even when a test throws.
+const tempSessionDirs: string[] = [];
+
 function tempSessionDir(): string {
-  return mkdtempSync(join(tmpdir(), 'lace-tz-degrade-'));
+  const dir = mkdtempSync(join(tmpdir(), 'lace-tz-degrade-'));
+  tempSessionDirs.push(dir);
+  return dir;
 }
+
+afterEach(() => {
+  for (const dir of tempSessionDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function makeMinimalState(dir: string): AgentServerState {
   return {

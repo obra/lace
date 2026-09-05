@@ -1,10 +1,10 @@
 // ABOUTME: Tests for Project class functionality including CRUD operations
 // ABOUTME: Covers project creation, persistence, updates, and cleanup with proper test isolation
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Project } from './project';
 import { setupCoreTest } from '@lace/agent/test-utils/core-test-setup';
-import { existsSync, mkdirSync, mkdtempSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { getProcessTempDir } from '@lace/agent/config/lace-dir';
@@ -327,8 +327,20 @@ describe('Project', () => {
   });
 
   describe('MCP Server Management', () => {
+    // Tempdirs handed out by makeUniqueTempProjectDir, removed by afterEach even
+    // when a test throws.
+    const projectTempDirs: string[] = [];
+
+    afterEach(() => {
+      for (const dir of projectTempDirs.splice(0)) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
     function makeUniqueTempProjectDir(): string {
-      return mkdtempSync(join(tmpdir(), 'lace-project-test-'));
+      const dir = mkdtempSync(join(tmpdir(), 'lace-project-test-'));
+      projectTempDirs.push(dir);
+      return dir;
     }
     it('should start async discovery when adding MCP server', async () => {
       const { ToolCatalog } = await import('@lace/agent/tools/tool-catalog');

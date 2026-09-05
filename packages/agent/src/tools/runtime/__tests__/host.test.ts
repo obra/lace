@@ -1,16 +1,29 @@
-import { mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HostToolRuntime } from '../host';
 
+// Tempdirs handed out by makeTempDir, tracked so afterEach removes them even
+// when a test throws.
+const tempDirs: string[] = [];
+
+async function makeTempDir(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+  tempDirs.push(dir);
+  return dir;
+}
+
 describe('HostToolRuntime', () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllGlobals();
+    for (const dir of tempDirs.splice(0)) {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it('resolves relative paths against cwd and reads files', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     await writeFile(join(dir, 'file.txt'), 'hello', 'utf8');
 
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
@@ -22,7 +35,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('executes commands in cwd', async () => {
-    const dir = await realpath(await mkdtemp(join(tmpdir(), 'lace-host-runtime-')));
+    const dir = await realpath(await makeTempDir());
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
 
     const result = await runtime.process.exec([
@@ -36,7 +49,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('returns structured results for commands that exit non-zero', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
 
     const result = await runtime.process.exec([
@@ -51,7 +64,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('applies default environment to exec commands', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({
       id: 'rt_host',
       cwd: dir,
@@ -69,7 +82,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('does not expose default environment through JSON serialization', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({
       id: 'rt_host',
       cwd: dir,
@@ -80,7 +93,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('rejects start completion when spawn fails', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
 
     const handle = await runtime.process.start(['lace-host-runtime-missing-command']);
@@ -89,7 +102,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('rejects start completion when the process is aborted', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
     const abortController = new AbortController();
 
@@ -102,7 +115,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('writes text files through runtime fs', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
     const path = await runtime.paths.resolve('out.txt');
 
@@ -112,7 +125,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('passes redirect mode to global fetch', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
     const mockFetch = vi.fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>().mockResolvedValue(
       new Response('ok', {
@@ -133,7 +146,7 @@ describe('HostToolRuntime', () => {
   });
 
   it('enforces fetch maxBytes while streaming the response body', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'lace-host-runtime-'));
+    const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
     const arrayBuffer = vi.fn(() => {
       throw new Error('arrayBuffer should not be called');
