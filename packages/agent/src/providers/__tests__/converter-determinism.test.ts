@@ -24,8 +24,8 @@ describe('converter determinism: each converter is a pure function of its input'
       expect(JSON.stringify(convertToOpenAIFormat(fixture.messages))).toBe(
         JSON.stringify(convertToOpenAIFormat(fixture.messages))
       );
-      expect(JSON.stringify(convertToGeminiFormat(fixture.messages))).toBe(
-        JSON.stringify(convertToGeminiFormat(fixture.messages))
+      expect(JSON.stringify(convertToGeminiFormat(fixture.messages, 'gemini-3-pro-preview'))).toBe(
+        JSON.stringify(convertToGeminiFormat(fixture.messages, 'gemini-3-pro-preview'))
       );
       expect(JSON.stringify(convertToTextOnlyFormat(fixture.messages))).toBe(
         JSON.stringify(convertToTextOnlyFormat(fixture.messages))
@@ -55,8 +55,8 @@ describe('converter determinism: each converter is a pure function of its input'
         ],
       },
     ];
-    expect(JSON.stringify(convertToGeminiFormat(messages))).toBe(
-      JSON.stringify(convertToGeminiFormat(messages))
+    expect(JSON.stringify(convertToGeminiFormat(messages, 'gemini-3-pro-preview'))).toBe(
+      JSON.stringify(convertToGeminiFormat(messages, 'gemini-3-pro-preview'))
     );
   });
 });

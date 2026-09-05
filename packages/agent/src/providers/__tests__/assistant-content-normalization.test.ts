@@ -60,14 +60,14 @@ describe('assistant text content: string and single-text-block array convert ide
   });
 
   it('Gemini — plain assistant text', () => {
-    expect(JSON.stringify(convertToGeminiFormat(asString))).toBe(
-      JSON.stringify(convertToGeminiFormat(asBlocks))
+    expect(JSON.stringify(convertToGeminiFormat(asString, 'gemini-3-pro-preview'))).toBe(
+      JSON.stringify(convertToGeminiFormat(asBlocks, 'gemini-3-pro-preview'))
     );
   });
 
   it('Gemini — assistant text with tool call', () => {
-    expect(JSON.stringify(convertToGeminiFormat(asStringWithCall))).toBe(
-      JSON.stringify(convertToGeminiFormat(asBlocksWithCall))
+    expect(JSON.stringify(convertToGeminiFormat(asStringWithCall, 'gemini-3-pro-preview'))).toBe(
+      JSON.stringify(convertToGeminiFormat(asBlocksWithCall, 'gemini-3-pro-preview'))
     );
   });
 
