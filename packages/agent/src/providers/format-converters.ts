@@ -5,7 +5,7 @@ import { ProviderMessage, ContentBlock, type ThinkingBlock } from './base-provid
 import type { ContentBlock as ToolResultContentBlock } from '../tools/types';
 import { ToolCall } from '@lace/agent/tools/types';
 import Anthropic from '@anthropic-ai/sdk';
-import type { Content, Part } from '@google/genai';
+import type { Content, FunctionResponsePart, Part } from '@google/genai';
 import type {
   ResponseFunctionCallOutputItem,
   ResponseInputContent,
@@ -88,10 +88,10 @@ function hasText(block: { type: string; text?: string }): boolean {
 }
 
 /**
- * PRI-3079. Some tool-result wire formats are text-only: OpenAI's
- * `ChatCompletionToolMessageParam.content` is `string | ContentPartText[]`, and
- * `@google/genai@1.x` `FunctionResponse` carries only a JSON `response` object.
- * An image cannot travel through those at all.
+ * PRI-3079. Some tool-result wire formats cannot carry an image at all: OpenAI's
+ * `ChatCompletionToolMessageParam.content` is `string | ContentPartText[]`, and a
+ * Gemini `functionResponse` reduces to its JSON `response` object on every model
+ * before the Gemini 3 series (see `toGeminiToolResultResponse`).
  */
 const TOOL_RESULT_IMAGE_UNSUPPORTED = 'this provider cannot carry an image in a tool result';
 
@@ -567,9 +567,64 @@ export function convertToTextOnlyFormat(messages: ProviderMessage[]): ProviderMe
 }
 
 /**
- * Converts enhanced ProviderMessage format to Gemini Content/Part format
+ * PRI-3079. Google documents multimodal function responses as available for
+ * "Gemini 3 series models" only, and this catalog's default models are
+ * gemini-2.5-pro/flash, so the older path is the common one and must not be
+ * handed a shape the model would reject.
+ *
+ * Matched on the id because the model catalog has no capability flag for it:
+ * `supports_attachments` is true for every Gemini entry and describes USER
+ * attachments, which 2.5 does carry. The `[.-]` tail keeps a future
+ * `gemini-3.5-*` in and keeps a hypothetical `gemini-30-*` out.
  */
-export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
+function supportsMultimodalFunctionResponse(model: string): boolean {
+  return /(?:^|\/)gemini-3(?:[.-]|$)/.test(model);
+}
+
+/**
+ * PRI-3079. The `response`/`parts` pair for one Gemini functionResponse.
+ *
+ * `@google/genai@2.x` declares `FunctionResponse.parts?: FunctionResponsePart[]`
+ * with `FunctionResponsePart.inlineData?: FunctionResponseBlob {data, mimeType}` —
+ * image bytes nested INSIDE the functionResponse. Note that a sibling `inlineData`
+ * part typechecks just as well (that is how a *user* image travels, above) and is
+ * the wrong shape. `FunctionResponsePart` has no `text` member, so the text half
+ * of a mixed result stays in `response.output`.
+ *
+ * A rendered image still gets a line in `output`: it keeps the tool's own ordering
+ * of text and images legible, and it means an image-only result never produces the
+ * empty string PRI-3078 exists to remove.
+ */
+function toGeminiToolResultResponse(
+  content: ToolResultContentBlock[],
+  model: string
+): { output: string; parts?: FunctionResponsePart[] } {
+  if (!supportsMultimodalFunctionResponse(model)) {
+    return { output: content.map(toolResultBlockAsText).join('\n') };
+  }
+  const parts: FunctionResponsePart[] = [];
+  const lines = content.map((block) => {
+    if (block.type !== 'image') return nonImageToolResultBlockAsText(block);
+    // On Gemini 3 the wire format is no longer the obstacle, so the honest reason
+    // for an omission is the block's own: undecodable bytes, or no bytes at all.
+    const reason = unrenderableImageReason(block);
+    if (reason) return describeOmittedToolResultImage(block, reason);
+    parts.push({
+      inlineData: { data: block.data as string, mimeType: block.mimeType as string },
+    });
+    return `[image: ${block.mimeType as string}]`;
+  });
+  return { output: lines.join('\n'), ...(parts.length > 0 ? { parts } : {}) };
+}
+
+/**
+ * Converts enhanced ProviderMessage format to Gemini Content/Part format.
+ *
+ * `model` decides whether a tool-result image can travel as bytes; see
+ * `toGeminiToolResultResponse`. It is required rather than optional so a new call
+ * site cannot silently drop images by forgetting it.
+ */
+export function convertToGeminiFormat(messages: ProviderMessage[], model: string): Content[] {
   return messages
     .filter((msg) => msg.role !== 'system') // System handled separately in Gemini
     .map((msg): Content => {
@@ -629,18 +684,17 @@ export function convertToGeminiFormat(messages: ProviderMessage[]): Content[] {
             }
           }
 
+          const { output, parts: responseParts } = toGeminiToolResultResponse(
+            result.content,
+            model
+          );
           parts.push({
             functionResponse: {
               name: toolName, // Function name for Gemini API
               id: correlationId, // Tool call ID for correlation
+              ...(responseParts ? { parts: responseParts } : {}),
               response: {
-                // PRI-3079: `@google/genai@1.x` FunctionResponse is
-                // `{id?, name?, response?: Record<string, unknown>, ...}` — no `parts`
-                // field, so inline image bytes cannot be expressed in a function
-                // response with the SDK in use. (Gemini 3 plus a 2.x SDK adds
-                // `functionResponse.parts[].inlineData`; adopting it is an SDK major
-                // bump, not this change.) Report the image instead of dropping it to ''.
-                output: result.content.map(toolResultBlockAsText).join('\n'),
+                output,
                 ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
               },
             },
