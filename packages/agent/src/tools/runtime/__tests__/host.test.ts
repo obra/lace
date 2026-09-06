@@ -176,4 +176,30 @@ describe('HostToolRuntime', () => {
     });
     expect(arrayBuffer).not.toHaveBeenCalled();
   });
+
+  it('reports the post-redirect URL fetch actually landed on', async () => {
+    const dir = await makeTempDir();
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+    // `Response.url` isn't settable through the constructor, so build a
+    // real Response and patch it the way a followed 301/302 would leave
+    // it: the resolved response reports the URL it actually came from,
+    // not the one that was requested.
+    const resolvedResponse = new Response('ok', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' },
+    });
+    Object.defineProperty(resolvedResponse, 'url', {
+      value: 'https://example.test/final-destination',
+    });
+    const mockFetch = vi
+      .fn<Parameters<typeof fetch>, ReturnType<typeof fetch>>()
+      .mockResolvedValue(resolvedResponse);
+    vi.stubGlobal('fetch', mockFetch);
+
+    const result = await runtime.network.fetch('https://example.test/redirect', {
+      redirect: 'follow',
+    });
+
+    expect(result.url).toBe('https://example.test/final-destination');
+  });
 });

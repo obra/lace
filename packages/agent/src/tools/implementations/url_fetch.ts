@@ -265,8 +265,12 @@ Follows redirects by default. Returns detailed error context for failures.`;
 
       const responseHeaders = this.normalizeResponseHeaders(response.headers);
       const statusText = STATUS_CODES[response.status] ?? '';
-      const finalUrl = url;
-      const redirectChain: string[] = [];
+      // `response.url` is the runtime's best knowledge of where the response
+      // actually came from after following any redirects; not every runtime
+      // can observe this (see RuntimeFetchResult.url), so fall back to the
+      // requested URL rather than claiming a redirect that may not have
+      // happened.
+      const finalUrl = response.url ?? url;
 
       if (response.status < 200 || response.status >= 300) {
         // Try to get response body for error context
@@ -289,7 +293,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
             method,
             headers,
             finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
             timing,
           },
           response: {
@@ -317,7 +320,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
             method,
             headers,
             finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
             timing,
           },
           response: {
@@ -344,7 +346,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
             method,
             headers,
             finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
             timing,
           },
           response: {

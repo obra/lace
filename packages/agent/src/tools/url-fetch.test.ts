@@ -461,5 +461,45 @@ Follows redirects by default. Returns detailed error context for failures.`
       expect(errorText).toContain('ValidationError');
       // The URL validation happens at schema level, so we get schema validation errors
     });
+
+    it('reports the post-redirect URL in error context, not the requested one', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 404,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('not found'),
+          url: 'https://example.com/moved-here',
+        },
+      });
+
+      const result = await tool.execute(
+        { url: 'https://example.com/original' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('failed');
+      const errorText = result.content[0].text ?? '';
+      expect(errorText).toContain('Final URL: https://example.com/moved-here');
+    });
+
+    it('omits Final URL when the runtime cannot report one (e.g. curl-based container fetch)', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 500,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('boom'),
+          // No `url` — mirrors ContainerExecNetworkClient, which cannot observe it.
+        },
+      });
+
+      const result = await tool.execute(
+        { url: 'https://example.com/original' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      expect(result.status).toBe('failed');
+      const errorText = result.content[0].text ?? '';
+      expect(errorText).not.toContain('Final URL:');
+    });
   });
 });

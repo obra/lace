@@ -203,6 +203,9 @@ class HostNetworkClient implements RuntimeNetworkClient {
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
       body: await readBoundedResponseBody(response, opts.maxBytes),
+      // `Response.url` is the URL the response actually came from once fetch
+      // has followed any redirects — not the request URL passed in above.
+      url: response.url,
     };
   }
 }
