@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { UrlFetchTool } from '@lace/agent/tools/implementations/url_fetch';
 import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
+import type { ToolRuntime } from './runtime/types';
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;
@@ -839,6 +840,63 @@ Follows redirects by default. Returns detailed error context for failures.`
       expect(output).not.toContain('redirected from');
       expect(output).not.toContain('SECRETCODE01234');
       expect(output).toContain('Content from https://example.com/cb?code=[REDACTED]&page=3');
+    });
+  });
+
+  describe('Credential redaction in runtime error messages', () => {
+    const throwingRuntime = (message: string): ToolRuntime => ({
+      ...createFakeRuntime(),
+      network: { fetch: vi.fn().mockRejectedValue(new Error(message)) },
+    });
+
+    const runToolAgainst = async (url: string, message: string) => {
+      const result = await tool.execute(
+        { url },
+        { signal: new AbortController().signal, runtime: throwingRuntime(message) }
+      );
+      return result.content[0].text ?? '';
+    };
+
+    it('redacts a credentialed URL embedded in the runtime error message', async () => {
+      const secret = 'SECRETVALUE0123456789abcdef0123456789';
+      const output = await runToolAgainst(
+        'https://example.com/x',
+        `curl: (3) unmatched brace in URL position 20:\nhttps://example.com/{a?token=${secret}\n`
+      );
+
+      expect(output).not.toContain(secret);
+      expect(output).toContain('token=[REDACTED]');
+      expect(output).toContain('unmatched brace in URL position 20');
+    });
+
+    it('redacts userinfo credentials embedded in the runtime error message', async () => {
+      const output = await runToolAgainst(
+        'https://example.com/private',
+        'connect ECONNREFUSED for https://alice:hunter2@example.com/private'
+      );
+
+      expect(output).not.toContain('hunter2');
+      expect(output).toContain('https://[REDACTED]@example.com/private');
+    });
+
+    it('redacts a URL the error message wrapped in parentheses', async () => {
+      // The trailing `).` is punctuation, not URL: left inside the value it
+      // fails the credential-shape charset test and the token survives.
+      const secret = 'f3a91c7de204b8615c9d0af27be431905ca8d76e12b34f9087ac5de6103b2f4d';
+      const output = await runToolAgainst(
+        'https://example.com/x',
+        `request failed (https://example.com/x?blob=${secret}).`
+      );
+
+      expect(output).not.toContain(secret);
+      expect(output).toContain('blob=[REDACTED]');
+    });
+
+    it('leaves an error message with no URL in it alone', async () => {
+      const output = await runToolAgainst('https://example.com/x', 'socket hang up');
+
+      expect(output).toContain('NETWORK ERROR: socket hang up');
+      expect(output).not.toContain('[REDACTED]');
     });
   });
 });

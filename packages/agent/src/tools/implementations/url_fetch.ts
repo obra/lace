@@ -12,6 +12,7 @@ import { Tool } from '../tool';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
 import { logger } from '@lace/agent/utils/logger';
 import { RuntimeFetchSizeLimitError } from '../runtime/types';
+import { redactSensitiveUrl, redactUrlsInText } from '../url-redaction';
 
 // Constants for configuration and validation
 const INLINE_CONTENT_LIMIT = 32 * 1024; // 32KB
@@ -492,8 +493,8 @@ Follows redirects by default. Returns detailed error context for failures.`;
     // distinct values to the same `[REDACTED]` and would otherwise hide a real
     // redirect (or, with the userinfo rewrite, invent one).
     return isSameUrl(requestedUrl, finalUrl)
-      ? this.redactSensitiveUrl(requestedUrl)
-      : `${this.redactSensitiveUrl(finalUrl)} (redirected from ${this.redactSensitiveUrl(requestedUrl)})`;
+      ? redactSensitiveUrl(requestedUrl)
+      : `${redactSensitiveUrl(finalUrl)} (redirected from ${redactSensitiveUrl(requestedUrl)})`;
   }
 
   private handleInlineContent(
@@ -572,134 +573,20 @@ Follows redirects by default. Returns detailed error context for failures.`;
     );
   }
 
-  /**
-   * Strip credentials out of a URL before it is shown to the model. URLs carry
-   * secrets as routinely as headers do — OAuth codes and tokens, pre-signed S3
-   * and SAS signatures, API keys pasted into a query string — and the redirect
-   * destination the tool now reports is exactly where those turn up.
-   *
-   * Purely textual: scheme, host, path and every parameter name survive so the
-   * request is still diagnosable, and only values are replaced. Nothing here
-   * feeds `isSameUrl`, so redaction cannot invent a redirect.
-   */
-  private redactSensitiveUrl(url: string): string {
-    const hashIndex = url.indexOf('#');
-    const beforeFragment = hashIndex === -1 ? url : url.slice(0, hashIndex);
-    const fragment = hashIndex === -1 ? undefined : url.slice(hashIndex + 1);
-
-    const queryIndex = beforeFragment.indexOf('?');
-    const origin = queryIndex === -1 ? beforeFragment : beforeFragment.slice(0, queryIndex);
-    const query = queryIndex === -1 ? undefined : beforeFragment.slice(queryIndex + 1);
-
-    // `https://user:pass@host/` hands over a password in the clear; the
-    // username is half a credential too, so the whole userinfo goes.
-    let redacted = origin.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^/?#]*@/, '$1[REDACTED]@');
-
-    if (query !== undefined) {
-      redacted += `?${this.redactSensitiveParams(query)}`;
-    }
-
-    if (fragment !== undefined) {
-      // Implicit-flow tokens ride in the fragment as a query string; a plain
-      // anchor (`#install`) is worth keeping intact.
-      redacted += `#${
-        fragment.includes('=')
-          ? this.redactSensitiveParams(fragment)
-          : this.isCredentialShapedValue(fragment)
-            ? '[REDACTED]'
-            : fragment
-      }`;
-    }
-
-    return redacted;
-  }
-
-  private redactSensitiveParams(query: string): string {
-    return query
-      .split('&')
-      .map((pair) => {
-        const separator = pair.indexOf('=');
-        if (separator === -1) {
-          return this.isCredentialShapedValue(pair) ? '[REDACTED]' : pair;
-        }
-
-        const name = pair.slice(0, separator);
-        const value = pair.slice(separator + 1);
-        if (value.length === 0) return pair;
-
-        return this.isSensitiveParamName(name) || this.isCredentialShapedValue(value)
-          ? `${name}=[REDACTED]`
-          : pair;
-      })
-      .join('&');
-  }
-
-  private isSensitiveParamName(name: string): boolean {
-    const sensitiveParams = [
-      'code',
-      'token',
-      'secret',
-      'password',
-      'passwd',
-      'pwd',
-      'key',
-      'apikey',
-      'auth',
-      'authorization',
-      'credential',
-      'credentials',
-      'accesskeyid',
-      'session',
-      'sessionid',
-      'sig',
-      'signature',
-      'jwt',
-      'bearer',
-      'hmac',
-      'sas',
-    ];
-
-    // Match whole words, not substrings: `api_key` and `X-Amz-Signature` are
-    // credentials, `keywords` and `sort_order` are not.
-    const words = this.decodeUrlComponent(name)
-      .toLowerCase()
-      .split(/[^a-z0-9]+/);
-    return words.some((word) => sensitiveParams.includes(word));
-  }
-
-  /**
-   * A long opaque string is a credential whatever its parameter is called —
-   * this is what catches token parameters the denylist has never heard of.
-   * Values this long that happen not to be secrets lose nothing but noise.
-   */
-  private isCredentialShapedValue(value: string): boolean {
-    const decoded = this.decodeUrlComponent(value);
-    return (
-      decoded.length >= 32 &&
-      /^[A-Za-z0-9._~+/=-]+$/.test(decoded) &&
-      /[A-Za-z]/.test(decoded) &&
-      /[0-9]/.test(decoded)
-    );
-  }
-
-  private decodeUrlComponent(value: string): string {
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
-  }
-
   private redactSensitiveUrls(context: RichErrorContext): RichErrorContext {
     return {
       ...context,
+      // The message is free text from whatever failed the request; the
+      // container runtime's curl quotes the URL it was handed straight back
+      // into it, so it needs the same scrubbing as the URLs we print ourselves.
+      error: { ...context.error, message: redactUrlsInText(context.error.message) },
       request: {
         ...context.request,
-        url: this.redactSensitiveUrl(context.request.url),
+        url: redactSensitiveUrl(context.request.url),
         finalUrl:
           context.request.finalUrl === undefined
             ? undefined
-            : this.redactSensitiveUrl(context.request.finalUrl),
+            : redactSensitiveUrl(context.request.finalUrl),
       },
     };
   }
@@ -756,7 +643,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
     };
 
     // Format for human-readable display
-    let errorMessage = `${context.error.type.toUpperCase()} ERROR: ${context.error.message}\n\n`;
+    let errorMessage = `${context.error.type.toUpperCase()} ERROR: ${sanitizedContext.error.message}\n\n`;
 
     // Request details
     errorMessage += `REQUEST:\n`;
