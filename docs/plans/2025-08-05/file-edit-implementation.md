@@ -79,7 +79,7 @@ src/
 1. Run existing tests to ensure environment works:
 
    ```bash
-   npm run test:run -- src/tools/implementations/file-edit.test.ts
+   npx vitest run src/tools/implementations/file-edit.test.ts
    ```
 
 2. Read these files to understand the system:
@@ -154,7 +154,7 @@ describe('FileEditTool V2', () => {
 **Testing**:
 
 ```bash
-npm run test:run -- src/tools/implementations/file-edit-v2.test.ts
+npx vitest run src/tools/implementations/file-edit-v2.test.ts
 ```
 
 Should see skipped test.
@@ -233,7 +233,7 @@ import { FileEditTool } from './file-edit-v2';
 **Testing**:
 
 ```bash
-npm run test:run -- src/tools/implementations/file-edit-v2.test.ts
+npx vitest run src/tools/implementations/file-edit-v2.test.ts
 ```
 
 Test should compile but still be skipped.
@@ -255,7 +255,7 @@ git commit -m "feat: add basic structure for file-edit-v2 tool"
 **Step 1**: Remove `.skip` from first test and run it:
 
 ```bash
-npm run test:run -- src/tools/implementations/file-edit-v2.test.ts
+npx vitest run src/tools/implementations/file-edit-v2.test.ts
 ```
 
 Test should fail with "Not implemented yet"
@@ -309,7 +309,7 @@ protected async executeValidated(
 **Step 3**: Run test - should pass:
 
 ```bash
-npm run test:run -- src/tools/implementations/file-edit-v2.test.ts
+npx vitest run src/tools/implementations/file-edit-v2.test.ts
 ```
 
 **Commit**:
@@ -915,7 +915,7 @@ git commit -m "test: add integration tests for real-world scenarios"
 3. **Run existing tests**:
 
    ```bash
-   npm run test:run -- src/tools/implementations/file-edit.test.ts
+   npx vitest run src/tools/implementations/file-edit.test.ts
    ```
 
 4. **Fix any compatibility issues** - the old tests should mostly pass
@@ -1012,7 +1012,7 @@ The tool provides detailed errors with:
 Run tests:
 
 ```bash
-npm run test:run -- src/tools/implementations/file-edit.test.ts
+npx vitest run src/tools/implementations/file-edit.test.ts
 ```
 
 ````
@@ -1066,7 +1066,7 @@ git commit -m "chore: cleanup temporary files"
 
 After each task, verify:
 
-- [ ] Tests pass: `npm run test:run -- <test-file>`
+- [ ] Tests pass: `npx vitest run <test-file>`
 - [ ] No TypeScript errors: `npm run typecheck`
 - [ ] Linter passes: `npm run lint`
 - [ ] Commit is made with descriptive message

@@ -326,8 +326,8 @@ msg.toolCalls.forEach((toolCall: ToolCall) => {
 5. Run tests after each file change to catch issues early:
 
 ```bash
-npm run test:run packages/core/src/providers/anthropic-provider.test.ts
-npm run test:run packages/core/src/providers/openai-provider.test.ts
+npx vitest run packages/core/src/providers/anthropic-provider.test.ts
+npx vitest run packages/core/src/providers/openai-provider.test.ts
 ```
 
 6. Commit your changes:
@@ -402,7 +402,7 @@ describe('parseProviderModel', () => {
 Run the test to verify it fails:
 
 ```bash
-npm run test:run packages/core/src/utils/provider-utils.test.ts
+npx vitest run packages/core/src/utils/provider-utils.test.ts
 ```
 
 Now implement `packages/core/src/utils/provider-utils.ts`:
@@ -451,7 +451,7 @@ export function parseProviderModel(providerModel: string): {
 Run tests to verify they pass:
 
 ```bash
-npm run test:run packages/core/src/utils/provider-utils.test.ts
+npx vitest run packages/core/src/utils/provider-utils.test.ts
 ```
 
 Update existing code to use the utility:
@@ -603,7 +603,7 @@ describe('GlobalConfigManager', () => {
 Run test to verify it fails:
 
 ```bash
-npm run test:run packages/core/src/config/global-config.test.ts
+npx vitest run packages/core/src/config/global-config.test.ts
 ```
 
 Now implement `packages/core/src/config/global-config.ts`:
@@ -695,7 +695,7 @@ export class GlobalConfigManager {
 Run tests to verify they pass:
 
 ```bash
-npm run test:run packages/core/src/config/global-config.test.ts
+npx vitest run packages/core/src/config/global-config.test.ts
 ```
 
 Commit:
@@ -991,7 +991,7 @@ describe('BaseHelper', () => {
 Run test to verify it fails:
 
 ```bash
-npm run test:run packages/core/src/helpers/base-helper.test.ts
+npx vitest run packages/core/src/helpers/base-helper.test.ts
 ```
 
 Now implement `packages/core/src/helpers/base-helper.ts`:
@@ -1163,7 +1163,7 @@ export abstract class BaseHelper {
 Run tests to verify they pass:
 
 ```bash
-npm run test:run packages/core/src/helpers/base-helper.test.ts
+npx vitest run packages/core/src/helpers/base-helper.test.ts
 ```
 
 Commit:
@@ -1475,7 +1475,7 @@ describe('InfrastructureHelper', () => {
 Run test to verify it fails:
 
 ```bash
-npm run test:run packages/core/src/helpers/infrastructure-helper.test.ts
+npx vitest run packages/core/src/helpers/infrastructure-helper.test.ts
 ```
 
 Now implement `packages/core/src/helpers/infrastructure-helper.ts`:
@@ -1670,7 +1670,7 @@ export class InfrastructureHelper extends BaseHelper {
 Run tests to verify they pass:
 
 ```bash
-npm run test:run packages/core/src/helpers/infrastructure-helper.test.ts
+npx vitest run packages/core/src/helpers/infrastructure-helper.test.ts
 ```
 
 Commit:
@@ -1950,7 +1950,7 @@ describe('SessionHelper', () => {
 Run test to verify it fails:
 
 ```bash
-npm run test:run packages/core/src/helpers/session-helper.test.ts
+npx vitest run packages/core/src/helpers/session-helper.test.ts
 ```
 
 Now implement `packages/core/src/helpers/session-helper.ts`:
@@ -2179,7 +2179,7 @@ export class SessionHelper extends BaseHelper {
 Run tests to verify they pass:
 
 ```bash
-npm run test:run packages/core/src/helpers/session-helper.test.ts
+npx vitest run packages/core/src/helpers/session-helper.test.ts
 ```
 
 Commit:
@@ -2304,7 +2304,7 @@ describe('Helper Integration Tests', () => {
 Run tests:
 
 ```bash
-npm run test:run packages/core/src/helpers/integration.test.ts
+npx vitest run packages/core/src/helpers/integration.test.ts
 ```
 
 Commit:
