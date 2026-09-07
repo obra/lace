@@ -122,4 +122,52 @@ describe('ContainerExecNetworkClient', () => {
     const client = new ContainerExecNetworkClient(runner);
     await expect(client.fetch('https://unreachable.example')).rejects.toThrow(/Failed to connect/);
   });
+
+  it('passes -w with a %{stderr}-prefixed format so curl reports url_effective on stderr, not stdout', async () => {
+    const raw = Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8');
+    const { runner, calls } = fakeRunner({ stdoutRaw: raw });
+    const client = new ContainerExecNetworkClient(runner);
+    await client.fetch('https://example.com');
+    const argv = calls[0]!;
+    const wIndex = argv.indexOf('-w');
+    expect(wIndex).toBeGreaterThanOrEqual(0);
+    const format = argv[wIndex + 1]!;
+    expect(format.startsWith('%{stderr}')).toBe(true);
+    expect(format).toContain('%{url_effective}');
+  });
+
+  it("reports the redirect-following runtime's effective URL as result.url (the curl-client half of the #394 fix)", async () => {
+    const raw = Buffer.from(
+      'HTTP/2 301\r\nlocation: https://example.com/final\r\n\r\n' +
+        'HTTP/2 200\r\ncontent-type: text/plain\r\n\r\nfinal body',
+      'utf8'
+    );
+    const stderr = '__lace_curl_effective_url__:https://example.com/final\n';
+    const { runner } = fakeRunner({ stdoutRaw: raw, stderr });
+    const client = new ContainerExecNetworkClient(runner);
+    const result = await client.fetch('https://example.com', { redirect: 'follow' });
+    expect(result.url).toBe('https://example.com/final');
+  });
+
+  it('leaves result.url undefined when curl never reports an effective URL (no fabrication)', async () => {
+    const raw = Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8');
+    const { runner } = fakeRunner({ stdoutRaw: raw, stderr: '' });
+    const client = new ContainerExecNetworkClient(runner);
+    const result = await client.fetch('https://example.com');
+    expect(result.url).toBeUndefined();
+  });
+
+  it('strips the effective-URL marker out of the error message on curl failure', async () => {
+    const stderr =
+      'curl: (6) Could not resolve host: unreachable.example\n' +
+      '__lace_curl_effective_url__:http://unreachable.example/\n';
+    const { runner } = fakeRunner({ exitCode: 6, stderr, stdoutRaw: Buffer.alloc(0) });
+    const client = new ContainerExecNetworkClient(runner);
+    await expect(client.fetch('http://unreachable.example')).rejects.toThrow(
+      /Could not resolve host/
+    );
+    await expect(client.fetch('http://unreachable.example')).rejects.not.toThrow(
+      /__lace_curl_effective_url__/
+    );
+  });
 });

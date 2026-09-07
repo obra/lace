@@ -12,6 +12,26 @@ import { nodeErrorFromExec, streamToString, writeStreamAndClose } from './contai
 
 const DEFAULT_FETCH_TIMEOUT_SECS = 120;
 
+// curl's `--write-out` runs after the transfer and can report the effective
+// (post-redirect) URL via `%{url_effective}` — the same information
+// `Response.url` gives the host runtime's native `fetch`. `%{stderr}` at the
+// front of the format redirects that single write-out to stderr so it never
+// touches the base64-framed stdout pipe the response is parsed from. The
+// marker line lets us pull the URL back out of stderr (which may also carry
+// curl's own `-S` error text) without guessing at curl's error formatting.
+const EFFECTIVE_URL_MARKER = '__lace_curl_effective_url__';
+const EFFECTIVE_URL_WRITE_OUT = `%{stderr}\n${EFFECTIVE_URL_MARKER}:%{url_effective}\n`;
+const EFFECTIVE_URL_LINE_RE = new RegExp(`\n?${EFFECTIVE_URL_MARKER}:(\\S*)\n?`);
+
+/** Pull the marked effective-URL line back out of curl's stderr, returning the
+ * URL (if the marker was found) and the stderr text with the marker line
+ * removed, so it never leaks into an error message. */
+function extractEffectiveUrl(stderr: string): { url: string | undefined; stderr: string } {
+  const match = EFFECTIVE_URL_LINE_RE.exec(stderr);
+  if (!match) return { url: undefined, stderr };
+  return { url: match[1] || undefined, stderr: stderr.replace(EFFECTIVE_URL_LINE_RE, '') };
+}
+
 export class ContainerExecNetworkClient implements RuntimeNetworkClient {
   constructor(private readonly process: RuntimeProcessRunner) {}
 
@@ -43,6 +63,8 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       ...(redirect === 'follow' ? ['-L'] : []),
       ...headerArgs,
       ...(hasBody ? ['--data-binary', '@-'] : []),
+      '-w',
+      EFFECTIVE_URL_WRITE_OUT,
       url,
     ];
 
@@ -64,8 +86,10 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       handle.completion,
     ]);
 
+    const { url: effectiveUrl, stderr: cleanStderr } = extractEffectiveUrl(stderr);
+
     if (completion.exitCode !== 0) {
-      throw nodeErrorFromExec(completion.exitCode ?? -1, stderr, 'fetch', url);
+      throw nodeErrorFromExec(completion.exitCode ?? -1, cleanStderr, 'fetch', url);
     }
 
     const raw = Buffer.from(stdout, 'base64');
@@ -76,7 +100,7 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       throw new RuntimeFetchSizeLimitError(opts.maxBytes, body.byteLength);
     }
 
-    return { status, headers, body: new Uint8Array(body) };
+    return { status, headers, body: new Uint8Array(body), url: effectiveUrl };
   }
 }
 
