@@ -191,6 +191,14 @@ export interface RuntimeFetchResult {
   status: number;
   headers: Record<string, string>;
   body: Uint8Array;
+  /**
+   * The URL the response actually came from, after any redirects the runtime
+   * followed. Only set by runtimes that can observe it — the host runtime's
+   * native `fetch` reports it via `Response.url`. Omitted (not fabricated)
+   * where a runtime has no way to determine it, e.g. the curl-based
+   * container-exec client.
+   */
+  url?: string;
 }
 
 export interface RuntimeNetworkClient {

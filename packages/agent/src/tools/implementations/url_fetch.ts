@@ -24,6 +24,27 @@ const DEFAULT_TIMEOUT = 30000; // 30 seconds
 const VALID_HTTP_METHODS = ['GET', 'POST'] as const;
 const MAX_TEMP_FILES = 1000; // Limit temp files array to prevent memory leaks
 
+/**
+ * Normalize a URL the way the platform does before it hands one back.
+ * `Response.url` (and curl's `%{url_effective}`) are WHATWG-normalized: a
+ * host-only URL gains its `/` path, spaces are percent-encoded, and the
+ * fragment is dropped. Comparing raw strings against those would report a
+ * redirect for URLs that were never redirected.
+ */
+function normalizeUrlForComparison(value: string): string {
+  try {
+    const parsed = new URL(value);
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return value;
+  }
+}
+
+function isSameUrl(a: string, b: string): boolean {
+  return normalizeUrlForComparison(a) === normalizeUrlForComparison(b);
+}
+
 // URL validation schema that checks protocol and format
 const HttpUrl = z
   .string()
@@ -87,7 +108,6 @@ interface RichErrorContext {
     method: string;
     headers: Record<string, string>;
     finalUrl?: string;
-    redirectChain?: string[];
     timing?: RequestTiming;
   };
   response?: {
@@ -265,8 +285,15 @@ Follows redirects by default. Returns detailed error context for failures.`;
 
       const responseHeaders = this.normalizeResponseHeaders(response.headers);
       const statusText = STATUS_CODES[response.status] ?? '';
-      const finalUrl = url;
-      const redirectChain: string[] = [];
+      // `response.url` is the runtime's best knowledge of where the response
+      // actually came from after following any redirects; not every runtime
+      // can observe this (see RuntimeFetchResult.url), so fall back to the
+      // requested URL rather than claiming a redirect that may not have
+      // happened.
+      // A Response that didn't come from a network fetch reports `url` as the
+      // empty string rather than undefined, so `||` — not `??` — is what
+      // actually falls back to the requested URL.
+      const finalUrl = response.url || url;
 
       if (response.status < 200 || response.status >= 300) {
         // Try to get response body for error context
@@ -289,7 +316,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
             method,
             headers,
             finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
             timing,
           },
           response: {
@@ -317,7 +343,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
             method,
             headers,
             finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
             timing,
           },
           response: {
@@ -344,7 +369,6 @@ Follows redirects by default. Returns detailed error context for failures.`;
             method,
             headers,
             finalUrl,
-            redirectChain: redirectChain.length > 0 ? redirectChain : undefined,
             timing,
           },
           response: {
@@ -356,16 +380,20 @@ Follows redirects by default. Returns detailed error context for failures.`;
         });
       }
 
+      // The content came from `finalUrl`, which is not the requested URL when a
+      // redirect was followed — a 301 to a login page still returns 200.
+      const source = this.describeSource(url, finalUrl);
+
       // Handle small responses inline
       if (actualSize <= INLINE_CONTENT_LIMIT) {
-        return this.handleInlineContent(buffer, contentType, url, returnContent);
+        return this.handleInlineContent(buffer, contentType, source, returnContent);
       }
 
       // Handle large responses with temp files
       return await this.handleLargeContent(
         buffer,
         contentType,
-        url,
+        source,
         actualSize,
         returnContent,
         context.toolTempDir
@@ -455,23 +483,33 @@ Follows redirects by default. Returns detailed error context for failures.`;
     );
   }
 
+  /**
+   * How the content should be attributed: the URL it actually came from, plus
+   * where the request started when a redirect moved it somewhere else.
+   */
+  private describeSource(requestedUrl: string, finalUrl: string): string {
+    return isSameUrl(requestedUrl, finalUrl)
+      ? requestedUrl
+      : `${finalUrl} (redirected from ${requestedUrl})`;
+  }
+
   private handleInlineContent(
     buffer: ArrayBuffer,
     contentType: string,
-    url: string,
+    source: string,
     returnContent: boolean
   ): ToolResult {
     try {
       if (!returnContent) {
         return this.createResult(
-          `Content fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\nContent not returned (returnContent=false). Use file tools to access if needed.`
+          `Content fetched from ${source}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\nContent not returned (returnContent=false). Use file tools to access if needed.`
         );
       }
 
       const processedContent = this.processContent(buffer, contentType);
 
       return this.createResult(
-        `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`
+        `Content from ${source}:\n\nContent-Type: ${contentType}\nSize: ${buffer.byteLength} bytes\n\n${processedContent}`
       );
     } catch (error) {
       return this.createError(
@@ -590,12 +628,8 @@ Follows redirects by default. Returns detailed error context for failures.`;
     errorMessage += `  URL: ${context.request.url}\n`;
     errorMessage += `  Method: ${context.request.method}\n`;
 
-    if (context.request.finalUrl && context.request.finalUrl !== context.request.url) {
+    if (context.request.finalUrl && !isSameUrl(context.request.finalUrl, context.request.url)) {
       errorMessage += `  Final URL: ${context.request.finalUrl}\n`;
-    }
-
-    if (context.request.redirectChain && context.request.redirectChain.length > 0) {
-      errorMessage += `  Redirects: ${context.request.redirectChain.join(' → ')}\n`;
     }
 
     if (context.request.timing) {
@@ -634,7 +668,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
   private async handleLargeContent(
     buffer: ArrayBuffer,
     contentType: string,
-    url: string,
+    source: string,
     size: number,
     returnContent: boolean,
     toolTempDir?: string
@@ -682,7 +716,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
 
       if (!returnContent) {
         return this.createResult(
-          `Large file fetched from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nContent not returned (returnContent=false). Use file tools to access the temp file.`
+          `Large file fetched from ${source}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nSaved to: ${tempFilePath}\n\nContent not returned (returnContent=false). Use file tools to access the temp file.`
         );
       }
 
@@ -692,7 +726,7 @@ Follows redirects by default. Returns detailed error context for failures.`;
         : `[Binary content - ${contentType}]`;
 
       return this.createResult(
-        `Content from ${url}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nFull content saved to: ${tempFilePath}\n\n${processedContent}`
+        `Content from ${source}:\n\nContent-Type: ${contentType}\nSize: ${size} bytes (${sizeInMB}MB)\nFull content saved to: ${tempFilePath}\n\n${processedContent}`
       );
     } catch (error) {
       return this.createError(

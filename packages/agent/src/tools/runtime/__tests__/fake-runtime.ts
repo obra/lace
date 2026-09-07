@@ -14,6 +14,7 @@ type FakeRuntimeInput = {
     status: number;
     headers: Record<string, string>;
     body: Uint8Array;
+    url?: string;
   };
 };
 
