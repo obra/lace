@@ -12,6 +12,59 @@ import { nodeErrorFromExec, streamToString, writeStreamAndClose } from './contai
 
 const DEFAULT_FETCH_TIMEOUT_SECS = 120;
 
+// curl's `--write-out` runs after the transfer and can report the effective
+// (post-redirect) URL via `%{url_effective}` — the same information
+// `Response.url` gives the host runtime's native `fetch`. `%{stderr}` at the
+// front of the format redirects that single write-out to stderr so it never
+// touches the base64-framed stdout pipe the response is parsed from. The
+// marker line lets us pull the URL back out of stderr (which may also carry
+// curl's own `-S` error text) without guessing at curl's error formatting.
+const EFFECTIVE_URL_MARKER = '__lace_curl_effective_url__';
+const EFFECTIVE_URL_WRITE_OUT = `%{stderr}\n${EFFECTIVE_URL_MARKER}:%{url_effective}\n`;
+// The URL runs to the end of the line, not to the first space: curl echoes
+// `%{url_effective}` verbatim when it rejects a malformed URL, so
+// `http://host/a b` must be captured whole rather than truncated at the space
+// (which would also leave the remainder behind in the error text).
+const EFFECTIVE_URL_LINE_RE = new RegExp(`\n?${EFFECTIVE_URL_MARKER}:([^\n]*)\n?`);
+
+/** Pull the marked effective-URL line back out of curl's stderr, returning the
+ * URL (if the marker was found) and the stderr text with the marker line
+ * removed, so it never leaks into an error message. */
+function extractEffectiveUrl(stderr: string): { url: string | undefined; stderr: string } {
+  const match = EFFECTIVE_URL_LINE_RE.exec(stderr);
+  if (!match) return { url: undefined, stderr };
+  return { url: match[1] || undefined, stderr: stderr.replace(EFFECTIVE_URL_LINE_RE, '') };
+}
+
+/**
+ * `%{stderr}` landed in curl 7.63.0 (Dec 2018), and the image is
+ * caller-supplied — CentOS 7 ships 7.29, Debian 9 ships 7.52. An older curl
+ * doesn't recognise the variable: it warns on stderr and writes the REST of
+ * the write-out format to *stdout*, which here is the base64-framed response
+ * pipe. Left alone, the marker line would be glued onto every response body
+ * and inflate the maxBytes accounting, silently and with a zero exit code.
+ * Recovering the URL from a trailing marker line instead degrades that path
+ * into the modern one.
+ *
+ * The write-out is the last thing curl emits, so the marker only counts when
+ * it runs to the very end of the stream — a body that merely contains the
+ * marker text mid-stream is left untouched.
+ */
+function extractTrailingEffectiveUrl(body: Buffer): { url: string | undefined; body: Buffer } {
+  const marker = Buffer.from(`${EFFECTIVE_URL_MARKER}:`, 'utf8');
+  const start = body.lastIndexOf(marker);
+  if (start === -1) return { url: undefined, body };
+
+  const tail = body.subarray(start + marker.length).toString('utf8');
+  const newline = tail.indexOf('\n');
+  if (newline !== -1 && newline !== tail.length - 1) return { url: undefined, body };
+
+  const url = newline === -1 ? tail : tail.slice(0, newline);
+  // Drop the newline the write-out format puts in front of the marker too.
+  const end = start > 0 && body[start - 1] === 0x0a ? start - 1 : start;
+  return { url: url || undefined, body: body.subarray(0, end) };
+}
+
 export class ContainerExecNetworkClient implements RuntimeNetworkClient {
   constructor(private readonly process: RuntimeProcessRunner) {}
 
@@ -43,6 +96,9 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       ...(redirect === 'follow' ? ['-L'] : []),
       ...headerArgs,
       ...(hasBody ? ['--data-binary', '@-'] : []),
+      // Only worth asking for when curl can actually end up somewhere else:
+      // without `-L` the effective URL is the requested one.
+      ...(redirect === 'follow' ? ['-w', EFFECTIVE_URL_WRITE_OUT] : []),
       url,
     ];
 
@@ -64,19 +120,22 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       handle.completion,
     ]);
 
+    const { url: effectiveUrl, stderr: cleanStderr } = extractEffectiveUrl(stderr);
+
     if (completion.exitCode !== 0) {
-      throw nodeErrorFromExec(completion.exitCode ?? -1, stderr, 'fetch', url);
+      throw nodeErrorFromExec(completion.exitCode ?? -1, cleanStderr, 'fetch', url);
     }
 
     const raw = Buffer.from(stdout, 'base64');
-    const { headerText, body } = splitHeadersAndBody(raw);
+    const { headerText, body: framedBody } = splitHeadersAndBody(raw);
     const { status, headers } = parseHeaderBlock(headerText);
+    const { url: stdoutUrl, body } = extractTrailingEffectiveUrl(framedBody);
 
     if (opts?.maxBytes !== undefined && body.byteLength > opts.maxBytes) {
       throw new RuntimeFetchSizeLimitError(opts.maxBytes, body.byteLength);
     }
 
-    return { status, headers, body: new Uint8Array(body) };
+    return { status, headers, body: new Uint8Array(body), url: effectiveUrl ?? stdoutUrl };
   }
 }
 
