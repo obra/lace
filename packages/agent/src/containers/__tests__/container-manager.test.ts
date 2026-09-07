@@ -12,7 +12,8 @@ import {
   type ExecStreamHandle,
   type ExecStreamOptions,
 } from '../types';
-import { ContainerManager } from '../container-manager';
+import { CONTAINER_OWNER_LABEL, ContainerManager } from '../container-manager';
+import { logger } from '@lace/agent/utils/logger';
 import { PlaneRuntime } from '../plane-runtime';
 import type { ContainerSpec } from '../spec';
 
@@ -27,6 +28,9 @@ class MockContainerRuntime extends BaseContainerRuntime {
     this.callLog.push(`create:${containerId}`);
     const info: ContainerInfo = { id: containerId, state: 'created' };
     info.mounts = config.mounts;
+    // A real daemon remembers create-time labels and reports them back from
+    // inspect; the reaper's ownership check depends on that.
+    if (config.labels) info.labels = config.labels;
     this.containers.set(containerId, info);
     this.registerMounts(containerId, config);
     return containerId;
@@ -70,6 +74,14 @@ class MockContainerRuntime extends BaseContainerRuntime {
     throw new Error('execStreamImpl not set');
   }
 
+  /**
+   * Mirror DockerContainerRuntime.list, which shells out to `docker ps` and so
+   * reports no labels — ownership has to come from an inspect.
+   */
+  async list(): Promise<ContainerInfo[]> {
+    return Array.from(this.containers.values()).map(({ labels: _labels, ...rest }) => rest);
+  }
+
   /** test helper: directly create-then-stop to simulate a leftover stopped container */
   async seedStopped(containerId: string): Promise<void> {
     this.create({
@@ -93,13 +105,28 @@ const baseSpec: ContainerSpec = {
   env: { FOO: 'bar' },
 };
 
+// This agent's identity (its LACE_DIR in production) and a sibling agent's.
+const OWNER = '/lace-dirs/agent-a';
+const OTHER_OWNER = '/lace-dirs/agent-b';
+
 describe('ContainerManager', () => {
   let runtime: MockContainerRuntime;
   let manager: ContainerManager;
 
+  /** Seed a daemon-side container as if created by `owner` (undefined = no owner label). */
+  function seedContainer(id: string, owner?: string): void {
+    runtime.create({
+      id,
+      image: 'test:latest',
+      workingDirectory: '/x',
+      mounts: [],
+      ...(owner === undefined ? {} : { labels: { [CONTAINER_OWNER_LABEL]: owner } }),
+    });
+  }
+
   beforeEach(() => {
     runtime = new MockContainerRuntime();
-    manager = new ContainerManager(runtime);
+    manager = new ContainerManager(runtime, OWNER);
   });
 
   describe('materialize', () => {
@@ -123,6 +150,7 @@ describe('ContainerManager', () => {
         workingDirectory: '/lace',
         mounts: baseSpec.mounts,
         environment: { FOO: 'bar' },
+        labels: { [CONTAINER_OWNER_LABEL]: OWNER },
       });
     });
 
@@ -167,14 +195,30 @@ describe('ContainerManager', () => {
       expect(config.labels).toEqual({
         'sen.broker.persona': 'persistent-box',
         'sen.broker.jobId': 'job_1',
+        [CONTAINER_OWNER_LABEL]: OWNER,
       });
     });
 
-    it('omits labels when spec has none', async () => {
+    it('stamps the owner label even when the spec carries none', async () => {
       const createSpy = vi.spyOn(runtime, 'create');
       await manager.materialize(baseSpec);
       const [config] = createSpy.mock.calls[0] as [ContainerConfig];
-      expect(config.labels).toBeUndefined();
+      expect(config.labels).toEqual({ [CONTAINER_OWNER_LABEL]: OWNER });
+    });
+
+    it('leaves labels alone for a verbatim-id spec (a persistent box)', async () => {
+      // Boxes live outside the `lace-` namespace, are never reaping candidates,
+      // and their identity labels belong to the shim — do not add ours.
+      const createSpy = vi.spyOn(runtime, 'create');
+      await manager.materialize({
+        ...baseSpec,
+        name: 'box-shell',
+        containerId: 'sen-box-shell',
+        labels: { 'sen.broker.persona': 'box' },
+      });
+
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.labels).toEqual({ 'sen.broker.persona': 'box' });
     });
 
     it('propagates spec.image into ContainerConfig (kata #53)', async () => {
@@ -605,38 +649,13 @@ describe('ContainerManager', () => {
   describe('reapOrphans', () => {
     it('destroys containers matching prefix that are not in liveSpecNames', async () => {
       // three lace-sess1-* containers, two live + one orphan
-      runtime.create({
-        id: 'lace-sess1-alpha',
-        image: 'test:latest',
-        workingDirectory: '/x',
-        mounts: [],
-      });
-      runtime.create({
-        id: 'lace-sess1-beta',
-        image: 'test:latest',
-        workingDirectory: '/x',
-        mounts: [],
-      });
-      runtime.create({
-        id: 'lace-sess1-zombie',
-        image: 'test:latest',
-        workingDirectory: '/x',
-        mounts: [],
-      });
+      seedContainer('lace-sess1-alpha', OWNER);
+      seedContainer('lace-sess1-beta', OWNER);
+      seedContainer('lace-sess1-zombie', OWNER);
       // unrelated prefix — must be left alone
-      runtime.create({
-        id: 'lace-other-x',
-        image: 'test:latest',
-        workingDirectory: '/x',
-        mounts: [],
-      });
+      seedContainer('lace-other-x', OWNER);
       // non-lace id — must be ignored entirely
-      runtime.create({
-        id: 'docker-default',
-        image: 'test:latest',
-        workingDirectory: '/x',
-        mounts: [],
-      });
+      seedContainer('docker-default', OWNER);
       runtime.callLog.length = 0;
 
       const result = await manager.reapOrphans('sess1-', new Set(['sess1-alpha', 'sess1-beta']));
@@ -650,17 +669,87 @@ describe('ContainerManager', () => {
     });
 
     it('empty prefix reaps any lace- container not in liveSpecNames', async () => {
-      runtime.create({ id: 'lace-keep', image: 'test:latest', workingDirectory: '/x', mounts: [] });
-      runtime.create({ id: 'lace-drop', image: 'test:latest', workingDirectory: '/x', mounts: [] });
+      seedContainer('lace-keep', OWNER);
+      seedContainer('lace-drop', OWNER);
 
       const result = await manager.reapOrphans('', new Set(['keep']));
 
       expect(result.reaped).toEqual(['drop']);
     });
 
+    it('spares a live container that belongs to us', async () => {
+      // The live-set exclusion must still bite for our OWN containers — owning a
+      // container is not a licence to destroy one that is currently in use.
+      seedContainer('lace-live', OWNER);
+      runtime.callLog.length = 0;
+
+      const result = await manager.reapOrphans('', new Set(['live']));
+
+      expect(result.reaped).toEqual([]);
+      expect(runtime.callLog).not.toContain('remove:lace-live');
+    });
+
+    it('reaps an orphan it created itself before restarting', async () => {
+      // Materialize through a first manager, then hand the same daemon to a
+      // fresh manager with the same owner id — the crash-and-restart shape.
+      const crashed = new ContainerManager(runtime, OWNER);
+      await crashed.materialize({ ...baseSpec, name: 'sess1-leaked' });
+      runtime.callLog.length = 0;
+
+      const restarted = new ContainerManager(runtime, OWNER);
+      const result = await restarted.reapOrphans('', new Set());
+
+      expect(result.reaped).toEqual(['sess1-leaked']);
+      expect(runtime.callLog).toContain('remove:lace-sess1-leaked');
+    });
+
+    it("leaves another agent's container alone", async () => {
+      // The blast-radius bug: a second agent booting on a shared host used to
+      // destroy every lace- container, including live ones owned by a sibling.
+      seedContainer('lace-mine', OWNER);
+      seedContainer('lace-theirs', OTHER_OWNER);
+      runtime.callLog.length = 0;
+
+      const result = await manager.reapOrphans('', new Set());
+
+      expect(result.reaped).toEqual(['mine']);
+      expect(runtime.callLog).not.toContain('stop:lace-theirs');
+      expect(runtime.callLog).not.toContain('remove:lace-theirs');
+    });
+
+    it('leaves an unlabelled container alone and warns about it', async () => {
+      // Containers created before the owner label existed are unattributable.
+      // Leaking one is recoverable by hand; reaping a stranger's is not.
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      seedContainer('lace-legacy');
+      runtime.callLog.length = 0;
+
+      const result = await manager.reapOrphans('', new Set());
+
+      expect(result.reaped).toEqual([]);
+      expect(runtime.callLog).not.toContain('remove:lace-legacy');
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no owner label'), {
+        containers: ['lace-legacy'],
+      });
+      warnSpy.mockRestore();
+    });
+
+    it('leaves a container alone when its ownership cannot be inspected', async () => {
+      // Fail closed: an inspect error must not read as "unowned, therefore mine".
+      seedContainer('lace-opaque', OWNER);
+      vi.spyOn(runtime, 'daemonInspect').mockRejectedValue(new Error('daemon unreachable'));
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      runtime.callLog.length = 0;
+
+      const result = await manager.reapOrphans('', new Set());
+
+      expect(result.reaped).toEqual([]);
+      expect(runtime.callLog).not.toContain('remove:lace-opaque');
+    });
+
     it('continues past individual failures and reports successes', async () => {
-      runtime.create({ id: 'lace-a', image: 'test:latest', workingDirectory: '/x', mounts: [] });
-      runtime.create({ id: 'lace-b', image: 'test:latest', workingDirectory: '/x', mounts: [] });
+      seedContainer('lace-a', OWNER);
+      seedContainer('lace-b', OWNER);
       const originalStop = runtime.stop.bind(runtime);
       vi.spyOn(runtime, 'stop').mockImplementation(async (id: string) => {
         if (id === 'lace-a') throw new Error('boom');
@@ -680,7 +769,7 @@ describe('ContainerManager', () => {
     });
 
     it('returns true when backed by a PlaneRuntime', () => {
-      const planeManager = new ContainerManager(new PlaneRuntime('/fake/sen-docker'));
+      const planeManager = new ContainerManager(new PlaneRuntime('/fake/sen-docker'), OWNER);
       expect(planeManager.isPlaneRuntime).toBe(true);
     });
   });

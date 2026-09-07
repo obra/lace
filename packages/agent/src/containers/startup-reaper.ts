@@ -1,12 +1,14 @@
 // ABOUTME: Best-effort orphan-container reaper invoked once at agent startup
-// ABOUTME: Destroys lace-prefixed containers not in the live spec set; failures never block boot
+// ABOUTME: Destroys this agent's own leaked lace- containers; failures never block boot
 
 import { logger } from '@lace/agent/utils/logger';
 import { ContainerManager } from './container-manager';
 
 /**
- * Reap every lace-prefixed container on the host that is not in liveSpecNames.
- * For v1 liveSpecNames is always empty — boot is a clean slate.
+ * Reap the lace-prefixed containers THIS agent leaked behind a previous run.
+ * The live set is empty because a booting agent owns no containers yet; the
+ * blast radius is bounded by ContainerManager's `lace.owner` label check, which
+ * spares containers belonging to other agents on the same host.
  *
  * Best-effort: a null manager (unsupported platform) or any thrown error logs
  * and returns. Reaper failure must never block agent startup.

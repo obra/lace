@@ -20,6 +20,15 @@ import { PlaneRuntime } from './plane-runtime';
 // cross-process orphan reaping can scope its scan.
 const CONTAINER_ID_PREFIX = 'lace-';
 
+/**
+ * Docker object label naming the agent that created a container. Its value is
+ * the creating agent's LACE_DIR (see manager-factory), which is stable across
+ * restarts of one agent and distinct between agents sharing a host. The startup
+ * reaper destroys only containers carrying its own value, so one agent's boot
+ * never touches a sibling agent's containers.
+ */
+export const CONTAINER_OWNER_LABEL = 'lace.owner';
+
 export function resolveContainerId(spec: Pick<ContainerSpec, 'name' | 'containerId'>): string {
   // Persistent container runtime opts out of the `lace-` namespace by supplying a verbatim
   // containerId. Using a non-`lace-` id is intentional: it makes boxes invisible
@@ -119,7 +128,16 @@ export class ContainerManager {
   private readonly containerIdsBySpecName = new Map<string, string>();
   private readonly materializations = new Map<string, Promise<ContainerHandle>>();
 
-  constructor(private readonly runtime: ContainerRuntime) {}
+  /**
+   * @param ownerId Identity stamped as `lace.owner` on every container this
+   *   manager creates in the `lace-` namespace, and the only value
+   *   `reapOrphans` will destroy. Must be stable across restarts of the same
+   *   agent (see `containerOwnerId` in manager-factory).
+   */
+  constructor(
+    private readonly runtime: ContainerRuntime,
+    private readonly ownerId: string
+  ) {}
 
   /**
    * True when the underlying runtime is a PlaneRuntime (the sen-docker shim).
@@ -188,7 +206,7 @@ export class ContainerManager {
       capAdd: spec.capAdd,
       network: spec.network,
       gatewayRoute: spec.gatewayRoute,
-      labels: spec.labels,
+      labels: this.labelsWithOwner(spec),
       persona: spec.persona,
       role: spec.role,
       parentSessionId: spec.parentSessionId,
@@ -275,6 +293,19 @@ export class ContainerManager {
     };
   }
 
+  /**
+   * Stamp our owner label onto the spec's labels so the reaper can tell our
+   * containers from a sibling agent's.
+   *
+   * Specs carrying a verbatim `containerId` (persistent boxes) live outside the
+   * `lace-` namespace and are never reaping candidates, so their labels are
+   * passed through untouched — the shim owns box identity labels.
+   */
+  private labelsWithOwner(spec: ContainerSpec): Record<string, string> | undefined {
+    if (spec.containerId && spec.containerId.length > 0) return spec.labels;
+    return { ...spec.labels, [CONTAINER_OWNER_LABEL]: this.ownerId };
+  }
+
   async inspect(specName: string): Promise<ContainerHandle | null> {
     const spec = this.specs.get(specName);
     const containerId = this.resolveBySpecName(specName);
@@ -357,7 +388,15 @@ export class ContainerManager {
   }
 
   /**
-   * Reap containers under our `lace-` id-prefix that are not in `liveSpecNames`.
+   * Reap containers under our `lace-` id-prefix that WE created and that are
+   * not in `liveSpecNames`.
+   *
+   * Ownership is authoritative: a candidate is destroyed only when its
+   * `lace.owner` label equals this manager's `ownerId`. Containers owned by
+   * another agent on the same host, and containers with no owner label at all
+   * (created before the label existed, or by a runtime that drops labels), are
+   * left alone — an unreaped container leaks, a wrongly-reaped one destroys
+   * someone's live work.
    *
    * @param specNamePrefix A SPEC-name prefix (NOT a container-id prefix). It is
    *   prepended internally with `CONTAINER_ID_PREFIX` (`lace-`) to form the
@@ -383,11 +422,19 @@ export class ContainerManager {
     }
 
     const reaped: string[] = [];
+    const unowned: string[] = [];
 
     for (const info of containers) {
       if (!info.id.startsWith(scanPrefix)) continue;
       const specName = specNameFromContainerId(info.id);
       if (liveSpecNames.has(specName)) continue;
+
+      const owner = await this.ownerOf(info);
+      if (owner === null) {
+        unowned.push(info.id);
+        continue;
+      }
+      if (owner !== this.ownerId) continue;
 
       try {
         await this.destroy(specName);
@@ -400,7 +447,34 @@ export class ContainerManager {
       }
     }
 
+    if (unowned.length > 0) {
+      logger.warn(
+        'Container reaper: skipping containers with no owner label; remove them by hand if stale',
+        { containers: unowned }
+      );
+    }
+
     return { reaped };
+  }
+
+  /**
+   * Read a candidate's owner label. Returns null when the container carries no
+   * owner label, has vanished, or cannot be inspected — every one of which
+   * means "not provably ours", so the caller must leave it alone.
+   */
+  private async ownerOf(info: ContainerInfo): Promise<string | null> {
+    // Ask the daemon rather than trusting `list()`: DockerContainerRuntime.list
+    // shells out to `docker ps`, which reports no labels at all.
+    try {
+      const inspected = await this.runtime.daemonInspect(info.id);
+      return inspected?.labels?.[CONTAINER_OWNER_LABEL] ?? null;
+    } catch (error) {
+      logger.warn('Container reaper: ownership inspect failed; leaving container alone', {
+        containerId: info.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
   }
 
   private async tryInspect(containerId: string): Promise<ContainerInfo | null> {

@@ -170,7 +170,7 @@ describe.skipIf(!DOCKER_AVAILABLE)('persona container sharing integration', () =
 
   beforeAll(async () => {
     runtime = new DockerContainerRuntime();
-    containerManager = new ContainerManager(runtime);
+    containerManager = new ContainerManager(runtime, `/lace-dir/persona-sharing-${process.pid}`);
 
     // Pull images if missing. Timeout generous for first-time pull.
     await pullImageIfMissing(TEST_PER_INVOCATION_IMAGE);

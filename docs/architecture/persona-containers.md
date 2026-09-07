@@ -31,6 +31,15 @@ lace runs the startup reaper, where the `lace-` prefix marks per_invocation
 containers as reap candidates and the `sen-` prefix keeps persistent containers
 outside its scope.
 
+The prefix alone does not identify WHICH agent's containers those are, so every
+container lace creates in the `lace-` namespace carries a `lace.owner` label
+holding the creating agent's `LACE_DIR`. The startup reaper destroys only
+candidates whose label matches its own owner id: an agent cleans up the
+containers it leaked before a crash and leaves a sibling agent's containers on
+the same host untouched. A `lace-` container with no `lace.owner` label (created
+before the label existed) is never reaped by anyone — the reaper logs it at WARN
+so an operator can remove it by hand.
+
 ## Workspace convention (the workspace IS the result)
 
 For `per_invocation` containers the sen-docker shim provisions a bind-mounted

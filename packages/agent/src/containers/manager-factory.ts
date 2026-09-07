@@ -7,6 +7,9 @@ import { DockerContainerRuntime } from './docker-container';
 import { PlaneRuntime } from './plane-runtime';
 import { AppleContainerRuntime } from './apple-container';
 import { registries } from '@lace/agent/plugins';
+import { getLaceDir } from '@lace/agent/config/lace-dir';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { ContainerRuntime } from './types';
 
 export const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
@@ -67,6 +70,27 @@ export function registerBuiltinRuntimes(): void {
   }
 }
 
+/**
+ * Identity for the containers this agent creates: its LACE_DIR.
+ *
+ * The requirements are that it survives an agent restart (so a crashed agent
+ * still recognizes and reaps its own leaked containers) and that two agents on
+ * one host never share it (so neither reaps the other's containers). LACE_DIR
+ * is exactly that — it is the agent's state directory, one per agent instance.
+ *
+ * Realpath'd so a symlinked and an unsymlinked spelling of the same directory
+ * do not read as two different agents; falls back to the resolved path when the
+ * directory does not exist yet.
+ */
+export function containerOwnerId(): string {
+  const laceDir = getLaceDir();
+  try {
+    return fs.realpathSync(laceDir);
+  } catch {
+    return path.resolve(laceDir);
+  }
+}
+
 export function createDefaultContainerManager(
   platform: NodeJS.Platform = process.platform,
   runtimeSelection: string | undefined = process.env[CONTAINER_RUNTIME_ENV]
@@ -94,5 +118,5 @@ export function createDefaultContainerManager(
     throw new Error(`${CONTAINER_RUNTIME_ENV}="${name}" but no runtime registered under that name`);
   }
 
-  return new ContainerManager(registries.runtimes.resolve(name));
+  return new ContainerManager(registries.runtimes.resolve(name), containerOwnerId());
 }

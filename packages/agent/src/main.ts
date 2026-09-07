@@ -160,7 +160,8 @@ async function boot(): Promise<void> {
   // The workspace reaper routes per_invocation teardown to the shim via the
   // container manager, so it needs the live container manager now that it exists.
   state.workspaceReaper.bindRuntime(manager);
-  // Orphan-container reap: destroys orphan lace-* containers via the runtime. The
+  // Orphan-container reap: destroys the lace-* containers THIS agent leaked in a
+  // previous run (matched by the `lace.owner` label), never a sibling agent's. The
   // shim owns workspace reaping on the plane, so lace does not run a workspace
   // sweep here (the removed owner marker defeats its liveness gates). On the
   // plane runtime runtime.list() returns only the empty in-process cache, so
