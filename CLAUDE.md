@@ -22,6 +22,7 @@ npm run dev           # Start the CLI client
 npm run typecheck     # Type-check all active packages
 npm run lint          # Lint packages that define lint scripts
 npm test              # Run package tests once
+npx vitest run <path> # Run a single test file, from inside its package
 npm run test:coverage # Run agent coverage
 ```
 
