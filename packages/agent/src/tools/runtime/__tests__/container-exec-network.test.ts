@@ -3,9 +3,11 @@
 
 import { Readable } from 'node:stream';
 import { describe, it, expect } from 'vitest';
+import { UrlFetchTool } from '@lace/agent/tools/implementations/url_fetch';
 import { ContainerExecNetworkClient } from '../container-exec-network';
+import { createFakeRuntime } from './fake-runtime';
 import { RuntimeFetchSizeLimitError } from '../types';
-import type { RuntimeProcessRunner, RuntimeProcessHandle } from '../types';
+import type { RuntimeProcessRunner, RuntimeProcessHandle, ToolRuntime } from '../types';
 
 interface FakeStart {
   /** Raw bytes that curl|base64 would have produced on stdout (we base64 them). */
@@ -127,7 +129,7 @@ describe('ContainerExecNetworkClient', () => {
     const raw = Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8');
     const { runner, calls } = fakeRunner({ stdoutRaw: raw });
     const client = new ContainerExecNetworkClient(runner);
-    await client.fetch('https://example.com');
+    await client.fetch('https://example.com', { redirect: 'follow' });
     const argv = calls[0]!;
     const wIndex = argv.indexOf('-w');
     expect(wIndex).toBeGreaterThanOrEqual(0);
@@ -155,6 +157,91 @@ describe('ContainerExecNetworkClient', () => {
     const client = new ContainerExecNetworkClient(runner);
     const result = await client.fetch('https://example.com');
     expect(result.url).toBeUndefined();
+  });
+
+  it('recovers the effective URL from stdout and keeps it out of the body on curl older than 7.63', async () => {
+    // curl < 7.63 doesn't know `%{stderr}`: it warns on stderr and writes the
+    // REST of the write-out format to stdout, which here is the base64-framed
+    // response pipe. Without handling, the marker line lands inside the body.
+    const raw = Buffer.concat([
+      Buffer.from('HTTP/2 200\r\ncontent-type: text/plain\r\n\r\nhello body', 'utf8'),
+      Buffer.from('\n__lace_curl_effective_url__:http://127.0.0.1:8791/final\n', 'utf8'),
+    ]);
+    const { runner } = fakeRunner({
+      stdoutRaw: raw,
+      stderr: "curl: unknown --write-out variable: 'stderr'\n",
+    });
+    const client = new ContainerExecNetworkClient(runner);
+    const result = await client.fetch('http://127.0.0.1:8791/start', { redirect: 'follow' });
+    expect(Buffer.from(result.body).toString()).toBe('hello body');
+    expect(result.url).toBe('http://127.0.0.1:8791/final');
+  });
+
+  it('does not count the stdout write-out trailer against maxBytes', async () => {
+    const raw = Buffer.concat([
+      Buffer.from('HTTP/2 200\r\n\r\n0123456789', 'utf8'),
+      Buffer.from('\n__lace_curl_effective_url__:http://example.com/final\n', 'utf8'),
+    ]);
+    const { runner } = fakeRunner({ stdoutRaw: raw });
+    const client = new ContainerExecNetworkClient(runner);
+    const result = await client.fetch('http://example.com/start', {
+      redirect: 'follow',
+      maxBytes: 10,
+    });
+    expect(Buffer.from(result.body).toString()).toBe('0123456789');
+  });
+
+  it('leaves a body that merely resembles the marker mid-stream alone', async () => {
+    const body = 'before\n__lace_curl_effective_url__:http://example.com/x\nafter';
+    const raw = Buffer.from(`HTTP/2 200\r\n\r\n${body}`, 'utf8');
+    const { runner } = fakeRunner({ stdoutRaw: raw });
+    const client = new ContainerExecNetworkClient(runner);
+    const result = await client.fetch('http://example.com/start', { redirect: 'follow' });
+    expect(Buffer.from(result.body).toString()).toBe(body);
+    expect(result.url).toBeUndefined();
+  });
+
+  it('captures an effective URL containing a space without truncating it or leaking the remainder', async () => {
+    // curl echoes %{url_effective} verbatim when it rejects a malformed URL.
+    const stderr =
+      'curl: (3) URL rejected: Malformed input to a URL function\n' +
+      '__lace_curl_effective_url__:http://127.0.0.1:32875/a b\n';
+    const { runner } = fakeRunner({ exitCode: 3, stderr, stdoutRaw: Buffer.alloc(0) });
+    const client = new ContainerExecNetworkClient(runner);
+    const error = await client.fetch('http://127.0.0.1:32875/a b').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Error);
+    const message = (error as Error).message;
+    expect(message).toContain('URL rejected');
+    expect(message).not.toContain('__lace_curl_effective_url__');
+    expect(message).not.toMatch(/\bb\b/);
+  });
+
+  it('only asks curl for the effective URL when it is actually following redirects', async () => {
+    const raw = Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8');
+    const { runner, calls } = fakeRunner({ stdoutRaw: raw });
+    const client = new ContainerExecNetworkClient(runner);
+    await client.fetch('https://example.com');
+    expect(calls[0]).not.toContain('-w');
+  });
+
+  it('does not make url_fetch report a redirect when curl only normalized the URL', async () => {
+    // curl normalizes `%{url_effective}` the same way `Response.url` does, so a
+    // host-only request comes back with its path filled in. That is not a redirect.
+    const raw = Buffer.from('HTTP/2 404\r\ncontent-type: text/plain\r\n\r\nnot found', 'utf8');
+    const stderr = '__lace_curl_effective_url__:https://example.com/\n';
+    const { runner } = fakeRunner({ stdoutRaw: raw, stderr });
+    const runtime: ToolRuntime = {
+      ...createFakeRuntime(),
+      network: new ContainerExecNetworkClient(runner),
+    };
+
+    const result = await new UrlFetchTool().execute(
+      { url: 'https://example.com' },
+      { signal: new AbortController().signal, runtime }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text ?? '').not.toContain('Final URL:');
   });
 
   it('strips the effective-URL marker out of the error message on curl failure', async () => {
