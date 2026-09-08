@@ -843,6 +843,86 @@ Follows redirects by default. Returns detailed error context for failures.`
     });
   });
 
+  describe('Credential redaction in response headers', () => {
+    const redirectingRuntime = (location: string) =>
+      createFakeRuntime({
+        fetchResult: {
+          status: 302,
+          headers: { 'content-type': 'text/html', location },
+          body: new TextEncoder().encode(''),
+        },
+      });
+
+    it('redacts the Location header of an unfollowed redirect', async () => {
+      // `followRedirects: false` turns any 3xx into an error report, and the
+      // redirect destination is exactly where an OAuth code lives.
+      const result = await tool.execute(
+        { url: 'https://example.com/start', followRedirects: false },
+        {
+          signal: new AbortController().signal,
+          runtime: redirectingRuntime('https://login.example.com/cb?code=SECRETCODE01234'),
+        }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('  location: https://login.example.com/cb?code=[REDACTED]\n');
+      expect(output).toContain('"location": "https://login.example.com/cb?code=[REDACTED]"');
+    });
+
+    it('redacts a relative Location header', async () => {
+      const result = await tool.execute(
+        { url: 'https://example.com/start', followRedirects: false },
+        {
+          signal: new AbortController().signal,
+          runtime: redirectingRuntime('/cb?code=SECRETCODE01234&page=3'),
+        }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('  location: /cb?code=[REDACTED]&page=3\n');
+    });
+
+    it('leaves a Location header carrying no credentials untouched', async () => {
+      const result = await tool.execute(
+        { url: 'https://example.com/start', followRedirects: false },
+        {
+          signal: new AbortController().signal,
+          runtime: redirectingRuntime('https://example.com/docs?page=3'),
+        }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).toContain('  location: https://example.com/docs?page=3\n');
+      expect(output).not.toContain('[REDACTED]');
+    });
+
+    it('redacts a credentialed URL in any other response header', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 404,
+          headers: {
+            'content-type': 'text/plain',
+            'x-debug-origin': 'served from https://origin.example.com/o?token=SECRETCODE01234',
+          },
+          body: new TextEncoder().encode('nope'),
+        },
+      });
+
+      const result = await tool.execute(
+        { url: 'https://example.com/start' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain(
+        '"x-debug-origin": "served from https://origin.example.com/o?token=[REDACTED]"'
+      );
+    });
+  });
+
   describe('Credential redaction in runtime error messages', () => {
     const throwingRuntime = (message: string): ToolRuntime => ({
       ...createFakeRuntime(),
@@ -890,6 +970,21 @@ Follows redirects by default. Returns detailed error context for failures.`
 
       expect(output).not.toContain(secret);
       expect(output).toContain('blob=[REDACTED]');
+    });
+
+    it('does not double the sentinel when the throw site already redacted the URL', async () => {
+      // The container runtime redacts into the Error message; url_fetch then
+      // runs the free-text scan over that same message. `]` is trailing
+      // punctuation, so a naive second pass emits `code=[REDACTED]]`.
+      const output = await runToolAgainst(
+        'https://example.com/cb',
+        'fetch failed (exit 7) for https://example.com/cb?code=[REDACTED]'
+      );
+
+      expect(output).toContain(
+        'NETWORK ERROR: fetch failed (exit 7) for https://example.com/cb?code=[REDACTED]\n'
+      );
+      expect(output).not.toContain('[REDACTED]]');
     });
 
     it('leaves an error message with no URL in it alone', async () => {

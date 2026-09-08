@@ -274,8 +274,10 @@ describe('ContainerExecNetworkClient', () => {
       expect(error).toBeInstanceOf(Error);
       const message = (error as Error).message;
       expect(message).not.toContain(SECRET);
-      expect(message).toContain('X-Amz-Signature=[REDACTED]');
-      expect(message).toContain('bucket.s3.amazonaws.com/report.csv');
+      expect(message).toContain(
+        'https://bucket.s3.amazonaws.com/report.csv?X-Amz-Signature=[REDACTED]'
+      );
+      expect(message).not.toContain('[REDACTED]]');
     });
 
     it('redacts a credentialed URL that curl echoed back in its own stderr', async () => {
@@ -289,7 +291,8 @@ describe('ContainerExecNetworkClient', () => {
 
       const message = (error as Error).message;
       expect(message).not.toContain(SECRET);
-      expect(message).toContain('token=[REDACTED]');
+      expect(message).toContain('https://example.com/{a?token=[REDACTED]\n');
+      expect(message).not.toContain('[REDACTED]]');
       expect(message).toContain('unmatched brace in URL position 20');
     });
 
@@ -303,7 +306,8 @@ describe('ContainerExecNetworkClient', () => {
 
       const message = (error as Error).message;
       expect(message).not.toContain(SECRET);
-      expect(message).toContain('code=[REDACTED]');
+      expect(message).toContain('http://127.0.0.1:32875/a b?code=[REDACTED]');
+      expect(message).not.toContain('[REDACTED]]');
     });
 
     it('redacts the effective URL curl reports alongside its error text', async () => {
@@ -320,7 +324,8 @@ describe('ContainerExecNetworkClient', () => {
 
       const message = (error as Error).message;
       expect(message).not.toContain(SECRET);
-      expect(message).toContain('code=[REDACTED]');
+      expect(message).toContain('https://login.example.com/cb?code=[REDACTED]');
+      expect(message).not.toContain('[REDACTED]]');
     });
 
     it('leaves a curl failure with no credentials in it untouched', async () => {

@@ -46,6 +46,29 @@ function isSameUrl(a: string, b: string): boolean {
   return normalizeUrlForComparison(a) === normalizeUrlForComparison(b);
 }
 
+// Headers whose whole value is a URL. `Location` is the redirect destination —
+// the single most credential-dense header there is, since OAuth codes and
+// signed-URL signatures live in exactly that URL — and `Referer` carries
+// whatever query string the previous page had. The sensitive-header denylist
+// does not cover them because the header itself is not a secret; the secret is
+// a parameter inside it.
+const URL_VALUED_HEADERS = ['location', 'content-location', 'referer'];
+
+/**
+ * Scrub credentials out of URLs carried in header values. A URL-valued header
+ * is redacted as a URL (so a relative `Location: /cb?code=…` is covered too);
+ * every other header gets the free-text scan as a backstop.
+ */
+function redactUrlsInHeaders(headers: Record<string, string>): Record<string, string> {
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    redacted[key] = URL_VALUED_HEADERS.includes(key.toLowerCase())
+      ? redactSensitiveUrl(value)
+      : redactUrlsInText(value);
+  }
+  return redacted;
+}
+
 // URL validation schema that checks protocol and format
 const HttpUrl = z
   .string()
@@ -587,7 +610,12 @@ Follows redirects by default. Returns detailed error context for failures.`;
           context.request.finalUrl === undefined
             ? undefined
             : redactSensitiveUrl(context.request.finalUrl),
+        headers: redactUrlsInHeaders(context.request.headers),
       },
+      response:
+        context.response === undefined
+          ? undefined
+          : { ...context.response, headers: redactUrlsInHeaders(context.response.headers) },
     };
   }
 
@@ -642,13 +670,16 @@ Follows redirects by default. Returns detailed error context for failures.`;
       timestamp: new Date().toISOString(),
     };
 
-    // Format for human-readable display
-    let errorMessage = `${context.error.type.toUpperCase()} ERROR: ${sanitizedContext.error.message}\n\n`;
+    // Format for human-readable display. Everything printed below reads from
+    // `sanitizedContext`; the one deliberate exception is the redirect
+    // comparison, which has to run on the raw URLs or two different URLs that
+    // redact to the same text would look like no redirect at all.
+    let errorMessage = `${sanitizedContext.error.type.toUpperCase()} ERROR: ${sanitizedContext.error.message}\n\n`;
 
     // Request details
     errorMessage += `REQUEST:\n`;
     errorMessage += `  URL: ${sanitizedContext.request.url}\n`;
-    errorMessage += `  Method: ${context.request.method}\n`;
+    errorMessage += `  Method: ${sanitizedContext.request.method}\n`;
 
     // Whether a redirect happened is decided on the raw URLs; only the printed
     // value is redacted.
@@ -656,14 +687,14 @@ Follows redirects by default. Returns detailed error context for failures.`;
       errorMessage += `  Final URL: ${sanitizedContext.request.finalUrl}\n`;
     }
 
-    if (context.request.timing) {
-      errorMessage += `  Timing: ${context.request.timing.total}ms total\n`;
+    if (sanitizedContext.request.timing) {
+      errorMessage += `  Timing: ${sanitizedContext.request.timing.total}ms total\n`;
     }
 
     // Response details (if available)
-    if (context.response) {
+    if (sanitizedContext.response) {
       errorMessage += `\nRESPONSE:\n`;
-      errorMessage += `  Status: ${context.response.status} ${context.response.statusText}\n`;
+      errorMessage += `  Status: ${sanitizedContext.response.status} ${sanitizedContext.response.statusText}\n`;
 
       // Show relevant headers
       const relevantHeaders = [
@@ -674,13 +705,13 @@ Follows redirects by default. Returns detailed error context for failures.`;
         'x-ratelimit-remaining',
       ];
       for (const header of relevantHeaders) {
-        if (context.response.headers[header]) {
-          errorMessage += `  ${header}: ${context.response.headers[header]}\n`;
+        if (sanitizedContext.response.headers[header]) {
+          errorMessage += `  ${header}: ${sanitizedContext.response.headers[header]}\n`;
         }
       }
 
-      if (context.response.bodyPreview) {
-        errorMessage += `\nResponse preview:\n${context.response.bodyPreview}\n`;
+      if (sanitizedContext.response.bodyPreview) {
+        errorMessage += `\nResponse preview:\n${sanitizedContext.response.bodyPreview}\n`;
       }
     }
 
