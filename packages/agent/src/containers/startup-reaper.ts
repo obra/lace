@@ -8,7 +8,9 @@ import { ContainerManager } from './container-manager';
  * Reap the lace-prefixed containers THIS agent leaked behind a previous run.
  * The live set is empty because a booting agent owns no containers yet; the
  * blast radius is bounded by ContainerManager's `lace.owner` label check, which
- * spares containers belonging to other agents on the same host.
+ * spares containers belonging to other agents on the same host. An agent with
+ * no distinct identity of its own (LACE_DIR unset) reaps nothing at all — see
+ * `containerOwnerId` in manager-factory.
  *
  * Best-effort: a null manager (unsupported platform) or any thrown error logs
  * and returns. Reaper failure must never block agent startup.

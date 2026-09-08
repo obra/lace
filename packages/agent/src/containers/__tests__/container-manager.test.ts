@@ -13,6 +13,7 @@ import {
   type ExecStreamOptions,
 } from '../types';
 import { CONTAINER_OWNER_LABEL, ContainerManager } from '../container-manager';
+import { containerOwnerId } from '../manager-factory';
 import { logger } from '@lace/agent/utils/logger';
 import { PlaneRuntime } from '../plane-runtime';
 import type { ContainerSpec } from '../spec';
@@ -219,6 +220,19 @@ describe('ContainerManager', () => {
 
       const [config] = createSpy.mock.calls[0] as [ContainerConfig];
       expect(config.labels).toEqual({ 'sen.broker.persona': 'box' });
+    });
+
+    it('stamps no owner label when the agent has no distinct identity', async () => {
+      // A null owner id means LACE_DIR was never set, so this agent cannot be
+      // told apart from its siblings. Stamping the shared value would let the
+      // next agent claim these containers as its own and destroy them.
+      const anonymous = new ContainerManager(runtime, null);
+      const createSpy = vi.spyOn(runtime, 'create');
+
+      await anonymous.materialize({ ...baseSpec, labels: { 'sen.broker.persona': 'shell' } });
+
+      const [config] = createSpy.mock.calls[0] as [ContainerConfig];
+      expect(config.labels).toEqual({ 'sen.broker.persona': 'shell' });
     });
 
     it('propagates spec.image into ContainerConfig (kata #53)', async () => {
@@ -745,6 +759,54 @@ describe('ContainerManager', () => {
 
       expect(result.reaped).toEqual([]);
       expect(runtime.callLog).not.toContain('remove:lace-opaque');
+    });
+
+    it('reaps nothing when the agent has no distinct identity', async () => {
+      // Fail closed, the same way an unlabelled container does: without a
+      // distinct identity we cannot prove a container is ours, and a wrongly
+      // reaped container is not recoverable.
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      seedContainer('lace-someones', OWNER);
+      seedContainer('lace-anons');
+      runtime.callLog.length = 0;
+
+      const anonymous = new ContainerManager(runtime, null);
+      const result = await anonymous.reapOrphans('', new Set());
+
+      expect(result.reaped).toEqual([]);
+      expect(runtime.callLog).toEqual([]);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('LACE_DIR'));
+      warnSpy.mockRestore();
+    });
+
+    it('does not let two agents in the default configuration reap each other', async () => {
+      // The headline guarantee, exercised through the real identity derivation:
+      // two agents booted with no LACE_DIR — the shared-dev-box shape this fix
+      // is for — must not destroy each other's containers.
+      const originalLaceDir = process.env.LACE_DIR;
+      delete process.env.LACE_DIR;
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        const agentA = new ContainerManager(runtime, containerOwnerId());
+        const agentB = new ContainerManager(runtime, containerOwnerId());
+        await agentA.materialize({ ...baseSpec, name: 'agent-a-work' });
+        await agentB.materialize({ ...baseSpec, name: 'agent-b-work' });
+        runtime.callLog.length = 0;
+
+        // Both boot their startup reaper against the one daemon.
+        expect((await agentA.reapOrphans('', new Set())).reaped).toEqual([]);
+        expect((await agentB.reapOrphans('', new Set())).reaped).toEqual([]);
+
+        expect(runtime.callLog).toEqual([]);
+        expect(await runtime.list()).toHaveLength(2);
+      } finally {
+        warnSpy.mockRestore();
+        if (originalLaceDir === undefined) {
+          delete process.env.LACE_DIR;
+        } else {
+          process.env.LACE_DIR = originalLaceDir;
+        }
+      }
     });
 
     it('continues past individual failures and reports successes', async () => {

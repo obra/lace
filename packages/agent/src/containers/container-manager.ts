@@ -22,10 +22,10 @@ const CONTAINER_ID_PREFIX = 'lace-';
 
 /**
  * Docker object label naming the agent that created a container. Its value is
- * the creating agent's LACE_DIR (see manager-factory), which is stable across
- * restarts of one agent and distinct between agents sharing a host. The startup
- * reaper destroys only containers carrying its own value, so one agent's boot
- * never touches a sibling agent's containers.
+ * the creating agent's explicitly configured LACE_DIR (see manager-factory),
+ * which is stable across restarts of one agent and distinct between agents
+ * sharing a host. The startup reaper destroys only containers carrying its own
+ * value, so one agent's boot never touches a sibling agent's containers.
  */
 export const CONTAINER_OWNER_LABEL = 'lace.owner';
 
@@ -132,11 +132,13 @@ export class ContainerManager {
    * @param ownerId Identity stamped as `lace.owner` on every container this
    *   manager creates in the `lace-` namespace, and the only value
    *   `reapOrphans` will destroy. Must be stable across restarts of the same
-   *   agent (see `containerOwnerId` in manager-factory).
+   *   agent and distinct from every other agent on the host (see
+   *   `containerOwnerId` in manager-factory). `null` when no such identity is
+   *   available: this manager then stamps no owner and reaps nothing.
    */
   constructor(
     private readonly runtime: ContainerRuntime,
-    private readonly ownerId: string
+    private readonly ownerId: string | null
   ) {}
 
   /**
@@ -300,8 +302,13 @@ export class ContainerManager {
    * Specs carrying a verbatim `containerId` (persistent boxes) live outside the
    * `lace-` namespace and are never reaping candidates, so their labels are
    * passed through untouched — the shim owns box identity labels.
+   *
+   * With no owner id we stamp nothing. A label whose value every agent on the
+   * host would also compute is worse than no label: it invites the next agent
+   * to claim these containers and destroy them.
    */
   private labelsWithOwner(spec: ContainerSpec): Record<string, string> | undefined {
+    if (this.ownerId === null) return spec.labels;
     if (spec.containerId && spec.containerId.length > 0) return spec.labels;
     return { ...spec.labels, [CONTAINER_OWNER_LABEL]: this.ownerId };
   }
@@ -396,7 +403,8 @@ export class ContainerManager {
    * another agent on the same host, and containers with no owner label at all
    * (created before the label existed, or by a runtime that drops labels), are
    * left alone — an unreaped container leaks, a wrongly-reaped one destroys
-   * someone's live work.
+   * someone's live work. For the same reason a manager with no owner id of its
+   * own reaps nothing at all.
    *
    * @param specNamePrefix A SPEC-name prefix (NOT a container-id prefix). It is
    *   prepended internally with `CONTAINER_ID_PREFIX` (`lace-`) to form the
@@ -410,6 +418,15 @@ export class ContainerManager {
     specNamePrefix: string,
     liveSpecNames: Set<string>
   ): Promise<{ reaped: string[] }> {
+    if (this.ownerId === null) {
+      logger.warn(
+        'Container reaper: this agent has no distinct identity (LACE_DIR is unset), ' +
+          "so it cannot tell its own containers from another agent's; reaping nothing. " +
+          'Set LACE_DIR to enable orphan reaping.'
+      );
+      return { reaped: [] };
+    }
+
     const scanPrefix = `${CONTAINER_ID_PREFIX}${specNamePrefix}`;
     let containers: ContainerInfo[];
     try {

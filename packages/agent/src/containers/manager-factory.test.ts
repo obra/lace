@@ -18,6 +18,10 @@ function getRuntime(manager: ContainerManager | null): ContainerRuntime | null {
   return manager === null ? null : (manager as unknown as { runtime: ContainerRuntime }).runtime;
 }
 
+function getOwnerId(manager: ContainerManager | null): string | null | undefined {
+  return manager === null ? null : (manager as unknown as { ownerId: string | null }).ownerId;
+}
+
 describe('createDefaultContainerManager', () => {
   const originalRuntimeOverride = process.env[ENV_KEY];
 
@@ -59,12 +63,18 @@ describe('createDefaultContainerManager', () => {
 
 describe('containerOwnerId', () => {
   const originalLaceDir = process.env.LACE_DIR;
+  const originalRuntimeOverride = process.env[ENV_KEY];
 
   afterEach(() => {
     if (originalLaceDir === undefined) {
       delete process.env.LACE_DIR;
     } else {
       process.env.LACE_DIR = originalLaceDir;
+    }
+    if (originalRuntimeOverride === undefined) {
+      delete process.env[ENV_KEY];
+    } else {
+      process.env[ENV_KEY] = originalRuntimeOverride;
     }
   });
 
@@ -74,7 +84,7 @@ describe('containerOwnerId', () => {
 
     // Two calls model two boots of one agent: same directory, same identity.
     expect(containerOwnerId()).toBe(containerOwnerId());
-    expect(containerOwnerId()).toBe(fs.realpathSync(dir));
+    expect(containerOwnerId()).toBe(path.resolve(dir));
 
     fs.rmSync(dir, { recursive: true, force: true });
   });
@@ -99,5 +109,55 @@ describe('containerOwnerId', () => {
     process.env.LACE_DIR = missing;
 
     expect(containerOwnerId()).toBe(path.resolve(missing));
+  });
+
+  it('is null when LACE_DIR is unset', () => {
+    // The default ~/.lace is shared by every agent this OS user runs, so it
+    // cannot tell two of them apart. No id at all is the honest answer; the
+    // manager then stamps no owner and reaps nothing.
+    delete process.env.LACE_DIR;
+
+    expect(containerOwnerId()).toBeNull();
+  });
+
+  it('treats an empty LACE_DIR as unset', () => {
+    process.env.LACE_DIR = '   ';
+
+    expect(containerOwnerId()).toBeNull();
+  });
+
+  it('survives a deploy retargeting the LACE_DIR symlink', () => {
+    // The `current -> releases/N` deploy shape. Resolving the symlink would
+    // change this agent's identity on every release, permanently stranding the
+    // containers it created before the swap: unownable, so unreapable by anyone.
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-owner-deploy-'));
+    const current = path.join(base, 'current');
+    fs.mkdirSync(path.join(base, 'releases', '1'), { recursive: true });
+    fs.mkdirSync(path.join(base, 'releases', '2'), { recursive: true });
+    fs.symlinkSync(path.join(base, 'releases', '1'), current);
+    process.env.LACE_DIR = current;
+
+    const beforeDeploy = containerOwnerId();
+    fs.unlinkSync(current);
+    fs.symlinkSync(path.join(base, 'releases', '2'), current);
+
+    expect(containerOwnerId()).toBe(beforeDeploy);
+
+    fs.rmSync(base, { recursive: true, force: true });
+  });
+
+  it('is the owner id the constructed manager stamps and reaps by', () => {
+    // Wiring: the factory must hand the derived identity to the manager, not a
+    // constant of its own.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-owner-wiring-'));
+    process.env.LACE_DIR = dir;
+    process.env[ENV_KEY] = 'docker';
+
+    const manager = createDefaultContainerManager('linux');
+
+    expect(getOwnerId(manager)).toBe(containerOwnerId());
+    expect(getOwnerId(manager)).toBe(path.resolve(dir));
+
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });
