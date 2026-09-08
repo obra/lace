@@ -22,7 +22,6 @@ env:
 jobs:
   ci:
     name: CI
-    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -50,8 +49,14 @@ jobs:
       - name: Check Prettier formatting
         run: npm run format:check
 
-      - name: Run tests with coverage
+      - name: Run ent-protocol tests
+        run: npm run test --workspace=packages/ent-protocol
+
+      - name: Run agent tests with coverage
         run: npm run test:coverage
+
+      - name: Run CLI tests
+        run: npm run test --workspace=packages/cli
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
