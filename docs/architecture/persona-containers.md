@@ -33,12 +33,38 @@ outside its scope.
 
 The prefix alone does not identify WHICH agent's containers those are, so every
 container lace creates in the `lace-` namespace carries a `lace.owner` label
-holding the creating agent's `LACE_DIR`. The startup reaper destroys only
-candidates whose label matches its own owner id: an agent cleans up the
-containers it leaked before a crash and leaves a sibling agent's containers on
-the same host untouched. A `lace-` container with no `lace.owner` label (created
-before the label existed) is never reaped by anyone — the reaper logs it at WARN
-so an operator can remove it by hand.
+holding the creating agent's identity, and the startup reaper destroys only
+candidates whose label matches its own. An agent cleans up the containers it
+leaked before a crash and leaves a sibling agent's containers on the same host
+untouched.
+
+**The identity is an explicitly configured `LACE_DIR`** (`containerOwnerId()` in
+`manager-factory.ts`), `path.resolve`d — not `realpath`d, so retargeting a
+`current -> releases/N` symlink does not silently change the agent's identity
+and strand everything it created before the swap. Two properties are needed at
+once: durable across a restart of one agent, and distinct between agents. An
+explicit `LACE_DIR` has both.
+
+**With `LACE_DIR` unset there is no identity, and reaping is off.** The
+`getLaceDir()` default (`~/.lace`) is shared by every agent one OS user runs, so
+an id derived from it is durable but not distinct — two concurrent agents would
+match each other's containers and reap them, which is the bug the label exists
+to fix. Nothing else available at boot repairs that: anything durable under a
+shared `LACE_DIR` is shared too, and anything distinct (pid, boot time, a fresh
+random) is lost on restart. So `containerOwnerId()` returns null, the manager
+stamps no owner label, and the reaper destroys nothing and says so at WARN.
+Orphans then accumulate until an operator removes them. **Set `LACE_DIR` to turn
+reaping on.**
+
+A `lace-` container with no `lace.owner` label — created before the label
+existed, or by an agent with no identity — is never reaped by anyone; the reaper
+logs it at WARN so an operator can remove it by hand.
+
+Residual sharing: the granularity is the `LACE_DIR`, not the process. Lace
+processes that share one `LACE_DIR` — a root agent and its delegate children —
+share an owner id and will reap each other's orphan containers. So will two
+agents an operator deliberately points at the same `LACE_DIR`. One `LACE_DIR`
+per agent instance is what the reaper's guarantee is built on.
 
 ## Workspace convention (the workspace IS the result)
 
