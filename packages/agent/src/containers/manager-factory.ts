@@ -7,6 +7,8 @@ import { DockerContainerRuntime } from './docker-container';
 import { PlaneRuntime } from './plane-runtime';
 import { AppleContainerRuntime } from './apple-container';
 import { registries } from '@lace/agent/plugins';
+import { getEnvVar } from '@lace/agent/config/env-loader';
+import * as path from 'path';
 import type { ContainerRuntime } from './types';
 
 export const CONTAINER_RUNTIME_ENV = 'LACE_CONTAINER_RUNTIME';
@@ -67,6 +69,36 @@ export function registerBuiltinRuntimes(): void {
   }
 }
 
+/**
+ * Identity for the containers this agent creates: an explicitly configured
+ * LACE_DIR, or null when there is none.
+ *
+ * The identity has to satisfy two properties at once: survive a restart of this
+ * agent (so a crashed agent still recognizes and reaps its own leaked
+ * containers) and differ from every other agent on the host (so neither reaps
+ * the other's). An explicit LACE_DIR satisfies both — it is durable, and giving
+ * a second agent its own LACE_DIR is how you run two agents in the first place.
+ *
+ * `getLaceDir()`'s ~/.lace default does NOT: every agent this OS user runs
+ * lands on the same path, so an id derived from it is stable but not distinct,
+ * and two concurrent agents would reap each other exactly as before this label
+ * existed. Nothing else available at boot fixes that — anything durable under a
+ * shared LACE_DIR is shared too, and anything distinct (pid, boot time, a fresh
+ * random) is lost on restart. So we return null and the caller fails closed:
+ * no owner stamped, nothing reaped. Set LACE_DIR to turn reaping back on.
+ *
+ * `path.resolve`, not `fs.realpathSync`: under the usual `current ->
+ * releases/N` deploy shape, resolving the symlink would change this agent's
+ * identity at every release and strand every container created before the swap
+ * as unowned, hence unreapable by anyone. Two different spellings of one
+ * directory read as two agents, which costs a leak rather than a wrong destroy.
+ */
+export function containerOwnerId(): string | null {
+  const laceDir = getEnvVar('LACE_DIR')?.trim();
+  if (!laceDir) return null;
+  return path.resolve(laceDir);
+}
+
 export function createDefaultContainerManager(
   platform: NodeJS.Platform = process.platform,
   runtimeSelection: string | undefined = process.env[CONTAINER_RUNTIME_ENV]
@@ -94,5 +126,5 @@ export function createDefaultContainerManager(
     throw new Error(`${CONTAINER_RUNTIME_ENV}="${name}" but no runtime registered under that name`);
   }
 
-  return new ContainerManager(registries.runtimes.resolve(name));
+  return new ContainerManager(registries.runtimes.resolve(name), containerOwnerId());
 }

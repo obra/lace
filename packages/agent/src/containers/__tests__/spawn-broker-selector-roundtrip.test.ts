@@ -79,7 +79,7 @@ describe('PRI-2012 B7.1 SELECTOR round-trip to create() config', () => {
 
   beforeEach(() => {
     runtime = new RecordingRuntime();
-    manager = new ContainerManager(runtime);
+    manager = new ContainerManager(runtime, '/lace-dir/selector-roundtrip');
   });
 
   afterEach(() => {});
