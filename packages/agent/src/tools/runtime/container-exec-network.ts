@@ -9,6 +9,7 @@ import {
   type RuntimeProcessRunner,
 } from './types';
 import { nodeErrorFromExec, streamToString, writeStreamAndClose } from './container-exec-shared';
+import { redactSensitiveUrl } from '../url-redaction';
 
 const DEFAULT_FETCH_TIMEOUT_SECS = 120;
 
@@ -63,6 +64,19 @@ function extractTrailingEffectiveUrl(body: Buffer): { url: string | undefined; b
   // Drop the newline the write-out format puts in front of the marker too.
   const end = start > 0 && body[start - 1] === 0x0a ? start - 1 : start;
   return { url: url || undefined, body: body.subarray(0, end) };
+}
+
+/** Scrub credentials out of curl's own error text, which quotes the URL it was
+ * handed back at the caller (`unmatched brace in URL position N:` prints it on
+ * its own line). Both URLs are known exactly, so replace those strings outright
+ * rather than hunting for URL-shaped spans: an exact replacement also covers a
+ * malformed URL containing a space, which no URL-shaped scan can delimit. */
+function redactUrlsInStderr(stderr: string, urls: (string | undefined)[]): string {
+  let redacted = stderr;
+  for (const url of urls) {
+    if (url) redacted = redacted.split(url).join(redactSensitiveUrl(url));
+  }
+  return redacted;
 }
 
 export class ContainerExecNetworkClient implements RuntimeNetworkClient {
@@ -123,7 +137,16 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
     const { url: effectiveUrl, stderr: cleanStderr } = extractEffectiveUrl(stderr);
 
     if (completion.exitCode !== 0) {
-      throw nodeErrorFromExec(completion.exitCode ?? -1, cleanStderr, 'fetch', url);
+      // The URL is a credential carrier (pre-signed signatures, OAuth codes),
+      // and this message is rendered straight into url_fetch's error report.
+      // Redact before it ever lands in an Error, so nothing downstream — a log
+      // line, another caller — has to remember to.
+      throw nodeErrorFromExec(
+        completion.exitCode ?? -1,
+        redactUrlsInStderr(cleanStderr, [url, effectiveUrl]),
+        'fetch',
+        redactSensitiveUrl(url)
+      );
     }
 
     const raw = Buffer.from(stdout, 'base64');

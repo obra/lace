@@ -257,4 +257,87 @@ describe('ContainerExecNetworkClient', () => {
       /__lace_curl_effective_url__/
     );
   });
+
+  describe('credential redaction in curl failures', () => {
+    const SECRET = 'SECRETVALUE0123456789abcdef0123456789';
+
+    it('does not leak the requested URL when curl fails with no stderr at all', async () => {
+      // Exit code with an empty stderr falls back to the message
+      // `nodeErrorFromExec` constructs, which interpolates the URL it was given.
+      const { runner } = fakeRunner({ exitCode: 7, stderr: '', stdoutRaw: Buffer.alloc(0) });
+      const client = new ContainerExecNetworkClient(runner);
+
+      const error = await client
+        .fetch(`https://bucket.s3.amazonaws.com/report.csv?X-Amz-Signature=${SECRET}`)
+        .catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(Error);
+      const message = (error as Error).message;
+      expect(message).not.toContain(SECRET);
+      expect(message).toContain(
+        'https://bucket.s3.amazonaws.com/report.csv?X-Amz-Signature=[REDACTED]'
+      );
+      expect(message).not.toContain('[REDACTED]]');
+    });
+
+    it('redacts a credentialed URL that curl echoed back in its own stderr', async () => {
+      // Verbatim curl 8.5.0 output for a URL containing an unmatched brace.
+      const url = `https://example.com/{a?token=${SECRET}`;
+      const stderr = `curl: (3) unmatched brace in URL position 20:\n${url}\n                   ^\n`;
+      const { runner } = fakeRunner({ exitCode: 3, stderr, stdoutRaw: Buffer.alloc(0) });
+      const client = new ContainerExecNetworkClient(runner);
+
+      const error = await client.fetch(url).catch((e: unknown) => e);
+
+      const message = (error as Error).message;
+      expect(message).not.toContain(SECRET);
+      expect(message).toContain('https://example.com/{a?token=[REDACTED]\n');
+      expect(message).not.toContain('[REDACTED]]');
+      expect(message).toContain('unmatched brace in URL position 20');
+    });
+
+    it('redacts an echoed URL whose embedded space would stop a URL-shaped scan', async () => {
+      const url = `http://127.0.0.1:32875/a b?code=${SECRET}`;
+      const stderr = `curl: (3) unmatched brace in URL position 20:\n${url}\n`;
+      const { runner } = fakeRunner({ exitCode: 3, stderr, stdoutRaw: Buffer.alloc(0) });
+      const client = new ContainerExecNetworkClient(runner);
+
+      const error = await client.fetch(url).catch((e: unknown) => e);
+
+      const message = (error as Error).message;
+      expect(message).not.toContain(SECRET);
+      expect(message).toContain('http://127.0.0.1:32875/a b?code=[REDACTED]');
+      expect(message).not.toContain('[REDACTED]]');
+    });
+
+    it('redacts the effective URL curl reports alongside its error text', async () => {
+      const effective = `https://login.example.com/cb?code=${SECRET}`;
+      const stderr =
+        `curl: (3) unmatched brace in URL position 20:\n${effective}\n` +
+        `__lace_curl_effective_url__:${effective}\n`;
+      const { runner } = fakeRunner({ exitCode: 3, stderr, stdoutRaw: Buffer.alloc(0) });
+      const client = new ContainerExecNetworkClient(runner);
+
+      const error = await client
+        .fetch('https://example.com/start', { redirect: 'follow' })
+        .catch((e: unknown) => e);
+
+      const message = (error as Error).message;
+      expect(message).not.toContain(SECRET);
+      expect(message).toContain('https://login.example.com/cb?code=[REDACTED]');
+      expect(message).not.toContain('[REDACTED]]');
+    });
+
+    it('leaves a curl failure with no credentials in it untouched', async () => {
+      const stderr = 'curl: (6) Could not resolve host: unreachable.example\n';
+      const { runner } = fakeRunner({ exitCode: 6, stderr, stdoutRaw: Buffer.alloc(0) });
+      const client = new ContainerExecNetworkClient(runner);
+
+      const error = await client
+        .fetch('http://unreachable.example/docs?page=3')
+        .catch((e: unknown) => e);
+
+      expect((error as Error).message).toBe(stderr.trim());
+    });
+  });
 });

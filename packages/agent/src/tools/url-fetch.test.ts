@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { UrlFetchTool } from '@lace/agent/tools/implementations/url_fetch';
 import { createFakeRuntime } from './runtime/__tests__/fake-runtime';
+import type { ToolRuntime } from './runtime/types';
 
 describe('UrlFetchTool with schema validation', () => {
   let tool: UrlFetchTool;
@@ -680,6 +681,317 @@ Follows redirects by default. Returns detailed error context for failures.`
       const output = result.content[0].text ?? '';
       expect(output).toContain('Content from https://example.com/plain');
       expect(output).not.toContain('redirected from');
+    });
+  });
+
+  describe('Credential redaction in surfaced URLs', () => {
+    const okRuntime = (finalUrl?: string) =>
+      createFakeRuntime({
+        fetchResult: {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('hello'),
+          ...(finalUrl === undefined ? {} : { url: finalUrl }),
+        },
+      });
+
+    const failingRuntime = (finalUrl?: string) =>
+      createFakeRuntime({
+        fetchResult: {
+          status: 404,
+          headers: { 'content-type': 'text/plain' },
+          body: new TextEncoder().encode('not found'),
+          ...(finalUrl === undefined ? {} : { url: finalUrl }),
+        },
+      });
+
+    const runTool = async (url: string, runtime: ReturnType<typeof createFakeRuntime>) => {
+      const result = await tool.execute({ url }, { signal: new AbortController().signal, runtime });
+      return result.content[0].text ?? '';
+    };
+
+    it('redacts a denylisted query parameter while keeping the key and benign params', async () => {
+      const output = await runTool(
+        'https://example.com/cb?page=3&code=4%2F0AeanS0abcdef&sort=asc',
+        failingRuntime()
+      );
+
+      expect(output).not.toContain('4%2F0AeanS0abcdef');
+      expect(output).toContain('code=[REDACTED]');
+      expect(output).toContain('page=3');
+      expect(output).toContain('sort=asc');
+      expect(output).toContain('https://example.com/cb?');
+    });
+
+    it('redacts a signed-URL signature parameter', async () => {
+      const signature = 'a'.repeat(20) + '9b2c3d4e5f60718293a4b5c6d7e8f901';
+      const output = await runTool(
+        `https://bucket.s3.amazonaws.com/report.csv?X-Amz-Credential=AKIAIOSFODNN7EXAMPLE&X-Amz-Expires=900&X-Amz-Signature=${signature}`,
+        failingRuntime()
+      );
+
+      expect(output).not.toContain(signature);
+      expect(output).not.toContain('AKIAIOSFODNN7EXAMPLE');
+      expect(output).toContain('X-Amz-Signature=[REDACTED]');
+      expect(output).toContain('X-Amz-Credential=[REDACTED]');
+      expect(output).toContain('X-Amz-Expires=900');
+    });
+
+    it('redacts a long high-entropy value under a key that is not on the denylist', async () => {
+      const opaque = 'f3a91c7de204b8615c9d0af27be431905ca8d76e12b34f9087ac5de6103b2f4d';
+      const output = await runTool(`https://example.com/x?blob=${opaque}&page=2`, failingRuntime());
+
+      expect(output).not.toContain(opaque);
+      expect(output).toContain('blob=[REDACTED]');
+      expect(output).toContain('page=2');
+    });
+
+    it('redacts userinfo credentials from the URL', async () => {
+      const output = await runTool('https://alice:hunter2@example.com/private', failingRuntime());
+
+      expect(output).not.toContain('hunter2');
+      expect(output).not.toContain('alice');
+      expect(output).toContain('https://[REDACTED]@example.com/private');
+    });
+
+    it('redacts an implicit-flow token carried in the fragment', async () => {
+      const output = await runTool(
+        'https://example.com/cb#access_token=ya29.a0AfB_byXXXXX&state=xyz789&token_type=Bearer',
+        failingRuntime()
+      );
+
+      expect(output).not.toContain('ya29.a0AfB_byXXXXX');
+      expect(output).toContain('access_token=[REDACTED]');
+      expect(output).toContain('state=xyz789');
+      // `token_type` is over-redacted: the denylist matches the word `token`.
+      // Losing `Bearer` costs nothing, and the parameter name still shows.
+      expect(output).toContain('token_type=[REDACTED]');
+    });
+
+    it('keeps a plain anchor fragment intact', async () => {
+      const output = await runTool('https://example.com/docs#installation', failingRuntime());
+
+      expect(output).toContain('URL: https://example.com/docs#installation');
+    });
+
+    it('leaves a benign URL untouched', async () => {
+      const output = await runTool(
+        'https://example.com/docs/guide?page=3&lang=en#section-2',
+        failingRuntime()
+      );
+
+      expect(output).toContain('URL: https://example.com/docs/guide?page=3&lang=en#section-2');
+      expect(output).not.toContain('[REDACTED]');
+    });
+
+    it('redacts both the requested and the effective URL of a redirect on the error path', async () => {
+      const output = await runTool(
+        'https://example.com/start?api_key=sk-live-01234567890',
+        failingRuntime('https://login.example.com/cb?code=SECRETCODE01234')
+      );
+
+      expect(output).not.toContain('sk-live-01234567890');
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('URL: https://example.com/start?api_key=[REDACTED]');
+      expect(output).toContain('Final URL: https://login.example.com/cb?code=[REDACTED]');
+    });
+
+    it('redacts both URLs in the success-path content attribution', async () => {
+      const output = await runTool(
+        'https://example.com/start?api_key=sk-live-01234567890',
+        okRuntime('https://login.example.com/cb?code=SECRETCODE01234')
+      );
+
+      expect(output).not.toContain('sk-live-01234567890');
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('Content from https://login.example.com/cb?code=[REDACTED]');
+      expect(output).toContain('redirected from https://example.com/start?api_key=[REDACTED]');
+    });
+
+    it('redacts the URL inside the diagnostic JSON blob', async () => {
+      const output = await runTool('https://example.com/cb?token=abc123secret', failingRuntime());
+
+      expect(output).not.toContain('abc123secret');
+      expect(output).toContain('"url": "https://example.com/cb?token=[REDACTED]"');
+    });
+
+    it('still reports a redirect when both URLs redact to the same text', async () => {
+      const output = await runTool(
+        'https://example.com/cb?code=AAAA1111',
+        failingRuntime('https://example.com/cb?code=BBBB2222')
+      );
+
+      expect(output).toContain('Final URL: https://example.com/cb?code=[REDACTED]');
+    });
+
+    it('does not report a phantom Final URL for a non-redirected request with query params', async () => {
+      const url = 'https://example.com/cb?code=SECRETCODE01234&page=3';
+      const output = await runTool(url, failingRuntime(url));
+
+      expect(output).not.toContain('Final URL:');
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('code=[REDACTED]');
+    });
+
+    it('does not report a phantom redirect on the success path for a redacted URL', async () => {
+      const url = 'https://example.com/cb?code=SECRETCODE01234&page=3';
+      const output = await runTool(url, okRuntime(url));
+
+      expect(output).not.toContain('redirected from');
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('Content from https://example.com/cb?code=[REDACTED]&page=3');
+    });
+  });
+
+  describe('Credential redaction in response headers', () => {
+    const redirectingRuntime = (location: string) =>
+      createFakeRuntime({
+        fetchResult: {
+          status: 302,
+          headers: { 'content-type': 'text/html', location },
+          body: new TextEncoder().encode(''),
+        },
+      });
+
+    it('redacts the Location header of an unfollowed redirect', async () => {
+      // `followRedirects: false` turns any 3xx into an error report, and the
+      // redirect destination is exactly where an OAuth code lives.
+      const result = await tool.execute(
+        { url: 'https://example.com/start', followRedirects: false },
+        {
+          signal: new AbortController().signal,
+          runtime: redirectingRuntime('https://login.example.com/cb?code=SECRETCODE01234'),
+        }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('  location: https://login.example.com/cb?code=[REDACTED]\n');
+      expect(output).toContain('"location": "https://login.example.com/cb?code=[REDACTED]"');
+    });
+
+    it('redacts a relative Location header', async () => {
+      const result = await tool.execute(
+        { url: 'https://example.com/start', followRedirects: false },
+        {
+          signal: new AbortController().signal,
+          runtime: redirectingRuntime('/cb?code=SECRETCODE01234&page=3'),
+        }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain('  location: /cb?code=[REDACTED]&page=3\n');
+    });
+
+    it('leaves a Location header carrying no credentials untouched', async () => {
+      const result = await tool.execute(
+        { url: 'https://example.com/start', followRedirects: false },
+        {
+          signal: new AbortController().signal,
+          runtime: redirectingRuntime('https://example.com/docs?page=3'),
+        }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).toContain('  location: https://example.com/docs?page=3\n');
+      expect(output).not.toContain('[REDACTED]');
+    });
+
+    it('redacts a credentialed URL in any other response header', async () => {
+      const runtime = createFakeRuntime({
+        fetchResult: {
+          status: 404,
+          headers: {
+            'content-type': 'text/plain',
+            'x-debug-origin': 'served from https://origin.example.com/o?token=SECRETCODE01234',
+          },
+          body: new TextEncoder().encode('nope'),
+        },
+      });
+
+      const result = await tool.execute(
+        { url: 'https://example.com/start' },
+        { signal: new AbortController().signal, runtime }
+      );
+
+      const output = result.content[0].text ?? '';
+      expect(output).not.toContain('SECRETCODE01234');
+      expect(output).toContain(
+        '"x-debug-origin": "served from https://origin.example.com/o?token=[REDACTED]"'
+      );
+    });
+  });
+
+  describe('Credential redaction in runtime error messages', () => {
+    const throwingRuntime = (message: string): ToolRuntime => ({
+      ...createFakeRuntime(),
+      network: { fetch: vi.fn().mockRejectedValue(new Error(message)) },
+    });
+
+    const runToolAgainst = async (url: string, message: string) => {
+      const result = await tool.execute(
+        { url },
+        { signal: new AbortController().signal, runtime: throwingRuntime(message) }
+      );
+      return result.content[0].text ?? '';
+    };
+
+    it('redacts a credentialed URL embedded in the runtime error message', async () => {
+      const secret = 'SECRETVALUE0123456789abcdef0123456789';
+      const output = await runToolAgainst(
+        'https://example.com/x',
+        `curl: (3) unmatched brace in URL position 20:\nhttps://example.com/{a?token=${secret}\n`
+      );
+
+      expect(output).not.toContain(secret);
+      expect(output).toContain('token=[REDACTED]');
+      expect(output).toContain('unmatched brace in URL position 20');
+    });
+
+    it('redacts userinfo credentials embedded in the runtime error message', async () => {
+      const output = await runToolAgainst(
+        'https://example.com/private',
+        'connect ECONNREFUSED for https://alice:hunter2@example.com/private'
+      );
+
+      expect(output).not.toContain('hunter2');
+      expect(output).toContain('https://[REDACTED]@example.com/private');
+    });
+
+    it('redacts a URL the error message wrapped in parentheses', async () => {
+      // The trailing `).` is punctuation, not URL: left inside the value it
+      // fails the credential-shape charset test and the token survives.
+      const secret = 'f3a91c7de204b8615c9d0af27be431905ca8d76e12b34f9087ac5de6103b2f4d';
+      const output = await runToolAgainst(
+        'https://example.com/x',
+        `request failed (https://example.com/x?blob=${secret}).`
+      );
+
+      expect(output).not.toContain(secret);
+      expect(output).toContain('blob=[REDACTED]');
+    });
+
+    it('does not double the sentinel when the throw site already redacted the URL', async () => {
+      // The container runtime redacts into the Error message; url_fetch then
+      // runs the free-text scan over that same message. `]` is trailing
+      // punctuation, so a naive second pass emits `code=[REDACTED]]`.
+      const output = await runToolAgainst(
+        'https://example.com/cb',
+        'fetch failed (exit 7) for https://example.com/cb?code=[REDACTED]'
+      );
+
+      expect(output).toContain(
+        'NETWORK ERROR: fetch failed (exit 7) for https://example.com/cb?code=[REDACTED]\n'
+      );
+      expect(output).not.toContain('[REDACTED]]');
+    });
+
+    it('leaves an error message with no URL in it alone', async () => {
+      const output = await runToolAgainst('https://example.com/x', 'socket hang up');
+
+      expect(output).toContain('NETWORK ERROR: socket hang up');
+      expect(output).not.toContain('[REDACTED]');
     });
   });
 });
