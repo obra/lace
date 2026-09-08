@@ -108,8 +108,6 @@ registry.removeHelper('analysis-task');
   guide
 - **[Code Examples](./examples/helper-patterns.ts)** - Practical implementation
   patterns
-- **[Integration Examples](./examples/integration-examples.md)** - Real-world
-  system integration
 
 ### Quick Start
 
