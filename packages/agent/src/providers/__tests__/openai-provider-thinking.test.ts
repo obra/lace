@@ -112,6 +112,65 @@ describe('OpenAIProvider thinking events', () => {
       expect(thinkingEndEvents[0].tokens).toBe(25);
     });
 
+    it('falls back to content[].text when a reasoning item has an empty summary', async () => {
+      // Some Responses-API-compatible gateways (e.g. LunaRoute) put the reasoning
+      // text under content[{type:'reasoning_text'}] and leave summary empty,
+      // instead of populating summary[].text the way real OpenAI reasoning
+      // models do.
+      const thinkingStartEvents: StreamingEvents['thinking_start'][] = [];
+      const thinkingDeltaEvents: StreamingEvents['thinking_delta'][] = [];
+      const thinkingEndEvents: StreamingEvents['thinking_end'][] = [];
+
+      provider.on('thinking_start', (data: StreamingEvents['thinking_start']) => {
+        thinkingStartEvents.push(data);
+      });
+      provider.on('thinking_delta', (data: StreamingEvents['thinking_delta']) => {
+        thinkingDeltaEvents.push(data);
+      });
+      provider.on('thinking_end', (data: StreamingEvents['thinking_end']) => {
+        thinkingEndEvents.push(data);
+      });
+
+      mockResponsesCreate.mockResolvedValue({
+        id: 'resp_123',
+        status: 'completed',
+        output: [
+          {
+            type: 'reasoning',
+            id: 'reasoning_1',
+            summary: [],
+            content: [
+              { type: 'reasoning_text', text: 'Working through the request...' },
+              { type: 'reasoning_text', text: 'Settling on an answer.' },
+            ],
+          },
+          {
+            type: 'message',
+            content: [{ type: 'output_text', text: 'Here is my answer.' }],
+          },
+        ],
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          total_tokens: 150,
+          output_tokens_details: {
+            reasoning_tokens: 25,
+          },
+        },
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Think about this' }];
+
+      await provider.createResponse(messages, [], 'deepseek-4.1-flash');
+
+      expect(thinkingStartEvents).toHaveLength(1);
+      expect(thinkingDeltaEvents).toHaveLength(2);
+      expect(thinkingDeltaEvents[0].text).toBe('Working through the request...');
+      expect(thinkingDeltaEvents[1].text).toBe('Settling on an answer.');
+      expect(thinkingEndEvents).toHaveLength(1);
+      expect(thinkingEndEvents[0].tokens).toBe(25);
+    });
+
     it('should not emit thinking events for responses without reasoning items', async () => {
       const thinkingStartEvents: StreamingEvents['thinking_start'][] = [];
       const thinkingDeltaEvents: StreamingEvents['thinking_delta'][] = [];
@@ -277,6 +336,93 @@ describe('OpenAIProvider thinking events', () => {
       expect(thinkingDeltaEvents).toHaveLength(2);
       expect(thinkingDeltaEvents[0].text).toBe('Let me think...');
       expect(thinkingDeltaEvents[1].text).toBe(' about this problem.');
+      expect(thinkingEndEvents).toHaveLength(1);
+      expect(thinkingEndEvents[0].tokens).toBe(30);
+    });
+
+    it('emits thinking_delta from response.reasoning_text.delta (no reasoning_summary events)', async () => {
+      // Some Responses-API-compatible gateways (e.g. LunaRoute) stream reasoning
+      // as response.reasoning_text.delta content deltas instead of the
+      // response.reasoning_summary.delta summary deltas real OpenAI reasoning
+      // models emit.
+      const thinkingStartEvents: StreamingEvents['thinking_start'][] = [];
+      const thinkingDeltaEvents: StreamingEvents['thinking_delta'][] = [];
+      const thinkingEndEvents: StreamingEvents['thinking_end'][] = [];
+
+      provider.on('thinking_start', (data: StreamingEvents['thinking_start']) => {
+        thinkingStartEvents.push(data);
+      });
+      provider.on('thinking_delta', (data: StreamingEvents['thinking_delta']) => {
+        thinkingDeltaEvents.push(data);
+      });
+      provider.on('thinking_end', (data: StreamingEvents['thinking_end']) => {
+        thinkingEndEvents.push(data);
+      });
+
+      const streamEvents = [
+        {
+          type: 'response.output_item.added',
+          output_index: 0,
+          item: { type: 'reasoning', id: 'reasoning_1' },
+        },
+        {
+          type: 'response.reasoning_text.delta',
+          item_id: 'reasoning_1',
+          content_index: 0,
+          output_index: 0,
+          sequence_number: 1,
+          delta: 'Working through the request...',
+        },
+        {
+          type: 'response.reasoning_text.delta',
+          item_id: 'reasoning_1',
+          content_index: 0,
+          output_index: 0,
+          sequence_number: 2,
+          delta: ' Settling on an answer.',
+        },
+        {
+          type: 'response.output_item.added',
+          output_index: 1,
+          item: { type: 'message', id: 'msg_1' },
+        },
+        {
+          type: 'response.output_text.delta',
+          delta: 'Here is my answer.',
+        },
+        {
+          type: 'response.completed',
+          response: {
+            id: 'resp_123',
+            status: 'completed',
+            usage: {
+              input_tokens: 100,
+              output_tokens: 50,
+              total_tokens: 150,
+              output_tokens_details: {
+                reasoning_tokens: 30,
+              },
+            },
+          },
+        },
+      ];
+
+      mockResponsesCreate.mockImplementation(() => {
+        return (async function* () {
+          for (const event of streamEvents) {
+            yield event;
+          }
+        })();
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Think about this' }];
+
+      await provider.createStreamingResponse(messages, [], 'deepseek-4.1-flash');
+
+      expect(thinkingStartEvents).toHaveLength(1);
+      expect(thinkingDeltaEvents).toHaveLength(2);
+      expect(thinkingDeltaEvents[0].text).toBe('Working through the request...');
+      expect(thinkingDeltaEvents[1].text).toBe(' Settling on an answer.');
       expect(thinkingEndEvents).toHaveLength(1);
       expect(thinkingEndEvents[0].tokens).toBe(30);
     });

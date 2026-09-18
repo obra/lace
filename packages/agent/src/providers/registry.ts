@@ -387,6 +387,7 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
+      ...(catalogProvider.api_style && { apiStyle: catalogProvider.api_style }),
       // Pass instance catalog (with dynamic models) so provider can look up model metadata
       catalogProvider: instanceCatalog ?? catalogProvider,
     };
@@ -462,6 +463,7 @@ export class ProviderRegistry {
       ...(credentials.additionalAuth || {}),
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
+      ...(catalogProvider.api_style && { apiStyle: catalogProvider.api_style }),
       // Pass instance catalog (with dynamic models) so provider can look up model metadata
       catalogProvider: catalog ?? catalogProvider,
     };

@@ -42,6 +42,10 @@ export interface ProviderConfig {
   systemPrompt?: string;
   streaming?: boolean; // Enable token-by-token streaming
   catalogProvider?: CatalogProvider; // Catalog data for this provider instance
+  // Catalog-declared OpenAI wire API opt-in (catalogProvider.api_style), copied
+  // up to a top-level field so providers can consult it without reaching into
+  // catalogProvider themselves. Only meaningful to the 'openai' provider type.
+  apiStyle?: 'responses' | 'chat';
   [key: string]: unknown; // Allow provider-specific config
 }
 
