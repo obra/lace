@@ -134,4 +134,63 @@ describe('Ent protocol provider/model management schemas', () => {
       })
     ).not.toThrow();
   });
+
+  // Regression test for the #401 (add-lunaroute-provider) CI failure: the
+  // catalog schema in @lace/agent (CatalogProviderSchema, see
+  // packages/agent/src/providers/catalog/types.ts) grew an `api_style` opt-in
+  // field, but this strict wire-protocol mirror (CatalogProviderInfoSchema in
+  // schemas/shared.ts) was not updated to match, so any catalog entry carrying
+  // `api_style` (e.g. lunaroute.json) failed `ent/providers/catalog` with
+  // "Unrecognized key(s) in object: 'api_style'".
+  it('accepts a catalog provider entry with an api_style opt-in', () => {
+    expect(() =>
+      EntProvidersCatalogResponseSchema.parse({
+        ...baseRequest,
+        result: {
+          providers: [
+            {
+              id: 'lunaroute',
+              name: 'LunaRoute',
+              type: 'openai',
+              api_endpoint: 'https://lunaroute.example.com/v1',
+              api_style: 'responses',
+              default_large_model_id: 'deepseek-reasoner',
+              default_small_model_id: 'deepseek-reasoner',
+              models: [
+                {
+                  id: 'deepseek-reasoner',
+                  name: 'DeepSeek Reasoner',
+                  context_window: 64000,
+                  default_max_tokens: 8192,
+                  cost_per_1m_in: 0,
+                  cost_per_1m_out: 0,
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).not.toThrow();
+
+    // A garbage value for api_style should still be rejected -- this isn't a
+    // free-text passthrough field.
+    expect(() =>
+      EntProvidersCatalogResponseSchema.parse({
+        ...baseRequest,
+        result: {
+          providers: [
+            {
+              id: 'lunaroute',
+              name: 'LunaRoute',
+              type: 'openai',
+              api_style: 'bogus',
+              default_large_model_id: 'deepseek-reasoner',
+              default_small_model_id: 'deepseek-reasoner',
+              models: [],
+            },
+          ],
+        },
+      })
+    ).toThrow();
+  });
 });

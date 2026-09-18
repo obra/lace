@@ -387,6 +387,13 @@ export const CatalogProviderInfoSchema = z
     type: NonEmptyStringSchema,
     api_key: z.string().optional(),
     api_endpoint: z.string().optional(),
+    // Which OpenAI wire API to use against this provider's endpoint. Mirrors
+    // @lace/agent's CatalogProviderSchema `api_style` field (see
+    // packages/agent/src/providers/catalog/types.ts) -- this schema is a strict
+    // wire-protocol copy, so any field added there needs to be added here too or
+    // catalog entries carrying it fail `ent/providers/catalog` with
+    // 'Unrecognized key(s) in object'.
+    api_style: z.enum(['responses', 'chat']).optional(),
     default_large_model_id: NonEmptyStringSchema,
     default_small_model_id: NonEmptyStringSchema,
     // What this provider's bare aliases ('opus', 'sonnet', 'haiku') resolve to.
