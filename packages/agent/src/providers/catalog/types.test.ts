@@ -122,6 +122,65 @@ describe('CatalogProviderSchema', () => {
     const result = CatalogProviderSchema.safeParse(invalidProvider);
     expect(result.success).toBe(false);
   });
+
+  it('accepts api_style: responses for an openai-type custom endpoint', () => {
+    const lunaroute = {
+      name: 'LunaRoute',
+      id: 'lunaroute',
+      type: 'openai',
+      api_key: '$LUNAROUTE_API_KEY',
+      api_endpoint: 'https://gw.lunaroute.com/v1',
+      api_style: 'responses',
+      default_large_model_id: 'deepseek-4.1-flash',
+      default_small_model_id: 'deepseek-4.1-flash',
+      models: [
+        {
+          id: 'deepseek-4.1-flash',
+          name: 'DeepSeek 4.1 Flash',
+          context_window: 128000,
+          default_max_tokens: 8192,
+        },
+      ],
+    };
+
+    const result = CatalogProviderSchema.safeParse(lunaroute);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.api_style).toBe('responses');
+    }
+  });
+
+  it('leaves api_style undefined when absent', () => {
+    const minimalProvider = {
+      name: 'Test Provider',
+      id: 'test',
+      type: 'openai',
+      default_large_model_id: 'gpt-4',
+      default_small_model_id: 'gpt-3.5-turbo',
+      models: [],
+    };
+
+    const result = CatalogProviderSchema.safeParse(minimalProvider);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.api_style).toBeUndefined();
+    }
+  });
+
+  it('rejects an api_style value outside the responses|chat enum', () => {
+    const invalidProvider = {
+      name: 'Test Provider',
+      id: 'test',
+      type: 'openai',
+      api_style: 'streaming',
+      default_large_model_id: 'gpt-4',
+      default_small_model_id: 'gpt-3.5-turbo',
+      models: [],
+    };
+
+    const result = CatalogProviderSchema.safeParse(invalidProvider);
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('ProviderInstanceSchema', () => {

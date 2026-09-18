@@ -571,12 +571,27 @@ export class OpenAIProvider extends AIProvider {
       // Process reasoning items for thinking events (o1/o3 models)
       // Note: Reasoning items are emitted as events but not included in regular content
       else if (item.type === 'reasoning') {
-        const reasoningItem = item as { summary: Array<{ text: string }> };
-        if (reasoningItem.summary && reasoningItem.summary.length > 0) {
+        const reasoningItem = item as {
+          summary: Array<{ text: string }>;
+          content?: Array<{ type: string; text: string }>;
+        };
+        // Some Responses-API-compatible gateways (e.g. LunaRoute) return the
+        // reasoning text under `content[{type:'reasoning_text'}]` and leave
+        // `summary` empty, rather than populating `summary[].text` the way real
+        // OpenAI reasoning models do. Fall back to `content` so that reasoning
+        // still surfaces as thinking events instead of silently disappearing.
+        const summaryParts = reasoningItem.summary ?? [];
+        const reasoningTexts =
+          summaryParts.length > 0
+            ? summaryParts.map((part) => part.text)
+            : (reasoningItem.content ?? [])
+                .filter((part) => part.type === 'reasoning_text')
+                .map((part) => part.text);
+        if (reasoningTexts.length > 0) {
           this.emit('thinking_start', {});
-          for (const summaryPart of reasoningItem.summary) {
-            if (summaryPart.text) {
-              this.emit('thinking_delta', { text: summaryPart.text });
+          for (const text of reasoningTexts) {
+            if (text) {
+              this.emit('thinking_delta', { text });
             }
           }
           // Get reasoning tokens from usage if available
@@ -633,6 +648,18 @@ export class OpenAIProvider extends AIProvider {
   }
 
   /**
+   * Whether a custom endpoint should still be routed to the Responses API rather
+   * than the default-for-custom-endpoints Chat Completions. Catalog entries opt
+   * in per-provider via `api_style: 'responses'` (threaded into ProviderConfig as
+   * `apiStyle` by the registry) for gateways -- like LunaRoute -- that implement
+   * the Responses API even though they aren't api.openai.com.
+   */
+  private customEndpointUsesResponsesAPI(): boolean {
+    const config = this._config as OpenAIProviderConfig;
+    return config.apiStyle === 'responses';
+  }
+
+  /**
    * Checks if an error indicates the model doesn't support the Responses API.
    * This allows us to fall back to Chat Completions for older models.
    */
@@ -666,8 +693,9 @@ export class OpenAIProvider extends AIProvider {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
-    // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support Responses API)
-    if (this.isCustomEndpoint()) {
+    // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support
+    // Responses API) unless the catalog entry opted this endpoint into Responses via api_style.
+    if (this.isCustomEndpoint() && !this.customEndpointUsesResponsesAPI()) {
       return this._createChatCompletionsResponse(messages, tools, model, signal, options);
     }
 
@@ -863,8 +891,9 @@ export class OpenAIProvider extends AIProvider {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
-    // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support Responses API)
-    if (this.isCustomEndpoint()) {
+    // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support
+    // Responses API) unless the catalog entry opted this endpoint into Responses via api_style.
+    if (this.isCustomEndpoint() && !this.customEndpointUsesResponsesAPI()) {
       return this._createChatCompletionsStreamingResponse(messages, tools, model, signal, options);
     }
 
@@ -1345,6 +1374,17 @@ export class OpenAIProvider extends AIProvider {
                 }
                 break;
               }
+
+              case 'response.reasoning_text.delta':
+                // Some Responses-API-compatible gateways (e.g. LunaRoute) stream
+                // reasoning as `response.reasoning_text.delta` content deltas
+                // rather than the `response.reasoning_summary.delta` summary
+                // deltas real OpenAI reasoning models emit (handled below in the
+                // default branch). Both surface as thinking_delta events.
+                if (event.delta) {
+                  this.emit('thinking_delta', { text: event.delta });
+                }
+                break;
 
               default: {
                 // Handle reasoning summary events (o1/o3 models)

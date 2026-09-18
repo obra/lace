@@ -47,6 +47,14 @@ export const CatalogProviderSchema = z.object({
   type: z.string().min(1),
   api_key: z.string().optional(),
   api_endpoint: z.string().optional(),
+  // Which OpenAI wire API to use against this provider's endpoint. Only consulted
+  // by the 'openai' provider type. Custom (non-api.openai.com) endpoints default
+  // to Chat Completions, since most OpenAI-compatible gateways only implement
+  // that surface; set 'responses' to opt a gateway that also implements the
+  // Responses API into that path instead. Absent means 'chat' for a custom
+  // endpoint, with no effect on the real OpenAI API (which always prefers
+  // Responses regardless of this field).
+  api_style: z.enum(['responses', 'chat']).optional(),
   default_large_model_id: z.string().min(1),
   default_small_model_id: z.string().min(1),
   // What this provider's bare aliases ('opus', 'sonnet', 'haiku') mean, as a
