@@ -442,9 +442,13 @@ async function activateStoredSession(
 
   state.activeSession = loadedWithMcpServers;
   rehydrateServerConfigFromSession(state, state.activeSession.state);
-  await ensureSchedulers();
 
+  // MCP servers before schedulers: the reminder scheduler fires anything overdue
+  // on its first tick and wakes an idle agent with an internal turn. Armed first,
+  // that turn runs while the servers are still connecting and has no MCP tools —
+  // a restarted coworker's reminder cannot reach Slack.
   await reconcileMcpServersForActiveSession(state);
+  await ensureSchedulers();
   await reissuePendingPermissionRequests();
   return state.activeSession;
 }
