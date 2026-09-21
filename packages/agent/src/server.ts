@@ -335,12 +335,16 @@ export function invalidateSessionToolExecutor(cache: ToolExecutorCache, sessionI
 }
 
 export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerState): void {
-  // When a dropped in-container MCP server reconnects, its tools were lost from
-  // every cached executor (discovery only registers 'running' servers). Clear
-  // the cache so the next turn rebuilds and re-discovers the recovered tools —
-  // e.g. browser-user's use_browser after a mid-session stdio drop.
-  state.mcpServerManager.on('server-reconnected', () => {
-    state.toolExecutorCache.clear();
+  // Discovery only registers 'running' servers, and executors are cached per
+  // session for the life of the process. So an executor built while a server was
+  // not running is missing that server's tools until something drops it from the
+  // cache. Two ways that happens: a turn that starts during session activation,
+  // while the persona's servers are still 'starting' (a cron reminder firing
+  // mid-resume left a coworker without its Slack tools for two days), and a
+  // mid-session stdio drop (browser-user's use_browser). Both end with the server
+  // reaching 'running', so clear the cache then and let the next turn rediscover.
+  state.mcpServerManager.on('server-status-changed', (_serverId: string, status: string) => {
+    if (status === 'running') state.toolExecutorCache.clear();
   });
 
   const runExclusive = async <T>(work: () => Promise<T> | T): Promise<T> => {
