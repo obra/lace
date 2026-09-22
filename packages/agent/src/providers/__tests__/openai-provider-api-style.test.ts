@@ -163,6 +163,64 @@ describe('OpenAIProvider custom-endpoint apiStyle routing', () => {
     });
   });
 
+  describe("custom baseURL with apiStyle:'responses', Responses API 404s", () => {
+    let provider: OpenAIProvider;
+
+    beforeEach(() => {
+      provider = new OpenAIProvider({
+        apiKey: 'test-key',
+        baseURL: CUSTOM_BASE_URL,
+        apiStyle: 'responses',
+      });
+      provider.setSystemPrompt('test');
+      provider.on('error', () => undefined);
+    });
+
+    afterEach(() => {
+      provider.removeAllListeners();
+    });
+
+    // A catalog entry that opts a custom endpoint into Responses is declaring
+    // that the endpoint speaks Responses -- it says nothing about Chat
+    // Completions, which many such gateways (LunaRoute included) never
+    // implement. Real OpenAI falls back to Chat Completions on a
+    // "model not found"-shaped 404 because older models genuinely lack
+    // Responses support but do support Chat Completions; that assumption
+    // doesn't hold for a third-party gateway, so the fallback must not fire
+    // here -- the original 404 should surface as-is.
+    it('does NOT fall back to Chat Completions on a 404 (non-streaming)', async () => {
+      const notFoundError = Object.assign(new Error('The model does not exist'), {
+        status: 404,
+      });
+      mockResponsesCreate.mockRejectedValueOnce(notFoundError);
+
+      await expect(
+        provider.createResponse([{ role: 'user', content: 'hello' }], [], 'deepseek-4.1-flash')
+      ).rejects.toThrow('The model does not exist');
+
+      expect(mockResponsesCreate).toHaveBeenCalledTimes(1);
+      expect(mockChatCreate).not.toHaveBeenCalled();
+    });
+
+    it('does NOT fall back to Chat Completions on a 404 (streaming)', async () => {
+      const notFoundError = Object.assign(new Error('The model does not exist'), {
+        status: 404,
+      });
+      mockResponsesCreate.mockRejectedValueOnce(notFoundError);
+
+      await expect(
+        provider.createStreamingResponse(
+          [{ role: 'user', content: 'hello' }],
+          [],
+          'deepseek-4.1-flash'
+        )
+      ).rejects.toThrow('The model does not exist');
+
+      expect(mockResponsesCreate).toHaveBeenCalledTimes(1);
+      expect(mockChatCreate).not.toHaveBeenCalled();
+    });
+  });
+
   describe("custom baseURL with apiStyle:'chat' (explicit)", () => {
     it('still uses Chat Completions', async () => {
       const provider = new OpenAIProvider({

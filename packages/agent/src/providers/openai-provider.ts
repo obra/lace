@@ -44,6 +44,7 @@ import {
   toOpenAIResponsesMessageContent,
   toOpenAIResponsesToolOutput,
 } from './format-converters';
+import { createContentTypeTolerantFetch } from './utils/content-type-tolerant-fetch';
 
 interface OpenAIProviderConfig extends ProviderConfig {
   apiKey: string | null;
@@ -89,6 +90,17 @@ export class OpenAIProvider extends AIProvider {
         logger.info('Using custom OpenAI base URL', {
           baseURL: configBaseURL,
         });
+
+        // LunaRoute-class gateways that opted into the Responses API via
+        // api_style label every /v1/responses reply text/event-stream, even
+        // for non-streaming requests, which crashes the SDK's own response
+        // parser (see content-type-tolerant-fetch.ts for the full mechanism).
+        // Scoped to api_style:'responses' custom endpoints only -- Chat
+        // Completions custom endpoints (today's default) never hit this SDK
+        // code path and are unaffected.
+        if (this.customEndpointUsesResponsesAPI()) {
+          openaiConfig.fetch = createContentTypeTolerantFetch();
+        }
       }
 
       this._openai = new OpenAI(openaiConfig);
@@ -580,13 +592,20 @@ export class OpenAIProvider extends AIProvider {
         // `summary` empty, rather than populating `summary[].text` the way real
         // OpenAI reasoning models do. Fall back to `content` so that reasoning
         // still surfaces as thinking events instead of silently disappearing.
+        //
+        // Checking `.length > 0` alone isn't enough: a gateway that always
+        // ships a fixed-shape `summary` array with a single empty-string
+        // placeholder (`summary: [{ text: '' }]`) rather than an empty array
+        // would satisfy `.length > 0` while carrying no real text, masking a
+        // `content` fallback that does. Require actual non-empty text before
+        // trusting `summary` over `content`.
         const summaryParts = reasoningItem.summary ?? [];
-        const reasoningTexts =
-          summaryParts.length > 0
-            ? summaryParts.map((part) => part.text)
-            : (reasoningItem.content ?? [])
-                .filter((part) => part.type === 'reasoning_text')
-                .map((part) => part.text);
+        const hasSummaryText = summaryParts.some((part) => !!part.text);
+        const reasoningTexts = hasSummaryText
+          ? summaryParts.map((part) => part.text)
+          : (reasoningItem.content ?? [])
+              .filter((part) => part.type === 'reasoning_text')
+              .map((part) => part.text);
         if (reasoningTexts.length > 0) {
           this.emit('thinking_start', {});
           for (const text of reasoningTexts) {
@@ -699,7 +718,12 @@ export class OpenAIProvider extends AIProvider {
       return this._createChatCompletionsResponse(messages, tools, model, signal, options);
     }
 
-    // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
+    // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported.
+    // A catalog entry that opted a custom endpoint into Responses via api_style (e.g. LunaRoute)
+    // is declaring that endpoint speaks Responses -- it makes no claim about Chat Completions,
+    // which many such gateways never implement at all. Falling back there on a 404 would trade a
+    // clear "model not found"-shaped error for a confusing one against a surface that may not
+    // exist, so the fallback is real-OpenAI-only.
     try {
       return await this._createResponsesAPIResponse(
         messages,
@@ -710,7 +734,7 @@ export class OpenAIProvider extends AIProvider {
         options
       );
     } catch (error) {
-      if (this.isResponsesAPINotSupportedError(error)) {
+      if (!this.isCustomEndpoint() && this.isResponsesAPINotSupportedError(error)) {
         logger.info('Model does not support Responses API, falling back to Chat Completions', {
           model,
           error: error instanceof Error ? error.message : String(error),
@@ -897,7 +921,9 @@ export class OpenAIProvider extends AIProvider {
       return this._createChatCompletionsStreamingResponse(messages, tools, model, signal, options);
     }
 
-    // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported
+    // For real OpenAI: try Responses API first, fall back to Chat Completions if not supported.
+    // Same reasoning as the non-streaming path above: an api_style:'responses' custom endpoint
+    // makes no claim about supporting Chat Completions, so the fallback is real-OpenAI-only.
     try {
       return await this._createResponsesAPIStreamingResponse(
         messages,
@@ -908,7 +934,7 @@ export class OpenAIProvider extends AIProvider {
         options
       );
     } catch (error) {
-      if (this.isResponsesAPINotSupportedError(error)) {
+      if (!this.isCustomEndpoint() && this.isResponsesAPINotSupportedError(error)) {
         logger.info(
           'Model does not support Responses API streaming, falling back to Chat Completions',
           {

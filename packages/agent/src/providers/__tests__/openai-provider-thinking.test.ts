@@ -171,6 +171,63 @@ describe('OpenAIProvider thinking events', () => {
       expect(thinkingEndEvents[0].tokens).toBe(25);
     });
 
+    it('falls back to content[].text when summary is a non-empty placeholder with no real text', async () => {
+      // Guards against a narrower gateway variant of the same bug: some
+      // gateways always ship a fixed-shape `summary` array (a single
+      // empty-string placeholder) rather than an empty array when there's no
+      // real summary. `.length > 0` alone would wrongly treat that as "summary
+      // has the real text" and skip the content[] fallback entirely, silently
+      // dropping the reasoning text that's actually sitting in content[].
+      const thinkingStartEvents: StreamingEvents['thinking_start'][] = [];
+      const thinkingDeltaEvents: StreamingEvents['thinking_delta'][] = [];
+      const thinkingEndEvents: StreamingEvents['thinking_end'][] = [];
+
+      provider.on('thinking_start', (data: StreamingEvents['thinking_start']) => {
+        thinkingStartEvents.push(data);
+      });
+      provider.on('thinking_delta', (data: StreamingEvents['thinking_delta']) => {
+        thinkingDeltaEvents.push(data);
+      });
+      provider.on('thinking_end', (data: StreamingEvents['thinking_end']) => {
+        thinkingEndEvents.push(data);
+      });
+
+      mockResponsesCreate.mockResolvedValue({
+        id: 'resp_124',
+        status: 'completed',
+        output: [
+          {
+            type: 'reasoning',
+            id: 'reasoning_1',
+            summary: [{ text: '' }],
+            content: [{ type: 'reasoning_text', text: 'Real reasoning text lives here.' }],
+          },
+          {
+            type: 'message',
+            content: [{ type: 'output_text', text: 'Here is my answer.' }],
+          },
+        ],
+        usage: {
+          input_tokens: 100,
+          output_tokens: 50,
+          total_tokens: 150,
+          output_tokens_details: {
+            reasoning_tokens: 25,
+          },
+        },
+      });
+
+      const messages = [{ role: 'user' as const, content: 'Think about this' }];
+
+      await provider.createResponse(messages, [], 'deepseek-4.1-flash');
+
+      expect(thinkingStartEvents).toHaveLength(1);
+      expect(thinkingDeltaEvents).toHaveLength(1);
+      expect(thinkingDeltaEvents[0].text).toBe('Real reasoning text lives here.');
+      expect(thinkingEndEvents).toHaveLength(1);
+      expect(thinkingEndEvents[0].tokens).toBe(25);
+    });
+
     it('should not emit thinking events for responses without reasoning items', async () => {
       const thinkingStartEvents: StreamingEvents['thinking_start'][] = [];
       const thinkingDeltaEvents: StreamingEvents['thinking_delta'][] = [];
