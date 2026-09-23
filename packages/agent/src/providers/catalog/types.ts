@@ -55,6 +55,12 @@ export const CatalogProviderSchema = z.object({
   // endpoint, with no effect on the real OpenAI API (which always prefers
   // Responses regardless of this field).
   api_style: z.enum(['responses', 'chat']).optional(),
+  // Whether this provider's Responses API can chain requests via stored responses
+  // (`store: true` + `previous_response_id`). Some gateways (e.g. LunaRoute) return
+  // response ids but cannot look them up again, so a chained request 404s. `false`
+  // makes every Responses request stateless: full history in `input`,
+  // `store: false`, no `previous_response_id`. Absent means chaining is supported.
+  supports_response_chaining: z.boolean().optional(),
   default_large_model_id: z.string().min(1),
   default_small_model_id: z.string().min(1),
   // What this provider's bare aliases ('opus', 'sonnet', 'haiku') mean, as a

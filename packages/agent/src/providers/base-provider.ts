@@ -46,6 +46,9 @@ export interface ProviderConfig {
   // up to a top-level field so providers can consult it without reaching into
   // catalogProvider themselves. Only meaningful to the 'openai' provider type.
   apiStyle?: 'responses' | 'chat';
+  // Catalog-declared catalogProvider.supports_response_chaining. `false` makes the
+  // 'openai' provider's Responses API requests stateless. Absent means supported.
+  supportsResponseChaining?: boolean;
   [key: string]: unknown; // Allow provider-specific config
 }
 

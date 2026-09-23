@@ -458,9 +458,15 @@ export class OpenAIProvider extends AIProvider {
     tools: WireTool[],
     model: string,
     stream: boolean,
-    previousResponseId?: string | null,
+    requestedPreviousResponseId?: string | null,
     options?: RequestOptions
   ): ResponseCreateParams {
+    // A provider that can't look up stored responses gets every request stateless:
+    // no previous_response_id, so the full-history branch below builds `input`, and
+    // store:false since nothing will ever chain onto it.
+    const chainingSupported = this.supportsResponseChaining();
+    const previousResponseId = chainingSupported ? requestedPreviousResponseId : null;
+
     // Extract system/developer instructions via the base helper so both
     // the Chat Completions path and this Responses-API path produce identical
     // system prompts (same \n\n separator, same content-block handling).
@@ -528,7 +534,7 @@ export class OpenAIProvider extends AIProvider {
       ...(previousResponseId && {
         context_management: [{ type: 'compaction', compact_threshold: 100000 }],
       }),
-      store: true, // Enable server-side storage for response chaining
+      store: chainingSupported, // Server-side storage exists only to enable chaining
     };
 
     // Log request details at INFO level for debugging
@@ -676,6 +682,17 @@ export class OpenAIProvider extends AIProvider {
   private customEndpointUsesResponsesAPI(): boolean {
     const config = this._config as OpenAIProviderConfig;
     return config.apiStyle === 'responses';
+  }
+
+  /**
+   * Whether this provider's Responses API can chain onto a stored response via
+   * `previous_response_id`. Catalog entries opt out with
+   * `supports_response_chaining: false` (threaded into ProviderConfig as
+   * `supportsResponseChaining` by the registry).
+   */
+  private supportsResponseChaining(): boolean {
+    const config = this._config as OpenAIProviderConfig;
+    return config.supportsResponseChaining !== false;
   }
 
   /**

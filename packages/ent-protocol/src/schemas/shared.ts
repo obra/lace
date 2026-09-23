@@ -394,6 +394,8 @@ export const CatalogProviderInfoSchema = z
     // catalog entries carrying it fail `ent/providers/catalog` with
     // 'Unrecognized key(s) in object'.
     api_style: z.enum(['responses', 'chat']).optional(),
+    // Mirrors @lace/agent's CatalogProviderSchema `supports_response_chaining`.
+    supports_response_chaining: z.boolean().optional(),
     default_large_model_id: NonEmptyStringSchema,
     default_small_model_id: NonEmptyStringSchema,
     // What this provider's bare aliases ('opus', 'sonnet', 'haiku') resolve to.

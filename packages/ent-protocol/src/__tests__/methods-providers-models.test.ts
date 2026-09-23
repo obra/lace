@@ -193,4 +193,29 @@ describe('Ent protocol provider/model management schemas', () => {
       })
     ).toThrow();
   });
+
+  it('accepts a catalog provider entry with supports_response_chaining', () => {
+    const provider = {
+      id: 'lunaroute',
+      name: 'LunaRoute',
+      type: 'openai',
+      api_style: 'responses',
+      default_large_model_id: 'deepseek-reasoner',
+      default_small_model_id: 'deepseek-reasoner',
+      models: [],
+    };
+    expect(() =>
+      EntProvidersCatalogResponseSchema.parse({
+        ...baseRequest,
+        result: { providers: [{ ...provider, supports_response_chaining: false }] },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      EntProvidersCatalogResponseSchema.parse({
+        ...baseRequest,
+        result: { providers: [{ ...provider, supports_response_chaining: 'no' }] },
+      })
+    ).toThrow();
+  });
 });
