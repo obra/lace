@@ -200,6 +200,7 @@ Parameters:
 
     // --- Step 2: Resolve persona bundle (if any) before any job creation ---
     let personaModelDefault: string | undefined;
+    let personaConnectionDefault: string | undefined;
     // Set for container personas: the host-side lace-agent reaches into the
     // container for tool exec via this projected binding.
     let projectedRuntimeBinding: RuntimeExecutionBinding | undefined;
@@ -215,6 +216,7 @@ Parameters:
       try {
         const parsed = this.personaRegistry.parsePersona(effectivePersona);
         personaModelDefault = parsed.config.model;
+        personaConnectionDefault = parsed.config.connectionId;
         if (parsed.config.runtime.type === 'container') {
           // The role references an environment by name; resolve the container
           // spec from the environment registry. The role contributes
@@ -347,8 +349,11 @@ Parameters:
       }
     }
 
-    // Per-call modelId wins; otherwise fall back to persona default (if any).
+    // Per-call modelId/connectionId win; otherwise fall back to persona defaults
+    // (if any). Still-unset fields are inherited from the parent when the
+    // subagent job runs (applyEffectiveJobConfig).
     const effectiveModelId = modelId ?? personaModelDefault;
+    const effectiveConnectionId = connectionId ?? personaConnectionDefault;
     // Inherit the parent's binding only when the persona doesn't impose its own runtime.
     const inheritedRuntimeBinding = !projectedRuntimeBinding ? runtimeBinding : undefined;
     const effectiveRuntimeBinding = projectedRuntimeBinding ?? inheritedRuntimeBinding;
@@ -358,7 +363,7 @@ Parameters:
       prompt,
       description,
       progressIntervalMs,
-      connectionId,
+      connectionId: effectiveConnectionId,
       modelId: effectiveModelId,
       turnContext:
         context.turnId && context.turnSeq !== undefined

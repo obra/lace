@@ -278,6 +278,61 @@ persona body`
     expect(loaded.state.config?.modelId).toBe('request-wins-model');
   });
 
+  describe('persona connectionId', () => {
+    async function newSessionConnection(opts: {
+      personaFrontmatter: string | null;
+      requestConnectionId?: string;
+    }): Promise<string | undefined> {
+      writeFileSync(
+        join(userPersonasDir, 'routed.md'),
+        opts.personaFrontmatter === null
+          ? 'persona body'
+          : `---\n${opts.personaFrontmatter}\n---\npersona body`
+      );
+
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      await client.request(
+        'initialize',
+        defaultInitializeParams(
+          { config: { connectionId: 'conn_process_default' } },
+          { userPersonasPaths: [userPersonasDir] }
+        )
+      );
+
+      const created = (await client.request('session/new', {
+        cwd: tempDir,
+        persona: 'routed',
+        ...(opts.requestConnectionId ? { config: { connectionId: opts.requestConnectionId } } : {}),
+      })) as { sessionId: string };
+
+      return loadSession(created.sessionId).state.config?.connectionId;
+    }
+
+    it('persona connectionId wins over the process default connection', async () => {
+      expect(await newSessionConnection({ personaFrontmatter: 'connectionId: conn_persona' })).toBe(
+        'conn_persona'
+      );
+    });
+
+    it('request-level config.connectionId overrides persona connectionId', async () => {
+      expect(
+        await newSessionConnection({
+          personaFrontmatter: 'connectionId: conn_persona',
+          requestConnectionId: 'conn_request',
+        })
+      ).toBe('conn_request');
+    });
+
+    it('persona without connectionId keeps the process default connection', async () => {
+      expect(await newSessionConnection({ personaFrontmatter: 'model: some-model' })).toBe(
+        'conn_process_default'
+      );
+      expect(await newSessionConnection({ personaFrontmatter: null })).toBe('conn_process_default');
+    });
+  });
+
   it('rejects persona with leading dash even if a matching file exists', async () => {
     // Seed a persona file matching the invalid name so PersonaNotFoundError
     // can't be the reason for the rejection — the shape check must fire first.

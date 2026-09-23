@@ -421,12 +421,14 @@ interface CompactionContext {
   threadId: string;
   sessionDir?: string;
   // One-shot LLM query, bound by the call site to the session connection
-  // (converts {prompt}->messages; defaults `model` to the session modelId).
-  // Absent when no connection/model is available; deterministic strategies ignore it.
+  // (converts {prompt}->messages; defaults `model` and `connectionId` to the
+  // session's). Absent when no connection/model is available; deterministic
+  // strategies ignore it.
   query?: (opts: {
     messages?: ProviderMessage[];
     prompt?: string;
     model?: string;
+    connectionId?: string;
     signal?: AbortSignal;
   }) => Promise<{ text: string; usage?: ProviderResponse['usage'] }>;
   // Context window of the model this session runs on. Size the verbatim tail you
@@ -609,6 +611,7 @@ frontmatter fields:
 ```ts
 interface PersonaConfig {
   model?: string;
+  connectionId?: string; // provider connection; applied wherever `model` is
   tools?: string[];
   runtime?: { type: 'root' } | { type: 'container' /* image, mounts, … */ }; // default { type: 'root' }
   compaction?: {

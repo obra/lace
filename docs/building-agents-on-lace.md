@@ -198,6 +198,7 @@ frontmatter feature], a persona file looks like:
 ```md
 ---
 model: haiku
+connectionId: conn_anthropic # optional; omit to use the session's connection
 tools:
   - knowledge/grep
 mcpServers:
@@ -217,6 +218,15 @@ mustache variable substitution]
 Frontmatter is optional. If omitted, the persona is a template-only persona
 (just a system prompt; model/tools/MCPs come from session-level config or your
 delegate call).
+
+`connectionId:` names the provider connection the persona runs on, and is
+applied wherever `model:` is: as the session default at `session/new`, again
+after every compaction, and as the subagent default in `delegate`. A request or
+per-call `connectionId` still wins. A persona without `connectionId:` runs on
+the session's (or, for a subagent, the parent's) connection. Lace does not check
+the id when the persona is loaded; an unknown connection fails when the session
+first calls the provider (`Provider instance not found: <id>`), the same as an
+unknown `connectionId` passed to `session/new`.
 
 **`tools:` is additive over lace builtins.** Lace builtin tools (`bash`,
 `file_read`, `file_write`, `file_edit`, `ripgrep_search`, `file_find`,
@@ -250,7 +260,8 @@ delegate({
 When `persona` is set, lace:
 
 1. Looks up `librarian` in the persona registry
-2. Reads the persona's frontmatter (`model`, `tools`, `mcpServers`, `maxTurns`)
+2. Reads the persona's frontmatter (`model`, `connectionId`, `tools`,
+   `mcpServers`, `maxTurns`)
 3. Spawns a subagent session with those as defaults
 4. Uses the persona's body as the system prompt template
 5. Returns the result (or a jobId in background mode)

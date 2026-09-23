@@ -523,7 +523,7 @@ export async function composeAndWriteSystemPromptSet(params: {
 
 /**
  * Re-establish a live session's persona from the current persona file: re-apply
- * the persona's model to the session config and append a fresh system_prompt_set
+ * the persona's model and connection to the session config and append a fresh system_prompt_set
  * rendered from the current persona (prompt, tools, skills). Used after compaction
  * so a long-lived session tracks edits to its persona instead of keeping its
  * creation-time snapshot forever. Persists the updated state and returns it.
@@ -537,13 +537,20 @@ export async function rerenderPersonaForSession(params: {
 }): Promise<SessionState> {
   const { sessionDir, persona, cwd, state, createToolExecutorForMode } = params;
 
-  // Re-apply the persona's model so the persona file stays the source of truth.
+  // Re-apply the persona's model and connection so the persona file stays the
+  // source of truth.
   let sessionState = readSessionState(sessionDir);
   const { config: personaConfig } = state.personaRegistry.parsePersona(persona);
   if (personaConfig.model) {
     sessionState = {
       ...sessionState,
       config: { ...sessionState.config, modelId: personaConfig.model },
+    };
+  }
+  if (personaConfig.connectionId) {
+    sessionState = {
+      ...sessionState,
+      config: { ...sessionState.config, connectionId: personaConfig.connectionId },
     };
   }
 
@@ -681,6 +688,7 @@ export function registerSessionHandlers(
     // Parse persona frontmatter before any storage writes so we fail fast on invalid input.
     const personaDefaults: {
       modelId?: string;
+      connectionId?: string;
       toolScope?: string[];
       mcpServers?: Array<{
         name: string;
@@ -695,6 +703,7 @@ export function registerSessionHandlers(
       try {
         const { config: personaConfig } = state.personaRegistry.parsePersona(requestedPersona);
         if (personaConfig.model) personaDefaults.modelId = personaConfig.model;
+        if (personaConfig.connectionId) personaDefaults.connectionId = personaConfig.connectionId;
         if (personaConfig.tools) {
           // Persona `tools:` is the COMPLETE allowlist (Claude Code semantics):
           // present = exactly these tools (no implicit builtins); omitted =
@@ -743,7 +752,9 @@ export function registerSessionHandlers(
     const effectiveModelId =
       toNonEmptyString(parsed.config?.modelId) ?? personaDefaults.modelId ?? state.config.modelId;
     const effectiveConnectionId =
-      toNonEmptyString(parsed.config?.connectionId) ?? state.config.connectionId;
+      toNonEmptyString(parsed.config?.connectionId) ??
+      personaDefaults.connectionId ??
+      state.config.connectionId;
     const effectiveMcpServers =
       parsed.mcpServers !== undefined
         ? mergeMcpServers(

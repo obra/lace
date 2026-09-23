@@ -1,5 +1,5 @@
 // ABOUTME: Factory that constructs a CompactionContext with ctx.query bound to oneShotQuery
-// ABOUTME: Converts {prompt} → messages and defaults model to the session modelId
+// ABOUTME: Converts {prompt} → messages and defaults model and connection to the session
 // ABOUTME: Omits ctx.query entirely when connectionId or modelId is absent
 
 import type { ProviderMessage, ProviderResponse } from '@lace/agent/providers/base-provider';
@@ -27,6 +27,7 @@ interface BuildContextDeps {
  * - `query({messages})` → passed through directly (prompt ignored); empty
  *   arrays are treated as "no messages" and fall back to prompt handling
  * - `query({model})` → overrides the session modelId for this call
+ * - `query({connectionId})` → overrides the session connectionId for this call
  *
  * When `connectionId` or `modelId` is falsy, `ctx.query` is omitted entirely
  * rather than bound to a function that will always throw InvalidParams.
@@ -112,13 +113,14 @@ export function buildCompactionContext(
     ...base,
     query(qopts) {
       const model = qopts.model ?? modelId;
+      const queryConnectionId = qopts.connectionId ?? connectionId;
       let messages: ProviderMessage[];
       if (qopts.messages && qopts.messages.length > 0) {
         messages = qopts.messages;
       } else {
         messages = [{ role: 'user', content: qopts.prompt ?? '' }];
       }
-      return query({ connectionId, model, messages, signal: qopts.signal });
+      return query({ connectionId: queryConnectionId, model, messages, signal: qopts.signal });
     },
   };
 }

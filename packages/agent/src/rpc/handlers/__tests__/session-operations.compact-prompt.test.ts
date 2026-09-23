@@ -3,14 +3,14 @@
 // ABOUTME: rejects unknown legacy strategy names.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, appendFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../../../server';
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
-import { getSessionDir } from '@lace/agent/storage/session-store';
+import { getSessionDir, readSessionState } from '@lace/agent/storage/session-store';
 import {
   readDurableEvents,
   deriveNextEventSeqAcrossSessionFiles,
@@ -223,6 +223,56 @@ describe('ent/session/compact — track-based strategy', () => {
       client.close();
       server.close();
     }
+  });
+
+  describe('re-applies the persona connection after compaction', () => {
+    // Session starts on the persona's connection, the embedder moves it to
+    // another connection mid-life, and compaction re-establishes the persona.
+    async function connectionAfterCompaction(personaFrontmatter: string): Promise<unknown> {
+      const personasDir = mkdtempSync(join(tmpdir(), 'lace-compact-rpc-personas-'));
+      try {
+        writeFileSync(
+          join(personasDir, 'routed.md'),
+          `---\n${personaFrontmatter}\n---\nYou are a routed persona.`
+        );
+        const state = createAgentServerState();
+        const { client, server } = createPairedPeers((peer) =>
+          registerAgentRpcMethods(peer, state)
+        );
+        try {
+          await client.request(
+            'initialize',
+            defaultInitializeParams({}, { userPersonasPaths: [personasDir] })
+          );
+          const newResult = (await client.request('session/new', {
+            cwd: workDir,
+            mcpServers: [],
+            persona: 'routed',
+          })) as { sessionId: string };
+          await client.request('ent/session/configure', { connectionId: 'conn_drifted' });
+
+          const sessionDir = getSessionDir(newResult.sessionId);
+          expect(readSessionState(sessionDir).config?.connectionId).toBe('conn_drifted');
+          writeMinimalConversation(sessionDir);
+
+          await client.request('ent/session/compact', { strategy: 'track-based' });
+          return readSessionState(sessionDir).config?.connectionId;
+        } finally {
+          client.close();
+          server.close();
+        }
+      } finally {
+        rmSync(personasDir, { recursive: true, force: true });
+      }
+    }
+
+    it('restores the connectionId the persona declares', async () => {
+      expect(await connectionAfterCompaction('connectionId: conn_persona')).toBe('conn_persona');
+    });
+
+    it('keeps the session connection when the persona declares none', async () => {
+      expect(await connectionAfterCompaction('model: some-model')).toBe('conn_drifted');
+    });
   });
 
   it('accepts no strategy (defaults to track-based)', async () => {

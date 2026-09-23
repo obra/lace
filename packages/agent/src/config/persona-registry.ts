@@ -57,6 +57,8 @@ const mcpSecretReferenceSchema = z
 const personaConfigSchema = z
   .object({
     model: z.string().optional(),
+    // Provider connection the persona runs on. Applied exactly where `model` is.
+    connectionId: z.string().optional(),
     tools: z.array(z.string()).optional(),
     mcpServers: z
       .record(
