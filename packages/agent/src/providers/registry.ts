@@ -388,6 +388,9 @@ export class ProviderRegistry {
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
       ...(catalogProvider.api_style && { apiStyle: catalogProvider.api_style }),
+      ...(catalogProvider.supports_response_chaining !== undefined && {
+        supportsResponseChaining: catalogProvider.supports_response_chaining,
+      }),
       // Pass instance catalog (with dynamic models) so provider can look up model metadata
       catalogProvider: instanceCatalog ?? catalogProvider,
     };
@@ -464,6 +467,9 @@ export class ProviderRegistry {
       ...(baseURL && { baseURL }),
       ...(instance.timeout && { timeout: instance.timeout }),
       ...(catalogProvider.api_style && { apiStyle: catalogProvider.api_style }),
+      ...(catalogProvider.supports_response_chaining !== undefined && {
+        supportsResponseChaining: catalogProvider.supports_response_chaining,
+      }),
       // Pass instance catalog (with dynamic models) so provider can look up model metadata
       catalogProvider: catalog ?? catalogProvider,
     };

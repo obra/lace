@@ -5,6 +5,7 @@
   "api_key": "$LUNAROUTE_API_KEY",
   "api_endpoint": "https://gw.lunaroute.com/v1",
   "api_style": "responses",
+  "supports_response_chaining": false,
   "default_large_model_id": "deepseek-4.1-flash",
   "default_small_model_id": "deepseek-4.1-flash",
   "models": [

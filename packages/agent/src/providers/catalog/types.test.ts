@@ -181,6 +181,36 @@ describe('CatalogProviderSchema', () => {
     const result = CatalogProviderSchema.safeParse(invalidProvider);
     expect(result.success).toBe(false);
   });
+
+  it('accepts supports_response_chaining and leaves it undefined when absent', () => {
+    const base = {
+      name: 'Test Provider',
+      id: 'test',
+      type: 'openai',
+      default_large_model_id: 'gpt-4',
+      default_small_model_id: 'gpt-3.5-turbo',
+      models: [],
+    };
+
+    const optedOut = CatalogProviderSchema.safeParse({
+      ...base,
+      supports_response_chaining: false,
+    });
+    expect(optedOut.success).toBe(true);
+    if (optedOut.success) {
+      expect(optedOut.data.supports_response_chaining).toBe(false);
+    }
+
+    const absent = CatalogProviderSchema.safeParse(base);
+    expect(absent.success).toBe(true);
+    if (absent.success) {
+      expect(absent.data.supports_response_chaining).toBeUndefined();
+    }
+
+    expect(
+      CatalogProviderSchema.safeParse({ ...base, supports_response_chaining: 'no' }).success
+    ).toBe(false);
+  });
 });
 
 describe('ProviderInstanceSchema', () => {
