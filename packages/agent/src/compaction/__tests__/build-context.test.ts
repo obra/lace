@@ -63,6 +63,16 @@ describe('buildCompactionContext', () => {
     );
   });
 
+  it('ctx.query({connectionId}) without a model is rejected, not sent with the session model', async () => {
+    const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
+    const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
+
+    await expect(ctx.query!({ prompt: 'test', connectionId: 'conn-other' })).rejects.toThrow(
+      'ctx.query: a connectionId override requires a model override'
+    );
+    expect(fakeOneShotQuery).not.toHaveBeenCalled();
+  });
+
   it('ctx.query({messages}) passes non-empty messages through directly (bypassing prompt mapping)', async () => {
     const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
     const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
@@ -216,9 +226,9 @@ describe('buildCompactionContext query against the real provider registry', () =
       modelId: 'some-model',
     });
 
-    await expect(ctx.query!({ prompt: 'x', connectionId: 'conn-unknown' })).rejects.toThrow(
-      'Provider instance not found: conn-unknown'
-    );
+    await expect(
+      ctx.query!({ prompt: 'x', connectionId: 'conn-unknown', model: 'some-model' })
+    ).rejects.toThrow('Provider instance not found: conn-unknown');
     await expect(ctx.query!({ prompt: 'x' })).rejects.toThrow(
       'Provider instance not found: conn-session'
     );

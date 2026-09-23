@@ -219,14 +219,39 @@ Frontmatter is optional. If omitted, the persona is a template-only persona
 (just a system prompt; model/tools/MCPs come from session-level config or your
 delegate call).
 
-`connectionId:` names the provider connection the persona runs on, and is
-applied wherever `model:` is: as the session default at `session/new`, again
-after every compaction, and as the subagent default in `delegate`. A request or
-per-call `connectionId` still wins. A persona without `connectionId:` runs on
-the session's (or, for a subagent, the parent's) connection. Lace does not check
-the id when the persona is loaded; an unknown connection fails when the session
-first calls the provider (`Provider instance not found: <id>`), the same as an
-unknown `connectionId` passed to `session/new`.
+`connectionId:` names the provider connection the persona runs on. A model
+belongs to a connection, so the two travel as a pair: a persona that declares
+`connectionId:` must also declare `model:`, or it is rejected as invalid
+frontmatter (`PersonaInvalid` at `session/new`, a failed `delegate`). A persona
+may still declare `model:` alone; it then runs on the session's (or, for a
+subagent, the parent's) connection.
+
+The persona's model and connection are applied at three points:
+
+- **`session/new`**: as session defaults. A request `config.modelId` or
+  `config.connectionId` wins, field by field.
+- **`delegate`**: as the subagent's defaults. A per-call `modelId` or
+  `connectionId` wins, field by field; anything still unset comes from the
+  parent session.
+- **After compaction**: the persona's model and connection are re-applied to the
+  session after auto-compaction (persona breakpoints, `compact_session`,
+  emergency compaction) and after `ent/session/compact`. The `/compact` slash
+  command does not re-apply them. So an explicit request, per-call, or
+  `ent/session/configure` / `session/set_config_option` override lasts only
+  until the first such compaction. `model:` has always behaved this way;
+  `connectionId:` follows it. A compaction that runs mid-turn takes effect from
+  the next turn, because a turn reads its model and connection once, when it
+  starts.
+
+`session/load` and `session/resume` copy the stored session's model and
+connection into the process defaults, so a persona's connection can become the
+default for sessions created afterward in the same process, as its model already
+does.
+
+Lace does not check the connection id when the persona is loaded. An unknown
+connection fails when the session first calls the provider
+(`Provider instance not found: <id>`), the same as an unknown `connectionId`
+passed to `session/new`.
 
 **`tools:` is additive over lace builtins.** Lace builtin tools (`bash`,
 `file_read`, `file_write`, `file_edit`, `ripgrep_search`, `file_find`,
@@ -267,7 +292,8 @@ When `persona` is set, lace:
 5. Returns the result (or a jobId in background mode)
 
 Per-call overrides (`connectionId`, `modelId`) still work and take precedence
-over frontmatter.
+over frontmatter for that subagent session, until its first compaction
+re-applies the persona (see [Personas](#personas)).
 
 `delegate` also supports:
 

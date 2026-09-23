@@ -279,57 +279,79 @@ persona body`
   });
 
   describe('persona connectionId', () => {
-    async function newSessionConnection(opts: {
+    async function startClient() {
+      const state = createAgentServerState();
+      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+      await client.request(
+        'initialize',
+        defaultInitializeParams(
+          { config: { connectionId: 'conn_process_default', modelId: 'process-default-model' } },
+          { userPersonasPaths: [userPersonasDir] }
+        )
+      );
+      return client;
+    }
+
+    async function newSessionSelection(opts: {
       personaFrontmatter: string | null;
-      requestConnectionId?: string;
-    }): Promise<string | undefined> {
+      requestConfig?: { connectionId?: string; modelId?: string };
+    }): Promise<{ connectionId?: string; modelId?: string }> {
       writeFileSync(
         join(userPersonasDir, 'routed.md'),
         opts.personaFrontmatter === null
           ? 'persona body'
           : `---\n${opts.personaFrontmatter}\n---\npersona body`
       );
-
-      const state = createAgentServerState();
-      const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
-
-      await client.request(
-        'initialize',
-        defaultInitializeParams(
-          { config: { connectionId: 'conn_process_default' } },
-          { userPersonasPaths: [userPersonasDir] }
-        )
-      );
-
+      const client = await startClient();
       const created = (await client.request('session/new', {
         cwd: tempDir,
         persona: 'routed',
-        ...(opts.requestConnectionId ? { config: { connectionId: opts.requestConnectionId } } : {}),
+        ...(opts.requestConfig ? { config: opts.requestConfig } : {}),
       })) as { sessionId: string };
 
-      return loadSession(created.sessionId).state.config?.connectionId;
+      const config = loadSession(created.sessionId).state.config;
+      return { connectionId: config?.connectionId, modelId: config?.modelId };
     }
 
-    it('persona connectionId wins over the process default connection', async () => {
-      expect(await newSessionConnection({ personaFrontmatter: 'connectionId: conn_persona' })).toBe(
-        'conn_persona'
-      );
+    const PAIRED = 'model: persona-model\nconnectionId: conn_persona';
+
+    it('persona model+connection win over the process defaults as a pair', async () => {
+      expect(await newSessionSelection({ personaFrontmatter: PAIRED })).toEqual({
+        connectionId: 'conn_persona',
+        modelId: 'persona-model',
+      });
     });
 
     it('request-level config.connectionId overrides persona connectionId', async () => {
       expect(
-        await newSessionConnection({
-          personaFrontmatter: 'connectionId: conn_persona',
-          requestConnectionId: 'conn_request',
+        await newSessionSelection({
+          personaFrontmatter: PAIRED,
+          requestConfig: { connectionId: 'conn_request', modelId: 'request-model' },
         })
-      ).toBe('conn_request');
+      ).toEqual({ connectionId: 'conn_request', modelId: 'request-model' });
     });
 
     it('persona without connectionId keeps the process default connection', async () => {
-      expect(await newSessionConnection({ personaFrontmatter: 'model: some-model' })).toBe(
+      expect(
+        (await newSessionSelection({ personaFrontmatter: 'model: some-model' })).connectionId
+      ).toBe('conn_process_default');
+      expect((await newSessionSelection({ personaFrontmatter: null })).connectionId).toBe(
         'conn_process_default'
       );
-      expect(await newSessionConnection({ personaFrontmatter: null })).toBe('conn_process_default');
+    });
+
+    it('rejects a persona that declares connectionId without model', async () => {
+      writeFileSync(
+        join(userPersonasDir, 'unpaired.md'),
+        '---\nconnectionId: conn_persona\n---\npersona body'
+      );
+      const client = await startClient();
+      await expect(
+        client.request('session/new', { cwd: tempDir, persona: 'unpaired' })
+      ).rejects.toMatchObject({
+        message: expect.stringContaining('connectionId requires model'),
+        data: { category: 'protocol', reason: 'PersonaInvalid' },
+      });
     });
   });
 

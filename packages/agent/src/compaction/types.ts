@@ -22,7 +22,9 @@ export interface CompactionContext {
   /**
    * One-shot LLM query bound by the call site to the session connection.
    * The binder converts {prompt} → messages and defaults `model` and
-   * `connectionId` to the session's. Strategies that don't need an LLM ignore it.
+   * `connectionId` to the session's. A `connectionId` override must come with a
+   * `model` override (the call rejects otherwise); a `model` alone is fine.
+   * Strategies that don't need an LLM ignore it.
    * Absent when connectionId or modelId is unavailable at the call site.
    */
   query?: (opts: {

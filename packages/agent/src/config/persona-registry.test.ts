@@ -118,11 +118,22 @@ describe('PersonaRegistry', () => {
     expect(makeRegistry().parsePersona('plain').config.connectionId).toBeUndefined();
   });
 
+  it('rejects connectionId without model: connection and model travel as a pair', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'unpaired.md'),
+      ['---', 'connectionId: conn_anthropic', '---', 'body'].join('\n')
+    );
+    expect(() => makeRegistry().parsePersona('unpaired')).toThrow(
+      "Invalid frontmatter for persona 'unpaired': connectionId: connectionId requires model"
+    );
+  });
+
   it('rejects a non-string connectionId as invalid frontmatter', () => {
     mkdirSync(userPersonaDir, { recursive: true });
     writeFileSync(
       path.join(userPersonaDir, 'bad.md'),
-      ['---', 'connectionId: 42', '---', 'body'].join('\n')
+      ['---', 'model: m', 'connectionId: 42', '---', 'body'].join('\n')
     );
     expect(() => makeRegistry().parsePersona('bad')).toThrow(
       /Invalid frontmatter for persona 'bad': connectionId/

@@ -27,7 +27,8 @@ interface BuildContextDeps {
  * - `query({messages})` → passed through directly (prompt ignored); empty
  *   arrays are treated as "no messages" and fall back to prompt handling
  * - `query({model})` → overrides the session modelId for this call
- * - `query({connectionId})` → overrides the session connectionId for this call
+ * - `query({connectionId, model})` → overrides the session connection for this
+ *   call; a connectionId without a model is rejected
  *
  * When `connectionId` or `modelId` is falsy, `ctx.query` is omitted entirely
  * rather than bound to a function that will always throw InvalidParams.
@@ -112,6 +113,13 @@ export function buildCompactionContext(
   return {
     ...base,
     query(qopts) {
+      // The session model belongs to the session connection; sending it to a
+      // different connection would pick a model that connection may not serve.
+      if (qopts.connectionId !== undefined && qopts.model === undefined) {
+        return Promise.reject(
+          new Error('ctx.query: a connectionId override requires a model override')
+        );
+      }
       const model = qopts.model ?? modelId;
       const queryConnectionId = qopts.connectionId ?? connectionId;
       let messages: ProviderMessage[];

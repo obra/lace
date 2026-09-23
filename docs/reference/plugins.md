@@ -422,8 +422,9 @@ interface CompactionContext {
   sessionDir?: string;
   // One-shot LLM query, bound by the call site to the session connection
   // (converts {prompt}->messages; defaults `model` and `connectionId` to the
-  // session's). Absent when no connection/model is available; deterministic
-  // strategies ignore it.
+  // session's). A `connectionId` override requires a `model` override (the
+  // call rejects otherwise); `model` alone is fine. Absent when no
+  // connection/model is available; deterministic strategies ignore it.
   query?: (opts: {
     messages?: ProviderMessage[];
     prompt?: string;
@@ -611,7 +612,7 @@ frontmatter fields:
 ```ts
 interface PersonaConfig {
   model?: string;
-  connectionId?: string; // provider connection; applied wherever `model` is
+  connectionId?: string; // provider connection; requires `model`, applied with it
   tools?: string[];
   runtime?: { type: 'root' } | { type: 'container' /* image, mounts, … */ }; // default { type: 'root' }
   compaction?: {
