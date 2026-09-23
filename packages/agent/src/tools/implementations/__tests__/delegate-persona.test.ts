@@ -9,6 +9,10 @@ import { DelegateTool } from '../delegate';
 import { PersonaRegistry } from '@lace/agent/config/persona-registry';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
 import type { JobState } from '@lace/agent/server-types';
+import {
+  applyEffectiveJobConfig,
+  type SubagentConfigSlot,
+} from '@lace/agent/jobs/subagent-job-helpers';
 
 describe('DelegateTool persona support', () => {
   let bundledDir: string;
@@ -115,8 +119,29 @@ mcpServers:
     );
   });
 
-  it('explicit connectionId overrides; persona has no connection concept', async () => {
-    writePersona('librarian', `model: claude-3-5-sonnet`, 'Body.');
+  it('persona connectionId is the subagent connection when the call omits one', async () => {
+    writePersona('librarian', `model: claude-3-5-sonnet\nconnectionId: conn_persona`, 'Body.');
+    registry = mkRegistry();
+    const tool = new DelegateTool({ personaRegistry: registry });
+    const { jobManager, createJob } = mkJobManagerMock();
+
+    await tool.execute(
+      { prompt: 'hi', persona: 'librarian' },
+      { signal: new AbortController().signal, jobManager }
+    );
+
+    expect(createJob).toHaveBeenCalledWith(
+      'delegate',
+      expect.objectContaining({
+        persona: 'librarian',
+        connectionId: 'conn_persona',
+        modelId: 'claude-3-5-sonnet',
+      })
+    );
+  });
+
+  it('explicit connectionId overrides persona connectionId', async () => {
+    writePersona('librarian', `model: claude-3-5-sonnet\nconnectionId: conn_persona`, 'Body.');
     registry = mkRegistry();
     const tool = new DelegateTool({ personaRegistry: registry });
     const { jobManager, createJob } = mkJobManagerMock();
@@ -134,6 +159,59 @@ mcpServers:
         modelId: 'claude-3-5-sonnet',
       })
     );
+  });
+
+  it('persona without connectionId leaves the connection for the parent to fill', async () => {
+    writePersona('librarian', `model: claude-3-5-sonnet`, 'Body.');
+    registry = mkRegistry();
+    const tool = new DelegateTool({ personaRegistry: registry });
+    const { jobManager, createJob } = mkJobManagerMock();
+
+    await tool.execute(
+      { prompt: 'hi', persona: 'librarian' },
+      { signal: new AbortController().signal, jobManager }
+    );
+
+    const args = createJob.mock.calls[0]![1] as SubagentConfigSlot;
+    expect(args.connectionId).toBeUndefined();
+    // The subagent job then inherits the parent's connection.
+    applyEffectiveJobConfig(args, { connectionId: 'conn_parent', modelId: 'parent-model' });
+    expect(args.connectionId).toBe('conn_parent');
+    expect(args.modelId).toBe('claude-3-5-sonnet');
+  });
+
+  it('persona model+connection survive the parent fill on the subagent job as a pair', async () => {
+    writePersona('librarian', `model: persona-model\nconnectionId: conn_persona`, 'Body.');
+    registry = mkRegistry();
+    const tool = new DelegateTool({ personaRegistry: registry });
+    const { jobManager, createJob } = mkJobManagerMock();
+
+    await tool.execute(
+      { prompt: 'hi', persona: 'librarian' },
+      { signal: new AbortController().signal, jobManager }
+    );
+
+    // createJob copies these fields onto the job; the subagent runner then
+    // fills only the unset ones from the parent's effective config.
+    const args = createJob.mock.calls[0]![1] as SubagentConfigSlot;
+    applyEffectiveJobConfig(args, { connectionId: 'conn_parent', modelId: 'parent-model' });
+    expect(args).toMatchObject({ connectionId: 'conn_persona', modelId: 'persona-model' });
+  });
+
+  it('persona declaring connectionId without model fails the delegate', async () => {
+    writePersona('librarian', `connectionId: conn_persona`, 'Body.');
+    registry = mkRegistry();
+    const tool = new DelegateTool({ personaRegistry: registry });
+    const { jobManager, createJob } = mkJobManagerMock();
+
+    const result = await tool.execute(
+      { prompt: 'hi', persona: 'librarian' },
+      { signal: new AbortController().signal, jobManager }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toContain('connectionId requires model');
+    expect(createJob).not.toHaveBeenCalled();
   });
 
   it('persona without frontmatter still loads (config empty)', async () => {

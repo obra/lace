@@ -1,16 +1,17 @@
 // ABOUTME: Regression tests for ent/session/compact using the track-based strategy.
 // ABOUTME: Verifies the RPC handler returns the expected response shape and
-// ABOUTME: rejects unknown legacy strategy names.
+// ABOUTME: rejects unknown legacy strategy names. Also covers re-applying the
+// ABOUTME: persona model+connection after manual and auto (breakpoint) compaction.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, appendFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, appendFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../../../server';
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
-import { getSessionDir } from '@lace/agent/storage/session-store';
+import { getSessionDir, readSessionState } from '@lace/agent/storage/session-store';
 import {
   readDurableEvents,
   deriveNextEventSeqAcrossSessionFiles,
@@ -222,6 +223,131 @@ describe('ent/session/compact — track-based strategy', () => {
     } finally {
       client.close();
       server.close();
+    }
+  });
+
+  describe('re-applies the persona connection after compaction', () => {
+    // Session starts on the persona's connection, the embedder moves it to
+    // another connection mid-life, and compaction re-establishes the persona.
+    async function selectionAfterCompaction(
+      personaFrontmatter: string
+    ): Promise<{ connectionId?: string; modelId?: string }> {
+      const personasDir = mkdtempSync(join(tmpdir(), 'lace-compact-rpc-personas-'));
+      try {
+        writeFileSync(
+          join(personasDir, 'routed.md'),
+          `---\n${personaFrontmatter}\n---\nYou are a routed persona.`
+        );
+        const state = createAgentServerState();
+        const { client, server } = createPairedPeers((peer) =>
+          registerAgentRpcMethods(peer, state)
+        );
+        try {
+          await client.request(
+            'initialize',
+            defaultInitializeParams({}, { userPersonasPaths: [personasDir] })
+          );
+          const newResult = (await client.request('session/new', {
+            cwd: workDir,
+            mcpServers: [],
+            persona: 'routed',
+          })) as { sessionId: string };
+          await client.request('ent/session/configure', { connectionId: 'conn_drifted' });
+          await client.request('session/set_config_option', {
+            sessionId: newResult.sessionId,
+            configId: 'model',
+            value: 'drifted-model',
+          });
+
+          const sessionDir = getSessionDir(newResult.sessionId);
+          expect(readSessionState(sessionDir).config).toMatchObject({
+            connectionId: 'conn_drifted',
+            modelId: 'drifted-model',
+          });
+          writeMinimalConversation(sessionDir);
+
+          await client.request('ent/session/compact', { strategy: 'track-based' });
+          const config = readSessionState(sessionDir).config;
+          return { connectionId: config?.connectionId, modelId: config?.modelId };
+        } finally {
+          client.close();
+          server.close();
+        }
+      } finally {
+        rmSync(personasDir, { recursive: true, force: true });
+      }
+    }
+
+    it('restores the model+connection pair the persona declares', async () => {
+      expect(
+        await selectionAfterCompaction('model: persona-model\nconnectionId: conn_persona')
+      ).toEqual({ connectionId: 'conn_persona', modelId: 'persona-model' });
+    });
+
+    it('keeps the session connection when the persona declares none', async () => {
+      expect(await selectionAfterCompaction('model: some-model')).toEqual({
+        connectionId: 'conn_drifted',
+        modelId: 'some-model',
+      });
+    });
+  });
+
+  it('auto-compaction during session/prompt re-applies the persona model+connection', async () => {
+    // A persona compact breakpoint low enough that the test provider's fixed
+    // usage crosses it on the first clean turn, so the runner compacts in-turn
+    // and calls prompt.ts's rerenderPersonaAfterCompaction.
+    const personasDir = mkdtempSync(join(tmpdir(), 'lace-compact-rpc-personas-'));
+    try {
+      writeFileSync(
+        join(personasDir, 'routed.md'),
+        [
+          '---',
+          'model: persona-model',
+          'connectionId: conn_persona',
+          'compaction:',
+          '  breakpoints:',
+          '    - { at: 0.0001, action: compact }',
+          '---',
+          'You are a routed persona.',
+        ].join('\n')
+      );
+      const state = createAgentServerState();
+      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+      try {
+        await client.request(
+          'initialize',
+          defaultInitializeParams({}, { userPersonasPaths: [personasDir] })
+        );
+        const newResult = (await client.request('session/new', {
+          cwd: workDir,
+          mcpServers: [],
+          persona: 'routed',
+        })) as { sessionId: string };
+        await client.request('ent/session/configure', { connectionId: 'conn_drifted' });
+        await client.request('session/set_config_option', {
+          sessionId: newResult.sessionId,
+          configId: 'model',
+          value: 'drifted-model',
+        });
+
+        const sessionDir = getSessionDir(newResult.sessionId);
+        writeMinimalConversation(sessionDir);
+
+        await client.request('session/prompt', { content: [{ type: 'text', text: 'hello' }] });
+
+        const events = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER })
+          .events as Array<{ type: string }>;
+        expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
+        expect(readSessionState(sessionDir).config).toMatchObject({
+          connectionId: 'conn_persona',
+          modelId: 'persona-model',
+        });
+      } finally {
+        client.close();
+        server.close();
+      }
+    } finally {
+      rmSync(personasDir, { recursive: true, force: true });
     }
   });
 

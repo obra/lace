@@ -98,6 +98,59 @@ describe('PersonaRegistry', () => {
     expect(servers['in-container'].command).toBe('./rel/in/container.js');
   });
 
+  it('parses connectionId from frontmatter alongside model', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'routed.md'),
+      ['---', 'model: claude-haiku', 'connectionId: conn_anthropic', '---', 'body'].join('\n')
+    );
+    const { config } = makeRegistry().parsePersona('routed');
+    expect(config.model).toBe('claude-haiku');
+    expect(config.connectionId).toBe('conn_anthropic');
+  });
+
+  it('leaves connectionId undefined when frontmatter omits it', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'plain.md'),
+      ['---', 'model: claude-haiku', '---', 'body'].join('\n')
+    );
+    expect(makeRegistry().parsePersona('plain').config.connectionId).toBeUndefined();
+  });
+
+  it('rejects connectionId without model: connection and model travel as a pair', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'unpaired.md'),
+      ['---', 'connectionId: conn_anthropic', '---', 'body'].join('\n')
+    );
+    expect(() => makeRegistry().parsePersona('unpaired')).toThrow(
+      "Invalid frontmatter for persona 'unpaired': connectionId: connectionId requires model"
+    );
+  });
+
+  it('rejects connectionId with an empty model: an empty model does not pair', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'emptymodel.md'),
+      ['---', 'model: ""', 'connectionId: conn_anthropic', '---', 'body'].join('\n')
+    );
+    expect(() => makeRegistry().parsePersona('emptymodel')).toThrow(
+      "Invalid frontmatter for persona 'emptymodel': connectionId: connectionId requires model"
+    );
+  });
+
+  it('rejects a non-string connectionId as invalid frontmatter', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'bad.md'),
+      ['---', 'model: m', 'connectionId: 42', '---', 'body'].join('\n')
+    );
+    expect(() => makeRegistry().parsePersona('bad')).toThrow(
+      /Invalid frontmatter for persona 'bad': connectionId/
+    );
+  });
+
   it('leaves relative MCP paths unchanged when no mcpBaseDir is configured', () => {
     mkdirSync(userPersonaDir, { recursive: true });
     writeFileSync(

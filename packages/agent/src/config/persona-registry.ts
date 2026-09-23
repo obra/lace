@@ -57,6 +57,9 @@ const mcpSecretReferenceSchema = z
 const personaConfigSchema = z
   .object({
     model: z.string().optional(),
+    // Provider connection the persona runs on. Applied exactly where `model` is,
+    // and only together with it (see the refine below).
+    connectionId: z.string().optional(),
     tools: z.array(z.string()).optional(),
     mcpServers: z
       .record(
@@ -89,7 +92,14 @@ const personaConfigSchema = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  // A connection only makes sense with a model chosen for it. Without this, a
+  // persona's connection would be paired with whichever model another source
+  // supplies (the process default, the delegating parent, a request override).
+  .refine((config) => config.connectionId === undefined || !!config.model, {
+    path: ['connectionId'],
+    message: 'connectionId requires model: declare both, or neither',
+  });
 
 export type PersonaConfig = z.infer<typeof personaConfigSchema>;
 

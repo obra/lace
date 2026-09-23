@@ -1,8 +1,12 @@
 // ABOUTME: Tests for buildCompactionContext — binds ctx.query to oneShotQuery and threads guidance
 // ABOUTME: Verifies prompt→messages mapping, model defaulting, guidance passthrough, and connection guard
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { buildCompactionContext, buildCompactionContextForConnection } from '../build-context';
+import { ProviderRegistry } from '@lace/agent/providers/registry';
 
 describe('buildCompactionContext', () => {
   const BASE_OPTS = {
@@ -46,6 +50,27 @@ describe('buildCompactionContext', () => {
     expect(fakeOneShotQuery).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'cheap-model' })
     );
+  });
+
+  it('ctx.query({prompt, connectionId}) overrides the session connectionId', async () => {
+    const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
+    const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
+
+    await ctx.query!({ prompt: 'test', connectionId: 'conn-other', model: 'cheap-model' });
+
+    expect(fakeOneShotQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ connectionId: 'conn-other', model: 'cheap-model' })
+    );
+  });
+
+  it('ctx.query({connectionId}) without a model is rejected, not sent with the session model', async () => {
+    const fakeOneShotQuery = vi.fn().mockResolvedValue({ text: 'ok', usage: undefined });
+    const ctx = buildCompactionContext(BASE_OPTS, { oneShotQuery: fakeOneShotQuery });
+
+    await expect(ctx.query!({ prompt: 'test', connectionId: 'conn-other' })).rejects.toThrow(
+      'ctx.query: a connectionId override requires a model override'
+    );
+    expect(fakeOneShotQuery).not.toHaveBeenCalled();
   });
 
   it('ctx.query({messages}) passes non-empty messages through directly (bypassing prompt mapping)', async () => {
@@ -167,5 +192,45 @@ describe('buildCompactionContext', () => {
     // on absence.
     const ctx = buildCompactionContext(BASE_OPTS);
     expect('contextWindow' in ctx).toBe(false);
+  });
+});
+
+describe('buildCompactionContext query against the real provider registry', () => {
+  let tempDir: string;
+  let originalLaceDir: string | undefined;
+  let originalTestProvider: string | undefined;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'lace-build-context-'));
+    originalLaceDir = process.env.LACE_DIR;
+    originalTestProvider = process.env.LACE_AGENT_TEST_PROVIDER;
+    process.env.LACE_DIR = tempDir;
+    delete process.env.LACE_AGENT_TEST_PROVIDER;
+    ProviderRegistry.clearInstance();
+  });
+
+  afterEach(() => {
+    ProviderRegistry.clearInstance();
+    if (originalLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = originalLaceDir;
+    if (originalTestProvider === undefined) delete process.env.LACE_AGENT_TEST_PROVIDER;
+    else process.env.LACE_AGENT_TEST_PROVIDER = originalTestProvider;
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('an unknown override connectionId fails like any unknown connection, naming the override', async () => {
+    const ctx = buildCompactionContext({
+      threadId: 'thread-1',
+      sessionDir: tempDir,
+      connectionId: 'conn-session',
+      modelId: 'some-model',
+    });
+
+    await expect(
+      ctx.query!({ prompt: 'x', connectionId: 'conn-unknown', model: 'some-model' })
+    ).rejects.toThrow('Provider instance not found: conn-unknown');
+    await expect(ctx.query!({ prompt: 'x' })).rejects.toThrow(
+      'Provider instance not found: conn-session'
+    );
   });
 });

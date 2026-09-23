@@ -1,6 +1,10 @@
 // ABOUTME: E2E tests for delegate tool connectionId/modelId configuration
+// ABOUTME: including a persona's model+connection pair reaching the child session
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { getSessionDir, readSessionState } from '../storage/session-store';
 import {
   AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
@@ -300,6 +304,95 @@ describe(
       )) as { status: string; output: string };
 
       expect(output.status).toBe('completed');
+    });
+
+    it('runs a persona subagent on the persona model+connection, not the parent pair', async () => {
+      // The persona declares its own pair; the parent session runs on another.
+      // The child session must end up on the persona's pair, which the parent
+      // pushes over the real child peer via ent/session/configure and
+      // session/set_config_option after applyEffectiveJobConfig.
+      const personasDir = join(ctx.laceDir, 'agent-personas');
+      mkdirSync(personasDir, { recursive: true });
+      writeFileSync(
+        join(personasDir, 'routed.md'),
+        '---\nmodel: persona-model\nconnectionId: conn_persona\n---\nYou are routed.\n'
+      );
+
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+
+      const updates: Array<Record<string, unknown>> = [];
+      let subagentJobId: string | undefined;
+
+      ctx.agent.peer.onRequest('session/update', async (params) => {
+        const p = params as Record<string, unknown>;
+        updates.push(p);
+        if (p.type === 'job_started' && p.jobType === 'delegate' && typeof p.jobId === 'string') {
+          subagentJobId = p.jobId;
+        }
+        return undefined;
+      });
+
+      ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
+
+      await withTimeout(
+        ctx.agent.peer.request(
+          'initialize',
+          defaultInitializeParams({
+            config: { approvalMode: 'ask', connectionId: 'conn_parent', modelId: 'parent-model' },
+          })
+        ),
+        AGENT_BOOT_TIMEOUT_MS,
+        'initialize'
+      );
+
+      await withTimeout(
+        ctx.agent.peer.request('session/new', { cwd: ctx.workDir, mcpServers: [] }),
+        2_000,
+        'session/new'
+      );
+
+      await withTimeout(
+        ctx.agent.peer.request('session/prompt', {
+          content: [{ type: 'text', text: 'subagent persona=routed: say hi' }],
+        }),
+        SUBAGENT_JOB_TIMEOUT_MS,
+        'session/prompt'
+      );
+
+      await withTimeout(
+        new Promise<void>((resolve) => {
+          const interval = setInterval(() => {
+            if (!subagentJobId) return;
+            const finished = updates.find(
+              (u) => u.type === 'job_finished' && u.jobId === subagentJobId
+            );
+            if (finished) {
+              clearInterval(interval);
+              resolve();
+            }
+          }, 10);
+        }),
+        SUBAGENT_JOB_TIMEOUT_MS,
+        'job_finished update'
+      );
+
+      const output = (await withTimeout(
+        ctx.agent.peer.request('ent/job/output', { jobId: subagentJobId }),
+        2_000,
+        'ent/job/output'
+      )) as { status: string };
+      expect(output.status).toBe('completed');
+
+      const listed = (await withTimeout(
+        ctx.agent.peer.request('ent/job/list', {}),
+        2_000,
+        'ent/job/list'
+      )) as { jobs: Array<{ jobId: string; subagentSessionId?: string }> };
+      const childSessionId = listed.jobs.find((j) => j.jobId === subagentJobId)?.subagentSessionId;
+      expect(childSessionId).toBeDefined();
+
+      const childConfig = readSessionState(getSessionDir(childSessionId!)).config;
+      expect(childConfig).toMatchObject({ connectionId: 'conn_persona', modelId: 'persona-model' });
     });
   }
 );
