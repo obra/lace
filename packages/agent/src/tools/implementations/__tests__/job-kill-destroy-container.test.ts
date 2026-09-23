@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import { JobKillTool } from '../job_kill';
 import { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
-import type { JobManager } from '@lace/agent/jobs/job-manager';
+import { JobManager } from '@lace/agent/jobs/job-manager';
 import { createFinalizeJob } from '@lace/agent/jobs/job-notifications';
 import { invalidatePersonaCache } from '@lace/agent/storage/event-log';
 import type { AgentServerState, JobState } from '@lace/agent/server-types';
@@ -46,14 +46,14 @@ describe('job_kill destroy_container', () => {
   // completed record — a hand-built one can keep fields the real finalize
   // drops, which is how a finished job's container went unreleasable while
   // the tests stayed green.
-  function runningDelegateJob(childId: string): JobState {
+  function runningDelegateJob(childId: string, jobId = 'job_x'): JobState {
     return {
-      jobId: 'job_x',
+      jobId,
       type: 'delegate',
       status: 'running',
       subagentSessionId: childId,
       startedAt: new Date().toISOString(),
-      outputPath: path.join(base, 'job_x.log'),
+      outputPath: path.join(base, `${jobId}.log`),
       finished: false,
       completion: Promise.resolve(),
       resolveCompletion: () => {},
@@ -105,7 +105,11 @@ describe('job_kill destroy_container', () => {
     const cancelJob = vi.fn(async () => {
       calls.push('cancelJob');
     });
-    const jobManager = { getJob: vi.fn().mockReturnValue(job), cancelJob } as unknown as JobManager;
+    const jobManager = {
+      getJob: vi.fn().mockReturnValue(job),
+      getRunningJobs: vi.fn().mockReturnValue(new Map([[job.jobId, job]])),
+      cancelJob,
+    } as unknown as JobManager;
 
     const tool = new JobKillTool();
     return {
@@ -155,6 +159,7 @@ describe('job_kill destroy_container', () => {
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: 'sess_other' })
     );
     expect(result.status).toBe('completed'); // the kill still "succeeds"
+    expect(result.content[0].text).toContain('owned by another session');
     expect(releasePerInvocation).not.toHaveBeenCalled(); // cross-session: untouched
     expect(fs.existsSync(dir)).toBe(true);
   });
@@ -190,6 +195,7 @@ describe('job_kill destroy_container', () => {
     await completeThroughRealFinalize(job, PARENT);
     const jobManager = {
       getJob: vi.fn().mockReturnValue(job),
+      getRunningJobs: vi.fn().mockReturnValue(new Map([[job.jobId, job]])),
       cancelJob: vi.fn(),
     } as unknown as JobManager;
 
@@ -201,6 +207,45 @@ describe('job_kill destroy_container', () => {
     expect(calls).toEqual([`release:${PARENT}:sess_child`]);
     expect(result.content[0].text).not.toContain('no container to destroy');
     expect(reaper.isReleased('sess_child')).toBe(true);
+  });
+
+  it('refuses to destroy a finished job whose child session a running resume still uses', async () => {
+    // delegate(resume=job_a) starts job_b on job_a's child session, so both
+    // name the same container. Destroying it for finished job_a would pull the
+    // container out from under running job_b without cancelling it.
+    const releasePerInvocation = vi.fn(async () => {});
+    const reaper = new WorkspaceReaper();
+    reaper.bindRuntime({ releasePerInvocation } as unknown as ContainerManager);
+    const childId = 'sess_child';
+    const dir = path.join(base, PARENT, childId);
+    fs.mkdirSync(dir, { recursive: true });
+    reaper.track({ childId, parentId: PARENT, path: dir, containerSpecName: 'spec-child' });
+
+    const jobManager = new JobManager({
+      getActiveSession: vi.fn().mockReturnValue(null),
+      persistEvent: vi.fn(),
+      emitUpdate: vi.fn(),
+      runShellProcess: vi.fn(),
+      runSubagentProcess: vi.fn(),
+    });
+    const jobA = runningDelegateJob(childId, 'job_a');
+    jobManager.addJob(jobA);
+    await completeThroughRealFinalize(jobA, PARENT);
+    const jobB = runningDelegateJob(childId, 'job_b');
+    jobManager.addJob(jobB);
+
+    const result = await new JobKillTool().execute(
+      { jobId: 'job_a', destroy_container: true },
+      ctx({ jobManager, workspaceReaper: reaper, activeSessionId: PARENT })
+    );
+    jobManager.clearJobs();
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toContain('job_b');
+    expect(releasePerInvocation).not.toHaveBeenCalled();
+    expect(reaper.get(childId)).toBeDefined();
+    expect(jobB.status).toBe('running');
+    expect(jobB.finished).toBe(false);
   });
 
   it('destroy_container on an unknown job fails', async () => {

@@ -95,6 +95,20 @@ Parameters:
     // and dispose only touches an entry this session owns).
     const childId = job.subagentSessionId;
     if (childId && workspaceReaper) {
+      // delegate(resume=<jobId>) runs a new job on the same child session, so
+      // it shares this container. Destroying it would pull the container out
+      // from under that job without cancelling it; make the caller kill it
+      // explicitly instead.
+      const sharingJob = [...jobManager.getRunningJobs().values()].find(
+        (other) => other.jobId !== jobId && !other.finished && other.subagentSessionId === childId
+      );
+      if (sharingJob) {
+        return fail(
+          `Job ${jobId} ${wasRunning ? 'cancelled' : 'already finished'}, but its container was NOT destroyed: ` +
+            `job ${sharingJob.jobId} is still running on the same subagent session. ` +
+            `Kill ${sharingJob.jobId} with destroy_container=true to tear it down.`
+        );
+      }
       const entry = workspaceReaper.get(childId);
       if (entry && entry.parentId === activeSessionId) {
         await workspaceReaper.runExclusive(childId, () => workspaceReaper.dispose(childId));
