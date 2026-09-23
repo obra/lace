@@ -9,26 +9,85 @@ import { JobKillTool } from '../job_kill';
 import { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 import type { ContainerManager } from '@lace/agent/containers/container-manager';
 import type { JobManager } from '@lace/agent/jobs/job-manager';
-import type { JobState } from '@lace/agent/server-types';
+import { createFinalizeJob } from '@lace/agent/jobs/job-notifications';
+import { invalidatePersonaCache } from '@lace/agent/storage/event-log';
+import type { AgentServerState, JobState } from '@lace/agent/server-types';
 import type { ToolContext } from '../../types';
+
+// The finalize path loads the parent session by id, so it must be a real
+// sess_<uuid>.
+const PARENT = 'sess_00000000-0000-4000-8000-000000000001';
 
 describe('job_kill destroy_container', () => {
   let prevWorkDir: string | undefined;
+  let prevLaceDir: string | undefined;
   let base: string;
 
   beforeEach(() => {
     prevWorkDir = process.env.LACE_WORK_DIR;
+    prevLaceDir = process.env.LACE_DIR;
     base = fs.mkdtempSync(path.join(os.tmpdir(), 'lace-jobkill-test-'));
     process.env.LACE_WORK_DIR = base;
+    process.env.LACE_DIR = base;
+    invalidatePersonaCache();
   });
 
   afterEach(() => {
     if (prevWorkDir === undefined) delete process.env.LACE_WORK_DIR;
     else process.env.LACE_WORK_DIR = prevWorkDir;
+    if (prevLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = prevLaceDir;
     fs.rmSync(base, { recursive: true, force: true });
   });
 
-  function setup(jobStatus: 'running' | 'completed', parentId = 'sess_parent') {
+  // A delegate job as the job runner holds it mid-run: it names its child
+  // session. Completed jobs in these tests must reach 'completed' through the
+  // production finalize (createFinalizeJob), never by hand-building a
+  // completed record — a hand-built one can keep fields the real finalize
+  // drops, which is how a finished job's container went unreleasable while
+  // the tests stayed green.
+  function runningDelegateJob(childId: string): JobState {
+    return {
+      jobId: 'job_x',
+      type: 'delegate',
+      status: 'running',
+      subagentSessionId: childId,
+      startedAt: new Date().toISOString(),
+      outputPath: path.join(base, 'job_x.log'),
+      finished: false,
+      completion: Promise.resolve(),
+      resolveCompletion: () => {},
+    } as JobState;
+  }
+
+  async function completeThroughRealFinalize(job: JobState, parentId: string): Promise<void> {
+    const sessionDir = path.join(base, 'agent-sessions', parentId);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId: parentId,
+        workDir: base,
+        created: new Date().toISOString(),
+        persona: 'test',
+      })
+    );
+    const state = {
+      activeSession: { meta: { sessionId: parentId }, dir: sessionDir },
+    } as unknown as AgentServerState;
+    const runExclusive = async <T>(work: () => Promise<T> | T): Promise<T> => work();
+    const finalizeJob = createFinalizeJob(
+      state,
+      runExclusive,
+      async () => {},
+      () => {}
+    );
+    job.status = 'completed';
+    await finalizeJob(job, { exitCode: 0 });
+    expect(job.finished).toBe(true);
+  }
+
+  async function setup(jobStatus: 'running' | 'completed', parentId = PARENT) {
     const calls: string[] = [];
     const releasePerInvocation = vi.fn(async (_parent: string, child: string, spec?: string) => {
       calls.push(`release:${child}:${spec}`);
@@ -41,7 +100,8 @@ describe('job_kill destroy_container', () => {
     fs.writeFileSync(path.join(dir, 'out.txt'), 'deliverable');
     reaper.track({ childId, parentId, path: dir, containerSpecName: 'spec-child' });
 
-    const job = { jobId: 'job_x', status: jobStatus, subagentSessionId: childId } as JobState;
+    const job = runningDelegateJob(childId);
+    if (jobStatus === 'completed') await completeThroughRealFinalize(job, parentId);
     const cancelJob = vi.fn(async () => {
       calls.push('cancelJob');
     });
@@ -66,7 +126,7 @@ describe('job_kill destroy_container', () => {
   }
 
   it('tears down a completed delegation: routes release through the shim', async () => {
-    const { calls, reaper, parentId, childId, jobManager, tool } = setup('completed');
+    const { calls, reaper, parentId, childId, jobManager, tool } = await setup('completed');
     const result = await tool.execute(
       { jobId: 'job_x', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: parentId })
@@ -78,7 +138,7 @@ describe('job_kill destroy_container', () => {
   });
 
   it('cancels a running job first, then tears it down via the shim', async () => {
-    const { calls, childId, jobManager, tool, reaper, parentId } = setup('running');
+    const { calls, childId, jobManager, tool, reaper, parentId } = await setup('running');
     const result = await tool.execute(
       { jobId: 'job_x', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: parentId })
@@ -89,7 +149,7 @@ describe('job_kill destroy_container', () => {
   });
 
   it('does NOT tear down a workspace owned by another session', async () => {
-    const { releasePerInvocation, dir, jobManager, tool, reaper } = setup('completed');
+    const { releasePerInvocation, dir, jobManager, tool, reaper } = await setup('completed');
     const result = await tool.execute(
       { jobId: 'job_x', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: 'sess_other' })
@@ -100,7 +160,8 @@ describe('job_kill destroy_container', () => {
   });
 
   it('plain kill (destroy_container=false) leaves the delegation tracked', async () => {
-    const { releasePerInvocation, dir, jobManager, tool, reaper, parentId } = setup('running');
+    const { releasePerInvocation, dir, jobManager, tool, reaper, parentId } =
+      await setup('running');
     const result = await tool.execute(
       { jobId: 'job_x' },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: parentId })
@@ -125,11 +186,8 @@ describe('job_kill destroy_container', () => {
     const reaper = new WorkspaceReaper();
     reaper.bindRuntime({ releasePerInvocation } as unknown as ContainerManager);
     // NOT tracked: no reaper.track() call — simulates the post-restart process.
-    const job = {
-      jobId: 'job_x',
-      status: 'completed',
-      subagentSessionId: 'sess_child',
-    } as JobState;
+    const job = runningDelegateJob('sess_child');
+    await completeThroughRealFinalize(job, PARENT);
     const jobManager = {
       getJob: vi.fn().mockReturnValue(job),
       cancelJob: vi.fn(),
@@ -137,10 +195,10 @@ describe('job_kill destroy_container', () => {
 
     const result = await new JobKillTool().execute(
       { jobId: 'job_x', destroy_container: true },
-      ctx({ jobManager, workspaceReaper: reaper, activeSessionId: 'sess_parent' })
+      ctx({ jobManager, workspaceReaper: reaper, activeSessionId: PARENT })
     );
     expect(result.status).toBe('completed');
-    expect(calls).toEqual(['release:sess_parent:sess_child']);
+    expect(calls).toEqual([`release:${PARENT}:sess_child`]);
     expect(result.content[0].text).not.toContain('no container to destroy');
     expect(reaper.isReleased('sess_child')).toBe(true);
   });
@@ -150,7 +208,7 @@ describe('job_kill destroy_container', () => {
     const jobManager = { getJob: vi.fn().mockReturnValue(undefined) } as unknown as JobManager;
     const result = await new JobKillTool().execute(
       { jobId: 'nope', destroy_container: true },
-      ctx({ jobManager, workspaceReaper: reaper, activeSessionId: 'sess_parent' })
+      ctx({ jobManager, workspaceReaper: reaper, activeSessionId: PARENT })
     );
     expect(result.status).toBe('failed');
   });
