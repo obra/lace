@@ -129,6 +129,17 @@ describe('PersonaRegistry', () => {
     );
   });
 
+  it('rejects connectionId with an empty model: an empty model does not pair', () => {
+    mkdirSync(userPersonaDir, { recursive: true });
+    writeFileSync(
+      path.join(userPersonaDir, 'emptymodel.md'),
+      ['---', 'model: ""', 'connectionId: conn_anthropic', '---', 'body'].join('\n')
+    );
+    expect(() => makeRegistry().parsePersona('emptymodel')).toThrow(
+      "Invalid frontmatter for persona 'emptymodel': connectionId: connectionId requires model"
+    );
+  });
+
   it('rejects a non-string connectionId as invalid frontmatter', () => {
     mkdirSync(userPersonaDir, { recursive: true });
     writeFileSync(

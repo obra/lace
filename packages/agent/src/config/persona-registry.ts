@@ -96,7 +96,7 @@ const personaConfigSchema = z
   // A connection only makes sense with a model chosen for it. Without this, a
   // persona's connection would be paired with whichever model another source
   // supplies (the process default, the delegating parent, a request override).
-  .refine((config) => config.connectionId === undefined || config.model !== undefined, {
+  .refine((config) => config.connectionId === undefined || !!config.model, {
     path: ['connectionId'],
     message: 'connectionId requires model: declare both, or neither',
   });
