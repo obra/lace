@@ -35,6 +35,8 @@ import {
 import { normalizeOpenAIChatStop, normalizeOpenAIResponsesStop } from './stop-reason';
 import type { LaceStopReason, LaceStopDetails } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
+import { fitOutputTokensToContextWindow } from './utils/output-token-budget';
+import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
@@ -361,6 +363,36 @@ export class OpenAIProvider extends AIProvider {
     }));
   }
 
+  /**
+   * The output-token limit for one request: the configured or catalog maximum, shrunk to
+   * the room the input leaves in the model's context window. Some gateways (LunaRoute)
+   * reject any request whose input + max output exceeds the window, so sending the
+   * catalog maximum unconditionally would fail every request past window - max output.
+   * Models the catalog doesn't describe get the maximum as-is: without a known window
+   * there is nothing to fit against.
+   */
+  private _outputTokenLimit(
+    model: string,
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    systemPrompt: string
+  ): number {
+    const requestedOutputTokens =
+      this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384);
+    const contextWindow = this._catalogData?.models.find((m) => m.id === model)?.context_window;
+    if (contextWindow === undefined) return requestedOutputTokens;
+
+    const estimatedInputTokens =
+      estimateProviderTokens(messages) +
+      this.estimateTokens(systemPrompt) +
+      (tools.length > 0 ? this.estimateTokens(JSON.stringify(tools)) : 0);
+    return fitOutputTokensToContextWindow({
+      requestedOutputTokens,
+      contextWindow,
+      estimatedInputTokens,
+    });
+  }
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: WireTool[],
@@ -385,7 +417,7 @@ export class OpenAIProvider extends AIProvider {
     return {
       model,
       messages: messagesWithSystem,
-      max_completion_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
+      max_completion_tokens: this._outputTokenLimit(model, messages, tools, systemPrompt),
       stream,
       ...(tools.length > 0 && { tools: this.buildOpenAITools(tools) }),
       ...(options?.toolChoice && { tool_choice: options.toolChoice }),
@@ -526,7 +558,9 @@ export class OpenAIProvider extends AIProvider {
       instructions,
       // Cast to ResponseCreateParams['input'] - types are complex but runtime compatible
       input: inputItems as unknown as ResponseCreateParams['input'],
-      max_output_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
+      // Sized against the FULL history even when chained: the server-side stored
+      // response still occupies the window.
+      max_output_tokens: this._outputTokenLimit(model, messages, tools, systemText),
       stream,
       ...(previousResponseId && { previous_response_id: previousResponseId }),
       ...(tools.length > 0 && { tools: responsesTools }),
