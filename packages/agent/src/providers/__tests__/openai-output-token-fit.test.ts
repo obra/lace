@@ -24,9 +24,11 @@ function userMessageOf(tokens: number) {
   return [{ role: 'user' as const, content: 'x'.repeat(tokens * 4) }];
 }
 
-const usage = { input_tokens: 1, output_tokens: 1, total_tokens: 2 };
+function usageFor(inputTokens: number) {
+  return { input_tokens: inputTokens, output_tokens: 1, total_tokens: inputTokens + 1 };
+}
 
-function responsesJson(): Response {
+function responsesJson(inputTokens = 1): Response {
   return new Response(
     JSON.stringify({
       id: 'resp_1',
@@ -41,13 +43,13 @@ function responsesJson(): Response {
           content: [{ type: 'output_text', text: 'ok', annotations: [] }],
         },
       ],
-      usage,
+      usage: usageFor(inputTokens),
     }),
     { status: 200, headers: { 'content-type': 'application/json' } }
   );
 }
 
-function responsesSse(): Response {
+function responsesSse(inputTokens = 1): Response {
   const events = [
     { type: 'response.output_text.delta', output_index: 0, delta: 'ok' },
     {
@@ -65,7 +67,7 @@ function responsesSse(): Response {
             content: [{ type: 'output_text', text: 'ok', annotations: [] }],
           },
         ],
-        usage,
+        usage: usageFor(inputTokens),
       },
     },
   ];
@@ -115,12 +117,12 @@ function stubEndpoint(respond: () => Response): Array<Record<string, unknown>> {
 }
 
 // Low input: nothing to fit, the catalog limit goes out as-is.
-// 700K estimated (699K message + 1K system prompt): reserve 700K * 1.25 = 875K for input,
-//   leaving 1 048 576 - 875 000 = 173 576 for output.
-// 900K estimated: 1.125M reserved exceeds the window, so the output limit drops to the floor.
+// 500K estimated (499K message + 1K system prompt): project 500K * 1.7 = 850K of input,
+//   leaving 1 048 576 - 850 000 = 198 576 for output.
+// 900K estimated: 1.53M projected exceeds the window, so the output limit drops to the floor.
 const CASES = [
   { label: 'low input', messageTokens: 1, expected: MAX_OUTPUT },
-  { label: '700K estimated input', messageTokens: 699_000, expected: 173_576 },
+  { label: '500K estimated input', messageTokens: 499_000, expected: 198_576 },
   { label: '900K estimated input', messageTokens: 899_000, expected: 4_096 },
 ];
 
@@ -186,6 +188,45 @@ describe('OpenAI Responses output limit fits the context window (shipped LunaRou
       expect(response.content).toBe('ok');
       expect(sent).toHaveLength(1);
       expect(sent[0]?.max_output_tokens).toBe(expected);
+    });
+  }
+
+  it('keeps input + max_output_tokens within the window when chars/4 undercounts by 1.6x', async () => {
+    // 600K estimated (599K message + 1K system prompt); real content at 2.5 chars/token
+    // is 1.6x that. Projected at 1.7x: 1 020 000, leaving 28 576 for output.
+    const trueInputTokens = 600_000 * 1.6;
+    const sent = stubEndpoint(() => responsesJson());
+
+    await provider.createResponse(userMessageOf(599_000), [], MODEL);
+
+    const maxOutput = sent[0]?.max_output_tokens as number;
+    expect(maxOutput).toBe(28_576);
+    expect(trueInputTokens + maxOutput).toBeLessThanOrEqual(CONTEXT_WINDOW);
+  });
+
+  for (const streaming of [false, true]) {
+    it(`sizes the next hop by the input ratio the previous hop measured (${streaming ? 'streaming' : 'non-streaming'})`, async () => {
+      // Hop 1: 400K estimated, and the gateway reports 800K real input tokens, a 2.0x
+      // undercount (worse than the fixed 1.7x). Hop 1 itself projects 680K, so it
+      // gets the full limit. Hop 2 adds 2 estimated tokens: 400 002 * 2.0 = 800 004
+      // projected, leaving 1 048 576 - 800 004 = 248 572.
+      const hop1Messages = userMessageOf(399_000);
+      const hop2Messages = [
+        ...hop1Messages,
+        { role: 'assistant' as const, content: 'ok' },
+        { role: 'user' as const, content: 'more' },
+      ];
+      const sent = stubEndpoint(() => (streaming ? responsesSse(800_000) : responsesJson(800_000)));
+      const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
+        provider
+      );
+
+      await send(hop1Messages, [], MODEL);
+      await send(hop2Messages, [], MODEL);
+
+      expect(sent).toHaveLength(2);
+      expect(sent[0]?.max_output_tokens).toBe(MAX_OUTPUT);
+      expect(sent[1]?.max_output_tokens).toBe(248_572);
     });
   }
 

@@ -35,7 +35,7 @@ import {
 import { normalizeOpenAIChatStop, normalizeOpenAIResponsesStop } from './stop-reason';
 import type { LaceStopReason, LaceStopDetails } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
-import { fitOutputTokensToContextWindow } from './utils/output-token-budget';
+import { fitOutputTokensToContextWindow, projectInputTokens } from './utils/output-token-budget';
 import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
@@ -58,6 +58,10 @@ export class OpenAIProvider extends AIProvider {
   private _encoderCache = new Map<string, Tiktoken>();
   private _tiktokenModule: typeof import('tiktoken') | null = null;
   private _tiktokenAvailable: boolean | undefined = undefined;
+  // Real input tokens over lace's estimate, as measured by this instance's last
+  // successful call per model. The runner holds one provider for a whole turn, so
+  // each hop's request is sized by what the previous hop actually cost.
+  private _measuredInputRatio = new Map<string, number>();
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
@@ -368,8 +372,10 @@ export class OpenAIProvider extends AIProvider {
    * the room the input leaves in the model's context window. Some gateways (LunaRoute)
    * reject any request whose input + max output exceeds the window, so sending the
    * catalog maximum unconditionally would fail every request past window - max output.
-   * Models the catalog doesn't describe get the maximum as-is: without a known window
-   * there is nothing to fit against.
+   * The input side is lace's estimate scaled up by the larger of a fixed undercount
+   * factor and the ratio the previous call in this turn measured (see
+   * `projectInputTokens`). Models the catalog doesn't describe get the maximum as-is:
+   * without a known window there is nothing to fit against.
    */
   private _outputTokenLimit(
     model: string,
@@ -382,15 +388,48 @@ export class OpenAIProvider extends AIProvider {
     const contextWindow = this._catalogData?.models.find((m) => m.id === model)?.context_window;
     if (contextWindow === undefined) return requestedOutputTokens;
 
-    const estimatedInputTokens =
-      estimateProviderTokens(messages) +
-      this.estimateTokens(systemPrompt) +
-      (tools.length > 0 ? this.estimateTokens(JSON.stringify(tools)) : 0);
     return fitOutputTokensToContextWindow({
       requestedOutputTokens,
       contextWindow,
-      estimatedInputTokens,
+      projectedInputTokens: projectInputTokens(
+        this._estimateInputTokens(messages, tools, systemPrompt),
+        this._measuredInputRatio.get(model)
+      ),
     });
+  }
+
+  /** lace's chars/4 estimate of everything a request puts in the window. */
+  private _estimateInputTokens(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    systemPrompt: string
+  ): number {
+    return (
+      estimateProviderTokens(messages) +
+      this.estimateTokens(systemPrompt) +
+      (tools.length > 0 ? this.estimateTokens(JSON.stringify(tools)) : 0)
+    );
+  }
+
+  /** Remember how far the estimate under-read this call's real input, for the next call. */
+  private _recordMeasuredInputRatio(
+    model: string,
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    response: ProviderResponse
+  ): void {
+    // A Chat Completions reply without usage reports lace's own estimate here, which
+    // records a ratio near 1; projectInputTokens never scales below its fixed factor,
+    // so that only drops back to the unmeasured projection.
+    const realInputTokens = response.usage?.promptTokens ?? 0;
+    if (realInputTokens <= 0) return;
+    const estimated = this._estimateInputTokens(
+      messages,
+      tools,
+      this.getEffectiveSystemPrompt(messages)
+    );
+    if (estimated <= 0) return;
+    this._measuredInputRatio.set(model, realInputTokens / estimated);
   }
 
   private _createRequestPayload(
@@ -766,6 +805,26 @@ export class OpenAIProvider extends AIProvider {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
+    const response = await this._routeResponse(
+      messages,
+      tools,
+      model,
+      signal,
+      conversationState,
+      options
+    );
+    this._recordMeasuredInputRatio(model, messages, tools, response);
+    return response;
+  }
+
+  private async _routeResponse(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    model: string,
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
+  ): Promise<ProviderResponse> {
     // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support
     // Responses API) unless the catalog entry opted this endpoint into Responses via api_style.
     if (this.isCustomEndpoint() && !this.customEndpointUsesResponsesAPI()) {
@@ -964,6 +1023,26 @@ export class OpenAIProvider extends AIProvider {
   protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
     tools: WireTool[] = [],
+    model: string,
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
+  ): Promise<ProviderResponse> {
+    const response = await this._routeStreamingResponse(
+      messages,
+      tools,
+      model,
+      signal,
+      conversationState,
+      options
+    );
+    this._recordMeasuredInputRatio(model, messages, tools, response);
+    return response;
+  }
+
+  private async _routeStreamingResponse(
+    messages: ProviderMessage[],
+    tools: WireTool[],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
