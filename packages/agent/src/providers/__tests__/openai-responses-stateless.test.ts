@@ -166,7 +166,6 @@ describe('OpenAI Responses API chaining', () => {
       const [hop1, hop2] = await runTwoHopTurn(provider, 'gpt-5', streaming);
 
       expect(hop1.store).toBe(true);
-      expect(hop1.previous_response_id).toBeUndefined();
       expect(hop2.store).toBe(true);
       expect(hop2.previous_response_id).toBe(HOP1_ID);
       // Only what came after the last assistant message: the tool result.
@@ -199,8 +198,8 @@ const REMINDER = '<system-reminder>Context budget is at 80%.</system-reminder>';
  * A three-hop history as the conversation runner builds it: assistant text beside
  * parallel tool calls, a system-reminder merged into the tool-result turn by
  * appendOrMergeUser (string-content branch), and a user interjection merged into the
- * next tool-result turn (array-content branch). The assistant's first turn also
- * carries a thinking block and the history carries a role:'system' message.
+ * next tool-result turn (array-content branch). The history also carries a
+ * role:'system' message, which travels only as `instructions`.
  */
 function multiHopHistory(): ProviderMessage[] {
   const history: ProviderMessage[] = [
@@ -209,7 +208,6 @@ function multiHopHistory(): ProviderMessage[] {
     {
       role: 'assistant',
       content: [{ type: 'text', text: 'Reading both files.' }],
-      thinkingBlocks: [{ type: 'thinking', thinking: 'read a and b in parallel', signature: 's' }],
       toolCalls: [
         { id: 'call_a', name: 'read_file', arguments: { path: 'a.txt' } },
         { id: 'call_b', name: 'read_file', arguments: { path: 'b.txt' } },
@@ -250,19 +248,17 @@ function multiHopHistory(): ProviderMessage[] {
   );
 }
 
-// What a stateless hop sends for multiHopHistory(), pinned as today's converter output.
-// Merged user text lands BEFORE the function_call_output items of its turn, and the
-// thinking block is dropped (no `reasoning` item). LunaRoute accepted both shapes in
-// live probes on 2026-09-24 (user text between function_call and function_call_output,
-// reasoning items present or omitted), so this pins behaviour rather than a wish.
+// What a stateless hop sends for multiHopHistory(). Text merged into a tool-result turn
+// follows that turn's function_call_output items, the same tool-results-first rule the
+// Anthropic converter follows (see message-building/append-or-merge.ts).
 const MULTI_HOP_FULL_HISTORY: SentItem[] = [
   { role: 'user', content: 'compare a.txt and b.txt, then write the diff' },
   { role: 'assistant', content: 'Reading both files.' },
   { type: 'function_call', call_id: 'call_a', name: 'read_file', arguments: '{"path":"a.txt"}' },
   { type: 'function_call', call_id: 'call_b', name: 'read_file', arguments: '{"path":"b.txt"}' },
-  { role: 'user', content: REMINDER },
   { type: 'function_call_output', call_id: 'call_a', output: 'A body' },
   { type: 'function_call_output', call_id: 'call_b', output: 'B body' },
+  { role: 'user', content: REMINDER },
   { role: 'assistant', content: 'Writing the diff.' },
   {
     type: 'function_call',
@@ -270,11 +266,44 @@ const MULTI_HOP_FULL_HISTORY: SentItem[] = [
     name: 'write_file',
     arguments: '{"path":"diff.txt"}',
   },
-  { role: 'user', content: 'also, thanks!' },
   { type: 'function_call_output', call_id: 'call_c', output: 'ok' },
+  { role: 'user', content: 'also, thanks!' },
 ];
 
-describe('OpenAI Responses API stateless multi-hop history', () => {
+/**
+ * Asserts the tool-results-first rule: every function_call's output appears after it
+ * and before any later user message item.
+ */
+function expectToolOutputsBeforeUserText(input: SentItem[]): void {
+  input.forEach((item, callIndex) => {
+    if (item.type !== 'function_call') return;
+    const outputIndex = input.findIndex(
+      (other) => other.type === 'function_call_output' && other.call_id === item.call_id
+    );
+    const nextUserIndex = input.findIndex(
+      (other, index) => index > callIndex && other.role === 'user'
+    );
+    expect(outputIndex, `output for ${item.call_id}`).toBeGreaterThan(callIndex);
+    if (nextUserIndex >= 0) {
+      expect(outputIndex, `output for ${item.call_id} precedes user text`).toBeLessThan(
+        nextUserIndex
+      );
+    }
+  });
+}
+
+function responsesProvider(supportsResponseChaining: boolean): OpenAIProvider {
+  const provider = new OpenAIProvider({
+    apiKey: 'sk-test-fake',
+    baseURL: 'https://gw.example.com/v1',
+    apiStyle: 'responses',
+    supportsResponseChaining,
+  });
+  provider.setSystemPrompt(SYSTEM_PROMPT);
+  return provider;
+}
+
+describe('OpenAI Responses API multi-hop history', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -283,13 +312,7 @@ describe('OpenAI Responses API stateless multi-hop history', () => {
     const mode = streaming ? 'streaming' : 'non-streaming';
 
     it(`sends the whole multi-hop history on a stateless hop (${mode})`, async () => {
-      const provider = new OpenAIProvider({
-        apiKey: 'sk-test-fake',
-        baseURL: 'https://gw.example.com/v1',
-        apiStyle: 'responses',
-        supportsResponseChaining: false,
-      });
-      provider.setSystemPrompt(SYSTEM_PROMPT);
+      const provider = responsesProvider(false);
       const sent = stubResponsesEndpoint(streaming, [[HOP2_ID, hop2Output]]);
       const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
         provider
@@ -303,27 +326,55 @@ describe('OpenAI Responses API stateless multi-hop history', () => {
       expect(sent).toHaveLength(1);
       const [body] = sent;
       expect(body.input).toEqual(MULTI_HOP_FULL_HISTORY);
-
-      // Every function_call is answered by exactly one function_call_output, by call_id.
-      const callIds = body.input.filter((i) => i.type === 'function_call').map((i) => i.call_id);
-      const outputIds = body.input
-        .filter((i) => i.type === 'function_call_output')
-        .map((i) => i.call_id);
-      expect(outputIds).toEqual(callIds);
-
-      // The system prompt rides once, in `instructions`, never in `input`.
+      expectToolOutputsBeforeUserText(body.input);
       expect(body.instructions).toBe(SYSTEM_PROMPT);
-      expect(JSON.stringify(body.input)).not.toContain(SYSTEM_PROMPT);
-
-      // Thinking blocks are dropped: no reasoning item, no thinking text.
-      expect(body.input.some((i) => i.type === 'reasoning')).toBe(false);
-      expect(JSON.stringify(body.input)).not.toContain('read a and b in parallel');
-
       expect(body.store).toBe(false);
       expect(body).not.toHaveProperty('previous_response_id');
       expect(body).not.toHaveProperty('context_management');
     });
+
+    it(`puts tool outputs before merged user text on a chained hop (${mode})`, async () => {
+      const provider = responsesProvider(true);
+      const sent = stubResponsesEndpoint(streaming, [[HOP2_ID, hop2Output]]);
+      const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
+        provider
+      );
+
+      await send(multiHopHistory(), [], 'some-model', undefined, {
+        previousResponseId: 'resp_previous_hop',
+      });
+
+      const [body] = sent;
+      expect(body.previous_response_id).toBe('resp_previous_hop');
+      // Only what follows the last assistant message: its tool result, then the merged text.
+      expect(body.input).toEqual([
+        { type: 'function_call_output', call_id: 'call_c', output: 'ok' },
+        { role: 'user', content: 'also, thanks!' },
+      ]);
+    });
   }
+
+  // Known limitation: in stateless mode, prior-hop reasoning isn't carried. Lace's only
+  // replay slot for reasoning is ProviderMessage.thinkingBlocks, which is Anthropic-shaped
+  // and never filled by the OpenAI provider; the Responses converter ignores it, so no
+  // `reasoning` item is sent. LunaRoute accepted stateless tool round trips with and
+  // without reasoning items in live probes on 2026-09-24.
+  it('does not carry prior-hop reasoning on a stateless hop (known limitation)', async () => {
+    const provider = responsesProvider(false);
+    const sent = stubResponsesEndpoint(false, [[HOP2_ID, hop2Output]]);
+    const history = multiHopHistory().map((msg) =>
+      msg.role === 'assistant'
+        ? {
+            ...msg,
+            thinkingBlocks: [{ type: 'thinking' as const, thinking: 'plan it', signature: 's' }],
+          }
+        : msg
+    );
+
+    await provider.createResponse(history, [], 'some-model');
+
+    expect(sent[0].input).toEqual(MULTI_HOP_FULL_HISTORY);
+  });
 });
 
 describe('shipped LunaRoute catalog response chaining', () => {

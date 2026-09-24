@@ -410,6 +410,22 @@ export class OpenAIProvider extends AIProvider {
           msg.role === 'user'
             ? toOpenAIResponsesMessageContent(msg.content)
             : getTextContent(msg.content);
+        // Tool results go BEFORE the message text. appendOrMergeUser merges user and
+        // system-reminder text into the tool-result turn; emitting that text first would
+        // put it between the function_call and its function_call_output. Same
+        // tool-results-first rule as convertToAnthropicFormat.
+        if (msg.toolResults) {
+          for (const result of msg.toolResults) {
+            inputItems.push({
+              type: 'function_call_output',
+              call_id: result.id,
+              // PRI-3079: the Responses API accepts an item list here, so a
+              // tool-result image reaches the model instead of flattening to ''.
+              output: toOpenAIResponsesToolOutput(result.content),
+            });
+          }
+        }
+
         // Add message if it has content
         if (typeof content === 'string' ? content.trim() : content.length > 0) {
           inputItems.push({
@@ -427,19 +443,6 @@ export class OpenAIProvider extends AIProvider {
               call_id: toolCall.id,
               name: toolCall.name,
               arguments: JSON.stringify(toolCall.arguments),
-            });
-          }
-        }
-
-        // Add tool results as separate items (user messages can have tool results)
-        if (msg.toolResults) {
-          for (const result of msg.toolResults) {
-            inputItems.push({
-              type: 'function_call_output',
-              call_id: result.id,
-              // PRI-3079: the Responses API accepts an item list here, so a
-              // tool-result image reaches the model instead of flattening to ''.
-              output: toOpenAIResponsesToolOutput(result.content),
             });
           }
         }
