@@ -35,6 +35,28 @@ function expandEnvVar(value: string | undefined): string | undefined {
   return value;
 }
 
+/**
+ * The catalog a provider looks model metadata up in: the instance's catalog, plus
+ * every static-catalog model it lacks. A dynamic catalog lists only what the API
+ * reported at its last successful fetch, and a stale cache (refreshes failing, or
+ * written before a deploy added a model) can omit a model the static catalog
+ * describes. Such a model still resolves through the static fallback, so without
+ * this the provider would size it with guessed defaults (200K window, 8192-token
+ * output cap, no reasoning effort). Instance entries win where both exist.
+ *
+ * Only for building providers: listings keep the dynamic catalog's availability.
+ */
+function withStaticModels(
+  instanceCatalog: CatalogProvider,
+  staticCatalog: CatalogProvider
+): CatalogProvider {
+  if (instanceCatalog === staticCatalog) return instanceCatalog;
+  const listed = new Set(instanceCatalog.models.map((m) => m.id));
+  const missing = staticCatalog.models.filter((m) => !listed.has(m.id));
+  if (missing.length === 0) return instanceCatalog;
+  return { ...instanceCatalog, models: [...instanceCatalog.models, ...missing] };
+}
+
 export interface ConfiguredInstance {
   id: string;
   displayName: string;
@@ -392,7 +414,7 @@ export class ProviderRegistry {
         supportsResponseChaining: catalogProvider.supports_response_chaining,
       }),
       // Pass instance catalog (with dynamic models) so provider can look up model metadata
-      catalogProvider: instanceCatalog ?? catalogProvider,
+      catalogProvider: withStaticModels(instanceCatalog ?? catalogProvider, catalogProvider),
     };
 
     // Create provider using the existing createProvider method
@@ -471,7 +493,7 @@ export class ProviderRegistry {
         supportsResponseChaining: catalogProvider.supports_response_chaining,
       }),
       // Pass instance catalog (with dynamic models) so provider can look up model metadata
-      catalogProvider: catalog ?? catalogProvider,
+      catalogProvider: withStaticModels(catalog ?? catalogProvider, catalogProvider),
     };
 
     // Create provider using the existing createProvider method

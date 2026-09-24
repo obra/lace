@@ -15,9 +15,18 @@ import type { ProviderInstancesConfig } from '../types';
  * in Claude Platform mode lace's dynamic Anthropic catalog can be a stale cached
  * copy, so a new model must be resolvable from the static catalog alone.
  */
-const FLEET_MODEL_IDS: Record<string, string[]> = {
-  lunaroute: ['deepseek-4.1-flash', 'deepseek-4.1-flash-background'],
-  anthropic: ['claude-opus-5', 'claude-opus-5-5'],
+const FLEET_MODELS: Record<
+  string,
+  Record<string, { contextWindow: number; maxOutputTokens: number }>
+> = {
+  lunaroute: {
+    'deepseek-4.1-flash': { contextWindow: 128_000, maxOutputTokens: 8192 },
+    'deepseek-4.1-flash-background': { contextWindow: 128_000, maxOutputTokens: 8192 },
+  },
+  anthropic: {
+    'claude-opus-5': { contextWindow: 1_000_000, maxOutputTokens: 50_000 },
+    'claude-opus-5-5': { contextWindow: 1_000_000, maxOutputTokens: 50_000 },
+  },
 };
 
 const instanceIdFor = (catalogProviderId: string) => `sen-${catalogProviderId}`;
@@ -33,7 +42,7 @@ describe('shipped fleet model catalogs', () => {
     process.env.LACE_DISABLE_DYNAMIC_CATALOGS = '1';
 
     const instances: ProviderInstancesConfig = { version: '1.0', instances: {} };
-    for (const catalogProviderId of Object.keys(FLEET_MODEL_IDS)) {
+    for (const catalogProviderId of Object.keys(FLEET_MODELS)) {
       instances.instances[instanceIdFor(catalogProviderId)] = {
         displayName: `Sen ${catalogProviderId}`,
         catalogProviderId,
@@ -44,7 +53,7 @@ describe('shipped fleet model catalogs', () => {
       JSON.stringify(instances, null, 2)
     );
     const instanceManager = new ProviderInstanceManager();
-    for (const catalogProviderId of Object.keys(FLEET_MODEL_IDS)) {
+    for (const catalogProviderId of Object.keys(FLEET_MODELS)) {
       await instanceManager.saveCredential(instanceIdFor(catalogProviderId), {
         apiKey: `test-${catalogProviderId}-key`,
       });
@@ -64,8 +73,8 @@ describe('shipped fleet model catalogs', () => {
     }
   });
 
-  for (const [catalogProviderId, modelIds] of Object.entries(FLEET_MODEL_IDS)) {
-    for (const modelId of modelIds) {
+  for (const [catalogProviderId, models] of Object.entries(FLEET_MODELS)) {
+    for (const [modelId, expected] of Object.entries(models)) {
       it(`resolves ${catalogProviderId}/${modelId} through the registry`, async () => {
         const provider = await registry.createProviderFromInstanceAndModel(
           instanceIdFor(catalogProviderId),
@@ -73,6 +82,12 @@ describe('shipped fleet model catalogs', () => {
         );
 
         expect(provider.config.model).toBe(modelId);
+        // A model the provider's catalog does not describe still resolves, but
+        // with a guessed 200K window and 8192-token output cap — so pin both.
+        expect(provider.contextWindowForModel(modelId)).toBe(expected.contextWindow);
+        expect(provider.getAvailableModels().find((m) => m.id === modelId)?.maxOutputTokens).toBe(
+          expected.maxOutputTokens
+        );
       });
     }
   }

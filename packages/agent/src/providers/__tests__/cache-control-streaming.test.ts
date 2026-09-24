@@ -9,6 +9,7 @@ import { AnthropicProvider } from '../anthropic-provider';
 import { Tool } from '@lace/agent/tools/tool';
 import { z } from 'zod';
 import type { ToolContext, ToolResult } from '@lace/agent/tools/types';
+import { writeSseStream } from './anthropic-sse-stream';
 
 class EchoTool extends Tool {
   name = 'echo';
@@ -38,58 +39,6 @@ interface RequestBody {
   system?: Array<{ cache_control?: unknown }>;
   tools?: Array<{ cache_control?: unknown }>;
   messages: Array<{ role: string; content: unknown }>;
-}
-
-// Build and write a minimal SSE stream that the Anthropic SDK can fully consume.
-// The SDK's messages.stream() requires: message_start → content_block_start →
-// content_block_delta → content_block_stop → message_delta → message_stop.
-function writeSseStream(res: import('node:http').ServerResponse): void {
-  res.writeHead(200, { 'content-type': 'text/event-stream' });
-
-  const send = (event: string, data: object) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
-
-  send('message_start', {
-    type: 'message_start',
-    message: {
-      id: 'msg_smoke_stream',
-      type: 'message',
-      role: 'assistant',
-      model: 'claude-sonnet-4-20250514',
-      content: [],
-      stop_reason: null,
-      stop_sequence: null,
-      usage: { input_tokens: 10, output_tokens: 0 },
-    },
-  });
-
-  send('content_block_start', {
-    type: 'content_block_start',
-    index: 0,
-    content_block: { type: 'text', text: '' },
-  });
-
-  send('content_block_delta', {
-    type: 'content_block_delta',
-    index: 0,
-    delta: { type: 'text_delta', text: 'ok' },
-  });
-
-  send('content_block_stop', {
-    type: 'content_block_stop',
-    index: 0,
-  });
-
-  send('message_delta', {
-    type: 'message_delta',
-    delta: { stop_reason: 'end_turn', stop_sequence: null },
-    usage: { output_tokens: 1 },
-  });
-
-  send('message_stop', { type: 'message_stop' });
-
-  res.end();
 }
 
 describe('streaming smoke — cache_control on the stream path', () => {
