@@ -278,7 +278,10 @@ export function createFinalizeJob(
 
     job.proc = undefined;
     job.childPeer = undefined;
-    job.subagentSessionId = undefined;
+    // subagentSessionId is deliberately kept: a finished delegate's container
+    // can outlive the job (the shim keeps it for resume), and
+    // job_kill(destroy_container) needs the child id to route its release.
+    // Cancel is gated on childPeer, which is cleared above.
     job.childTransportClose = undefined;
     job.finished = true;
 
