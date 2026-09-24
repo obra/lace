@@ -3,7 +3,8 @@
 
 /**
  * How far to scale lace's input estimate up before subtracting it from the window, when
- * no real usage has calibrated it yet.
+ * nothing has measured this turn's real input yet (its first hop, or a reply with no
+ * usage).
  *
  * The estimate is characters / 4 over text (`estimateProviderTokens`). Real coworker
  * content measures 2.4–2.9 characters per token (see `estimateUndercountRatio` in
@@ -15,6 +16,16 @@
 export const INPUT_ESTIMATE_UNDERCOUNT_FACTOR = 1.7;
 
 /**
+ * Headroom on top of a ratio the previous hop measured. The next hop's new content (tool
+ * results, the model's own output) can tokenize denser than the history the ratio was
+ * measured on, so the ratio is a good guide but not an exact one. 10% absorbs that
+ * hop-to-hop drift without falling back to the blanket 1.7, which on content that
+ * chars/4 already estimates well would pin output to the floor at ~60% of the window,
+ * long before compaction runs.
+ */
+export const MEASURED_RATIO_MARGIN = 1.1;
+
+/**
  * The smallest output limit we send once the window is (nearly) full. Sending something
  * rather than zero lets the request go through when the projection was pessimistic, and
  * when it wasn't, the gateway's overflow error is what starts emergency compaction.
@@ -22,14 +33,17 @@ export const INPUT_ESTIMATE_UNDERCOUNT_FACTOR = 1.7;
 export const MIN_OUTPUT_TOKENS = 4096;
 
 /**
- * The input size to plan around: the estimate scaled by whichever is larger, the fixed
- * undercount factor or the ratio a previous call in this turn actually measured (its real
- * input tokens over its estimate). Scaling by a ratio, rather than reusing the last real
- * count as-is, stays right when history shrinks between calls, as after an emergency
- * compaction.
+ * The input size to plan around: the estimate scaled by the ratio the previous call in
+ * this turn actually measured (its real input tokens over its estimate) plus a margin,
+ * or by the fixed undercount factor when there is no measurement. Scaling by a ratio,
+ * rather than reusing the last real count as-is, stays right when history shrinks
+ * between calls, as after an emergency compaction.
  */
 export function projectInputTokens(estimatedInputTokens: number, measuredRatio?: number): number {
-  const factor = Math.max(INPUT_ESTIMATE_UNDERCOUNT_FACTOR, measuredRatio ?? 0);
+  const factor =
+    measuredRatio === undefined
+      ? INPUT_ESTIMATE_UNDERCOUNT_FACTOR
+      : measuredRatio * MEASURED_RATIO_MARGIN;
   return Math.ceil(estimatedInputTokens * factor);
 }
 

@@ -75,7 +75,8 @@ function responsesSse(inputTokens = 1): Response {
   return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
 }
 
-function chatCompletionJson(): Response {
+/** A Chat Completions reply; `promptTokens` null leaves usage out, as some gateways do. */
+function chatCompletionJson(promptTokens: number | null = 1): Response {
   return new Response(
     JSON.stringify({
       id: 'chatcmpl_1',
@@ -83,10 +84,38 @@ function chatCompletionJson(): Response {
       created: 0,
       model: MODEL,
       choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'ok' } }],
-      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      ...(promptTokens !== null && {
+        usage: {
+          prompt_tokens: promptTokens,
+          completion_tokens: 1,
+          total_tokens: promptTokens + 1,
+        },
+      }),
     }),
     { status: 200, headers: { 'content-type': 'application/json' } }
   );
+}
+
+function chatCompletionSse(promptTokens: number): Response {
+  const chunks = [
+    {
+      id: 'chatcmpl_1',
+      object: 'chat.completion.chunk',
+      created: 0,
+      model: MODEL,
+      choices: [{ index: 0, delta: { role: 'assistant', content: 'ok' }, finish_reason: null }],
+    },
+    {
+      id: 'chatcmpl_1',
+      object: 'chat.completion.chunk',
+      created: 0,
+      model: MODEL,
+      choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+      usage: { prompt_tokens: promptTokens, completion_tokens: 1, total_tokens: promptTokens + 1 },
+    },
+  ];
+  const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n';
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
 }
 
 // What LunaRoute answered, live, when input + max_output_tokens exceeded the window.
@@ -101,6 +130,16 @@ function lunaRouteContextOverflow(): Response {
     }),
     { status: 400, headers: { 'content-type': 'application/json' } }
   );
+}
+
+/**
+ * A projection scaled by measured ratio x 1.1 is the ceiling of a floating-point
+ * product (2.0 * 1.1 is 2.2000000000000002), so it can land one token above the exact
+ * figure, leaving one token less output. Either value is correct.
+ */
+function expectOutputLimit(actual: unknown, exact: number): void {
+  expect(actual).toBeGreaterThanOrEqual(exact - 1);
+  expect(actual).toBeLessThanOrEqual(exact);
 }
 
 /** Stubs the fetch the OpenAI SDK sends through and records each request body. */
@@ -204,30 +243,40 @@ describe('OpenAI Responses output limit fits the context window (shipped LunaRou
     expect(trueInputTokens + maxOutput).toBeLessThanOrEqual(CONTEXT_WINDOW);
   });
 
-  for (const streaming of [false, true]) {
-    it(`sizes the next hop by the input ratio the previous hop measured (${streaming ? 'streaming' : 'non-streaming'})`, async () => {
-      // Hop 1: 400K estimated, and the gateway reports 800K real input tokens, a 2.0x
-      // undercount (worse than the fixed 1.7x). Hop 1 itself projects 680K, so it
-      // gets the full limit. Hop 2 adds 2 estimated tokens: 400 002 * 2.0 = 800 004
-      // projected, leaving 1 048 576 - 800 004 = 248 572.
-      const hop1Messages = userMessageOf(399_000);
-      const hop2Messages = [
-        ...hop1Messages,
-        { role: 'assistant' as const, content: 'ok' },
-        { role: 'user' as const, content: 'more' },
-      ];
-      const sent = stubEndpoint(() => (streaming ? responsesSse(800_000) : responsesJson(800_000)));
-      const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
-        provider
-      );
+  // Hop 1 is 400K estimated (399K message + 1K system prompt) and the gateway reports
+  // `ratio` x that as real input. Hop 2 projects its own estimate x (ratio x 1.1).
+  //   1.0x: 614K estimated -> 675 400 projected -> full limit, far above the floor.
+  //   1.6x: 550K estimated (880K real) -> 968 000 projected -> 80 576 left.
+  //   2.0x: 400K estimated (800K real) -> 880 000 projected -> 168 576 left.
+  const MEASURED_CASES = [
+    { ratio: 1.0, hop2MessageTokens: 613_000, expected: MAX_OUTPUT },
+    { ratio: 1.6, hop2MessageTokens: 549_000, expected: 80_576 },
+    { ratio: 2.0, hop2MessageTokens: 399_000, expected: 168_576 },
+  ];
 
-      await send(hop1Messages, [], MODEL);
-      await send(hop2Messages, [], MODEL);
+  for (const { ratio, hop2MessageTokens, expected } of MEASURED_CASES) {
+    for (const streaming of [false, true]) {
+      it(`sizes hop 2 by hop 1's measured ${ratio}x ratio (${streaming ? 'streaming' : 'non-streaming'})`, async () => {
+        const hop1RealInput = 400_000 * ratio;
+        const hop2RealInput = (hop2MessageTokens + 1_000) * ratio;
+        const sent = stubEndpoint(() =>
+          streaming ? responsesSse(hop1RealInput) : responsesJson(hop1RealInput)
+        );
+        const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
+          provider
+        );
 
-      expect(sent).toHaveLength(2);
-      expect(sent[0]?.max_output_tokens).toBe(MAX_OUTPUT);
-      expect(sent[1]?.max_output_tokens).toBe(248_572);
-    });
+        await send(userMessageOf(399_000), [], MODEL);
+        await send(userMessageOf(hop2MessageTokens), [], MODEL);
+
+        expect(sent).toHaveLength(2);
+        // Hop 1 has no measurement yet: 400K x 1.7 = 680K projected, full limit.
+        expect(sent[0]?.max_output_tokens).toBe(MAX_OUTPUT);
+        const hop2MaxOutput = sent[1]?.max_output_tokens as number;
+        expectOutputLimit(hop2MaxOutput, expected);
+        expect(hop2RealInput + hop2MaxOutput).toBeLessThanOrEqual(CONTEXT_WINDOW);
+      });
+    }
   }
 
   for (const streaming of [false, true]) {
@@ -276,7 +325,7 @@ describe('OpenAI Chat Completions output limit fits the context window', () => {
         catalogProvider,
       });
       provider.setSystemPrompt(SYSTEM_PROMPT);
-      const sent = stubEndpoint(chatCompletionJson);
+      const sent = stubEndpoint(() => chatCompletionJson());
 
       const response = await provider.createResponse(userMessageOf(messageTokens), [], MODEL);
 
@@ -285,4 +334,47 @@ describe('OpenAI Chat Completions output limit fits the context window', () => {
       expect(sent[0]?.max_completion_tokens).toBe(expected);
     });
   }
+
+  function makeProvider(): OpenAIProvider {
+    const provider = new OpenAIProvider({
+      apiKey: 'sk-test-fake',
+      baseURL: 'https://gw.example.com/v1',
+      catalogProvider,
+    });
+    provider.setSystemPrompt(SYSTEM_PROMPT);
+    return provider;
+  }
+
+  for (const streaming of [false, true]) {
+    it(`sizes hop 2 by hop 1's reported prompt_tokens (${streaming ? 'streaming' : 'non-streaming'})`, async () => {
+      // Hop 1: 400K estimated, 800K reported (2.0x). Hop 2: 400K x 2.2 = 880 000 -> 168 576.
+      const provider = makeProvider();
+      const sent = stubEndpoint(() =>
+        streaming ? chatCompletionSse(800_000) : chatCompletionJson(800_000)
+      );
+      const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
+        provider
+      );
+
+      await send(userMessageOf(399_000), [], MODEL);
+      await send(userMessageOf(399_000), [], MODEL);
+
+      expect(sent).toHaveLength(2);
+      expectOutputLimit(sent[1]?.max_completion_tokens, 168_576);
+    });
+  }
+
+  it('does not treat usage it had to estimate as a measurement', async () => {
+    // Hop 1's reply carries no usage, so lace fills promptTokens with its own estimate.
+    // That is not a measured ratio: hop 2 at 500K estimated must still project at 1.7x
+    // (850 000 -> 198 576), not at ~1.1x.
+    const provider = makeProvider();
+    const sent = stubEndpoint(() => chatCompletionJson(null));
+
+    await provider.createResponse(userMessageOf(399_000), [], MODEL);
+    await provider.createResponse(userMessageOf(499_000), [], MODEL);
+
+    expect(sent).toHaveLength(2);
+    expect(sent[1]?.max_completion_tokens).toBe(198_576);
+  });
 });

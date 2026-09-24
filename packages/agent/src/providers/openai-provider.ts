@@ -411,17 +411,17 @@ export class OpenAIProvider extends AIProvider {
     );
   }
 
-  /** Remember how far the estimate under-read this call's real input, for the next call. */
+  /**
+   * Remember how far the estimate under-read this call's real input, for the next call.
+   * Called only where the wire reported usage: an estimated promptTokens is lace's own
+   * guess, and treating it as a measurement would loosen the clamp on no evidence.
+   */
   private _recordMeasuredInputRatio(
     model: string,
     messages: ProviderMessage[],
     tools: WireTool[],
-    response: ProviderResponse
+    realInputTokens: number
   ): void {
-    // A Chat Completions reply without usage reports lace's own estimate here, which
-    // records a ratio near 1; projectInputTokens never scales below its fixed factor,
-    // so that only drops back to the unmeasured projection.
-    const realInputTokens = response.usage?.promptTokens ?? 0;
     if (realInputTokens <= 0) return;
     const estimated = this._estimateInputTokens(
       messages,
@@ -805,26 +805,6 @@ export class OpenAIProvider extends AIProvider {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
-    const response = await this._routeResponse(
-      messages,
-      tools,
-      model,
-      signal,
-      conversationState,
-      options
-    );
-    this._recordMeasuredInputRatio(model, messages, tools, response);
-    return response;
-  }
-
-  private async _routeResponse(
-    messages: ProviderMessage[],
-    tools: WireTool[],
-    model: string,
-    signal?: AbortSignal,
-    conversationState?: ConversationState,
-    options?: RequestOptions
-  ): Promise<ProviderResponse> {
     // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support
     // Responses API) unless the catalog entry opted this endpoint into Responses via api_style.
     if (this.isCustomEndpoint() && !this.customEndpointUsesResponsesAPI()) {
@@ -923,6 +903,7 @@ export class OpenAIProvider extends AIProvider {
             completionTokens: response.usage.completion_tokens,
             totalTokens: response.usage.total_tokens,
           };
+          this._recordMeasuredInputRatio(model, messages, tools, response.usage.prompt_tokens);
         } else {
           // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
           logger.debug('No usage data in OpenAI response, estimating tokens', {
@@ -1004,6 +985,7 @@ export class OpenAIProvider extends AIProvider {
         logProviderResponse('openai', response);
 
         const parsedResponse = this._parseResponsesAPIResponse(response);
+        this._recordMeasuredInputRatio(model, messages, tools, response.usage?.input_tokens ?? 0);
 
         logger.trace('Received response from OpenAI Responses API', {
           provider: 'openai',
@@ -1023,26 +1005,6 @@ export class OpenAIProvider extends AIProvider {
   protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
     tools: WireTool[] = [],
-    model: string,
-    signal?: AbortSignal,
-    conversationState?: ConversationState,
-    options?: RequestOptions
-  ): Promise<ProviderResponse> {
-    const response = await this._routeStreamingResponse(
-      messages,
-      tools,
-      model,
-      signal,
-      conversationState,
-      options
-    );
-    this._recordMeasuredInputRatio(model, messages, tools, response);
-    return response;
-  }
-
-  private async _routeStreamingResponse(
-    messages: ProviderMessage[],
-    tools: WireTool[],
     model: string,
     signal?: AbortSignal,
     conversationState?: ConversationState,
@@ -1253,6 +1215,7 @@ export class OpenAIProvider extends AIProvider {
               completionTokens: usage.completion_tokens,
               totalTokens: usage.total_tokens,
             };
+            this._recordMeasuredInputRatio(model, messages, tools, usage.prompt_tokens);
           } else {
             // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
             logger.debug('No usage data in OpenAI streaming response, estimating tokens', {
@@ -1648,6 +1611,10 @@ export class OpenAIProvider extends AIProvider {
               message: 'Responses API stream ended without completion event',
               source: 'openai_responses_failed_status',
             };
+          }
+
+          if (completionUsage) {
+            this._recordMeasuredInputRatio(model, messages, tools, completionUsage.input_tokens);
           }
 
           const response = {
