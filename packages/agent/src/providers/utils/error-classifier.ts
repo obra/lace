@@ -21,6 +21,7 @@ import { logger } from '@lace/agent/utils/logger';
  * Patterns:
  *   1. Anthropic — body `error.message` matches `/prompt is too long/i`.
  *   2. OpenAI — body `error.code === 'context_length_exceeded'`.
+ *   3. LunaRoute gateway — body `error.cause === 'model_context_length_exceeded'`.
  *
  * The classifier inspects unknown shapes cautiously (no SDK class instanceof
  * checks) so it works uniformly across `@anthropic-ai/sdk`,
@@ -85,6 +86,13 @@ function getAnthropicBody(err: InspectableHttpError): { type?: string; message?:
   return null;
 }
 
+/** The OpenAI-style body's `error.cause`, which some gateways add beside `code`. */
+function getOpenAIBodyCause(err: InspectableHttpError): string | undefined {
+  if (!isObject(err.error)) return undefined;
+  const cause = (err.error as Record<string, unknown>).cause;
+  return typeof cause === 'string' ? cause : undefined;
+}
+
 /** Extract OpenAI's body `{code, message}` from `error: { code, message, type }`. */
 function getOpenAIBody(
   err: InspectableHttpError
@@ -135,6 +143,19 @@ const PATTERNS: readonly ClassifierPattern[] = [
       if (getStatus(err) !== 400) return false;
       const body = getOpenAIBody(err);
       return body?.code === 'context_length_exceeded';
+    },
+  },
+  {
+    // LunaRoute (OpenAI-compatible gateway) 400 when input + max_output_tokens exceeds
+    // the model window. Observed live 2026-09-24:
+    //   {"error":{"cause":"model_context_length_exceeded","code":"UPSTREAM_ERROR",
+    //             "message":"Upstream provider error"}}
+    // `code` is a generic UPSTREAM_ERROR shared by unrelated failures, so only the
+    // `cause` identifies the overflow.
+    description: 'LunaRoute cause model_context_length_exceeded',
+    matches: (err) => {
+      if (getStatus(err) !== 400) return false;
+      return getOpenAIBodyCause(err) === 'model_context_length_exceeded';
     },
   },
 ];

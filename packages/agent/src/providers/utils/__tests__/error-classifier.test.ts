@@ -115,6 +115,57 @@ describe('classifyHttpError', () => {
       });
     });
 
+    it('classifies the LunaRoute gateway cause model_context_length_exceeded', () => {
+      // Body LunaRoute returned, live, for input + max_output_tokens over the window.
+      // The OpenAI SDK stores the body's `error` object and lifts `code` to the top.
+      const err = {
+        status: 400,
+        error: {
+          cause: 'model_context_length_exceeded',
+          code: 'UPSTREAM_ERROR',
+          message: 'Upstream provider error',
+        },
+        code: 'UPSTREAM_ERROR',
+        message: '400 Upstream provider error',
+      };
+
+      expect(classifyHttpError(err)).toEqual({
+        stopReason: 'context_window_exceeded',
+        stopDetails: {
+          type: 'context_window_exceeded',
+          source: 'http_400_prompt_too_long',
+        },
+      });
+    });
+
+    it('returns null for a LunaRoute UPSTREAM_ERROR with any other cause', () => {
+      const err = {
+        status: 400,
+        error: {
+          cause: 'rate_limited',
+          code: 'UPSTREAM_ERROR',
+          message: 'Upstream provider error',
+        },
+        code: 'UPSTREAM_ERROR',
+        message: '400 Upstream provider error',
+      };
+
+      expect(classifyHttpError(err)).toBeNull();
+    });
+
+    it('returns null for a model_context_length_exceeded cause on a non-400 status', () => {
+      const err = {
+        status: 500,
+        error: {
+          cause: 'model_context_length_exceeded',
+          code: 'UPSTREAM_ERROR',
+          message: 'Upstream provider error',
+        },
+      };
+
+      expect(classifyHttpError(err)).toBeNull();
+    });
+
     it('returns null for an unrelated OpenAI 400 invalid_request_error', () => {
       const err = makeOpenAI400({
         code: 'invalid_value',

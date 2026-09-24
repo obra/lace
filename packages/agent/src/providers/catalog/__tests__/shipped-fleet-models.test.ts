@@ -14,18 +14,38 @@ import type { ProviderInstancesConfig } from '../types';
  * Per catalog provider, the model ids the fleet runs. Anthropic is here because
  * in Claude Platform mode lace's dynamic Anthropic catalog can be a stale cached
  * copy, so a new model must be resolvable from the static catalog alone.
+ *
+ * The LunaRoute limits are what the gateway's own GET /v1/models publishes for
+ * both ids (fetched 2026-09-24): context_window 1048576, max_output_tokens
+ * 262144, capabilities.vision true.
  */
 const FLEET_MODELS: Record<
   string,
-  Record<string, { contextWindow: number; maxOutputTokens: number }>
+  Record<string, { contextWindow: number; maxOutputTokens: number; supportsAttachments: boolean }>
 > = {
   lunaroute: {
-    'deepseek-4.1-flash': { contextWindow: 128_000, maxOutputTokens: 8192 },
-    'deepseek-4.1-flash-background': { contextWindow: 128_000, maxOutputTokens: 8192 },
+    'deepseek-4.1-flash': {
+      contextWindow: 1_048_576,
+      maxOutputTokens: 262_144,
+      supportsAttachments: true,
+    },
+    'deepseek-4.1-flash-background': {
+      contextWindow: 1_048_576,
+      maxOutputTokens: 262_144,
+      supportsAttachments: true,
+    },
   },
   anthropic: {
-    'claude-opus-5': { contextWindow: 1_000_000, maxOutputTokens: 50_000 },
-    'claude-opus-5-5': { contextWindow: 1_000_000, maxOutputTokens: 50_000 },
+    'claude-opus-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 50_000,
+      supportsAttachments: true,
+    },
+    'claude-opus-5-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 50_000,
+      supportsAttachments: true,
+    },
   },
 };
 
@@ -85,8 +105,10 @@ describe('shipped fleet model catalogs', () => {
         // A model the provider's catalog does not describe still resolves, but
         // with a guessed 200K window and 8192-token output cap — so pin both.
         expect(provider.contextWindowForModel(modelId)).toBe(expected.contextWindow);
-        expect(provider.getAvailableModels().find((m) => m.id === modelId)?.maxOutputTokens).toBe(
-          expected.maxOutputTokens
+        const model = provider.getAvailableModels().find((m) => m.id === modelId);
+        expect(model?.maxOutputTokens).toBe(expected.maxOutputTokens);
+        expect(model?.capabilities?.includes('attachments') ?? false).toBe(
+          expected.supportsAttachments
         );
       });
     }

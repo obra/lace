@@ -35,6 +35,8 @@ import {
 import { normalizeOpenAIChatStop, normalizeOpenAIResponsesStop } from './stop-reason';
 import type { LaceStopReason, LaceStopDetails } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
+import { fitOutputTokensToContextWindow, projectInputTokens } from './utils/output-token-budget';
+import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
 import { logger } from '@lace/agent/utils/logger';
@@ -56,6 +58,10 @@ export class OpenAIProvider extends AIProvider {
   private _encoderCache = new Map<string, Tiktoken>();
   private _tiktokenModule: typeof import('tiktoken') | null = null;
   private _tiktokenAvailable: boolean | undefined = undefined;
+  // Real input tokens over lace's estimate, as measured by this instance's last
+  // successful call per model. The runner holds one provider for a whole turn, so
+  // each hop's request is sized by what the previous hop actually cost.
+  private _measuredInputRatio = new Map<string, number>();
 
   constructor(config: OpenAIProviderConfig) {
     super(config);
@@ -361,6 +367,71 @@ export class OpenAIProvider extends AIProvider {
     }));
   }
 
+  /**
+   * The output-token limit for one request: the configured or catalog maximum, shrunk to
+   * the room the input leaves in the model's context window. Some gateways (LunaRoute)
+   * reject any request whose input + max output exceeds the window, so sending the
+   * catalog maximum unconditionally would fail every request past window - max output.
+   * The input side is lace's estimate scaled up by the larger of a fixed undercount
+   * factor and the ratio the previous call in this turn measured (see
+   * `projectInputTokens`). Models the catalog doesn't describe get the maximum as-is:
+   * without a known window there is nothing to fit against.
+   */
+  private _outputTokenLimit(
+    model: string,
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    systemPrompt: string
+  ): number {
+    const requestedOutputTokens =
+      this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384);
+    const contextWindow = this._catalogData?.models.find((m) => m.id === model)?.context_window;
+    if (contextWindow === undefined) return requestedOutputTokens;
+
+    return fitOutputTokensToContextWindow({
+      requestedOutputTokens,
+      contextWindow,
+      projectedInputTokens: projectInputTokens(
+        this._estimateInputTokens(messages, tools, systemPrompt),
+        this._measuredInputRatio.get(model)
+      ),
+    });
+  }
+
+  /** lace's chars/4 estimate of everything a request puts in the window. */
+  private _estimateInputTokens(
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    systemPrompt: string
+  ): number {
+    return (
+      estimateProviderTokens(messages) +
+      this.estimateTokens(systemPrompt) +
+      (tools.length > 0 ? this.estimateTokens(JSON.stringify(tools)) : 0)
+    );
+  }
+
+  /**
+   * Remember how far the estimate under-read this call's real input, for the next call.
+   * Called only where the wire reported usage: an estimated promptTokens is lace's own
+   * guess, and treating it as a measurement would loosen the clamp on no evidence.
+   */
+  private _recordMeasuredInputRatio(
+    model: string,
+    messages: ProviderMessage[],
+    tools: WireTool[],
+    realInputTokens: number
+  ): void {
+    if (realInputTokens <= 0) return;
+    const estimated = this._estimateInputTokens(
+      messages,
+      tools,
+      this.getEffectiveSystemPrompt(messages)
+    );
+    if (estimated <= 0) return;
+    this._measuredInputRatio.set(model, realInputTokens / estimated);
+  }
+
   private _createRequestPayload(
     messages: ProviderMessage[],
     tools: WireTool[],
@@ -385,7 +456,7 @@ export class OpenAIProvider extends AIProvider {
     return {
       model,
       messages: messagesWithSystem,
-      max_completion_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
+      max_completion_tokens: this._outputTokenLimit(model, messages, tools, systemPrompt),
       stream,
       ...(tools.length > 0 && { tools: this.buildOpenAITools(tools) }),
       ...(options?.toolChoice && { tool_choice: options.toolChoice }),
@@ -526,7 +597,9 @@ export class OpenAIProvider extends AIProvider {
       instructions,
       // Cast to ResponseCreateParams['input'] - types are complex but runtime compatible
       input: inputItems as unknown as ResponseCreateParams['input'],
-      max_output_tokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 16384),
+      // Sized against the FULL history even when chained: the server-side stored
+      // response still occupies the window.
+      max_output_tokens: this._outputTokenLimit(model, messages, tools, systemText),
       stream,
       ...(previousResponseId && { previous_response_id: previousResponseId }),
       ...(tools.length > 0 && { tools: responsesTools }),
@@ -830,6 +903,7 @@ export class OpenAIProvider extends AIProvider {
             completionTokens: response.usage.completion_tokens,
             totalTokens: response.usage.total_tokens,
           };
+          this._recordMeasuredInputRatio(model, messages, tools, response.usage.prompt_tokens);
         } else {
           // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
           logger.debug('No usage data in OpenAI response, estimating tokens', {
@@ -911,6 +985,7 @@ export class OpenAIProvider extends AIProvider {
         logProviderResponse('openai', response);
 
         const parsedResponse = this._parseResponsesAPIResponse(response);
+        this._recordMeasuredInputRatio(model, messages, tools, response.usage?.input_tokens ?? 0);
 
         logger.trace('Received response from OpenAI Responses API', {
           provider: 'openai',
@@ -1140,6 +1215,7 @@ export class OpenAIProvider extends AIProvider {
               completionTokens: usage.completion_tokens,
               totalTokens: usage.total_tokens,
             };
+            this._recordMeasuredInputRatio(model, messages, tools, usage.prompt_tokens);
           } else {
             // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
             logger.debug('No usage data in OpenAI streaming response, estimating tokens', {
@@ -1535,6 +1611,10 @@ export class OpenAIProvider extends AIProvider {
               message: 'Responses API stream ended without completion event',
               source: 'openai_responses_failed_status',
             };
+          }
+
+          if (completionUsage) {
+            this._recordMeasuredInputRatio(model, messages, tools, completionUsage.input_tokens);
           }
 
           const response = {
