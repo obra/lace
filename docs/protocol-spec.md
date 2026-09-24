@@ -2341,8 +2341,11 @@ interface CatalogProviderInfo {
   type: string;
   api_key?: string;
   api_endpoint?: string;
+  api_style?: 'responses' | 'chat'; // Which OpenAI wire API the endpoint speaks
+  supports_response_chaining?: boolean; // false: Responses requests go stateless (full history, store:false)
   default_large_model_id: string;
   default_small_model_id: string;
+  model_aliases?: Record<string, string>; // Bare alias ('opus', 'sonnet', 'haiku') -> model id
   models: CatalogModelInfo[];
 }
 
@@ -2361,6 +2364,7 @@ interface CatalogModelInfo {
   reasoning_effort?: string;
   supports_attachments?: boolean;
   supported_parameters?: string[];
+  extra_headers?: Record<string, string>; // HTTP headers sent on every request for this model
 }
 ```
 
