@@ -78,9 +78,11 @@ export class AnthropicDynamicProvider {
       return filteredCatalog;
     } catch (error) {
       logger.warn('Failed to fetch Anthropic models, using cached or static catalog', { error });
-      // Fall back to cache if available (even if stale), otherwise use full static catalog
+      // Fall back to cache if available (even if stale), otherwise use full static catalog.
+      // A stale cache is reconciled like a fresh one, or its inferred placeholders
+      // would outlive the static entries that replaced them for as long as refreshes fail.
       const cached = await this.loadCache();
-      return cached?.provider ?? staticCatalog;
+      return cached ? this.reconcileWithStatic(cached.provider, staticCatalog) : staticCatalog;
     }
   }
 

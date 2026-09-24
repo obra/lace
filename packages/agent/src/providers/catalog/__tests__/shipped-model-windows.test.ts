@@ -18,6 +18,7 @@ import { resolveModelAlias } from '../alias-resolver';
  * believed it held 200K.
  */
 const EXPECTED_WINDOWS: Record<string, number> = {
+  'claude-opus-5-5': 1_000_000,
   'claude-opus-5': 1_000_000,
   'claude-opus-4-8': 1_000_000,
   'claude-sonnet-5': 1_000_000,
