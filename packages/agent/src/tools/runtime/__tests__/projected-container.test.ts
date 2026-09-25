@@ -693,5 +693,83 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(endSpy).not.toHaveBeenCalled();
     expect(containerHandle.stdin.writableEnded).toBe(false);
     expect(handle.stdin).toBe(containerHandle.stdin);
+
+    // jc's #415 review (verifier refutation, minor): the assertions above are
+    // true of an UNMODIFIED PassThrough too, so they don't actually exercise
+    // the 'pipe' branch's own logic -- pre-fix code (which always left the
+    // pipe live, unconditionally) would pass them identically. Prove the
+    // returned stdin is the SAME live pipe the container process reads by
+    // actually writing through it and observing the bytes on the other end.
+    const received: Buffer[] = [];
+    containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
+    handle.stdin!.write('ping');
+    handle.stdin!.end();
+    await new Promise((resolve) => containerHandle.stdin.once('end', resolve));
+    expect(Buffer.concat(received).toString('utf8')).toBe('ping');
+  });
+
+  // jc's #415 review, findings 1/2/4: the unit-level fakes in
+  // container-exec-fs.test.ts / container-exec-network.test.ts don't observe
+  // RuntimeProcessOptions at all, so they can't catch a call site that omits
+  // `stdin: 'pipe'` -- exactly how the writeTextFile/fetch regression slipped
+  // through review. These compose the REAL ProjectedContainerProcessRunner
+  // (this file's own fake execStream manager) with the REAL
+  // ContainerExecFileSystem/ContainerExecNetworkClient, the actual integration
+  // seam production code goes through.
+  describe('PRI-3250 container stdin regression (jc #415 review)', () => {
+    it('ContainerExecFileSystem.writeTextFile succeeds and writes the real content over the container stdin pipe', async () => {
+      const containerHandle = createFakeExecStreamHandle();
+      const manager = createFakeContainerManager();
+      manager.execStream.mockResolvedValue(containerHandle);
+      const runtime = new ProjectedContainerToolRuntime({
+        id: 'rt_container',
+        containerManager: manager,
+        descriptor: descriptor(),
+      });
+
+      const received: Buffer[] = [];
+      containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
+
+      // On d449f5109, this call site passed no opts at all, so the runner's
+      // default ('ignore') ended the pipe immediately and this threw
+      // "ContainerExecFileSystem write stream unavailable" -- every
+      // container-mode file_write/file_edit was broken.
+      await runtime.fs.writeTextFile(
+        { original: '/workspace/x', runtimePath: '/workspace/x', displayPath: '/workspace/x' },
+        'new file content'
+      );
+
+      const writtenBase64 = Buffer.concat(received).toString('utf8');
+      expect(Buffer.from(writtenBase64, 'base64').toString('utf8')).toBe('new file content');
+    });
+
+    it('ContainerExecNetworkClient.fetch delivers a POST body intact over the container stdin pipe', async () => {
+      const containerHandle = createFakeExecStreamHandle();
+      // The real curl argv base64-encodes its own stdout; give the fake a
+      // canned base64 response so fetch() has something to parse.
+      containerHandle.stdout = Readable.from([
+        Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8').toString('base64'),
+      ]);
+      const manager = createFakeContainerManager();
+      manager.execStream.mockResolvedValue(containerHandle);
+      const runtime = new ProjectedContainerToolRuntime({
+        id: 'rt_container',
+        containerManager: manager,
+        descriptor: descriptor(),
+      });
+
+      const received: Buffer[] = [];
+      containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
+
+      // On d449f5109, `if (handle.stdin)` was false (no opts.stdin passed), so
+      // this body write was silently skipped -- no error, curl just sent an
+      // empty body.
+      await runtime.network.fetch('https://example.com/post', {
+        method: 'POST',
+        body: 'the actual post body',
+      });
+
+      expect(Buffer.concat(received).toString('utf8')).toBe('the actual post body');
+    });
   });
 });

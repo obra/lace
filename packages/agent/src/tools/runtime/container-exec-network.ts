@@ -116,14 +116,29 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       url,
     ];
 
-    const handle = await this.process.start(argv, { signal: opts?.signal });
+    // stdin: 'pipe' only when there's a body to write: the runner defaults
+    // to 'ignore' (ends the pipe immediately, PRI-3243/PRI-3250), which is
+    // exactly right for a GET/no-body request. Omitting it unconditionally
+    // broke every container-mode POST (jc's #415 review, finding 2): with
+    // no live stdin, the old `if (handle.stdin)` guard silently skipped the
+    // body write and curl sent an empty body with no error.
+    const handle = await this.process.start(argv, {
+      signal: opts?.signal,
+      stdin: hasBody ? 'pipe' : undefined,
+    });
 
-    if (handle.stdin) {
-      if (hasBody) {
-        await writeStreamAndClose(handle.stdin, opts!.body!);
-      } else {
-        handle.stdin.end();
+    if (hasBody) {
+      // Fail loudly rather than silently dropping the body the way the old
+      // `if (handle.stdin)` guard did: a caller that asked to send a body
+      // but got no pipe back is a runner regression, not something to send
+      // as an empty POST with no error raised.
+      if (!handle.stdin) {
+        handle.kill();
+        throw new Error('ContainerExecNetworkClient write stream unavailable');
       }
+      await writeStreamAndClose(handle.stdin, opts!.body!);
+    } else {
+      handle.stdin?.end();
     }
 
     // Drain both pipes concurrently with completion; reading after completion can

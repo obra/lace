@@ -7,7 +7,12 @@ import { UrlFetchTool } from '@lace/agent/tools/implementations/url_fetch';
 import { ContainerExecNetworkClient } from '../container-exec-network';
 import { createFakeRuntime } from './fake-runtime';
 import { RuntimeFetchSizeLimitError } from '../types';
-import type { RuntimeProcessRunner, RuntimeProcessHandle, ToolRuntime } from '../types';
+import type {
+  RuntimeProcessRunner,
+  RuntimeProcessHandle,
+  RuntimeProcessOptions,
+  ToolRuntime,
+} from '../types';
 
 interface FakeStart {
   /** Raw bytes that curl|base64 would have produced on stdout (we base64 them). */
@@ -30,17 +35,27 @@ function fakeRunner(start: FakeStart): {
       calls.push(command);
       return { exitCode: 0, stdout: '', stderr: '' };
     },
-    async start(command): Promise<RuntimeProcessHandle> {
+    // Mirrors the real runner's behavior (PRI-3243/PRI-3250): stdin is only
+    // live when the caller opts in with `stdin: 'pipe'`. A fake that always
+    // hands back a writable stdin regardless of opts is exactly how jc's
+    // #415 review finding 4 slipped through -- these tests kept passing
+    // while the real container-mode fetch() call site never asked for
+    // 'pipe', so a real POST body was silently dropped.
+    async start(command, opts?: RuntimeProcessOptions): Promise<RuntimeProcessHandle> {
       calls.push(command);
       const base64 = start.stdoutBase64 ?? (start.stdoutRaw ?? Buffer.alloc(0)).toString('base64');
+      const stdin =
+        opts?.stdin === 'pipe'
+          ? ({
+              end: (c?: string, _enc?: string, cb?: () => void) => {
+                if (typeof c === 'string') stdinWrites.push(c);
+                cb?.();
+              },
+              once: () => {},
+            } as never)
+          : undefined;
       return {
-        stdin: {
-          end: (c?: string, _enc?: string, cb?: () => void) => {
-            if (typeof c === 'string') stdinWrites.push(c);
-            cb?.();
-          },
-          once: () => {},
-        } as never,
+        stdin,
         stdout: Readable.from([base64]),
         stderr: Readable.from([start.stderr ?? '']),
         kill: () => {},

@@ -4,7 +4,12 @@
 import { Readable } from 'node:stream';
 import { describe, it, expect } from 'vitest';
 import { ContainerExecFileSystem } from '../container-exec-fs';
-import type { RuntimeProcessRunner, RuntimeProcessResult, RuntimePath } from '../types';
+import type {
+  RuntimeProcessRunner,
+  RuntimeProcessResult,
+  RuntimeProcessOptions,
+  RuntimePath,
+} from '../types';
 
 interface FakeStartOptions {
   exitCode?: number;
@@ -26,19 +31,29 @@ function fakeRunner(
       calls.push(command);
       return handlers[command[0]!] ?? { exitCode: 0, stdout: '', stderr: '' };
     },
-    async start(command) {
+    // Mirrors the real runner's behavior (PRI-3243/PRI-3250): stdin is only
+    // live when the caller opts in with `stdin: 'pipe'`. A fake that always
+    // hands back a writable stdin regardless of opts is exactly how jc's
+    // #415 review finding 4 slipped through -- these tests kept passing
+    // while the real container-mode writeTextFile call site never asked for
+    // 'pipe' and threw on every real write.
+    async start(command, opts?: RuntimeProcessOptions) {
       calls.push(command);
       const exitCode = startOverride?.exitCode ?? handlers[command[0]!]?.exitCode ?? 0;
       const stderrContent = startOverride?.stderr ?? '';
       const stderrStream = Readable.from([stderrContent]);
+      const stdin =
+        opts?.stdin === 'pipe'
+          ? ({
+              end: (c: string, _enc: string, cb: () => void) => {
+                stdinWrites.push(c);
+                cb();
+              },
+              once: () => {},
+            } as never)
+          : undefined;
       return {
-        stdin: {
-          end: (c: string, _enc: string, cb: () => void) => {
-            stdinWrites.push(c);
-            cb();
-          },
-          once: () => {},
-        } as never,
+        stdin,
         stdout: undefined,
         stderr: stderrStream,
         kill: () => {},
