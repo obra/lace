@@ -648,4 +648,50 @@ describe('ProjectedContainerToolRuntime', () => {
     await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
     expect(containerHandle.kill).toHaveBeenCalledTimes(1);
   });
+
+  // PRI-3250: container execStream always wires a piped stdin. Unlike the
+  // host runtime (PRI-3243), this runtime silently ignored
+  // RuntimeProcessOptions.stdin, leaving that pipe open and unwritten for a
+  // default ('ignore') caller — exactly the shape that hangs a command like
+  // `head` with no file args forever.
+  it('ends the container stdin pipe immediately when the caller does not opt into it', async () => {
+    const containerHandle = createFakeExecStreamHandle();
+    const endSpy = vi.spyOn(containerHandle.stdin, 'end');
+    const manager = createFakeContainerManager();
+    manager.execStream.mockResolvedValue(containerHandle);
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    const handle = await runtime.process.start(['/bin/sh', '-lc', 'head'], {
+      cwd: runtime.cwd,
+    });
+
+    expect(endSpy).toHaveBeenCalledTimes(1);
+    expect(containerHandle.stdin.writableEnded).toBe(true);
+    expect(handle.stdin).toBeUndefined();
+  });
+
+  it('does not end the container stdin pipe when the caller opts into stdin: pipe', async () => {
+    const containerHandle = createFakeExecStreamHandle();
+    const endSpy = vi.spyOn(containerHandle.stdin, 'end');
+    const manager = createFakeContainerManager();
+    manager.execStream.mockResolvedValue(containerHandle);
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    const handle = await runtime.process.start(['node', 'mcp-server.js'], {
+      cwd: runtime.cwd,
+      stdin: 'pipe',
+    });
+
+    expect(endSpy).not.toHaveBeenCalled();
+    expect(containerHandle.stdin.writableEnded).toBe(false);
+    expect(handle.stdin).toBe(containerHandle.stdin);
+  });
 });

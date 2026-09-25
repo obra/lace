@@ -390,6 +390,24 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       this.optionsFor(tagged.command, opts)
     );
 
+    // Container execStream always wires a piped stdin (some callers, e.g. an
+    // in-container MCP server, genuinely drive it — see ExecStreamHandle).
+    // But RuntimeProcessOptions.stdin defaults to 'ignore' (PRI-3243's fix on
+    // the host runtime), and this container runtime silently dropped that:
+    // a caller that asked to ignore stdin still got a live pipe nobody wrote
+    // to or closed, so a command that fell back to reading stdin (e.g. `head`
+    // with no file args) would hang forever. Mirror the host runtime here:
+    // end the pipe immediately unless the caller opted into 'pipe'. See
+    // PRI-3250.
+    const stdinMode = opts.stdin === 'pipe' ? 'pipe' : 'ignore';
+    if (stdinMode !== 'pipe') {
+      containerHandle.stdin.on('error', () => {
+        // Swallow EPIPE if the process exits before the end() below drains;
+        // wait()/completion is the authoritative signal for the caller.
+      });
+      containerHandle.stdin.end();
+    }
+
     let treeKillFired = false;
     const killInContainerTree = (): void => {
       if (!tagged.killSentinel || treeKillFired) return;
@@ -425,7 +443,7 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       .finally(() => opts.signal?.removeEventListener('abort', abortHandler));
 
     return {
-      stdin: containerHandle.stdin,
+      stdin: stdinMode === 'pipe' ? containerHandle.stdin : undefined,
       stdout: containerHandle.stdout,
       stderr: containerHandle.stderr,
       kill: (signal?: NodeJS.Signals) => {
