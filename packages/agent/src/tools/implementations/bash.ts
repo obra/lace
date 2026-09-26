@@ -47,14 +47,17 @@ const KILL_GRACE_MS = 2_000;
  * The timeout for a sync call that omits timeoutMs. Operators can set it per
  * instance with LACE_BASH_FOREGROUND_TIMEOUT_MS, but only to lower it: the
  * default is already the 600000ms per-call ceiling, and the value is clamped
- * to [MIN, MAX]. A clamped value, or one that isn't a positive integer (e.g.
- * "10s"), is logged as a warning; the latter falls back to the default.
+ * to [MIN, MAX]. A clamped value, or one that isn't a plain positive decimal
+ * integer (e.g. "10s", "1e3", "0x3e8"), is logged as a warning; the latter
+ * falls back to the default.
  */
 function defaultForegroundTimeoutMs(): number {
   const raw = process.env.LACE_BASH_FOREGROUND_TIMEOUT_MS;
   if (raw === undefined) return MAX_FOREGROUND_TIMEOUT_MS;
 
-  const parsed = Number(raw);
+  // Number() alone would also accept "0x3e8", "1e3" and "1000.0".
+  const trimmed = raw.trim();
+  const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
   if (!Number.isInteger(parsed) || parsed <= 0) {
     logger.warn('LACE_BASH_FOREGROUND_TIMEOUT_MS is not a positive integer; using the default', {
       value: raw,

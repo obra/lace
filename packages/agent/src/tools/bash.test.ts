@@ -1080,11 +1080,21 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
       expect(warn).not.toHaveBeenCalled();
     });
 
+    it('accepts a value with surrounding whitespace without warning', () => {
+      process.env[ENV_VAR] = ' 120000\n';
+      expect(describedDefault()).toBe('120000');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
     it.each([
       ['1800000', '600000', 'clamped'],
       ['500', '1000', 'clamped'],
       ['10s', '600000', 'not a positive integer'],
       ['0', '600000', 'not a positive integer'],
+      ['0x3e8', '600000', 'not a positive integer'],
+      ['1e3', '600000', 'not a positive integer'],
+      ['1000.0', '600000', 'not a positive integer'],
+      ['', '600000', 'not a positive integer'],
     ])('maps %s to %sms and warns', (raw, expected, reason) => {
       process.env[ENV_VAR] = raw;
       expect(describedDefault()).toBe(expected);
