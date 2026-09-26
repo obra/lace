@@ -63,6 +63,9 @@ export class RuntimeStdioClientTransport implements Transport {
           // brokering container runtime exempts it from the one-shot stream
           // budgets that would otherwise SIGKILL it mid-session.
           longLived: true,
+          // This transport talks to the child over stdio, so it needs a real
+          // stdin pipe rather than the process-runner default of 'ignore'.
+          stdin: 'pipe',
         }
       );
       this.process = handle;

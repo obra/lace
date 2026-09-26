@@ -70,6 +70,7 @@ describe('RuntimeStdioClientTransport', () => {
       env: { HOME: '/host-home', PATH: '/host-bin', DECLARED: 'visible' },
       envMode: 'replace',
       longLived: true,
+      stdin: 'pipe',
     });
   });
 
@@ -89,6 +90,7 @@ describe('RuntimeStdioClientTransport', () => {
       env: { DECLARED: 'visible' },
       envMode: 'inherit',
       longLived: true,
+      stdin: 'pipe',
     });
   });
 

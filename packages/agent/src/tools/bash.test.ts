@@ -765,4 +765,39 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
       expect(output.outputFiles.stdout).toBeDefined();
     });
   });
+
+  // PRI-3243: stdin was left as an open, unwritten pipe. Any command that
+  // reads from stdin when it doesn't get file args (classically: a failed
+  // `$(find ... )` substitution leaving `head`/`cat` with none) blocked
+  // forever instead of seeing immediate EOF.
+  describe('PRI-3243: stdin gets EOF instead of hanging', () => {
+    it('head with no file args (empty command substitution) returns promptly', async () => {
+      // Mirrors the reported repro: `head -8 $(find ... | head -1)` where the
+      // find returns nothing, so head is invoked with zero file args and
+      // falls back to reading stdin.
+      const result = await bashTool.execute(
+        {
+          command: 'head -8 $(find /nonexistent-dir-for-pri-3243 -name nope 2>/dev/null | head -1)',
+        },
+        toolContext
+      );
+
+      expect(result.status).toBe('completed');
+      const output = JSON.parse(result.content[0].text!) as BashOutput;
+      expect(output.exitCode).toBe(0);
+      expect(output.stdoutPreview).toBe('');
+      // Milliseconds in practice; the bound is generous for loaded CI hosts.
+      expect(output.runtime).toBeLessThan(5000);
+    }, 10000);
+
+    it('bare cat with no args returns promptly', async () => {
+      const result = await bashTool.execute({ command: 'cat' }, toolContext);
+
+      expect(result.status).toBe('completed');
+      const output = JSON.parse(result.content[0].text!) as BashOutput;
+      expect(output.exitCode).toBe(0);
+      expect(output.stdoutPreview).toBe('');
+      expect(output.runtime).toBeLessThan(5000);
+    }, 10000);
+  });
 });

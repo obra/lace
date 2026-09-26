@@ -114,6 +114,33 @@ describe('HostToolRuntime', () => {
     await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
   });
 
+  // PRI-3243: stdin defaulted to an open pipe nobody wrote to or closed, so a
+  // started command that read stdin blocked forever.
+  it('gives started processes an EOF stdin by default', async () => {
+    const dir = await makeTempDir();
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+
+    const handle = await runtime.process.start(['cat']);
+
+    expect(handle.stdin).toBeUndefined();
+    await expect(handle.completion).resolves.toMatchObject({ exitCode: 0 });
+  }, 10000);
+
+  it('gives started processes a writable stdin pipe when asked for one', async () => {
+    const dir = await makeTempDir();
+    const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
+
+    const handle = await runtime.process.start(['cat'], { stdin: 'pipe' });
+    let stdout = '';
+    handle.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    handle.stdin?.end('piped input');
+
+    await expect(handle.completion).resolves.toMatchObject({ exitCode: 0 });
+    expect(stdout).toBe('piped input');
+  });
+
   it('writes text files through runtime fs', async () => {
     const dir = await makeTempDir();
     const runtime = new HostToolRuntime({ id: 'rt_host', cwd: dir });
