@@ -649,11 +649,9 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(containerHandle.kill).toHaveBeenCalledTimes(1);
   });
 
-  // PRI-3250: container execStream always wires a piped stdin. Unlike the
-  // host runtime (PRI-3243), this runtime silently ignored
-  // RuntimeProcessOptions.stdin, leaving that pipe open and unwritten for a
-  // default ('ignore') caller — exactly the shape that hangs a command like
-  // `head` with no file args forever.
+  // Container execStream always wires a piped stdin. A default ('ignore')
+  // caller must get that pipe ended, or a command like `head` with no file
+  // args waits on it forever.
   it('ends the container stdin pipe immediately when the caller does not opt into it', async () => {
     const containerHandle = createFakeExecStreamHandle();
     const endSpy = vi.spyOn(containerHandle.stdin, 'end');
@@ -694,12 +692,11 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(containerHandle.stdin.writableEnded).toBe(false);
     expect(handle.stdin).toBe(containerHandle.stdin);
 
-    // jc's #415 review (verifier refutation, minor): the assertions above are
-    // true of an UNMODIFIED PassThrough too, so they don't actually exercise
-    // the 'pipe' branch's own logic -- pre-fix code (which always left the
-    // pipe live, unconditionally) would pass them identically. Prove the
-    // returned stdin is the SAME live pipe the container process reads by
-    // actually writing through it and observing the bytes on the other end.
+    // This guards against ending or hiding the pipe for 'pipe' callers. A
+    // runner that ignored opts.stdin entirely would also pass it; the test
+    // above is the one that requires 'ignore' to be honored. Writing through
+    // the returned handle confirms the caller holds the live pipe the
+    // container process reads.
     const received: Buffer[] = [];
     containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
     handle.stdin!.write('ping');
@@ -708,15 +705,11 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(Buffer.concat(received).toString('utf8')).toBe('ping');
   });
 
-  // jc's #415 review, findings 1/2/4: the unit-level fakes in
-  // container-exec-fs.test.ts / container-exec-network.test.ts don't observe
-  // RuntimeProcessOptions at all, so they can't catch a call site that omits
-  // `stdin: 'pipe'` -- exactly how the writeTextFile/fetch regression slipped
-  // through review. These compose the REAL ProjectedContainerProcessRunner
-  // (this file's own fake execStream manager) with the REAL
-  // ContainerExecFileSystem/ContainerExecNetworkClient, the actual integration
-  // seam production code goes through.
-  describe('PRI-3250 container stdin regression (jc #415 review)', () => {
+  // These compose the real ProjectedContainerProcessRunner (over this file's
+  // fake execStream manager) with the real ContainerExecFileSystem and
+  // ContainerExecNetworkClient, so a stdin writer that forgets to opt into
+  // 'pipe' fails here even if its own unit fakes are wrong.
+  describe('container stdin writers composed with the real runner', () => {
     it('ContainerExecFileSystem.writeTextFile succeeds and writes the real content over the container stdin pipe', async () => {
       const containerHandle = createFakeExecStreamHandle();
       const manager = createFakeContainerManager();
@@ -730,10 +723,6 @@ describe('ProjectedContainerToolRuntime', () => {
       const received: Buffer[] = [];
       containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
 
-      // On d449f5109, this call site passed no opts at all, so the runner's
-      // default ('ignore') ended the pipe immediately and this threw
-      // "ContainerExecFileSystem write stream unavailable" -- every
-      // container-mode file_write/file_edit was broken.
       await runtime.fs.writeTextFile(
         { original: '/workspace/x', runtimePath: '/workspace/x', displayPath: '/workspace/x' },
         'new file content'
@@ -761,9 +750,6 @@ describe('ProjectedContainerToolRuntime', () => {
       const received: Buffer[] = [];
       containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
 
-      // On d449f5109, `if (handle.stdin)` was false (no opts.stdin passed), so
-      // this body write was silently skipped -- no error, curl just sent an
-      // empty body.
       await runtime.network.fetch('https://example.com/post', {
         method: 'POST',
         body: 'the actual post body',

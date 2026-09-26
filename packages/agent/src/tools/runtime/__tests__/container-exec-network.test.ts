@@ -21,31 +21,31 @@ interface FakeStart {
   stdoutBase64?: string;
   stderr?: string;
   exitCode?: number | null;
+  /** Hand back no stdin even when the caller asks for 'pipe'. */
+  withholdStdin?: boolean;
 }
 
 function fakeRunner(start: FakeStart): {
   runner: RuntimeProcessRunner;
   calls: string[][];
   stdinWrites: string[];
+  kills: { count: number };
 } {
   const calls: string[][] = [];
   const stdinWrites: string[] = [];
+  const kills = { count: 0 };
   const runner: RuntimeProcessRunner = {
     async exec(command) {
       calls.push(command);
       return { exitCode: 0, stdout: '', stderr: '' };
     },
-    // Mirrors the real runner's behavior (PRI-3243/PRI-3250): stdin is only
-    // live when the caller opts in with `stdin: 'pipe'`. A fake that always
-    // hands back a writable stdin regardless of opts is exactly how jc's
-    // #415 review finding 4 slipped through -- these tests kept passing
-    // while the real container-mode fetch() call site never asked for
-    // 'pipe', so a real POST body was silently dropped.
+    // Like the real runners, stdin is live only when the caller opts in with
+    // `stdin: 'pipe'`, so a call site that forgets to opt in fails here too.
     async start(command, opts?: RuntimeProcessOptions): Promise<RuntimeProcessHandle> {
       calls.push(command);
       const base64 = start.stdoutBase64 ?? (start.stdoutRaw ?? Buffer.alloc(0)).toString('base64');
       const stdin =
-        opts?.stdin === 'pipe'
+        opts?.stdin === 'pipe' && !start.withholdStdin
           ? ({
               end: (c?: string, _enc?: string, cb?: () => void) => {
                 if (typeof c === 'string') stdinWrites.push(c);
@@ -58,12 +58,14 @@ function fakeRunner(start: FakeStart): {
         stdin,
         stdout: Readable.from([base64]),
         stderr: Readable.from([start.stderr ?? '']),
-        kill: () => {},
+        kill: () => {
+          kills.count++;
+        },
         completion: Promise.resolve({ exitCode: start.exitCode ?? 0 }),
       };
     },
   };
-  return { runner, calls, stdinWrites };
+  return { runner, calls, stdinWrites, kills };
 }
 
 describe('ContainerExecNetworkClient', () => {
@@ -104,6 +106,26 @@ describe('ContainerExecNetworkClient', () => {
     expect(argv).toContain('@-');
     expect(argv).not.toContain(secret);
     expect(argv.join(' ')).not.toContain(secret);
+  });
+
+  it('kills curl and throws rather than sending an empty body when the runner returns no stdin', async () => {
+    const raw = Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8');
+    const { runner, stdinWrites, kills } = fakeRunner({ stdoutRaw: raw, withholdStdin: true });
+    const client = new ContainerExecNetworkClient(runner);
+    await expect(
+      client.fetch('https://example.com/post', { method: 'POST', body: 'payload' })
+    ).rejects.toThrow('ContainerExecNetworkClient write stream unavailable');
+    expect(kills.count).toBe(1);
+    expect(stdinWrites).toEqual([]);
+  });
+
+  it('does not need stdin for a request without a body', async () => {
+    const raw = Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8');
+    const { runner, kills } = fakeRunner({ stdoutRaw: raw, withholdStdin: true });
+    const client = new ContainerExecNetworkClient(runner);
+    const result = await client.fetch('https://example.com');
+    expect(result.status).toBe(200);
+    expect(kills.count).toBe(0);
   });
 
   it('rejects with RuntimeFetchSizeLimitError when body exceeds maxBytes', async () => {

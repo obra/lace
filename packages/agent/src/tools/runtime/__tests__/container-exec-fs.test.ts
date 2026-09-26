@@ -14,6 +14,8 @@ import type {
 interface FakeStartOptions {
   exitCode?: number;
   stderr?: string;
+  /** Hand back no stdin even when the caller asks for 'pipe'. */
+  withholdStdin?: boolean;
 }
 
 function fakeRunner(
@@ -23,27 +25,25 @@ function fakeRunner(
   runner: RuntimeProcessRunner;
   calls: string[][];
   stdinWrites: string[];
+  kills: { count: number };
 } {
   const calls: string[][] = [];
   const stdinWrites: string[] = [];
+  const kills = { count: 0 };
   const runner: RuntimeProcessRunner = {
     async exec(command) {
       calls.push(command);
       return handlers[command[0]!] ?? { exitCode: 0, stdout: '', stderr: '' };
     },
-    // Mirrors the real runner's behavior (PRI-3243/PRI-3250): stdin is only
-    // live when the caller opts in with `stdin: 'pipe'`. A fake that always
-    // hands back a writable stdin regardless of opts is exactly how jc's
-    // #415 review finding 4 slipped through -- these tests kept passing
-    // while the real container-mode writeTextFile call site never asked for
-    // 'pipe' and threw on every real write.
+    // Like the real runners, stdin is live only when the caller opts in with
+    // `stdin: 'pipe'`, so a call site that forgets to opt in fails here too.
     async start(command, opts?: RuntimeProcessOptions) {
       calls.push(command);
       const exitCode = startOverride?.exitCode ?? handlers[command[0]!]?.exitCode ?? 0;
       const stderrContent = startOverride?.stderr ?? '';
       const stderrStream = Readable.from([stderrContent]);
       const stdin =
-        opts?.stdin === 'pipe'
+        opts?.stdin === 'pipe' && !startOverride?.withholdStdin
           ? ({
               end: (c: string, _enc: string, cb: () => void) => {
                 stdinWrites.push(c);
@@ -56,12 +56,14 @@ function fakeRunner(
         stdin,
         stdout: undefined,
         stderr: stderrStream,
-        kill: () => {},
+        kill: () => {
+          kills.count++;
+        },
         completion: Promise.resolve({ exitCode }),
       };
     },
   };
-  return { runner, calls, stdinWrites };
+  return { runner, calls, stdinWrites, kills };
 }
 
 const path = (p: string): RuntimePath => ({ original: p, runtimePath: p, displayPath: p });
@@ -121,6 +123,19 @@ describe('ContainerExecFileSystem', () => {
     const fs = new ContainerExecFileSystem(runner);
     await fs.writeTextFile(path('/sen/mutable-identity/identity.md'), 'new body');
     expect(Buffer.from(stdinWrites[0]!, 'base64').toString('utf8')).toBe('new body');
+  });
+
+  it('writeTextFile kills the process and throws when the runner returns no stdin', async () => {
+    const { runner, stdinWrites, kills } = fakeRunner(
+      { sh: { exitCode: 0, stdout: '', stderr: '' } },
+      { withholdStdin: true }
+    );
+    const fs = new ContainerExecFileSystem(runner);
+    await expect(fs.writeTextFile(path('/sen/x'), 'data')).rejects.toThrow(
+      'ContainerExecFileSystem write stream unavailable'
+    );
+    expect(kills.count).toBe(1);
+    expect(stdinWrites).toEqual([]);
   });
 
   it('readTextFile round-trips UTF-8 multibyte content via base64', async () => {

@@ -392,13 +392,10 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
 
     // Container execStream always wires a piped stdin (some callers, e.g. an
     // in-container MCP server, genuinely drive it — see ExecStreamHandle).
-    // But RuntimeProcessOptions.stdin defaults to 'ignore' (PRI-3243's fix on
-    // the host runtime), and this container runtime silently dropped that:
-    // a caller that asked to ignore stdin still got a live pipe nobody wrote
-    // to or closed, so a command that fell back to reading stdin (e.g. `head`
-    // with no file args) would hang forever. Mirror the host runtime here:
-    // end the pipe immediately unless the caller opted into 'pipe'. See
-    // PRI-3250.
+    // RuntimeProcessOptions.stdin defaults to 'ignore', so unless the caller
+    // opted into 'pipe', end the pipe now: a live pipe nobody writes to or
+    // closes would hang a command that falls back to reading stdin (e.g.
+    // `head` with no file args). This matches the host runtime's 'ignore'.
     const stdinMode = opts.stdin === 'pipe' ? 'pipe' : 'ignore';
     if (stdinMode !== 'pipe') {
       containerHandle.stdin.on('error', () => {

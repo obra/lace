@@ -79,11 +79,8 @@ export class ContainerExecFileSystem implements RuntimeFileSystem {
   async writeTextFile(path: RuntimePath, content: string): Promise<void> {
     this.charge('writeTextFile', path.runtimePath);
     const p = path.runtimePath;
-    // stdin: 'pipe' is REQUIRED here: the runner defaults to 'ignore' (ends
-    // the pipe immediately, PRI-3243/PRI-3250) and this call writes the file
-    // content over stdin. Omitting it broke every container-mode file write
-    // (jc's #415 review, finding 1) -- writeTextFile always threw the guard
-    // below instead of writing anything.
+    // stdin: 'pipe' is required: the runner defaults to 'ignore' and this
+    // call writes the content over stdin.
     const handle = await this.process.start(['sh', '-c', 'base64 -d > "$0"', p], {
       stdin: 'pipe',
     });
