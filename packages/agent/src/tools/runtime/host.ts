@@ -186,6 +186,9 @@ class HostProcessRunner implements RuntimeProcessRunner {
           );
         }
       ),
+      exited: new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>((resolve) => {
+        child.on('exit', (exitCode, signal) => resolve({ exitCode, signal: signal ?? undefined }));
+      }),
     };
   }
 }

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
+import { logger } from '@lace/agent/utils/logger';
 
 export interface BashOutput {
   command: string;
@@ -28,6 +29,50 @@ export interface BashOutput {
     stderr: string;
     combined: string;
   };
+
+  // True when the sync-call timeout ended the call (PRI-3251).
+  timedOut: boolean;
+  // Explains what the timeout did; present only when timedOut is true.
+  timeoutMessage?: string;
+}
+
+// Sync-call timeout bounds (PRI-3251). A per-call timeoutMs must fall in
+// [MIN, MAX]; calls that omit it get the per-instance default.
+const MIN_FOREGROUND_TIMEOUT_MS = 1_000;
+const MAX_FOREGROUND_TIMEOUT_MS = 600_000;
+// Time between SIGTERM and SIGKILL, for both timeout and abort.
+const KILL_GRACE_MS = 2_000;
+
+/**
+ * The timeout for a sync call that omits timeoutMs. Operators can set it per
+ * instance with LACE_BASH_FOREGROUND_TIMEOUT_MS, but only to lower it: the
+ * default is already the 600000ms per-call ceiling, and the value is clamped
+ * to [MIN, MAX]. A clamped value, or one that isn't a positive integer (e.g.
+ * "10s"), is logged as a warning; the latter falls back to the default.
+ */
+function defaultForegroundTimeoutMs(): number {
+  const raw = process.env.LACE_BASH_FOREGROUND_TIMEOUT_MS;
+  if (raw === undefined) return MAX_FOREGROUND_TIMEOUT_MS;
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    logger.warn('LACE_BASH_FOREGROUND_TIMEOUT_MS is not a positive integer; using the default', {
+      value: raw,
+      effectiveMs: MAX_FOREGROUND_TIMEOUT_MS,
+    });
+    return MAX_FOREGROUND_TIMEOUT_MS;
+  }
+
+  const clamped = Math.min(Math.max(parsed, MIN_FOREGROUND_TIMEOUT_MS), MAX_FOREGROUND_TIMEOUT_MS);
+  if (clamped !== parsed) {
+    logger.warn('LACE_BASH_FOREGROUND_TIMEOUT_MS is out of range; clamped', {
+      value: raw,
+      effectiveMs: clamped,
+      minMs: MIN_FOREGROUND_TIMEOUT_MS,
+      maxMs: MAX_FOREGROUND_TIMEOUT_MS,
+    });
+  }
+  return clamped;
 }
 
 export const bashSchema = z.object({
@@ -35,10 +80,18 @@ export const bashSchema = z.object({
   background: z.boolean().default(false),
   description: z.string().optional(),
   progressIntervalMs: z.number().int().min(5000).max(600000).optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(MIN_FOREGROUND_TIMEOUT_MS)
+    .max(MAX_FOREGROUND_TIMEOUT_MS)
+    .optional(),
 });
 
 export class BashTool extends Tool {
   name = 'bash';
+  // Read once per instance so the description and the enforced default agree.
+  private readonly defaultTimeoutMs = defaultForegroundTimeoutMs();
   description = `Execute shell commands in isolated bash processes.
 
 Parameters:
@@ -46,12 +99,13 @@ Parameters:
 - background: Set to true for background execution (returns jobId immediately)
 - description: Label shown in job listings when background=true (optional)
 - progressIntervalMs: For background jobs, interval in ms for periodic progress notifications (5000-600000). **Off by default** — set this only if you want a fixed cadence regardless of subscribers. Subscribing to a job via job_notify(on=['progress'], ...) arms the timer on its own at the default cadence.
+- timeoutMs: Sync calls only. Kill the command if it runs longer than this many ms (${MIN_FOREGROUND_TIMEOUT_MS}-${MAX_FOREGROUND_TIMEOUT_MS}). Defaults to ${this.defaultTimeoutMs}.
 
 When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
 Background jobs send completion notifications automatically. Progress notifications are opt-in (see progressIntervalMs / job_notify).
 
 Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.
-A sync command is subject to a runtime timeout (tens of seconds) and is killed if it exceeds it — for anything long-running (installs, builds, long fetches) use background=true and poll job_output(jobId).`;
+A sync command that runs past its timeout (${this.defaultTimeoutMs / 1000}s unless timeoutMs is set) is killed (SIGTERM, then SIGKILL ${KILL_GRACE_MS / 1000}s later) — for anything long-running (installs, builds, long fetches) use background=true and poll job_output(jobId).`;
   schema = bashSchema;
   annotations: ToolAnnotations = {
     title: 'Run commands with bash',
@@ -69,10 +123,18 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
     args: z.infer<typeof bashSchema>,
     context: ToolContext
   ): Promise<ToolResult> {
-    return await this.executeCommand(args.command, context);
+    return await this.executeCommand(
+      args.command,
+      context,
+      args.timeoutMs ?? this.defaultTimeoutMs
+    );
   }
 
-  private async executeCommand(command: string, context: ToolContext): Promise<ToolResult> {
+  private async executeCommand(
+    command: string,
+    context: ToolContext,
+    timeoutMs: number
+  ): Promise<ToolResult> {
     const startTime = Date.now();
 
     try {
@@ -128,6 +190,15 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
         let stdoutEnded = !childProcess.stdout;
         let stderrEnded = !childProcess.stderr;
         let exitCode: number | null = null;
+        // The shell's own exit, seen before its stdout/stderr close (when the
+        // runtime reports it). Set means the shell is gone and anything still
+        // holding the pipes is a process it started.
+        let shellExit: { exitCode: number | null; signal?: NodeJS.Signals } | undefined;
+        let timeoutMessage: string | undefined;
+
+        void childProcess.exited?.then((result) => {
+          shellExit = result;
+        });
 
         const closeStreamsAndComplete = () => {
           if (settled || !completionDone || !stdoutEnded || !stderrEnded) {
@@ -135,6 +206,7 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
           }
 
           settled = true;
+          clearTimeout(foregroundTimeoutTimer);
           const runtime = Date.now() - startTime;
 
           // Clean up abort handler
@@ -199,7 +271,8 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
                   stdoutLineCount,
                   stderrLineCount,
                   outputPaths,
-                  resolve
+                  resolve,
+                  timeoutMessage
                 );
               }
             }
@@ -216,6 +289,7 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
             return;
           }
           settled = true;
+          clearTimeout(foregroundTimeoutTimer);
           const runtime = Date.now() - startTime;
 
           // Clean up abort handler
@@ -242,9 +316,46 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
               stderr: { skipped: 0, total: 1 },
             },
             outputFiles: outputPaths,
+            timedOut: timeoutMessage !== undefined,
           };
 
           resolve(this.createError(result as unknown as Record<string, unknown>));
+        };
+
+        // Settle with whatever output has been captured, without waiting for
+        // stdout/stderr to end. Used when something the tool can't signal (a
+        // process the shell started) is still holding the pipes open.
+        const settleWithoutWaitingForPipes = () => {
+          if (settled) return;
+          if (!completionDone) {
+            exitCode = shellExit?.exitCode ?? null;
+            completionDone = true;
+          }
+          stdoutEnded = true;
+          stderrEnded = true;
+          childProcess.stdout?.destroy();
+          childProcess.stderr?.destroy();
+          closeStreamsAndComplete();
+        };
+
+        // SIGTERM the shell, then SIGKILL it after the grace period. The
+        // SIGKILL timer is deliberately never cleared when the call settles:
+        // on abort the call settles at once (the runtime's own abort handling
+        // rejects `completion`), while a TERM-ignoring shell is still alive.
+        // Once the SIGKILLed shell has exited, stop waiting on the pipes too,
+        // so a timeout is bounded by timeoutMs + KILL_GRACE_MS. unref() so
+        // this cleanup can't keep the agent process alive by itself.
+        const terminateShell = () => {
+          childProcess.kill('SIGTERM');
+          const killTimer = setTimeout(() => {
+            childProcess.kill('SIGKILL');
+            // Without an exit signal from the runtime, don't wait at all.
+            void (childProcess.exited ?? Promise.resolve()).then(() => {
+              // Let an already-queued stdout/stderr 'end' settle normally first.
+              setImmediate(settleWithoutWaitingForPipes);
+            });
+          }, KILL_GRACE_MS);
+          killTimer.unref();
         };
 
         // Handle abort signal
@@ -252,15 +363,38 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
           cancelled = true;
           if (!processKilled) {
             processKilled = true;
-            // First try SIGTERM
-            childProcess.kill('SIGTERM');
-
-            // Give it 2 seconds to exit gracefully
-            setTimeout(() => {
-              childProcess.kill('SIGKILL');
-            }, 2000);
+            terminateShell();
           }
         };
+
+        const timeoutHandler = () => {
+          if (settled || processKilled) return;
+          processKilled = true;
+          const seconds = timeoutMs / 1000;
+
+          if (shellExit) {
+            // The shell already exited and there is nothing of ours left to
+            // signal; the pipes are held by a process it started.
+            const howItExited =
+              shellExit.exitCode === null
+                ? `was terminated by ${shellExit.signal ?? 'a signal'}`
+                : `exited with code ${shellExit.exitCode}`;
+            timeoutMessage =
+              `Command ${howItExited}, but its stdout/stderr stayed open until the ${seconds}s timeout, ` +
+              'probably held by a background process it started (that process may still be running). ' +
+              "For long-running work use background=true, or redirect the background process's output (e.g. `cmd > out.log 2>&1 &`).";
+            settleWithoutWaitingForPipes();
+            return;
+          }
+
+          // Only the shell is signaled, so processes it started can outlive it.
+          timeoutMessage =
+            `Command timed out after ${seconds}s and its shell was killed ` +
+            `(SIGTERM, then SIGKILL ${KILL_GRACE_MS / 1000}s later if still running). ` +
+            'Processes it started may still be running.';
+          terminateShell();
+        };
+        const foregroundTimeoutTimer = setTimeout(timeoutHandler, timeoutMs);
 
         context.signal.addEventListener('abort', abortHandler);
         if (context.signal.aborted) {
@@ -344,6 +478,7 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
           stderr: '',
           combined: '',
         },
+        timedOut: false,
       };
 
       return this.createError(result as unknown as Record<string, unknown>);
@@ -496,7 +631,8 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
     stdoutLineCount: number,
     stderrLineCount: number,
     outputPaths: { stdout: string; stderr: string; combined: string },
-    resolve: (result: ToolResult) => void
+    resolve: (result: ToolResult) => void,
+    timeoutMessage: string | undefined
   ): void {
     // Generate head+tail previews
     const stdoutPreview = this.generateHeadTailPreview(
@@ -537,6 +673,8 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
         },
       },
       outputFiles: outputPaths,
+      timedOut: timeoutMessage !== undefined,
+      ...(timeoutMessage !== undefined && { timeoutMessage }),
     };
 
     // Important distinction: Tool success vs Command exit code
@@ -549,8 +687,9 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
     // - Single invalid command: Tool success=false, exit code=127, stderr=command not found
     // - Command sequence with invalid command: Tool success=true, exit code=0, stderr=command not found
     // - Process terminated by signal: Tool success=false, exit code=null
+    // - Sync-call timeout (PRI-3251): Tool success=false, whatever the exit code
 
-    if (exitCode === null) {
+    if (timeoutMessage !== undefined || exitCode === null) {
       resolve(this.createError(result as unknown as Record<string, unknown>));
       return;
     }

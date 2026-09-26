@@ -182,7 +182,15 @@ export interface RuntimeProcessHandle {
   stdout?: Readable;
   stderr?: Readable;
   kill(signal?: NodeJS.Signals): void;
+  /** Settles once the process has exited AND its stdout/stderr have closed. */
   completion: Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>;
+  /**
+   * Resolves as soon as the process itself exits, which can be long before
+   * `completion` when a process it started still holds stdout/stderr open.
+   * Never rejects. Optional: runtimes that can't observe the exit separately
+   * leave it undefined.
+   */
+  exited?: Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>;
 }
 
 export interface RuntimeProcessRunner {
