@@ -938,6 +938,45 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
       }
     }, 15000);
 
+    it('releases the pipes when it stops waiting, so an escaped descendant cannot write into a settled call', async () => {
+      const pidFile = path.join(testTempDir, 'late-writer-pid');
+      const statusFile = path.join(testTempDir, 'late-writer-status');
+      const start = Date.now();
+      const execPromise = bashTool.execute(
+        {
+          // The setsid'd writer escapes the timeout's signals and holds the
+          // pipes. It writes after the call has settled (timeoutMs + grace)
+          // and records the write's exit status: 0 means the tool still had
+          // the read end open, anything else (EPIPE or SIGPIPE) means the tool
+          // let go of it.
+          command:
+            `(setsid sh -c 'echo $$ > ${pidFile}; sleep 5; (echo late-output) 2>/dev/null; ` +
+            `echo $? > ${statusFile}' &); exec sleep 30`,
+          timeoutMs: 1000,
+        },
+        hostContext('timeout_late_writer')
+      );
+      const writerPid = await readPidFile(pidFile);
+
+      try {
+        const result = await execPromise;
+        const elapsed = Date.now() - start;
+        expect(elapsed).toBeLessThan(1000 + KILL_GRACE_MS + 1500);
+        const output = JSON.parse(result.content[0].text!) as BashOutput;
+        expect(output.timedOut).toBe(true);
+
+        const deadline = Date.now() + 8000;
+        while (!fs.existsSync(statusFile) && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        expect(fs.readFileSync(statusFile, 'utf8').trim()).not.toBe('0');
+      } finally {
+        // setsid made the writer a process-group leader, so this reaches its
+        // sleep too and nothing else.
+        if (isAlive(writerPid)) process.kill(-writerPid, 'SIGKILL');
+      }
+    }, 20000);
+
     it('says so when the shell exited but a background process kept the pipes open', async () => {
       const pidFile = path.join(testTempDir, 'background-pid');
       const start = Date.now();
