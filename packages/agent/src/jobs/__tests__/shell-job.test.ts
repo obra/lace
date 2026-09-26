@@ -144,7 +144,7 @@ describe('createRunShellJobProcess', () => {
     expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'echo hello'], {
       cwd: '/tmp',
       env: expect.any(Object),
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
       signal: undefined,
     });
@@ -203,7 +203,7 @@ describe('createRunShellJobProcess', () => {
     expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'pwd'], {
       cwd: '/tmp',
       env: expect.any(Object),
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
       signal: undefined,
     });
@@ -268,7 +268,7 @@ describe('createRunShellJobProcess', () => {
     expect(mockSpawn).toHaveBeenCalledWith('/bin/bash', ['-c', 'pwd'], {
       cwd: process.cwd(),
       env: expect.any(Object),
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
       signal: undefined,
     });

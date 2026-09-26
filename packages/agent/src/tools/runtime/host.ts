@@ -164,15 +164,19 @@ class HostProcessRunner implements RuntimeProcessRunner {
     const child = spawn(file, args, {
       cwd: opts.cwd ?? this.#cwd,
       env: this.envFor(opts),
-      stdio: ['pipe', 'pipe', 'pipe'],
+      // stdin defaults to 'ignore' (/dev/null) rather than an open pipe that
+      // nobody writes to or closes — see the RuntimeProcessOptions.stdin doc
+      // and PRI-3243. Callers that actually drive stdin (e.g. an MCP server
+      // child) opt in with stdin: 'pipe'.
+      stdio: [opts.stdin === 'pipe' ? 'pipe' : 'ignore', 'pipe', 'pipe'],
       detached: opts.detached === true,
       signal: opts.signal,
     });
     return {
       pid: child.pid,
-      stdin: child.stdin,
-      stdout: child.stdout,
-      stderr: child.stderr,
+      stdin: child.stdin ?? undefined,
+      stdout: child.stdout ?? undefined,
+      stderr: child.stderr ?? undefined,
       kill: (signal?: NodeJS.Signals) => child.kill(signal),
       completion: new Promise<{ exitCode: number | null; signal?: NodeJS.Signals }>(
         (resolve, reject) => {

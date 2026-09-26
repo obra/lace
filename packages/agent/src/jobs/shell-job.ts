@@ -220,6 +220,8 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
         const detached = process.platform !== 'win32';
         proc = await runtime.process.start(['/bin/bash', '-c', job.command ?? ''], {
           detached,
+          // /dev/null, not an open unwritten pipe — see PRI-3243.
+          stdin: 'ignore',
         });
         job.proc = createJobProcessAdapter(proc, { processGroup: detached });
       } catch (error) {

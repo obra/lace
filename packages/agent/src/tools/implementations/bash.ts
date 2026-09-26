@@ -108,6 +108,10 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
         cwd: context.runtime.cwd,
         env: context.processEnv,
         signal: context.signal,
+        // /dev/null rather than an open, unwritten pipe, so a command that
+        // falls back to reading stdin gets EOF instead of hanging. See
+        // RuntimeProcessOptions.stdin and PRI-3243.
+        stdin: 'ignore',
       });
 
       // Set up output streams after the runtime process is started so a start failure
