@@ -79,7 +79,11 @@ export class ContainerExecFileSystem implements RuntimeFileSystem {
   async writeTextFile(path: RuntimePath, content: string): Promise<void> {
     this.charge('writeTextFile', path.runtimePath);
     const p = path.runtimePath;
-    const handle = await this.process.start(['sh', '-c', 'base64 -d > "$0"', p]);
+    // stdin: 'pipe' is required: the runner defaults to 'ignore' and this
+    // call writes the content over stdin.
+    const handle = await this.process.start(['sh', '-c', 'base64 -d > "$0"', p], {
+      stdin: 'pipe',
+    });
     if (!handle.stdin) {
       handle.kill();
       throw new Error('ContainerExecFileSystem write stream unavailable');

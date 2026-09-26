@@ -116,14 +116,23 @@ export class ContainerExecNetworkClient implements RuntimeNetworkClient {
       url,
     ];
 
-    const handle = await this.process.start(argv, { signal: opts?.signal });
+    // stdin: 'pipe' only when there's a body to write over stdin; the
+    // runner's default ('ignore') is right for a request without one.
+    const handle = await this.process.start(argv, {
+      signal: opts?.signal,
+      stdin: hasBody ? 'pipe' : undefined,
+    });
 
-    if (handle.stdin) {
-      if (hasBody) {
-        await writeStreamAndClose(handle.stdin, opts!.body!);
-      } else {
-        handle.stdin.end();
+    if (hasBody) {
+      // A runner that hands back no pipe after we asked for one is a bug;
+      // throw instead of letting curl send an empty body.
+      if (!handle.stdin) {
+        handle.kill();
+        throw new Error('ContainerExecNetworkClient write stream unavailable');
       }
+      await writeStreamAndClose(handle.stdin, opts!.body!);
+    } else {
+      handle.stdin?.end();
     }
 
     // Drain both pipes concurrently with completion; reading after completion can

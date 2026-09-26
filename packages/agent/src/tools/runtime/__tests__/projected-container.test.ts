@@ -648,4 +648,114 @@ describe('ProjectedContainerToolRuntime', () => {
     await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
     expect(containerHandle.kill).toHaveBeenCalledTimes(1);
   });
+
+  // Container execStream always wires a piped stdin. A default ('ignore')
+  // caller must get that pipe ended, or a command like `head` with no file
+  // args waits on it forever.
+  it('ends the container stdin pipe immediately when the caller does not opt into it', async () => {
+    const containerHandle = createFakeExecStreamHandle();
+    const endSpy = vi.spyOn(containerHandle.stdin, 'end');
+    const manager = createFakeContainerManager();
+    manager.execStream.mockResolvedValue(containerHandle);
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    const handle = await runtime.process.start(['/bin/sh', '-lc', 'head'], {
+      cwd: runtime.cwd,
+    });
+
+    expect(endSpy).toHaveBeenCalledTimes(1);
+    expect(containerHandle.stdin.writableEnded).toBe(true);
+    expect(handle.stdin).toBeUndefined();
+  });
+
+  it('does not end the container stdin pipe when the caller opts into stdin: pipe', async () => {
+    const containerHandle = createFakeExecStreamHandle();
+    const endSpy = vi.spyOn(containerHandle.stdin, 'end');
+    const manager = createFakeContainerManager();
+    manager.execStream.mockResolvedValue(containerHandle);
+    const runtime = new ProjectedContainerToolRuntime({
+      id: 'rt_container',
+      containerManager: manager,
+      descriptor: descriptor(),
+    });
+
+    const handle = await runtime.process.start(['node', 'mcp-server.js'], {
+      cwd: runtime.cwd,
+      stdin: 'pipe',
+    });
+
+    expect(endSpy).not.toHaveBeenCalled();
+    expect(containerHandle.stdin.writableEnded).toBe(false);
+    expect(handle.stdin).toBe(containerHandle.stdin);
+
+    // This guards against ending or hiding the pipe for 'pipe' callers. A
+    // runner that ignored opts.stdin entirely would also pass it; the test
+    // above is the one that requires 'ignore' to be honored. Writing through
+    // the returned handle confirms the caller holds the live pipe the
+    // container process reads.
+    const received: Buffer[] = [];
+    containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
+    handle.stdin!.write('ping');
+    handle.stdin!.end();
+    await new Promise((resolve) => containerHandle.stdin.once('end', resolve));
+    expect(Buffer.concat(received).toString('utf8')).toBe('ping');
+  });
+
+  // These compose the real ProjectedContainerProcessRunner (over this file's
+  // fake execStream manager) with the real ContainerExecFileSystem and
+  // ContainerExecNetworkClient, so a stdin writer that forgets to opt into
+  // 'pipe' fails here even if its own unit fakes are wrong.
+  describe('container stdin writers composed with the real runner', () => {
+    it('ContainerExecFileSystem.writeTextFile succeeds and writes the real content over the container stdin pipe', async () => {
+      const containerHandle = createFakeExecStreamHandle();
+      const manager = createFakeContainerManager();
+      manager.execStream.mockResolvedValue(containerHandle);
+      const runtime = new ProjectedContainerToolRuntime({
+        id: 'rt_container',
+        containerManager: manager,
+        descriptor: descriptor(),
+      });
+
+      const received: Buffer[] = [];
+      containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
+
+      await runtime.fs.writeTextFile(
+        { original: '/workspace/x', runtimePath: '/workspace/x', displayPath: '/workspace/x' },
+        'new file content'
+      );
+
+      const writtenBase64 = Buffer.concat(received).toString('utf8');
+      expect(Buffer.from(writtenBase64, 'base64').toString('utf8')).toBe('new file content');
+    });
+
+    it('ContainerExecNetworkClient.fetch delivers a POST body intact over the container stdin pipe', async () => {
+      const containerHandle = createFakeExecStreamHandle();
+      // The real curl argv base64-encodes its own stdout; give the fake a
+      // canned base64 response so fetch() has something to parse.
+      containerHandle.stdout = Readable.from([
+        Buffer.from('HTTP/2 200\r\n\r\nok', 'utf8').toString('base64'),
+      ]);
+      const manager = createFakeContainerManager();
+      manager.execStream.mockResolvedValue(containerHandle);
+      const runtime = new ProjectedContainerToolRuntime({
+        id: 'rt_container',
+        containerManager: manager,
+        descriptor: descriptor(),
+      });
+
+      const received: Buffer[] = [];
+      containerHandle.stdin.on('data', (chunk: Buffer) => received.push(chunk));
+
+      await runtime.network.fetch('https://example.com/post', {
+        method: 'POST',
+        body: 'the actual post body',
+      });
+
+      expect(Buffer.concat(received).toString('utf8')).toBe('the actual post body');
+    });
+  });
 });
