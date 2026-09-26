@@ -7,6 +7,7 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
 import { logger } from '@lace/agent/utils/logger';
+import { trackProcessGroup } from '../runtime/process-group-registry';
 
 export interface BashOutput {
   command: string;
@@ -169,6 +170,15 @@ A sync command that runs past its timeout (${this.defaultTimeoutMs / 1000}s unle
       let stdoutTailIndex = 0;
       let stderrTailIndex = 0;
 
+      // detached (POSIX only) makes the spawned shell a process-group leader
+      // so a kill can reach pipeline children (e.g. `sleep | cat`) that would
+      // otherwise be orphaned by signaling just the shell's own pid — see
+      // killProcessOrGroup below. It also means this group is now OUTSIDE the
+      // agent process's own group, so nothing signals it if the agent process
+      // itself is killed/exits without reaping it first; process-group-registry
+      // (tracked via trackProcessGroup just below) and main.ts's shutdown()
+      // close that gap. See PRI-3243.
+      const detached = process.platform !== 'win32';
       const childProcess = await context.runtime.process.start(['/bin/bash', '-c', command], {
         cwd: context.runtime.cwd,
         env: context.processEnv,
@@ -177,7 +187,19 @@ A sync command that runs past its timeout (${this.defaultTimeoutMs / 1000}s unle
         // falls back to reading stdin gets EOF instead of hanging. See
         // RuntimeProcessOptions.stdin and PRI-3243.
         stdin: 'ignore',
+        detached,
       });
+
+      // Track this detached command's own process group so a killed or
+      // shut-down agent process can reap it instead of orphaning it (see the
+      // module doc on process-group-registry.ts). trackProcessGroup untracks
+      // itself once `childProcess.completion` settles either way, so there is
+      // deliberately nothing else attached to that promise here — an earlier
+      // version of this fix added a redundant `.finally(untrack)` on top of
+      // it, which left an unhandled `AbortError` behind on every aborted call.
+      if (detached && typeof childProcess.pid === 'number') {
+        trackProcessGroup(childProcess.pid, childProcess.completion);
+      }
 
       // Set up output streams after the runtime process is started so a start failure
       // cannot leave output file handles open.
@@ -341,17 +363,43 @@ A sync command that runs past its timeout (${this.defaultTimeoutMs / 1000}s unle
           closeStreamsAndComplete();
         };
 
-        // SIGTERM the shell, then SIGKILL it after the grace period. The
-        // SIGKILL timer is deliberately never cleared when the call settles:
-        // on abort the call settles at once (the runtime's own abort handling
-        // rejects `completion`), while a TERM-ignoring shell is still alive.
-        // Once the SIGKILLed shell has exited, stop waiting on the pipes too,
-        // so a timeout is bounded by timeoutMs + KILL_GRACE_MS. unref() so
-        // this cleanup can't keep the agent process alive by itself.
+        // Kill the process, preferring the whole process group (negative
+        // pid) on POSIX so pipeline children (e.g. `sleep | cat`) don't
+        // survive as orphans when only the shell's own pid is signaled.
+        // Falls back to signaling the process directly if group-kill fails
+        // (e.g. ESRCH when the child isn't a process-group leader, which
+        // shouldn't happen here since `detached` is what makes it one). See
+        // PRI-3243.
+        const killProcessOrGroup = (signal: NodeJS.Signals) => {
+          if (detached && typeof childProcess.pid === 'number') {
+            try {
+              process.kill(-childProcess.pid, signal);
+              return;
+            } catch {
+              // Fall through to direct signal below.
+            }
+          }
+          childProcess.kill(signal);
+        };
+
+        // SIGTERM the shell (or its whole process group), then SIGKILL after
+        // the grace period. The SIGKILL timer is deliberately never cleared
+        // when the call settles: on abort the call settles at once (the
+        // runtime's own abort handling rejects `completion`), while a
+        // TERM-ignoring shell/group is still alive. Once the SIGKILLed
+        // shell has exited, stop waiting on the pipes too, so a timeout is
+        // bounded by timeoutMs + KILL_GRACE_MS. unref() so this cleanup
+        // can't keep the agent process alive by itself.
+        //
+        // This 2s grace is unrelated to (and much longer than) the fast
+        // reap process-group-registry.ts does when the whole AGENT process
+        // is being killed/shut down: this one runs the tool call's own
+        // in-process abort/timeout handling, with no 500ms deadline from an
+        // outside killer bearing down on it.
         const terminateShell = () => {
-          childProcess.kill('SIGTERM');
+          killProcessOrGroup('SIGTERM');
           const killTimer = setTimeout(() => {
-            childProcess.kill('SIGKILL');
+            killProcessOrGroup('SIGKILL');
             // Without an exit signal from the runtime, don't wait at all.
             void (childProcess.exited ?? Promise.resolve()).then(() => {
               // Let an already-queued stdout/stderr 'end' settle normally first.
