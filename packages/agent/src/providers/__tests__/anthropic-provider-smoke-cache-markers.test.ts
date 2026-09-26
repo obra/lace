@@ -173,7 +173,7 @@ describe('smoke: real outgoing request body has three 1h cache_control markers',
 
     // ── Count: exactly three cache_control markers in the whole body ────
     // This conversation has 7 cacheable blocks — fewer than
-    // ANCHOR_OFFSET_RAW_BLOCKS (10), so no stable anchor is attached and
+    // ANCHOR_OFFSET_RAW_BLOCKS, so no stable anchor is attached and
     // the total is system + last-tool + tail = 3. See the 1802 smoke
     // for the long-conversation 4-marker case.
     const allMarkers = JSON.stringify(body).match(/"cache_control"/g) ?? [];

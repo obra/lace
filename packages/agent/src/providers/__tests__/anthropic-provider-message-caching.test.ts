@@ -8,6 +8,7 @@ import { ToolResult, ToolContext } from '@lace/agent/tools/types';
 import { z } from 'zod';
 import type Anthropic from '@anthropic-ai/sdk';
 import { anthropicBaseMessagesTrap } from '@lace/agent/test-utils/anthropic-base-namespace-trap';
+import { ANCHOR_OFFSET_RAW_BLOCKS } from '../cache-control';
 
 const mockCreateResponse = vi.fn();
 
@@ -246,8 +247,10 @@ describe('AnthropicProvider stable-anchor breakpoint', () => {
     provider.removeAllListeners();
   });
 
-  // Build a long conversation with N tool round-trips so the cacheable-block
-  // count exceeds ANCHOR_OFFSET_BLOCKS (10), forcing a stable anchor to land.
+  // Build a long conversation with `turns` tool round-trips so the
+  // cacheable-block count exceeds ANCHOR_OFFSET_RAW_BLOCKS, forcing a stable
+  // anchor to land. Each round-trip is 4 raw blocks (user text, assistant
+  // text + tool_use, user tool_result).
   function longConversation(turns: number) {
     const messages: Parameters<typeof provider.createResponse>[0] = [];
     for (let i = 0; i < turns; i++) {
@@ -277,8 +280,17 @@ describe('AnthropicProvider stable-anchor breakpoint', () => {
     return (JSON.stringify(payload.messages).match(/"cache_control"/g) ?? []).length;
   }
 
+  // Sized off ANCHOR_OFFSET_RAW_BLOCKS with headroom (PRI-1821 review
+  // finding 6) — a fixture pinned to a raw-block count sized for one offset
+  // value silently loses its anchor the next time the constant grows.
+  const LONG_CONVERSATION_TURNS = Math.ceil(ANCHOR_OFFSET_RAW_BLOCKS / 4) + 2;
+
   it('places TWO message-level breakpoints (anchor + tail) on a long conversation', async () => {
-    await provider.createResponse(longConversation(6), [mockTool], 'claude-sonnet-4-20250514');
+    await provider.createResponse(
+      longConversation(LONG_CONVERSATION_TURNS),
+      [mockTool],
+      'claude-sonnet-4-20250514'
+    );
 
     const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
     expect(countCacheControl(callArgs)).toBe(2);
@@ -293,7 +305,7 @@ describe('AnthropicProvider stable-anchor breakpoint', () => {
   });
 
   it('places ONLY the tail breakpoint on a short conversation', async () => {
-    // 3 messages → only ~3 cacheable blocks, well below the 10-block offset
+    // 3 messages → only ~3 cacheable blocks, well below ANCHOR_OFFSET_RAW_BLOCKS
     await provider.createResponse(
       [
         { role: 'user', content: 'hi' },
@@ -331,7 +343,11 @@ describe('AnthropicProvider stable-anchor breakpoint', () => {
     // thinking content via the assistant content array directly — bypass via
     // a string here, then verify the helper's output doesn't have
     // cache_control on any thinking-typed block in the converted wire format.
-    await provider.createResponse(longConversation(6), [mockTool], 'claude-sonnet-4-20250514');
+    await provider.createResponse(
+      longConversation(LONG_CONVERSATION_TURNS),
+      [mockTool],
+      'claude-sonnet-4-20250514'
+    );
 
     const callArgs = mockCreateResponse.mock.calls[0][0] as Anthropic.Messages.MessageCreateParams;
     for (const msg of callArgs.messages) {
