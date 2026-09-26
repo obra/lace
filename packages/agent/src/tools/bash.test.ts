@@ -2,7 +2,7 @@
 // ABOUTME: Tests command execution, error handling, and success/failure distinction
 
 import { PassThrough } from 'node:stream';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -10,6 +10,7 @@ import { BashTool, type BashOutput } from '@lace/agent/tools/implementations/bas
 import type { ToolContext } from './types';
 import { createStreamingFakeRuntime } from './runtime/__tests__/fake-runtime';
 import { HostToolRuntime } from './runtime/host';
+import { logger } from '@lace/agent/utils/logger';
 
 describe('BashTool', () => {
   let bashTool: BashTool;
@@ -48,8 +49,18 @@ describe('BashTool', () => {
 
   describe('Tool metadata', () => {
     it('should have correct name and description', () => {
-      expect(bashTool.name).toBe('bash');
-      expect(bashTool.description).toBe(
+      // The default timeout in the description comes from
+      // LACE_BASH_FOREGROUND_TIMEOUT_MS, so pin it to "unset" here.
+      const saved = process.env.LACE_BASH_FOREGROUND_TIMEOUT_MS;
+      delete process.env.LACE_BASH_FOREGROUND_TIMEOUT_MS;
+      let tool: BashTool;
+      try {
+        tool = new BashTool();
+      } finally {
+        if (saved !== undefined) process.env.LACE_BASH_FOREGROUND_TIMEOUT_MS = saved;
+      }
+      expect(tool.name).toBe('bash');
+      expect(tool.description).toBe(
         `Execute shell commands in isolated bash processes.
 
 Parameters:
@@ -57,12 +68,13 @@ Parameters:
 - background: Set to true for background execution (returns jobId immediately)
 - description: Label shown in job listings when background=true (optional)
 - progressIntervalMs: For background jobs, interval in ms for periodic progress notifications (5000-600000). **Off by default** — set this only if you want a fixed cadence regardless of subscribers. Subscribing to a job via job_notify(on=['progress'], ...) arms the timer on its own at the default cadence.
+- timeoutMs: Sync calls only. Kill the command if it runs longer than this many ms (1000-600000). Defaults to 600000.
 
 When background=true, returns { jobId, status: "started" }. Use job_output(jobId) to check status/output.
 Background jobs send completion notifications automatically. Progress notifications are opt-in (see progressIntervalMs / job_notify).
 
 Default (sync): Blocks until complete. Output truncated to 100+50 lines. Chain with && or ;.
-A sync command is subject to a runtime timeout (tens of seconds) and is killed if it exceeds it — for anything long-running (installs, builds, long fetches) use background=true and poll job_output(jobId).`
+A sync command that runs past its timeout (600s unless timeoutMs is set) is killed (SIGTERM, then SIGKILL 2s later) — for anything long-running (installs, builds, long fetches) use background=true and poll job_output(jobId).`
       );
     });
 
@@ -799,5 +811,309 @@ A sync command is subject to a runtime timeout (tens of seconds) and is killed i
       expect(output.stdoutPreview).toBe('');
       expect(output.runtime).toBeLessThan(5000);
     }, 10000);
+  });
+
+  // PRI-3251: sync bash calls get a real timeout. On timeout the tool
+  // SIGTERMs the shell it spawned, SIGKILLs it after a 2s grace period, and
+  // stops waiting on stdout/stderr once that grace period is over, so a call
+  // is bounded by timeoutMs + 2s even when a descendant keeps the pipes open.
+  describe('PRI-3251: foreground timeout', () => {
+    const KILL_GRACE_MS = 2000;
+
+    function hostContext(label: string, signal = new AbortController().signal): ToolContext {
+      return {
+        signal,
+        runtime: new HostToolRuntime({ id: `rt_bash_${label}_${runtimeId++}`, cwd: process.cwd() }),
+        toolTempDir: testTempDir,
+      };
+    }
+
+    // Polls until the command under test has written its `$$` into pidFile.
+    async function readPidFile(pidFile: string): Promise<number> {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(pidFile)) {
+          const pid = Number.parseInt(fs.readFileSync(pidFile, 'utf8').trim(), 10);
+          if (Number.isInteger(pid) && pid > 0) return pid;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      throw new Error(`no pid written to ${pidFile}`);
+    }
+
+    // Only ESRCH means the process is gone; EPERM means it exists.
+    function isAlive(pid: number): boolean {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false;
+        throw error;
+      }
+    }
+
+    function killIfAlive(pid: number | undefined): void {
+      if (pid !== undefined && isAlive(pid)) process.kill(pid, 'SIGKILL');
+    }
+
+    it('rejects a per-call timeoutMs outside 1000..600000', async () => {
+      for (const timeoutMs of [999, 600_001]) {
+        const result = await bashTool.execute({ command: 'true', timeoutMs }, toolContext);
+        expect(result.status).toBe('failed');
+        expect(result.content[0].text).toContain('ValidationError');
+      }
+      for (const timeoutMs of [1000, 600_000]) {
+        const result = await bashTool.execute({ command: 'true', timeoutMs }, toolContext);
+        expect(result.status).toBe('completed');
+      }
+    });
+
+    it('kills a hung command after timeoutMs and keeps its partial output', async () => {
+      const result = await bashTool.execute(
+        { command: 'echo before-timeout; exec sleep 60', timeoutMs: 1000 },
+        toolContext
+      );
+
+      expect(result.status).toBe('failed');
+      const output = JSON.parse(result.content[0].text!) as BashOutput;
+      expect(output.timedOut).toBe(true);
+      expect(output.timeoutMessage).toBe(
+        'Command timed out after 1s and its shell was killed (SIGTERM, then SIGKILL 2s later if still running). Processes it started may still be running.'
+      );
+      expect(output.stdoutPreview).toContain('before-timeout');
+      expect(output.runtime).toBeLessThan(1000 + KILL_GRACE_MS);
+    }, 15000);
+
+    it('SIGKILLs a TERM-ignoring command and still ends within timeoutMs + grace', async () => {
+      const pidFile = path.join(testTempDir, 'term-ignoring-pid');
+      const start = Date.now();
+      const execPromise = bashTool.execute(
+        // `exec` keeps the TERM-ignoring sleep as the tool's direct child,
+        // so `$$` is the pid the timeout has to kill.
+        { command: `trap '' TERM; echo $$ > ${pidFile}; exec sleep 60`, timeoutMs: 1000 },
+        hostContext('timeout_trap')
+      );
+      const pid = await readPidFile(pidFile);
+
+      try {
+        const result = await execPromise;
+        const elapsed = Date.now() - start;
+
+        expect(result.status).toBe('failed');
+        const output = JSON.parse(result.content[0].text!) as BashOutput;
+        expect(output.timedOut).toBe(true);
+        // SIGTERM was ignored, so only the SIGKILL after the grace period ends it.
+        expect(elapsed).toBeGreaterThanOrEqual(1000 + KILL_GRACE_MS - 100);
+        expect(elapsed).toBeLessThan(1000 + KILL_GRACE_MS + 1500);
+        expect(isAlive(pid)).toBe(false);
+      } finally {
+        killIfAlive(pid);
+      }
+    }, 15000);
+
+    it('stops waiting when an escaped descendant keeps the pipes open after SIGKILL', async () => {
+      const pidFile = path.join(testTempDir, 'escaped-pid');
+      const start = Date.now();
+      const execPromise = bashTool.execute(
+        {
+          // The setsid'd sleep is in its own session, is never signaled, and
+          // inherits (and holds open) the call's stdout/stderr.
+          command: `(setsid sh -c 'echo $$ > ${pidFile}; exec sleep 30' &); exec sleep 30`,
+          timeoutMs: 1000,
+        },
+        hostContext('timeout_escaped')
+      );
+      const escapedPid = await readPidFile(pidFile);
+
+      try {
+        const result = await execPromise;
+        const elapsed = Date.now() - start;
+
+        const output = JSON.parse(result.content[0].text!) as BashOutput;
+        expect(result.status).toBe('failed');
+        expect(output.timedOut).toBe(true);
+        expect(elapsed).toBeLessThan(1000 + KILL_GRACE_MS + 1500);
+      } finally {
+        killIfAlive(escapedPid);
+      }
+    }, 15000);
+
+    it('releases the pipes when it stops waiting, so an escaped descendant cannot write into a settled call', async () => {
+      const pidFile = path.join(testTempDir, 'late-writer-pid');
+      const statusFile = path.join(testTempDir, 'late-writer-status');
+      const start = Date.now();
+      const execPromise = bashTool.execute(
+        {
+          // The setsid'd writer escapes the timeout's signals and holds the
+          // pipes. It writes after the call has settled (timeoutMs + grace)
+          // and records the write's exit status: 0 means the tool still had
+          // the read end open, anything else (EPIPE or SIGPIPE) means the tool
+          // let go of it.
+          command:
+            `(setsid sh -c 'echo $$ > ${pidFile}; sleep 5; (echo late-output) 2>/dev/null; ` +
+            `echo $? > ${statusFile}' &); exec sleep 30`,
+          timeoutMs: 1000,
+        },
+        hostContext('timeout_late_writer')
+      );
+      const writerPid = await readPidFile(pidFile);
+
+      try {
+        const result = await execPromise;
+        const elapsed = Date.now() - start;
+        expect(elapsed).toBeLessThan(1000 + KILL_GRACE_MS + 1500);
+        const output = JSON.parse(result.content[0].text!) as BashOutput;
+        expect(output.timedOut).toBe(true);
+
+        const deadline = Date.now() + 8000;
+        while (!fs.existsSync(statusFile) && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        expect(fs.readFileSync(statusFile, 'utf8').trim()).not.toBe('0');
+      } finally {
+        // setsid made the writer a process-group leader, so this reaches its
+        // sleep too and nothing else.
+        if (isAlive(writerPid)) process.kill(-writerPid, 'SIGKILL');
+      }
+    }, 20000);
+
+    it('says so when the shell exited but a background process kept the pipes open', async () => {
+      const pidFile = path.join(testTempDir, 'background-pid');
+      const start = Date.now();
+      const execPromise = bashTool.execute(
+        {
+          command: `sh -c 'echo $$ > ${pidFile}; exec sleep 30' & echo started`,
+          timeoutMs: 1000,
+        },
+        hostContext('timeout_background')
+      );
+      const backgroundPid = await readPidFile(pidFile);
+
+      try {
+        const result = await execPromise;
+        const elapsed = Date.now() - start;
+
+        expect(result.status).toBe('failed');
+        const output = JSON.parse(result.content[0].text!) as BashOutput;
+        expect(output.timedOut).toBe(true);
+        expect(output.exitCode).toBe(0);
+        expect(output.stdoutPreview).toContain('started');
+        expect(output.timeoutMessage).toBe(
+          "Command exited with code 0, but its stdout/stderr stayed open until the 1s timeout, probably held by a background process it started (that process may still be running). For long-running work use background=true, or redirect the background process's output (e.g. `cmd > out.log 2>&1 &`)."
+        );
+        // Nothing left to kill, so no grace period.
+        expect(elapsed).toBeLessThan(1000 + 1500);
+      } finally {
+        killIfAlive(backgroundPid);
+      }
+    }, 15000);
+
+    it('does not delay or flag a fast command', async () => {
+      const result = await bashTool.execute(
+        { command: 'echo quick', timeoutMs: 1000 },
+        toolContext
+      );
+
+      expect(result.status).toBe('completed');
+      const output = JSON.parse(result.content[0].text!) as BashOutput;
+      expect(output.timedOut).toBe(false);
+      expect(output.timeoutMessage).toBeUndefined();
+      expect(output.stdoutPreview.trim()).toBe('quick');
+    }, 10000);
+
+    it('still SIGKILLs a TERM-ignoring command after an abort settles the call', async () => {
+      const pidFile = path.join(testTempDir, 'abort-trap-pid');
+      const abortController = new AbortController();
+      const execPromise = bashTool.execute(
+        { command: `trap '' TERM; echo $$ > ${pidFile}; exec sleep 30` },
+        hostContext('abort_trap', abortController.signal)
+      );
+      const pid = await readPidFile(pidFile);
+
+      try {
+        abortController.abort();
+        const result = await execPromise;
+        expect(result.status).toBe('aborted');
+        // The call settles as soon as the abort rejects the process's
+        // completion; the SIGKILL comes after the grace period regardless.
+        await new Promise((resolve) => setTimeout(resolve, KILL_GRACE_MS + 500));
+        expect(isAlive(pid)).toBe(false);
+      } finally {
+        killIfAlive(pid);
+      }
+    }, 15000);
+  });
+
+  // The default for calls that omit timeoutMs is a per-instance setting,
+  // LACE_BASH_FOREGROUND_TIMEOUT_MS. It can only lower the default: values
+  // above the 600000ms per-call ceiling are clamped to it.
+  describe('PRI-3251: LACE_BASH_FOREGROUND_TIMEOUT_MS', () => {
+    const ENV_VAR = 'LACE_BASH_FOREGROUND_TIMEOUT_MS';
+    let savedEnvValue: string | undefined;
+    let warn: MockInstance<typeof logger.warn>;
+
+    beforeEach(() => {
+      savedEnvValue = process.env[ENV_VAR];
+      warn = vi.spyOn(logger, 'warn');
+    });
+
+    afterEach(() => {
+      warn.mockRestore();
+      if (savedEnvValue === undefined) delete process.env[ENV_VAR];
+      else process.env[ENV_VAR] = savedEnvValue;
+    });
+
+    function describedDefault(): string | undefined {
+      return /Defaults to (\d+)\./.exec(new BashTool().description)?.[1];
+    }
+
+    it('defaults to 600000ms when unset, without warning', () => {
+      delete process.env[ENV_VAR];
+      expect(describedDefault()).toBe('600000');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('accepts an in-range value without warning', () => {
+      process.env[ENV_VAR] = '120000';
+      expect(describedDefault()).toBe('120000');
+      expect(new BashTool().description).toContain('(120s unless timeoutMs is set)');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('accepts a value with surrounding whitespace without warning', () => {
+      process.env[ENV_VAR] = ' 120000\n';
+      expect(describedDefault()).toBe('120000');
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['1800000', '600000', 'clamped'],
+      ['500', '1000', 'clamped'],
+      ['10s', '600000', 'not a positive integer'],
+      ['0', '600000', 'not a positive integer'],
+      ['0x3e8', '600000', 'not a positive integer'],
+      ['1e3', '600000', 'not a positive integer'],
+      ['1000.0', '600000', 'not a positive integer'],
+      ['', '600000', 'not a positive integer'],
+    ])('maps %s to %sms and warns', (raw, expected, reason) => {
+      process.env[ENV_VAR] = raw;
+      expect(describedDefault()).toBe(expected);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining(reason),
+        expect.objectContaining({ value: raw, effectiveMs: Number(expected) })
+      );
+    });
+
+    it('applies the configured default to a call that omits timeoutMs', async () => {
+      process.env[ENV_VAR] = '1000';
+      const tool = new BashTool();
+
+      const result = await tool.execute({ command: 'exec sleep 30' }, toolContext);
+
+      expect(result.status).toBe('failed');
+      const output = JSON.parse(result.content[0].text!) as BashOutput;
+      expect(output.timedOut).toBe(true);
+      expect(output.timeoutMessage).toContain('timed out after 1s');
+    }, 15000);
   });
 });
