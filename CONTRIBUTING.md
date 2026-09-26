@@ -119,7 +119,7 @@ From `CLAUDE.md` and `docs/development.md`:
 - Files start with an `// ABOUTME:` comment explaining their purpose.
 - Strict TypeScript; never `any`.
 - Use the repo's logger, never `console.log`.
-- Pre-commit hooks run ESLint, Prettier and related tests. Don't skip them.
+- Pre-commit hooks run ESLint and Prettier on staged files. Don't skip them.
 - Keep changes small, direct, and easy to verify.
 - Lint is ESLint plus Prettier. (The `Biomefile` in the repo root is an unused
   stub.)
