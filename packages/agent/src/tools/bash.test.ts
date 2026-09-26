@@ -1116,4 +1116,106 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
       expect(output.timeoutMessage).toContain('timed out after 1s');
     }, 15000);
   });
+
+  // PRI-3243: aborting a foreground bash call has to reach the whole
+  // process group it spawned, not just the shell's own pid. When bash
+  // doesn't exec-replace itself (e.g. a pipeline like sleep piped to cat,
+  // where bash forks one process per stage), a plain childProcess.kill()
+  // only kills the shell -- the other pipeline members are left running as
+  // orphans instead of being killed.
+  describe('PRI-3243: abort kills the whole process group, not just the shell', () => {
+    function hostContext(label: string, signal: AbortSignal): ToolContext {
+      return {
+        signal,
+        runtime: new HostToolRuntime({ id: `rt_bash_${label}_${runtimeId++}`, cwd: process.cwd() }),
+        toolTempDir: testTempDir,
+      };
+    }
+
+    // Only ESRCH means the process is gone; any other error (e.g. EPERM)
+    // means it is alive but unsignalable from here, which this test is not
+    // checking for. process.kill(NaN, 0) throws synchronously before ever
+    // reaching the OS -- treating that as "dead" is what made an earlier
+    // version of this test pass vacuously against unfixed bash.ts.
+    function isAlive(pid: number): boolean {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'ESRCH') throw error;
+        return false;
+      }
+    }
+
+    it('kills a non-shell pipeline member on abort, not just the shell', async () => {
+      const pidFile = path.join(testTempDir, 'pgroup-abort-pid');
+      const abortController = new AbortController();
+
+      // sh -c '...' | cat: bash forks a subprocess for the left side of the
+      // pipe rather than exec-replacing itself, so cat (and, via exec, the
+      // left side's own sh) are both distinct from the bash tool's direct
+      // child. The double-dollar-sign token below is the sh subprocess's own
+      // pid (a bare single dollar sign, the pre-fix version of this test,
+      // writes a literal dollar character, so parseInt gives NaN,
+      // toBeDefined() accepts it, and process.kill(NaN, 0) throws
+      // synchronously before ever reaching the OS -- making the "is it still
+      // alive" check pass vacuously no matter what bash.ts does).
+      const execPromise = bashTool.execute(
+        {
+          command: `sh -c 'echo $$ > ${pidFile}; exec sleep 30' | cat`,
+        },
+        hostContext('pgroup_abort', abortController.signal)
+      );
+
+      let childPid: number | undefined;
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(pidFile)) {
+          const raw = fs.readFileSync(pidFile, 'utf8').trim();
+          const parsed = Number.parseInt(raw, 10);
+          if (Number.isInteger(parsed)) {
+            childPid = parsed;
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(Number.isInteger(childPid)).toBe(true);
+
+      abortController.abort();
+      await execPromise;
+
+      // Give signal delivery a moment, then confirm the grandchild is gone.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(isAlive(childPid!)).toBe(false);
+    }, 15000);
+
+    it('does not leave an unhandled rejection behind when aborted', async () => {
+      const rejections: unknown[] = [];
+      const onUnhandledRejection = (reason: unknown) => rejections.push(reason);
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      try {
+        const abortController = new AbortController();
+        const execPromise = bashTool.execute(
+          { command: 'sleep 30' },
+          hostContext('pgroup_unhandled', abortController.signal)
+        );
+
+        // Give the process a moment to actually start before aborting.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        abortController.abort();
+        await execPromise;
+
+        // Let any unhandled-rejection microtask/macrotask actually fire.
+        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection);
+      }
+
+      expect(rejections).toEqual([]);
+    }, 15000);
+  });
 });
