@@ -163,9 +163,9 @@ export interface RuntimeProcessOptions {
    * came back empty) doesn't block forever on a pipe nobody is writing to or
    * closing. Pass 'pipe' only when the caller genuinely drives stdin, e.g. an
    * MCP server child talked to over stdio (see RuntimeStdioClientTransport).
-   * Honored by the host runtime (and the bounded host runtime, which delegates
-   * to it). The projected container runtime does not honor it yet: its
-   * children still get an open stdin pipe. See PRI-3243.
+   * Honored by every runtime: the host runtime (and the bounded host runtime,
+   * which delegates to it) and the projected container runtime, which ends
+   * its always-piped container stdin unless the caller asks for 'pipe'.
    */
   stdin?: 'ignore' | 'pipe';
 }
