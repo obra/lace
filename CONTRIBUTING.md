@@ -9,6 +9,10 @@ repository actually uses today.
 
 ## 1. Set up
 
+Install ripgrep (`rg`) and make sure it is on your `PATH`. The agent's
+`ripgrep_search` tool shells out to it, so its tests fail without it (CI
+installs it with `apt-get install ripgrep`).
+
 ```bash
 git clone https://github.com/obra/lace
 cd lace
@@ -36,8 +40,9 @@ To run a single test file:
 npx vitest run <path>     # from inside the package that owns the file
 ```
 
-The full `packages/agent` unit suite takes several minutes. Some integration
-suites call live model APIs; skip those locally unless your change needs them.
+The full `packages/agent` unit suite takes several minutes. Suites named
+`*.live.test.ts` call live model APIs and run whenever `ANTHROPIC_API_KEY` is
+set. Unset it (for example `ANTHROPIC_API_KEY= npm test`) to skip them.
 
 ## 3. PR titles
 
@@ -96,7 +101,8 @@ Then describe your own change.
 
 - Open the PR as a draft while it is in flight, and mark it ready for review
   when it is.
-- A maintainer reviews and merges. Don't merge your own PR.
+- A maintainer reviews and merges contributor PRs; contributors don't merge
+  their own.
 - A maintainer may push review fixes onto your branch before merging.
 
 ## 9. Tests for bug fixes
@@ -119,7 +125,9 @@ From `CLAUDE.md` and `docs/development.md`:
 - Files start with an `// ABOUTME:` comment explaining their purpose.
 - Strict TypeScript; never `any`.
 - Use the repo's logger, never `console.log`.
-- Pre-commit hooks run ESLint and Prettier on staged files. Don't skip them.
+- Pre-commit hooks run ESLint and Prettier on staged `.ts`/`.tsx` files. Don't
+  skip them. For markdown, JSON and YAML changes, run `npm run format:check` (or
+  `npx prettier --write <file>`) yourself.
 - Keep changes small, direct, and easy to verify.
 - Lint is ESLint plus Prettier. (The `Biomefile` in the repo root is an unused
   stub.)
