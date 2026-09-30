@@ -69,8 +69,9 @@ const RECALL_DESCRIPTION = [
   '',
   'Query syntax: `search.query` is a SQLite FTS5 match expression, not a plain string.',
   'Plain words and phrases work best (terms are implicitly ANDed). Punctuation is',
-  'operator syntax — `:` selects a column, a leading `-` excludes, `*` is a prefix',
-  'marker, `"` opens a phrase, and the barewords AND/OR/NOT/NEAR are operators. A term',
+  'operator syntax — `:` selects a column, `*` is a prefix marker, `"` opens a phrase,',
+  'and the barewords AND/OR/NOT/NEAR are operators. NOT excludes a term:',
+  '`deploy NOT staging`. There is no leading-`-` exclusion. A term',
   'that contains punctuation (e.g. a hyphenated id like `github-token` or a `key:value`)',
   'will be misread as an operator and error. Wrap any such term in double quotes to',
   'search it literally: `capture committed "github-token" slot policy`.',
@@ -217,10 +218,10 @@ export class RecallTool extends Tool {
     try {
       rows = db.prepare(sql).all(...params) as SearchHitRow[];
     } catch (err) {
-      // FTS5 has its own query syntax: bareword AND/OR/NOT/NEAR are operators,
-      // a leading '-' is "exclude", '"' opens a phrase, '*' is a prefix marker,
-      // ':' selects a column. Any of those — and a bunch of punctuation
-      // combinations — can throw SqliteError mid-prepare. Surface the failure
+      // FTS5 has its own query syntax: bareword AND/OR/NOT/NEAR are operators
+      // (NOT excludes), '"' opens a phrase, '*' is a prefix marker, ':' selects
+      // a column, and a '-' is column syntax too, so `here -foo` fails. Any of
+      // those — and a bunch of punctuation combinations — can throw SqliteError mid-prepare. Surface the failure
       // as a zero-hit envelope with a hint so the conversation turn doesn't
       // crash. (User-supplied strings get redacted here too — see I1.)
       const message = err instanceof Error ? err.message : String(err);
@@ -237,8 +238,9 @@ export class RecallTool extends Tool {
         hint:
           `FTS5 syntax error on query=${JSON.stringify(redact(args.query))}: ${redact(message)}. ` +
           columnHint +
-          `Plain words and phrases work best; ':' selects a column, a leading '-' excludes, ` +
-          `'*' is a prefix marker, '"' opens a phrase, and AND/OR/NOT/NEAR are operators.`,
+          `Plain words and phrases work best; ':' selects a column, '*' is a prefix marker, ` +
+          `'"' opens a phrase, and AND/OR/NOT/NEAR are operators. NOT excludes a term ` +
+          `(e.g. deploy NOT staging); a leading '-' does not.`,
       });
     }
     // Use redactSnippet (strict + prefix-only) on previews because FTS5's

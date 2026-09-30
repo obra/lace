@@ -445,6 +445,38 @@ describe('RecallTool search', () => {
     expect(parsed.hint as string).toContain('"github-token"');
   });
 
+  it('excludes a term with NOT', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'here bar');
+    appendPrompt(fx, 'here foo');
+
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'here NOT foo' },
+      makeCtx()
+    );
+    const hits = parseResult(result).hits as Array<Record<string, unknown>>;
+    expect(hits).toHaveLength(1);
+    expect(hits[0].preview).toBe('here bar');
+  });
+
+  it('points a failed leading-dash exclusion at NOT instead of advertising "-"', async () => {
+    const fx = makeSession(laceDir, 'ada');
+    appendPrompt(fx, 'here foo');
+
+    // FTS5 has no leading-'-' exclusion: `here -foo` fails with
+    // "no such column: foo". The hint must name NOT as the exclusion operator.
+    const result = await new RecallTool().execute(
+      { action: 'search', query: 'here -foo' },
+      makeCtx()
+    );
+    const parsed = parseResult(result);
+    expect(parsed.hits).toEqual([]);
+    const hint = parsed.hint as string;
+    expect(hint).toMatch(/no such column/);
+    expect(hint).not.toMatch(/leading '-' excludes/);
+    expect(hint).toContain('NOT excludes');
+  });
+
   it('does not echo secrets verbatim in the zero-hit hint (I1)', async () => {
     const fx = makeSession(laceDir, 'ada');
     appendPrompt(fx, 'unrelated');
