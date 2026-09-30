@@ -27,7 +27,7 @@ describe('process-group-registry', () => {
   let tempDir: string;
   const spawned: number[] = [];
 
-  afterEach(() => {
+  afterEach(async () => {
     // Belt-and-suspenders: make sure no test process leaks past this file.
     for (const pid of spawned) {
       try {
@@ -40,6 +40,11 @@ describe('process-group-registry', () => {
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+    // The registry's tracked set is module-level state shared across every
+    // test in this file. Sweep it back to empty so one test's tracked pgid
+    // (now dead, thanks to the SIGKILLs above) can't leak into the next
+    // test's assertions about trackedProcessGroupCount().
+    await killAllTrackedProcessGroups(50);
   });
 
   function spawnDetached(command: string): ReturnType<typeof spawn> {
@@ -52,27 +57,39 @@ describe('process-group-registry', () => {
     return child;
   }
 
-  it('tracks a spawned group and untracks it once the completion promise settles', async () => {
+  it('tracks a spawned group', () => {
     const child = spawnDetached('exit 0');
-    const completion = new Promise<void>((resolve) => child.once('exit', () => resolve()));
     expect(typeof child.pid).toBe('number');
 
-    const untrack = trackProcessGroup(child.pid!, completion);
+    trackProcessGroup(child.pid!);
+    expect(trackedProcessGroupCount()).toBe(1);
+  });
+
+  it('does NOT untrack a group just because the shell we spawned directly exits', async () => {
+    // This is the regression found in review: `cmd &` backgrounds a grandchild that
+    // outlives the shell bash.ts spawned. The old code untracked the pgid
+    // as soon as the SHELL's own completion promise settled, so a live
+    // background child dropped out of `tracked` the moment the shell
+    // returned -- well before the child itself was done. Assert the entry
+    // survives the shell's exit.
+    const child = spawnDetached('(sleep 300 &) ; exit 0');
+    const pid = child.pid!;
+    trackProcessGroup(pid);
     expect(trackedProcessGroupCount()).toBe(1);
 
-    await completion;
-    // Simulate what bash.ts does: untrack once completion is known.
-    untrack();
-    expect(trackedProcessGroupCount()).toBe(0);
-  });
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    // The shell (the pid we tracked) is gone, but its backgrounded `sleep`
+    // grandchild is still alive in the same group.
+    expect(isAlive(pid)).toBe(false);
+    expect(trackedProcessGroupCount()).toBe(1);
+  }, 10000);
 
   it('SIGKILLs a TERM-ignoring tracked process group instead of leaving it alive', async () => {
     // Mirrors jc's repro: a process that traps (ignores) SIGTERM must still
     // be gone after killAllTrackedProcessGroups, via the SIGKILL escalation.
     const child = spawnDetached("trap '' TERM; sleep 300");
     const pid = child.pid!;
-    const completion = new Promise<void>((resolve) => child.once('exit', () => resolve()));
-    trackProcessGroup(pid, completion);
+    trackProcessGroup(pid);
 
     // Give the trap a moment to actually get installed before we signal it.
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -95,13 +112,45 @@ describe('process-group-registry', () => {
     expect(elapsed).toBeLessThan(500);
   }, 10000);
 
+  it('removes a tracked entry once the kill sweep observes its group empty', async () => {
+    const child = spawnDetached('exit 0');
+    const pid = child.pid!;
+    trackProcessGroup(pid);
+    expect(trackedProcessGroupCount()).toBe(1);
+
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    // Give the kernel a moment to actually reap the exited process so the
+    // group-membership probe sees it gone.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    await killAllTrackedProcessGroups(50);
+    expect(trackedProcessGroupCount()).toBe(0);
+  }, 10000);
+
+  it('lazily drops an already-empty entry on the next trackProcessGroup call', async () => {
+    const first = spawnDetached('exit 0');
+    const firstPid = first.pid!;
+    trackProcessGroup(firstPid);
+
+    await new Promise<void>((resolve) => first.once('exit', () => resolve()));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Nothing has swept yet -- the registry can still see the stale entry.
+    expect(trackedProcessGroupCount()).toBe(1);
+
+    const second = spawnDetached('sleep 300');
+    trackProcessGroup(second.pid!);
+
+    // Tracking the second group opportunistically swept the first (now
+    // empty) one out, so the count reflects only the live group.
+    expect(trackedProcessGroupCount()).toBe(1);
+  }, 10000);
+
   it('is a no-op when nothing is tracked', async () => {
     await expect(killAllTrackedProcessGroups(50)).resolves.toBeUndefined();
   });
 
   it('leaves an untracked group alone', async () => {
-    // A group that was never registered (e.g. already untracked after its
-    // own completion) must not be touched by a later sweep.
+    // A group that was never registered must not be touched by a sweep.
     const child = spawnDetached('sleep 300');
     const pid = child.pid!;
     spawned.push(pid);

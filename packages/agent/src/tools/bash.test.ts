@@ -11,6 +11,7 @@ import type { ToolContext } from './types';
 import { createStreamingFakeRuntime } from './runtime/__tests__/fake-runtime';
 import { HostToolRuntime } from './runtime/host';
 import { logger } from '@lace/agent/utils/logger';
+import { killAllTrackedProcessGroups } from './runtime/process-group-registry';
 
 describe('BashTool', () => {
   let bashTool: BashTool;
@@ -1216,6 +1217,66 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
       }
 
       expect(rejections).toEqual([]);
+    }, 15000);
+
+    // Regression found in review: untracking a pgid as soon as the SHELL's own
+    // completion promise settled was unsound. `cmd &` backgrounds a
+    // grandchild that outlives the shell -- the shell exits (and its
+    // completion promise resolves) right after launching the background
+    // job, well before that job is anywhere near done. The old code treated
+    // "the tracked pid exited" as "the group is empty" and dropped the
+    // registry entry at that point, so killAllTrackedProcessGroups() had
+    // nothing left to signal for a still-running background child by the
+    // time anyone called it. Must fail on that old behavior; must pass once
+    // removal is deferred to an actual groupIsEmpty() observation.
+    it('reaps a background cmd-ampersand child that outlives the shell, via the kill sweep', async () => {
+      const pidFile = path.join(testTempDir, 'bg-child-pid');
+      const abortController = new AbortController();
+
+      // Redirect the backgrounded sleep's own stdio away from the tool's
+      // pipes: otherwise the backgrounded process (not just the shell)
+      // keeps those pipes open and the foreground call never settles
+      // within this test's timeout -- a real but separate behavior (see the
+      // PRI-3251 test "says so when the shell exited but a background
+      // process kept the pipes open", above). This test is about the
+      // registry, not that pipe-lifetime behavior.
+      const execPromise = bashTool.execute(
+        { command: `sleep 30 >/dev/null 2>&1 & echo $! > ${pidFile}` },
+        hostContext('bg_child_outlives_shell', abortController.signal)
+      );
+
+      const result = await execPromise;
+      expect(result.status).toBe('completed');
+
+      const deadline = Date.now() + 5000;
+      let bgPid: number | undefined;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(pidFile)) {
+          const raw = fs.readFileSync(pidFile, 'utf8').trim();
+          const parsed = Number.parseInt(raw, 10);
+          if (Number.isInteger(parsed)) {
+            bgPid = parsed;
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(Number.isInteger(bgPid)).toBe(true);
+
+      try {
+        expect(isAlive(bgPid!)).toBe(true);
+
+        await killAllTrackedProcessGroups();
+
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(isAlive(bgPid!)).toBe(false);
+      } finally {
+        try {
+          process.kill(bgPid!, 'SIGKILL');
+        } catch {
+          // already gone
+        }
+      }
     }, 15000);
   });
 });

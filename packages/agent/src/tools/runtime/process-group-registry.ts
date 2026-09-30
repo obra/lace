@@ -40,35 +40,66 @@
  * `DEFAULT_GRACE_MS` is deliberately far under that 500ms deadline, with
  * headroom for signal-delivery and poll-loop latency, so the escalation
  * `shutdown()` runs reliably finishes with time to spare.
+ *
+ * ## Why entries are removed lazily, not on the shell's own completion
+ *
+ * An earlier version of this module untracked a pgid as soon as the ONE
+ * pid bash.ts spawned directly (the shell) exited — driven off that
+ * process's own completion promise. That's wrong: a plain `cmd &`
+ * backgrounds a grandchild that outlives the shell. The shell's completion
+ * promise resolves (it returned immediately once the background job was
+ * launched), so the entry got untracked, and `killAllTrackedProcessGroups`
+ * then has no idea the group — still containing that live background
+ * child — even exists. The bug wasn't limited to that one case: ANY
+ * survivor in the group (a background job, a trap, a pipeline stage)
+ * outlives the shell's own exit, so "the shell exited" was never a sound
+ * proxy for "the group is empty."
+ *
+ * The only sound signal that a group is actually gone is probing the group
+ * itself (`groupIsEmpty`, below) — never a completion promise for one
+ * member of it. So a tracked pgid is removed ONLY once `groupIsEmpty(pgid)`
+ * is observed true, checked lazily: once opportunistically whenever a new
+ * pgid is tracked, and again (this is what actually matters for
+ * correctness) during `killAllTrackedProcessGroups`'s sweep, after the
+ * SIGTERM/SIGKILL escalation has had its chance to empty the group out.
+ * That keeps the map from growing without bound over the life of a
+ * long-running agent process without ever trusting a false "done" signal.
+ * A pgid whose group still has live members can't be reused by the OS for
+ * something unrelated, so there's no pid-reuse risk in leaving a live
+ * entry tracked past the originating shell's own exit.
  */
 
-const tracked = new Map<number, number>();
+const tracked = new Set<number>();
+
+/**
+ * Drop any tracked pgid whose group has already fully emptied out. Safe to
+ * call at any time; a no-op for any pgid that still has a live member.
+ */
+function sweepEmptyGroups(): void {
+  for (const pid of tracked) {
+    if (groupIsEmpty(pid)) {
+      tracked.delete(pid);
+    }
+  }
+}
 
 /**
  * Register a detached command's pid (which, on POSIX, is also its process
- * group id) for cleanup on shutdown. Returns an unregister function — callers
- * should invoke it once the command's own completion is known so the map
- * doesn't accumulate entries for the life of the agent process.
+ * group id) for cleanup on shutdown.
  *
- * `completion` is accepted (and used internally to drive the unregister
- * timing bash.ts wants) but killAllTrackedProcessGroups deliberately does NOT
- * rely on it to decide whether a GROUP is dead: `completion` only resolves
- * when this one tracked pid (the shell bash.ts spawned directly) exits, and
- * that process is typically the first thing a plain SIGTERM kills — while a
- * TERM-ignoring descendant it forked (a trap, or a pipeline stage) can survive
- * in the same group. Treating "this one process exited" as "the group is
- * gone" is exactly the bug this module exists to avoid, so liveness is polled
- * against the group itself instead (see groupIsEmpty).
+ * There is deliberately no "untrack on completion" here (see the module doc
+ * above): the shell bash.ts spawns can exit while a background child (`cmd
+ * &`) it launched keeps running in the same group, and that survivor is
+ * exactly what `killAllTrackedProcessGroups` needs to still know about. A
+ * pgid is only ever removed once its group is observed empty — opportunistically
+ * here (so the map doesn't grow across the life of the agent process for
+ * pgids that emptied out long ago and were never swept), and, more
+ * importantly, inside `killAllTrackedProcessGroups` itself after its kill
+ * escalation.
  */
-export function trackProcessGroup(pid: number, completion: Promise<unknown>): () => void {
-  tracked.set(pid, pid);
-  const untrack = () => {
-    if (tracked.get(pid) === pid) {
-      tracked.delete(pid);
-    }
-  };
-  void completion.then(untrack, untrack);
-  return untrack;
+export function trackProcessGroup(pid: number): void {
+  sweepEmptyGroups();
+  tracked.add(pid);
 }
 
 /** Test/introspection only: how many process groups are currently tracked. */
@@ -120,18 +151,21 @@ const DEFAULT_GRACE_MS = 150;
  * (the poll loop below returns as soon as it does); `graceMs` only bounds how
  * long a TERM-ignoring survivor gets before the SIGKILL escalation fires.
  *
- * Deliberately does not trust a tracked entry's own `completion` promise to
- * mean the GROUP is empty — only the group-membership probe (`groupIsEmpty`)
- * does, since completion resolves when the one tracked pid exits, and a
- * descendant it forked (a trap, or a pipeline stage) can be left alive in the
- * same group — exactly the survivor jc's orphan repro depends on. Declaring
- * victory the moment the named pid's own exit event fires would skip the
- * SIGKILL that survivor needs.
+ * A pgid is removed from the registry once this sweep observes its group
+ * empty (see the module doc above for why that observation — never a
+ * completion promise for one member — is the only sound removal signal). A
+ * SIGKILL is not synchronous, so a survivor that needed the SIGKILL
+ * escalation may still show up as non-empty for a moment after this
+ * function returns; it will be swept out on the NEXT call (another kill
+ * sweep, or the next `trackProcessGroup`), so the registry still can't grow
+ * without bound.
  *
  * Safe to call with nothing tracked (no-op) and safe to call more than once.
  */
 export async function killAllTrackedProcessGroups(graceMs = DEFAULT_GRACE_MS): Promise<void> {
-  const pids = [...tracked.values()];
+  sweepEmptyGroups();
+
+  const pids = [...tracked];
   if (pids.length === 0) return;
 
   for (const pid of pids) {
@@ -148,6 +182,9 @@ export async function killAllTrackedProcessGroups(graceMs = DEFAULT_GRACE_MS): P
       }
       if (!groupIsEmpty(pid)) {
         killGroup(pid, 'SIGKILL');
+      }
+      if (groupIsEmpty(pid)) {
+        tracked.delete(pid);
       }
     })
   );

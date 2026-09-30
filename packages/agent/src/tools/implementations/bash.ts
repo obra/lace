@@ -192,13 +192,14 @@ A sync command that runs past its timeout (${this.defaultTimeoutMs / 1000}s unle
 
       // Track this detached command's own process group so a killed or
       // shut-down agent process can reap it instead of orphaning it (see the
-      // module doc on process-group-registry.ts). trackProcessGroup untracks
-      // itself once `childProcess.completion` settles either way, so there is
-      // deliberately nothing else attached to that promise here — an earlier
-      // version of this fix added a redundant `.finally(untrack)` on top of
-      // it, which left an unhandled `AbortError` behind on every aborted call.
+      // module doc on process-group-registry.ts). The registry does NOT
+      // untrack this pgid just because the shell we spawned directly exits —
+      // a plain `cmd &` backgrounds a grandchild that outlives the shell, and
+      // that survivor is exactly what the shutdown-time kill sweep needs to
+      // still know about. The registry only drops an entry once it observes
+      // the whole group empty, lazily, in its own sweep.
       if (detached && typeof childProcess.pid === 'number') {
-        trackProcessGroup(childProcess.pid, childProcess.completion);
+        trackProcessGroup(childProcess.pid);
       }
 
       // Set up output streams after the runtime process is started so a start failure
