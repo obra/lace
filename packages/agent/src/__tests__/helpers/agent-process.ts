@@ -77,6 +77,18 @@ async function sleep(ms: number): Promise<void> {
 export function spawnAgentProcess(options: {
   laceDir: string;
   env?: Record<string, string>;
+  /**
+   * Spawn the test agent the same way `subagent-spawn.ts` spawns a real
+   * subagent: `detached: true` on POSIX, so it becomes the leader of its own
+   * process group instead of sharing the test runner's group. Defaults to
+   * `false` (most callers of this helper are testing request/response
+   * behavior, not process-group semantics, and don't need it). A test that
+   * exercises job-control.ts's group-kill path (`process.kill(-pid, ...)`)
+   * MUST pass `true` here -- a non-detached child makes that group kill a
+   * no-op that falls back to signaling one pid, which is not what happens in
+   * production and hides exactly the bugs that path is supposed to catch.
+   */
+  detached?: boolean;
 }): SpawnedAgent {
   const agentMainPath = fileURLToPath(new URL('../../../dist/main.js', import.meta.url));
   const agentCwd = fileURLToPath(new URL('../../../', import.meta.url));
@@ -94,6 +106,7 @@ export function spawnAgentProcess(options: {
       ...(options.env || {}),
     },
     stdio: ['pipe', 'pipe', 'pipe'],
+    detached: options.detached ? process.platform !== 'win32' : false,
   });
 
   proc.stderr.setEncoding('utf8');

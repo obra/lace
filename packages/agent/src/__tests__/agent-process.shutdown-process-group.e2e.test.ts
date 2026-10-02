@@ -1,11 +1,16 @@
-// ABOUTME: E2E reproduction of jc's PRI-3243 orphan finding: a subagent
+// ABOUTME: E2E reproduction of jc's PRI-3243 orphan findings: a subagent
 // ABOUTME: process killed the way the parent actually kills it must take its
-// ABOUTME: detached bash command tree (foreground pipeline AND background
-// ABOUTME: children) down with it, inside the parent's real kill window.
+// ABOUTME: detached bash command tree down with it -- both a background `&`
+// ABOUTME: child left behind by a bash call that already returned (finding
+// ABOUTME: #1) and a SIGTERM-ignoring pipeline stage (finding #2's original
+// ABOUTME: repro) -- inside the parent's real kill window.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { ChildProcess } from 'node:child_process';
+import { killJob } from '../jobs/job-control';
+import type { JobState } from '../server-types';
 import {
   AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
@@ -26,29 +31,34 @@ function isAlive(pid: number): boolean {
   }
 }
 
-// Mirrors job-control.ts's killJob/killAllRunningJobs exactly: SIGTERM the
-// process, wait only `waitMs` for it to exit on its own, and SIGKILL it
-// outright if it hasn't. That 500ms is a hard deadline on the WHOLE subagent
-// process, not just its cleanup step -- a subagent is not itself spawned
-// detached (see job-control.ts's comment on the group-kill fallback), so this
-// signals its own pid directly, exactly like the real parent-kill path does.
-async function killTheWayTheParentDoes(
-  proc: { pid?: number; kill: (signal: NodeJS.Signals) => boolean; exitCode: number | null },
-  waitMs = 500
-): Promise<void> {
-  proc.kill('SIGTERM');
-  if (proc.exitCode !== null) return;
-  await Promise.race([
-    new Promise<void>((resolve) => {
-      const onExit = () => resolve();
-      // @ts-expect-error -- proc is a real ChildProcess at the call site.
-      proc.once('exit', onExit);
-    }),
-    new Promise<void>((resolve) => setTimeout(resolve, waitMs)),
-  ]);
-  if (proc.exitCode === null) {
-    proc.kill('SIGKILL');
-  }
+// Wraps the spawned agent's real ChildProcess in just enough JobState shape
+// to hand to job-control.ts's OWN killJob -- not a hand-rolled approximation
+// of it. jobs.ts's job-kill RPC and session.ts's session-close path both call
+// killJob with exactly these options (`waitMs: 500, forceKill: true`), so
+// calling the real function here is what makes this test exercise the real
+// kill path: SIGTERM the process GROUP (job-control.ts's `process.kill(-pid,
+// ...)`), wait only `waitMs` for the whole process to exit on its own, then
+// SIGKILL the group outright if it hasn't. That group kill only has
+// something of the agent's own to hit because the agent is spawned detached
+// below, exactly as a real subagent is (`subagent-spawn.ts`).
+function jobStateForRealKill(proc: ChildProcess): JobState {
+  let resolveCompletion!: () => void;
+  const completion = new Promise<void>((resolve) => {
+    resolveCompletion = resolve;
+  });
+  proc.once('exit', () => resolveCompletion());
+
+  return {
+    jobId: 'e2e-shutdown-pgroup-test',
+    type: 'delegate',
+    status: 'running',
+    startedAt: new Date().toISOString(),
+    outputPath: '/dev/null',
+    proc,
+    finished: false,
+    completion,
+    resolveCompletion,
+  };
 }
 
 describe(
@@ -72,8 +82,12 @@ describe(
       // process whose own shutdown() has to do the reaping) and kills it with
       // the SAME timing the parent actually uses (job-control.ts's killJob:
       // SIGTERM, wait only 500ms, then SIGKILL) -- not an unbounded wait,
-      // which would hide exactly the race jc found.
-      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });
+      // which would hide exactly the race jc found. Spawned `detached` here
+      // the same way `subagent-spawn.ts` spawns a real subagent -- a
+      // non-detached test agent would make killJob's group kill a no-op
+      // that falls back to a direct kill of one pid, which isn't the real
+      // path and is exactly the gap jc's finding #4 flagged in this test.
+      ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir, detached: true });
 
       ctx.agent.peer.onRequest('session/update', async () => undefined);
       ctx.agent.peer.onRequest('session/request_permission', async () => ({ decision: 'allow' }));
@@ -95,27 +109,41 @@ describe(
       const trapPidFile = path.join(ctx.workDir, 'pri-3243-trap-pid');
       const bgPidFile = path.join(ctx.workDir, 'pri-3243-bg-pid');
 
-      // Two orphan shapes in one command:
+      // Two orphan shapes, both backgrounded so the bash TOOL CALL ITSELF
+      // returns right away -- this is what finding #1 needs: a background
+      // job left running by a bash call that has ALREADY returned, so the
+      // group-empty check has to see past the shell's own exit rather than
+      // riding its completion.
       // 1. A plain `&` background child (not setsid'd, so it stays in the
-      //    foreground command's process group unless something reaps it).
-      // 2. A foreground pipeline whose first stage traps (ignores) SIGTERM
-      //    (so a plain group SIGTERM alone wouldn't kill it -- the SIGKILL
-      //    escalation has to actually fire) piped to `cat`, a second
+      //    foreground command's process group unless something reaps it) --
+      //    jc's own finding #1 repro shape (`sleep 302 & echo $! > bg`).
+      // 2. A SIGTERM-ignoring pipeline, ALSO backgrounded with `&` so it
+      //    doesn't block the tool call either, piped to `cat` (a second
       //    pipeline member distinct from the /bin/bash process the bash tool
-      //    spawns directly -- the classic orphan target from #413's own repro.
+      //    spawns directly) -- the classic orphan target from #413's own
+      //    repro, needing the SIGKILL escalation since a plain SIGTERM alone
+      //    can't touch it.
+      // Each backgrounded descendant explicitly redirects its own stdout AND
+      // stderr away from the pipe the agent reads bash output over -- an
+      // inherited, unredirected fd held open by a backgrounded descendant
+      // would keep that pipe from ever reaching EOF, hanging the tool call
+      // itself (a background-job variant of the stdin-pipe hang PRI-3243's
+      // other half already fixed; see shell-job.ts's own `/dev/null` note).
       const command =
-        `(sleep 300 & echo $! > ${bgPidFile}); ` +
-        `sh -c 'trap "" TERM; echo $$ > ${trapPidFile}; exec sleep 300' | cat`;
+        `(sleep 300 >/dev/null 2>&1 & echo $! > ${bgPidFile}); ` +
+        `(sh -c 'trap "" TERM; echo $$ > ${trapPidFile}; exec sleep 300' 2>/dev/null | cat >/dev/null 2>&1 &)`;
 
-      // Fire-and-forget: this tool call is never expected to return a normal
-      // result in this test -- we kill the agent process out from under it.
-      // Swallow the eventual rejection (the peer closes once the agent
-      // process exits) so it doesn't show up as an unhandled rejection.
-      ctx.agent.peer
-        .requestWithId('session/prompt', {
+      // Awaited, not fire-and-forget: both orphans are backgrounded, so this
+      // tool call -- and the whole turn -- completes normally on its own,
+      // well before we kill the agent below. That's the shape finding #1
+      // needs: the bash call has already returned by the time we act.
+      await withTimeout(
+        ctx.agent.peer.request('session/prompt', {
           content: [{ type: 'text', text: `run: ${command}` }],
-        })
-        .result.catch(() => undefined);
+        }),
+        10_000,
+        'session/prompt (backgrounds both orphans and returns)'
+      );
 
       async function readPid(pidFile: string): Promise<number> {
         const deadline = Date.now() + 10_000;
@@ -136,15 +164,19 @@ describe(
       expect(isAlive(trapPid)).toBe(true);
       expect(isAlive(bgPid)).toBe(true);
 
-      // Kill the agent process the way the parent actually does: SIGTERM,
-      // wait only 500ms, then SIGKILL if it's still running. This must NOT
-      // be sent to the process group (only to the agent's own pid): a
-      // subagent is not itself spawned detached, and the detached bash
-      // command is the leader of a DIFFERENT process group anyway -- it's
-      // only reachable via the agent's own shutdown() reaping it, not by
-      // widening the blast radius of this signal.
+      // Kill the agent process the way the parent actually does it: the
+      // real job-control.ts `killJob`, SIGTERM-ing the agent's process
+      // GROUP, waiting only 500ms, then SIGKILLing the group if it's still
+      // running. The agent is this test's "subagent" from the orphan's
+      // point of view, and it's spawned `detached` above for exactly this
+      // reason: that's what gives the group kill something of the agent's
+      // own to hit at all. It still doesn't reach the detached bash
+      // command's tree -- that command is the leader of a DIFFERENT,
+      // disjoint process group one level further down, only reachable via
+      // the agent's own shutdown() reaping it, not by widening the blast
+      // radius of the parent's signal.
       const killStart = Date.now();
-      await killTheWayTheParentDoes(ctx.agent.proc, 500);
+      await killJob(jobStateForRealKill(ctx.agent.proc), { waitMs: 500, forceKill: true });
 
       await withTimeout(
         new Promise<void>((resolve, reject) => {

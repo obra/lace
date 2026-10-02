@@ -9,11 +9,13 @@
  * distinct from the agent process's own group.
  *
  * That means a signal aimed at the agent process (e.g. the parent's
- * `killJob`/`killAllRunningJobs` in job-control.ts, which SIGTERMs a subagent
- * process directly — subagents are not themselves spawned detached, so the
- * group-kill form of that signal has nothing to hit and falls back to a
- * direct kill of the subagent's own pid) reaches the agent process itself but
- * NOT the detached command tree: it never arrives at that separate group at
+ * `killJob`/`killAllRunningJobs` in job-control.ts, which group-kills a
+ * subagent — `process.kill(-pid, ...)` — rather than signaling its pid
+ * directly; subagents ARE themselves spawned detached (`subagent-spawn.ts`)
+ * specifically so that group-kill has a group of the subagent's own to hit)
+ * reaches the agent process itself but NOT the detached command tree: the
+ * bash tool's spawn made that command the leader of a THIRD group, disjoint
+ * from the subagent's own, so the parent's signal never arrives there at
  * all. If the agent process then exits — whether from that signal or any
  * other shutdown path — the detached tree is simply reparented to init with
  * no one left to signal it. It runs forever.
