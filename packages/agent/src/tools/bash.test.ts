@@ -11,6 +11,11 @@ import type { ToolContext } from './types';
 import { createStreamingFakeRuntime } from './runtime/__tests__/fake-runtime';
 import { HostToolRuntime } from './runtime/host';
 import { logger } from '@lace/agent/utils/logger';
+import {
+  killAllTrackedProcessGroups,
+  resetProcessGroupRegistryForTest,
+  trackedProcessGroupCount,
+} from './runtime/process-group-registry';
 
 describe('BashTool', () => {
   let bashTool: BashTool;
@@ -1114,6 +1119,187 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
       const output = JSON.parse(result.content[0].text!) as BashOutput;
       expect(output.timedOut).toBe(true);
       expect(output.timeoutMessage).toContain('timed out after 1s');
+    }, 15000);
+  });
+
+  // PRI-3243: aborting a foreground bash call has to reach the whole
+  // process group it spawned, not just the shell's own pid. When bash
+  // doesn't exec-replace itself (e.g. a pipeline like sleep piped to cat,
+  // where bash forks one process per stage), a plain childProcess.kill()
+  // only kills the shell -- the other pipeline members are left running as
+  // orphans instead of being killed.
+  describe('PRI-3243: abort kills the whole process group, not just the shell', () => {
+    function hostContext(label: string, signal: AbortSignal): ToolContext {
+      return {
+        signal,
+        runtime: new HostToolRuntime({ id: `rt_bash_${label}_${runtimeId++}`, cwd: process.cwd() }),
+        toolTempDir: testTempDir,
+      };
+    }
+
+    // Only ESRCH means the process is gone; any other error (e.g. EPERM)
+    // means it is alive but unsignalable from here, which this test is not
+    // checking for. process.kill(NaN, 0) throws synchronously before ever
+    // reaching the OS -- treating that as "dead" is what made an earlier
+    // version of this test pass vacuously against unfixed bash.ts.
+    function isAlive(pid: number): boolean {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'ESRCH') throw error;
+        return false;
+      }
+    }
+
+    it('kills a non-shell pipeline member on abort, not just the shell', async () => {
+      const pidFile = path.join(testTempDir, 'pgroup-abort-pid');
+      const abortController = new AbortController();
+
+      // sh -c '...' | cat: bash forks a subprocess for the left side of the
+      // pipe rather than exec-replacing itself, so cat (and, via exec, the
+      // left side's own sh) are both distinct from the bash tool's direct
+      // child. The double-dollar-sign token below is the sh subprocess's own
+      // pid (a bare single dollar sign, the pre-fix version of this test,
+      // writes a literal dollar character, so parseInt gives NaN,
+      // toBeDefined() accepts it, and process.kill(NaN, 0) throws
+      // synchronously before ever reaching the OS -- making the "is it still
+      // alive" check pass vacuously no matter what bash.ts does).
+      const execPromise = bashTool.execute(
+        {
+          command: `sh -c 'echo $$ > ${pidFile}; exec sleep 30' | cat`,
+        },
+        hostContext('pgroup_abort', abortController.signal)
+      );
+
+      let childPid: number | undefined;
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(pidFile)) {
+          const raw = fs.readFileSync(pidFile, 'utf8').trim();
+          const parsed = Number.parseInt(raw, 10);
+          if (Number.isInteger(parsed)) {
+            childPid = parsed;
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(Number.isInteger(childPid)).toBe(true);
+
+      abortController.abort();
+      await execPromise;
+
+      // Give signal delivery a moment, then confirm the grandchild is gone.
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(isAlive(childPid!)).toBe(false);
+    }, 15000);
+
+    it('does not leave an unhandled rejection behind when aborted', async () => {
+      const rejections: unknown[] = [];
+      const onUnhandledRejection = (reason: unknown) => rejections.push(reason);
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      try {
+        const abortController = new AbortController();
+        const execPromise = bashTool.execute(
+          { command: 'sleep 30' },
+          hostContext('pgroup_unhandled', abortController.signal)
+        );
+
+        // Give the process a moment to actually start before aborting.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        abortController.abort();
+        await execPromise;
+
+        // Let any unhandled-rejection microtask/macrotask actually fire.
+        await new Promise((resolve) => setImmediate(resolve));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      } finally {
+        process.off('unhandledRejection', onUnhandledRejection);
+      }
+
+      expect(rejections).toEqual([]);
+    }, 15000);
+
+    // A stale entry for an emptied group is a pid-reuse hazard: if the pid is
+    // recycled as an unrelated group leader, the shutdown reap would signal
+    // it. So the tool releases its group as soon as the shell exits and the
+    // group is observed empty, rather than waiting for the next lazy sweep.
+    it('releases its process group once the shell exits and leaves nothing behind', async () => {
+      const before = trackedProcessGroupCount();
+
+      const result = await bashTool.execute(
+        { command: 'echo done' },
+        hostContext('release_on_exit', new AbortController().signal)
+      );
+
+      expect(result.status).toBe('completed');
+      expect(trackedProcessGroupCount()).toBe(before);
+    }, 15000);
+
+    // Regression found in review: untracking a pgid as soon as the SHELL's own
+    // completion promise settled was unsound. `cmd &` backgrounds a
+    // grandchild that outlives the shell -- the shell exits (and its
+    // completion promise resolves) right after launching the background
+    // job, well before that job is anywhere near done. The old code treated
+    // "the tracked pid exited" as "the group is empty" and dropped the
+    // registry entry at that point, so killAllTrackedProcessGroups() had
+    // nothing left to signal for a still-running background child by the
+    // time anyone called it. Must fail on that old behavior; must pass once
+    // removal is deferred to an actual groupIsEmpty() observation.
+    it('reaps a background cmd-ampersand child that outlives the shell, via the kill sweep', async () => {
+      const pidFile = path.join(testTempDir, 'bg-child-pid');
+      const abortController = new AbortController();
+
+      // Redirect the backgrounded sleep's own stdio away from the tool's
+      // pipes: otherwise the backgrounded process (not just the shell)
+      // keeps those pipes open and the foreground call never settles
+      // within this test's timeout -- a real but separate behavior (see the
+      // PRI-3251 test "says so when the shell exited but a background
+      // process kept the pipes open", above). This test is about the
+      // registry, not that pipe-lifetime behavior.
+      const execPromise = bashTool.execute(
+        { command: `sleep 30 >/dev/null 2>&1 & echo $! > ${pidFile}` },
+        hostContext('bg_child_outlives_shell', abortController.signal)
+      );
+
+      const result = await execPromise;
+      expect(result.status).toBe('completed');
+
+      const deadline = Date.now() + 5000;
+      let bgPid: number | undefined;
+      while (Date.now() < deadline) {
+        if (fs.existsSync(pidFile)) {
+          const raw = fs.readFileSync(pidFile, 'utf8').trim();
+          const parsed = Number.parseInt(raw, 10);
+          if (Number.isInteger(parsed)) {
+            bgPid = parsed;
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(Number.isInteger(bgPid)).toBe(true);
+
+      try {
+        expect(isAlive(bgPid!)).toBe(true);
+
+        await killAllTrackedProcessGroups();
+
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(isAlive(bgPid!)).toBe(false);
+      } finally {
+        try {
+          process.kill(bgPid!, 'SIGKILL');
+        } catch {
+          // already gone
+        }
+        // The reap above left the registry shutting down; later tests track
+        // groups normally.
+        resetProcessGroupRegistryForTest();
+      }
     }, 15000);
   });
 });

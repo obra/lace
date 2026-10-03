@@ -50,9 +50,9 @@ export async function killJob(job: JobState, options?: KillJobOptions): Promise<
         jobId: job.jobId,
         error: error instanceof Error ? error.message : String(error),
       });
-      // Group kill fails with ESRCH when the child is not a process-group
-      // leader (subagents are not spawned detached). Fall back to signaling
-      // the process directly rather than silently not killing anything.
+      // Group kill can still fail here (e.g. ESRCH if the process already
+      // exited before the signal landed). Fall back to signaling the
+      // process directly rather than silently not killing anything.
       try {
         proc.kill('SIGTERM');
       } catch (fallbackError) {

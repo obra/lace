@@ -23,6 +23,7 @@ import {
   registerBuiltinRuntimes,
   createDefaultContainerManager,
 } from './containers/manager-factory';
+import { killAllTrackedProcessGroups } from './tools/runtime/process-group-registry';
 
 const state = createAgentServerState();
 const laceDir = getLaceDir();
@@ -104,11 +105,24 @@ const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
   try {
-    // FIRST, before any later await that can hang: dispose every per_invocation
-    // child workspace this process tracks — destroy each container, then rm
-    // /work. No parent-id arg: a process can't know its parent; its own tracked
-    // entries are exactly what must be freed. (Belt; the Part 4 sweep is the
-    // SIGKILL backstop.) releaseAllTracked is per-entry try/catch, never rejects.
+    // ABSOLUTE FIRST, before anything else: reap every detached bash-tool
+    // process group this process spawned. A detached command is the leader
+    // of its own process group, distinct from this process's group, so no
+    // signal aimed at killing this process (or its group from outside) ever
+    // reaches it — it would otherwise be orphaned to init the moment this
+    // process exits. This has to run before any other shutdown step because
+    // when THIS process was killed by a parent's group-kill (job-control.ts's
+    // killJob/killAllRunningJobs), that parent only waits 500ms before
+    // escalating to SIGKILL on this process outright — see
+    // process-group-registry.ts's module doc for why its default grace stays
+    // well under that deadline. See killAllTrackedProcessGroups.
+    await killAllTrackedProcessGroups();
+
+    // Dispose every per_invocation child workspace this process tracks —
+    // destroy each container, then rm /work. No parent-id arg: a process
+    // can't know its parent; its own tracked entries are exactly what must
+    // be freed. (Belt; the Part 4 sweep is the SIGKILL backstop.)
+    // releaseAllTracked is per-entry try/catch, never rejects.
     await state.workspaceReaper.releaseAllTracked();
     await shutdownReminders(state);
     await emitSubagentExitedIfNeeded(state);
