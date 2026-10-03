@@ -7,7 +7,7 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolResult, ToolContext, ToolAnnotations } from '../types';
 import { logger } from '@lace/agent/utils/logger';
-import { trackProcessGroup } from '../runtime/process-group-registry';
+import { releaseProcessGroupIfEmpty, trackProcessGroup } from '../runtime/process-group-registry';
 
 export interface BashOutput {
   command: string;
@@ -197,9 +197,14 @@ A sync command that runs past its timeout (${this.defaultTimeoutMs / 1000}s unle
       // a plain `cmd &` backgrounds a grandchild that outlives the shell, and
       // that survivor is exactly what the shutdown-time kill sweep needs to
       // still know about. The registry only drops an entry once it observes
-      // the whole group empty, lazily, in its own sweep.
+      // the whole group empty: here, when the shell exits, and lazily in its
+      // own sweeps for groups whose background jobs exit later.
       if (detached && typeof childProcess.pid === 'number') {
-        trackProcessGroup(childProcess.pid);
+        const pgid = childProcess.pid;
+        trackProcessGroup(pgid);
+        void (childProcess.exited ?? childProcess.completion.catch(() => undefined)).then(() =>
+          releaseProcessGroupIfEmpty(pgid)
+        );
       }
 
       // Set up output streams after the runtime process is started so a start failure

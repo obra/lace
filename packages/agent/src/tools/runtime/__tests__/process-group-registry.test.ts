@@ -10,6 +10,8 @@ import {
   trackProcessGroup,
   trackedProcessGroupCount,
   killAllTrackedProcessGroups,
+  releaseProcessGroupIfEmpty,
+  resetProcessGroupRegistryForTest,
 } from '../process-group-registry';
 
 function isAlive(pid: number): boolean {
@@ -40,11 +42,10 @@ describe('process-group-registry', () => {
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-    // The registry's tracked set is module-level state shared across every
-    // test in this file. Sweep it back to empty so one test's tracked pgid
-    // (now dead, thanks to the SIGKILLs above) can't leak into the next
-    // test's assertions about trackedProcessGroupCount().
-    await killAllTrackedProcessGroups(50);
+    // The registry's tracked set and its shutting-down flag are module-level
+    // state shared across every test in this file. Reset both so one test's
+    // tracked pgid or reap can't leak into the next test's assertions.
+    resetProcessGroupRegistryForTest();
   });
 
   function spawnDetached(command: string): ReturnType<typeof spawn> {
@@ -143,6 +144,50 @@ describe('process-group-registry', () => {
     // Tracking the second group opportunistically swept the first (now
     // empty) one out, so the count reflects only the live group.
     expect(trackedProcessGroupCount()).toBe(1);
+  }, 10000);
+
+  it('drops a group on release once the shell exits and nothing else is left in it', async () => {
+    const child = spawnDetached('exit 0');
+    const pid = child.pid!;
+    trackProcessGroup(pid);
+
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    releaseProcessGroupIfEmpty(pid);
+
+    expect(trackedProcessGroupCount()).toBe(0);
+  }, 10000);
+
+  it('keeps a group on release while a background child is still alive in it', async () => {
+    const child = spawnDetached('(sleep 300 &) ; exit 0');
+    const pid = child.pid!;
+    trackProcessGroup(pid);
+
+    await new Promise<void>((resolve) => child.once('exit', () => resolve()));
+    releaseProcessGroupIfEmpty(pid);
+
+    expect(trackedProcessGroupCount()).toBe(1);
+  }, 10000);
+
+  it('SIGKILLs a group tracked after the shutdown reap instead of leaving it to outlive the agent', async () => {
+    // The reap is a one-time snapshot, and shutdown() does not abort the
+    // running turn, so a bash call can start (and track its group) after
+    // the reap has already run. Once the reap has started, tracking a group
+    // has to kill it on the spot -- a TERM-ignoring command included.
+    await killAllTrackedProcessGroups(50);
+
+    const child = spawnDetached("trap '' TERM; sleep 300");
+    const pid = child.pid!;
+    // Let the trap get installed, so only a SIGKILL can end it.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(isAlive(pid)).toBe(true);
+
+    trackProcessGroup(pid);
+
+    await new Promise<void>((resolve) => {
+      child.once('exit', () => resolve());
+      setTimeout(resolve, 1000);
+    });
+    expect(isAlive(pid)).toBe(false);
   }, 10000);
 
   it('is a no-op when nothing is tracked', async () => {

@@ -11,7 +11,11 @@ import type { ToolContext } from './types';
 import { createStreamingFakeRuntime } from './runtime/__tests__/fake-runtime';
 import { HostToolRuntime } from './runtime/host';
 import { logger } from '@lace/agent/utils/logger';
-import { killAllTrackedProcessGroups } from './runtime/process-group-registry';
+import {
+  killAllTrackedProcessGroups,
+  resetProcessGroupRegistryForTest,
+  trackedProcessGroupCount,
+} from './runtime/process-group-registry';
 
 describe('BashTool', () => {
   let bashTool: BashTool;
@@ -1219,6 +1223,22 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
       expect(rejections).toEqual([]);
     }, 15000);
 
+    // A stale entry for an emptied group is a pid-reuse hazard: if the pid is
+    // recycled as an unrelated group leader, the shutdown reap would signal
+    // it. So the tool releases its group as soon as the shell exits and the
+    // group is observed empty, rather than waiting for the next lazy sweep.
+    it('releases its process group once the shell exits and leaves nothing behind', async () => {
+      const before = trackedProcessGroupCount();
+
+      const result = await bashTool.execute(
+        { command: 'echo done' },
+        hostContext('release_on_exit', new AbortController().signal)
+      );
+
+      expect(result.status).toBe('completed');
+      expect(trackedProcessGroupCount()).toBe(before);
+    }, 15000);
+
     // Regression found in review: untracking a pgid as soon as the SHELL's own
     // completion promise settled was unsound. `cmd &` backgrounds a
     // grandchild that outlives the shell -- the shell exits (and its
@@ -1276,6 +1296,9 @@ A sync command that runs past its timeout (600s unless timeoutMs is set) is kill
         } catch {
           // already gone
         }
+        // The reap above left the registry shutting down; later tests track
+        // groups normally.
+        resetProcessGroupRegistryForTest();
       }
     }, 15000);
   });

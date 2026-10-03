@@ -60,18 +60,61 @@
  * The only sound signal that a group is actually gone is probing the group
  * itself (`groupIsEmpty`, below) — never a completion promise for one
  * member of it. So a tracked pgid is removed ONLY once `groupIsEmpty(pgid)`
- * is observed true, checked lazily: once opportunistically whenever a new
- * pgid is tracked, and again (this is what actually matters for
- * correctness) during `killAllTrackedProcessGroups`'s sweep, after the
+ * is observed true: when the shell bash.ts spawned exits
+ * (`releaseProcessGroupIfEmpty`, which covers every command that leaves
+ * nothing behind), opportunistically whenever a new pgid is tracked, and
+ * again during `killAllTrackedProcessGroups`'s sweep, after the
  * SIGTERM/SIGKILL escalation has had its chance to empty the group out.
  * That keeps the map from growing without bound over the life of a
  * long-running agent process without ever trusting a false "done" signal.
+ *
  * A pgid whose group still has live members can't be reused by the OS for
- * something unrelated, so there's no pid-reuse risk in leaving a live
- * entry tracked past the originating shell's own exit.
+ * something unrelated. A pgid whose group has emptied CAN be: once its last
+ * member exits, the kernel may hand the number to a new process, and if
+ * that process becomes a group leader (a detached spawn, `setsid`, a
+ * job-control shell) before this registry notices the old group is gone,
+ * the shutdown reap would signal an unrelated group. Releasing on the
+ * shell's exit closes that window for commands that leave nothing behind.
+ * It stays open, briefly, for a group whose last background job exits
+ * later: that entry lingers until the next sweep.
+ *
+ * ## Background jobs do not survive an agent restart
+ *
+ * The reap runs on every `shutdown()` path in main.ts (SIGTERM, SIGINT,
+ * stdin end), for the root agent as well as subagents. A `cmd &` or
+ * `nohup cmd &` started by a finished bash call is still in its tracked
+ * group, so it is killed when the agent shuts down, including when a
+ * supervisor restarts the agent by SIGTERMing its pid. Work that must
+ * outlive the agent belongs in a background job (`job_start`), or must
+ * leave the group itself (`setsid`).
+ *
+ * ## Shutting down
+ *
+ * The reap is a one-time snapshot, and `shutdown()` does not abort the
+ * running turn, so a bash call can start after the reap has run (the next
+ * call in a multi-tool batch, say). Its group would be tracked but never
+ * reaped. So the first `killAllTrackedProcessGroups` call puts the registry
+ * into a shutting-down state, and from then on `trackProcessGroup` SIGKILLs
+ * the new group on the spot instead of tracking it.
+ *
+ * ## Known gap: an unresponsive subagent's groups are orphaned
+ *
+ * The reap only runs if the subagent can run its own SIGTERM handler inside
+ * the parent's 500ms window. If the subagent is stopped (SIGSTOP), or its
+ * event loop is blocked past about 350ms, the parent's group SIGKILL lands
+ * before the reap does, and every tracked group is orphaned to init: the
+ * in-flight command and any `&` jobs left by finished calls. The detached
+ * groups are outside the subagent's own group, so that SIGKILL never
+ * reaches them. This is a regression over the pre-detach behavior, where
+ * those processes shared the subagent's group and died with it. Repro:
+ * SIGSTOP a detached subagent that has a tracked group, then run the real
+ * `killJob`. Fixing it is a design change (the parent learns the child's
+ * pgids, or the subagent becomes a subreaper via prctl); see
+ * https://github.com/obra/lace/issues/419.
  */
 
 const tracked = new Set<number>();
+let shuttingDown = false;
 
 /**
  * Drop any tracked pgid whose group has already fully emptied out. Safe to
@@ -100,13 +143,38 @@ function sweepEmptyGroups(): void {
  * escalation.
  */
 export function trackProcessGroup(pid: number): void {
+  if (shuttingDown) {
+    // The reap has already run (see "Shutting down" in the module doc), so
+    // nothing would ever signal this group. The agent is exiting; there is
+    // no grace period left to give it.
+    killGroup(pid, 'SIGKILL');
+    return;
+  }
   sweepEmptyGroups();
   tracked.add(pid);
+}
+
+/**
+ * Drop `pid`'s entry if its group is already empty. bash.ts calls this when
+ * the shell it spawned exits, so a command that leaves nothing behind
+ * doesn't keep a stale pgid tracked (see the module doc on pid reuse). A
+ * group that still has a live member, such as a `cmd &` job, stays tracked.
+ */
+export function releaseProcessGroupIfEmpty(pid: number): void {
+  if (groupIsEmpty(pid)) {
+    tracked.delete(pid);
+  }
 }
 
 /** Test/introspection only: how many process groups are currently tracked. */
 export function trackedProcessGroupCount(): number {
   return tracked.size;
+}
+
+/** Test only: forget every tracked group and leave the shutting-down state. */
+export function resetProcessGroupRegistryForTest(): void {
+  tracked.clear();
+  shuttingDown = false;
 }
 
 function killGroup(pid: number, signal: NodeJS.Signals): void {
@@ -162,9 +230,13 @@ const DEFAULT_GRACE_MS = 150;
  * sweep, or the next `trackProcessGroup`), so the registry still can't grow
  * without bound.
  *
+ * The first call puts the registry into its shutting-down state, so any
+ * group tracked afterwards is killed at once (see the module doc).
+ *
  * Safe to call with nothing tracked (no-op) and safe to call more than once.
  */
 export async function killAllTrackedProcessGroups(graceMs = DEFAULT_GRACE_MS): Promise<void> {
+  shuttingDown = true;
   sweepEmptyGroups();
 
   const pids = [...tracked];
