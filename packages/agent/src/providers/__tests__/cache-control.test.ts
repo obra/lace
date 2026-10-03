@@ -86,78 +86,87 @@ describe('markLastToolForCaching', () => {
 });
 
 describe('attachMessageCacheBreakpoints — raw block math', () => {
-  it(`places anchor at least ${ANCHOR_OFFSET_RAW_BLOCKS} RAW blocks behind tail, counting thinking blocks`, () => {
-    // Build a conversation with thinking blocks interleaved. The anchor must
-    // count those toward the distance threshold even though it can't land
-    // ON them.
+  it(`places anchor at EXACTLY the raw distance ANCHOR_OFFSET_RAW_BLOCKS behind tail, not the cacheable-only distance`, () => {
+    // Build a raw block layout by hand (alternating one cacheable block with
+    // one non-cacheable thinking block) so we know, independently of
+    // attachMessageCacheBreakpoints, exactly which raw index the anchor must
+    // land on — and exactly which (wrong) index a cacheable-only distance
+    // counter would land on instead. N is read from the constant (PRI-1821)
+    // so the fixture and both expectations track it if it changes.
     //
-    // Layout (15 raw blocks total — anchor must be at raw distance >= 10):
-    //   0  user  text  "go"
-    //   1  asst  thinking "step 1"     ← non-cacheable
-    //   2  asst  text  "I'll do it"
-    //   3  asst  tool_use t1
-    //   4  user  tool_result t1
-    //   5  asst  thinking "step 2"     ← non-cacheable
-    //   6  asst  text  "next"
-    //   7  asst  tool_use t2
-    //   8  user  tool_result t2
-    //   9  asst  thinking "step 3"     ← non-cacheable
-    //  10  asst  text  "another"
-    //  11  asst  tool_use t3
-    //  12  user  tool_result t3
-    //  13  asst  text  "summary"
-    //  14  user  text  "final"          ← TAIL
-    //
-    // Distance from tail (14) backward by 10 raw blocks → raw block 4.
-    // Block 4 is a tool_result (cacheable). Anchor should land there.
-    const messages: Anthropic.MessageParam[] = [
-      user(text('go')),
-      assistant(thinking('step 1'), text("I'll do it"), tool_use('t1')),
-      user(tool_result('t1', 'r1')),
-      assistant(thinking('step 2'), text('next'), tool_use('t2')),
-      user(tool_result('t2', 'r2')),
-      assistant(thinking('step 3'), text('another'), tool_use('t3')),
-      user(tool_result('t3', 'r3')),
-      assistant(text('summary')),
-      user(text('final')),
-    ];
+    // Layout: raw 0 = cacheable "go"; then N groups of
+    // (thinking, cacheable) pairs at raw 1..2N; then the tail at raw 2N+1.
+    // Cacheable raw indices are {0, 2, 4, ..., 2N, 2N+1(tail)}.
+    const N = ANCHOR_OFFSET_RAW_BLOCKS;
+    const messages: Anthropic.MessageParam[] = [user(text('go'))];
+    for (let i = 0; i < N; i++) {
+      messages.push(assistant(thinking(`step ${i}`), text(`turn ${i}`)));
+    }
+    messages.push(user(text('final')));
+
+    const tailRaw = 2 * N + 1;
+    // Ground truth for the algorithm's contract (last cacheable raw index,
+    // walking backward from the tail, whose RAW distance is >= N):
+    // candidates are the even indices 0,2,...,2N. The largest one at
+    // raw-distance >= N from tailRaw is 2N - N = N (raw N+1 is a thinking
+    // block, so N is the closest usable one).
+    const expectedAnchorRawDistanceIdx = 2 * N - N; // = N
+
+    // What a mutation that counts CACHEABLE-ONLY distance instead of raw
+    // distance would pick: in cacheable-only index space the tail is at
+    // index N+1 (0..N are the paired cacheable blocks, N+1 is the tail), so
+    // the last cacheable-only index at distance >= N is (N+1) - N = 1,
+    // which is raw index 2*1 = 2.
+    const expectedAnchorCacheableOnlyIdx = 2 * (N + 1 - N); // = 2
+
+    // Sanity: the fixture only proves the raw-vs-cacheable distinction if
+    // these two candidate answers actually differ.
+    expect(expectedAnchorRawDistanceIdx).not.toBe(expectedAnchorCacheableOnlyIdx);
 
     const out = attachMessageCacheBreakpoints(messages, OPTIONS_1H);
     const flat = flattenBlocks(out);
+    const tailIdx = flat.length - 1;
+    expect(tailIdx).toBe(tailRaw);
+    expect(flat[tailIdx].cache_control).toEqual(MARKER_1H);
+    expect(flat[tailIdx].type).toBe('text');
 
-    // Tail at raw idx 14
-    expect(flat[14].cache_control).toEqual(MARKER_1H);
-    expect(flat[14].type).toBe('text');
-
-    // Anchor at raw idx 4 (tool_result for t1) — exactly 10 raw blocks back.
-    expect(flat[4].cache_control).toEqual(MARKER_1H);
-    expect(flat[4].type).toBe('tool_result');
-
-    // No other markers
     const markers = flat.filter((b) => b.cache_control !== undefined);
     expect(markers).toHaveLength(2);
+    const anchorIdx = markers[0].rawIdx;
+
+    // Exact placement — not just ">= N", which a cacheable-only counter
+    // would also satisfy.
+    expect(anchorIdx).toBe(expectedAnchorRawDistanceIdx);
+    expect(anchorIdx).not.toBe(expectedAnchorCacheableOnlyIdx);
+    expect(flat[anchorIdx].type).not.toBe('thinking');
   });
 
-  it('never stamps cache_control on a thinking block, even when one would otherwise be at the anchor distance', () => {
-    // Layout (12 raw blocks, anchor target at raw 1 which is thinking):
-    //   0  user  text "go"
-    //   1  asst  thinking "deep thought"  ← target distance — must SKIP
-    //   2  asst  text "ok"
-    //   ...8 more cacheable blocks to make the conversation long enough...
-    //  11  user  text "final"
+  it('never stamps cache_control on a thinking block, even when one sits exactly at the naive anchor target', () => {
+    // Place the thinking block at EXACTLY raw distance ANCHOR_OFFSET_RAW_BLOCKS
+    // behind the tail — the precise position a naive (type-blind) anchor
+    // walk would land on — then fill the gap between it and the tail with
+    // exactly N-1 cacheable blocks, so nothing else in that gap qualifies as
+    // an anchor. A single earlier cacheable block (raw 0) is the only valid
+    // fallback. This isolates the "skip past a disqualified candidate"
+    // behavior instead of leaving it to chance where the padding lands
+    // (PRI-1821 review finding 1).
+    const N = ANCHOR_OFFSET_RAW_BLOCKS;
     const messages: Anthropic.MessageParam[] = [
-      user(text('go')),
-      assistant(thinking('deep'), text('ok'), tool_use('t1')),
-      user(tool_result('t1', 'r1')),
-      assistant(text('next'), tool_use('t2')),
-      user(tool_result('t2', 'r2')),
-      assistant(text('again'), tool_use('t3')),
-      user(tool_result('t3', 'r3')),
-      user(text('final')),
+      user(text('go')), // raw 0 — the only valid anchor candidate
+      assistant(thinking('deep')), // raw 1 — exactly N behind the tail (raw N+1)
     ];
+    for (let i = 0; i < N - 1; i++) {
+      // raw 2..N — cacheable filler, all too close to the tail (< N away)
+      messages.push(i % 2 === 0 ? assistant(text(`turn ${i}`)) : user(text(`turn ${i}`)));
+    }
+    messages.push(user(text('final'))); // raw N+1 — tail
+
+    const tailRaw = N + 1;
 
     const out = attachMessageCacheBreakpoints(messages, OPTIONS_1H);
     const flat = flattenBlocks(out);
+    const tailIdx = flat.length - 1;
+    expect(tailIdx).toBe(tailRaw);
 
     // Anywhere thinking appears, no cache_control
     for (const b of flat) {
@@ -169,6 +178,12 @@ describe('attachMessageCacheBreakpoints — raw block math', () => {
     // Exactly 2 markers total (anchor + tail)
     const markers = flat.filter((b) => b.cache_control !== undefined);
     expect(markers).toHaveLength(2);
+
+    // The anchor must have skipped past the disqualified thinking block at
+    // raw 1 and landed on the nearest cacheable block before it — raw 0.
+    const anchorIdx = markers[0].rawIdx;
+    expect(anchorIdx).toBe(0);
+    expect(flat[anchorIdx].type).not.toBe('thinking');
   });
 
   it('skips the anchor when the conversation is too short for the offset', () => {
@@ -225,6 +240,67 @@ describe('attachMessageCacheBreakpoints — raw block math', () => {
     const anchorIdx = markers[0].rawIdx;
     expect(tailIdx - anchorIdx).toBeGreaterThanOrEqual(ANCHOR_OFFSET_RAW_BLOCKS);
   });
+
+  it('anchor breakpoint stays reachable across turn-to-turn growth, for every Δ in the anchor+tail union (PRI-1821)', () => {
+    // Regression for PRI-1821, generalized per review finding 4: sampling a
+    // single Δ (the original test only checked Δ=40) cannot catch an
+    // OVER-WIDENED N that opens a hole just above the tail path's own
+    // 20-block reach, at Δ ∈ (20, N) — e.g. N=22 leaves Δ=21 uncovered even
+    // though every other cache-control test still passes. Loop the full Δ
+    // range instead of sampling one point.
+    //
+    // The two paths that keep a turn's write reachable from the next turn's
+    // breakpoints (derivation in the cache-control.ts module comment):
+    //   • tail path:   Δ ≤ 20
+    //   • anchor path: N ≤ Δ ≤ N + 20
+    // Their union is gap-free only for N ≤ 21.
+    //
+    // We loop Δ up to max(N + 20, PRI_1819_INCIDENT_DELTA) rather than just
+    // N + 20, so that reverting N back below what PRI-1819 needs still
+    // fails THIS test at the historical incident's own magnitude, not just
+    // whatever range happens to fall out of the current N.
+    const N = ANCHOR_OFFSET_RAW_BLOCKS;
+    // The turn-to-turn growth PRI-1819's post-deploy data measured a real
+    // cache bust at was 41 blocks; 40 is the largest Δ still meant to be
+    // covered (N=20's anchor-path edge, Δ ≤ N+20).
+    const PRI_1819_INCIDENT_DELTA = 40;
+
+    // Each turn below is a single cacheable text block, so raw-flat index
+    // equals message index — that makes the arithmetic exact and legible.
+    // Turn 1 is sized off N (not hardcoded) with margin so it always gets
+    // its own anchor regardless of N's current value.
+    const turn1Length = N + 5;
+    const turn1Messages: Anthropic.MessageParam[] = [];
+    for (let i = 0; i < turn1Length; i++) {
+      turn1Messages.push(i % 2 === 0 ? user(text(`u${i}`)) : assistant(text(`a${i}`)));
+    }
+    const turn1Out = attachMessageCacheBreakpoints(turn1Messages, OPTIONS_1H);
+    const turn1Markers = flattenBlocks(turn1Out).filter((b) => b.cache_control !== undefined);
+    expect(turn1Markers).toHaveLength(2);
+    const tail1Idx = turn1Markers[turn1Markers.length - 1].rawIdx;
+
+    const maxDelta = Math.max(N + 20, PRI_1819_INCIDENT_DELTA);
+    for (let delta = 0; delta <= maxDelta; delta++) {
+      const turn2Messages = [...turn1Messages];
+      for (let i = 0; i < delta; i++) {
+        const idx = turn1Length + i;
+        turn2Messages.push(idx % 2 === 0 ? user(text(`u${idx}`)) : assistant(text(`a${idx}`)));
+      }
+      const turn2Out = attachMessageCacheBreakpoints(turn2Messages, OPTIONS_1H);
+      const turn2Markers = flattenBlocks(turn2Out).filter((b) => b.cache_control !== undefined);
+      expect(turn2Markers).toHaveLength(2);
+      const tail2Idx = turn2Markers[turn2Markers.length - 1].rawIdx;
+      const anchor2Idx = turn2Markers[0].rawIdx;
+
+      // Reachable via the tail path (new tail's own lookback reaches the
+      // prior tail directly) OR via the anchor path (new anchor's lookback
+      // reaches the prior tail). If neither holds, the prior turn's cache
+      // write is unreachable from EITHER of this turn's breakpoints.
+      const reachableViaTail = tail2Idx - tail1Idx <= 20;
+      const reachableViaAnchor = anchor2Idx - tail1Idx >= 0 && anchor2Idx - tail1Idx <= 20;
+      expect(reachableViaTail || reachableViaAnchor).toBe(true);
+    }
+  });
 });
 
 describe('attachMessageCacheBreakpoints — block-type whitelist', () => {
@@ -262,31 +338,22 @@ describe('attachMessageCacheBreakpoints — block-type whitelist', () => {
     // any markers (the tail guard fires: last cacheable block is not in the
     // last message). With it whitelisted, both tail and anchor are placed.
     //
-    // Layout (12 raw blocks total):
-    //   0   user  text 'q1'
-    //   1   asst  text '1'
-    //   2   asst  text '2'
-    //   3   asst  text '3'
-    //   4   asst  text '4'
-    //   5   asst  text '5'
-    //   6   asst  text 'a'
-    //   7   asst  text 'b'
-    //   8   asst  text 'c'
-    //   9   asst  text 'd'
-    //  10   asst  server_tool_use 'st1'
-    //  11   user  web_search_tool_result  ← last message, only block
     //
     // Before whitelist expansion:
-    //   - web_search_tool_result (idx 11) is non-cacheable
-    //   - last cacheable block is server_tool_use (idx 10) in message[-2]
-    //   - tail guard: tail.msgIdx (3) != messages.length-1 (4) → return unchanged
+    //   - web_search_tool_result is non-cacheable
+    //   - last cacheable block is server_tool_use, one message back
+    //   - tail guard: tail's message isn't the last message → return unchanged
     //   - result: 0 markers
     //
     // After whitelist expansion:
-    //   - web_search_tool_result IS cacheable → tail = idx 11
+    //   - web_search_tool_result IS cacheable → it becomes the tail
     //   - server_tool_use IS cacheable → appears in cacheablePositions
-    //   - anchor at raw distance >= 10 from tail → idx 1 (distance = 10)
+    //   - anchor at raw distance >= ANCHOR_OFFSET_RAW_BLOCKS from tail
     //   - result: 2 markers
+    //
+    // Filler count is sized off ANCHOR_OFFSET_RAW_BLOCKS (not hardcoded —
+    // PRI-1821) so there's always room for a real anchor ahead of the
+    // server_tool_use / web_search_tool_result pair, whatever the offset is.
     const serverToolUseBlock = {
       type: 'server_tool_use',
       id: 'st1',
@@ -300,12 +367,13 @@ describe('attachMessageCacheBreakpoints — block-type whitelist', () => {
       content: [],
     } as unknown as Anthropic.ContentBlockParam;
 
-    const messages: Anthropic.MessageParam[] = [
-      user(text('q1')),
-      assistant(text('1'), text('2'), text('3'), text('4'), text('5')),
-      assistant(text('a'), text('b'), text('c'), text('d'), serverToolUseBlock),
-      user(webSearchResultBlock),
-    ];
+    const messages: Anthropic.MessageParam[] = [user(text('q1'))];
+    const fillerBlocks = ANCHOR_OFFSET_RAW_BLOCKS + 4;
+    for (let i = 0; i < fillerBlocks; i++) {
+      messages.push(assistant(text(`filler ${i}`)));
+    }
+    messages.push(assistant(serverToolUseBlock));
+    messages.push(user(webSearchResultBlock));
 
     const out = attachMessageCacheBreakpoints(messages, OPTIONS_1H);
     const flat = flattenBlocks(out);

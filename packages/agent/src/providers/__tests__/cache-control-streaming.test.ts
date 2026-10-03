@@ -10,6 +10,7 @@ import { Tool } from '@lace/agent/tools/tool';
 import { z } from 'zod';
 import type { ToolContext, ToolResult } from '@lace/agent/tools/types';
 import { writeSseStream } from './anthropic-sse-stream';
+import { ANCHOR_OFFSET_RAW_BLOCKS } from '../cache-control';
 
 class EchoTool extends Tool {
   name = 'echo';
@@ -72,10 +73,14 @@ describe('streaming smoke — cache_control on the stream path', () => {
     const provider = new AnthropicProvider({ apiKey: 'sk-test', baseURL });
     provider.setSystemPrompt('You are an agentic assistant.');
 
-    // 6 tool round-trips = enough cacheable blocks (>10) to trigger the stable
-    // anchor, producing 4 total cache_control markers: system + last-tool + anchor + tail.
+    // Round-trips sized off ANCHOR_OFFSET_RAW_BLOCKS with headroom (PRI-1821
+    // review finding 6) — enough cacheable blocks to trigger the stable
+    // anchor, producing 4 total cache_control markers: system + last-tool +
+    // anchor + tail. A count pinned to one offset value silently loses the
+    // anchor the next time the constant grows.
+    const roundTrips = Math.ceil(ANCHOR_OFFSET_RAW_BLOCKS / 4) + 2;
     const messages: Parameters<typeof provider.createStreamingResponse>[0] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < roundTrips; i++) {
       messages.push({ role: 'user', content: `q${i}` });
       messages.push({
         role: 'assistant',
@@ -121,8 +126,9 @@ describe('streaming smoke — cache_control on the stream path', () => {
     expect(body.tools![0].cache_control).toBeUndefined();
 
     // ── 3. total cache_control marker count: 4 (system + last-tool + anchor + tail)
-    //    This conversation has 25 cacheable blocks (system + 6 rounds of 4 blocks each + final),
-    //    which exceeds ANCHOR_OFFSET_RAW_BLOCKS (10), so the stable anchor fires.
+    //    This conversation has `roundTrips` rounds of 4 blocks each plus a
+    //    final message, sized (with headroom) to exceed
+    //    ANCHOR_OFFSET_RAW_BLOCKS, so the stable anchor fires.
     const total = (JSON.stringify(body).match(/"cache_control"/g) ?? []).length;
     expect(total).toBe(4);
 

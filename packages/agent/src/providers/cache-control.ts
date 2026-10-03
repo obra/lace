@@ -13,11 +13,30 @@ export const MAX_CACHE_BREAKPOINTS = 4;
 // Anthropic's cache lookup window is ~20 raw content blocks per breakpoint.
 // The offset is in **raw** blocks, not cacheable-only — thinking
 // blocks count toward the lookback budget even though we never stamp them.
-// Placing the anchor 10 raw blocks behind the tail keeps both markers
-// reachable from the next request's breakpoints for turn growth Δ ≤ 10
-// blocks via the tail path AND extends reachability to Δ ≤ 30 via the
-// anchor path.
-export const ANCHOR_OFFSET_RAW_BLOCKS = 10;
+//
+// Two independent paths can keep a turn's cache write reachable from the
+// NEXT turn's breakpoints, as a function of Δ = raw-block growth between the
+// two turns:
+//   • tail path: the tail is always the last cacheable block of the last
+//     message, so the new turn's tail breakpoint has its own ~20-block
+//     lookback reach the prior turn's tail directly whenever Δ ≤ 20 — this
+//     is independent of N.
+//   • anchor path: the anchor sits at (new tail − N). Its own ~20-block
+//     lookback reaches the prior tail iff
+//     0 ≤ (new tail − N) − prior tail ≤ 20, i.e. N ≤ Δ ≤ N + 20.
+// The two ranges [0, 20] and [N, N+20] union to a gap-free Δ ≤ N + 20 only
+// when N ≤ 21 (so the ranges are adjacent or overlapping); for N > 21 there's
+// a hole at Δ ∈ (20, N) that NEITHER path covers. Never raise N past 21
+// without adding another breakpoint to close that hole — a bigger N is not
+// unconditionally safer.
+//
+// At N=20 (current): tail path covers Δ ≤ 20, anchor path covers
+// Δ ∈ [20, 40], union Δ ≤ 40 with no gap. PRI-1819 post-deploy data showed a
+// real cache bust from a 41-block growth between successful calls — one
+// block past this budget — so N=20 narrows the gap rather than closing the
+// class; if PRI-1819-class bursts recur, the next lever is N up to 21 (not
+// higher without a new breakpoint), or another breakpoint entirely.
+export const ANCHOR_OFFSET_RAW_BLOCKS = 20;
 
 // Whitelist of block types that accept `cache_control` AND are sensible
 // breakpoint targets. Only stamp types confirmed by the SDK
@@ -157,10 +176,12 @@ export function attachMessageCacheBreakpoints(
 
   // Anchor = the most recent cacheable block whose raw-flat distance from
   // the tail is at least ANCHOR_OFFSET_RAW_BLOCKS. Walking backward, take
-  // the FIRST candidate that meets the threshold so the anchor is as close
-  // to the tail as the offset allows — that keeps the anchor reachable
-  // from the next request's tail breakpoint (see derivation in cache-control.ts
-  // module comment).
+  // the FIRST candidate that meets the threshold so the anchor lands as
+  // close to (tail − N) as a real cacheable block allows — landing farther
+  // back than that would only shrink the anchor path's Δ ∈ [N, N+20]
+  // reachability window (see derivation in the module comment above); it
+  // does NOT guarantee reachability from the next request's tail on its
+  // own — that only holds within the Δ window, not for every Δ.
   let anchor: BlockPosition | null = null;
   for (let i = cacheablePositions.length - 2; i >= 0; i--) {
     const candidate = cacheablePositions[i];
