@@ -34,6 +34,24 @@
       "can_reason": true,
       "has_reasoning_effort": false,
       "supports_attachments": true
+    },
+    {
+      "id": "glm-5.3-vision",
+      "name": "GLM 5.3 Vision",
+      "context_window": 524288,
+      "default_max_tokens": 131072,
+      "can_reason": true,
+      "has_reasoning_effort": false,
+      "supports_attachments": true
+    },
+    {
+      "id": "glm-5.3-vision-background",
+      "name": "GLM 5.3 Vision (Background)",
+      "context_window": 524288,
+      "default_max_tokens": 131072,
+      "can_reason": true,
+      "has_reasoning_effort": false,
+      "supports_attachments": true
     }
   ]
 }

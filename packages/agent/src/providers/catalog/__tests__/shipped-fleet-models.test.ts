@@ -18,6 +18,12 @@ import type { ProviderInstancesConfig } from '../types';
  * The LunaRoute limits are what the gateway's own GET /v1/models publishes for
  * both ids (fetched 2026-09-24): context_window 1048576, max_output_tokens
  * 262144, capabilities.vision true.
+ *
+ * glm-5.3-vision and glm-5.3-vision-background limits are also from the
+ * gateway's GET /v1/models (pulled 2026-10-05): context_window 524288,
+ * max_output_tokens 131072, capabilities.vision true. Pricing is unknown
+ * for these two, so the catalog omits the cost fields entirely (the schema
+ * allows this).
  */
 const FLEET_MODELS: Record<
   string,
@@ -32,6 +38,16 @@ const FLEET_MODELS: Record<
     'deepseek-4.1-flash-background': {
       contextWindow: 1_048_576,
       maxOutputTokens: 262_144,
+      supportsAttachments: true,
+    },
+    'glm-5.3-vision': {
+      contextWindow: 524_288,
+      maxOutputTokens: 131_072,
+      supportsAttachments: true,
+    },
+    'glm-5.3-vision-background': {
+      contextWindow: 524_288,
+      maxOutputTokens: 131_072,
       supportsAttachments: true,
     },
   },
