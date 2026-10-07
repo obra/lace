@@ -310,6 +310,7 @@ export async function injectIntoActiveSession(
  * Register session operation handlers with the peer.
  * - ent/session/configure: Configure Ent-owned session settings (connection, runtime limits, etc.)
  * - ent/session/compact: Compact conversation history using various strategies
+ * - ent/session/rerender_persona: Re-render the frozen system prompt from the current persona without compacting
  * - ent/session/checkpoint: Create a checkpoint of the current session state
  * - ent/session/rewind: Rewind to a previous checkpoint
  * - ent/session/inject: Inject context into the session
@@ -583,6 +584,41 @@ export function registerSessionOperationHandlers(
         messagesCompacted: result.compactionEvent.data.messagesCompacted ?? 0,
         strategy: name,
       };
+    });
+  });
+
+  // Re-renders the frozen system prompt from the current persona file without
+  // compacting. Compaction is the only other path that re-renders, and a noop
+  // compaction skips it.
+  peer.onRequest('ent/session/rerender_persona', async (params: unknown) => {
+    assertSessionReady(state);
+
+    if (!params || typeof params !== 'object' || Array.isArray(params)) {
+      throwInvalidParams('params must be an object');
+    }
+    const parsed = params as Partial<{ sessionId: string }>;
+    if (!parsed.sessionId) throwInvalidParams('sessionId is required');
+
+    return await runExclusive(async () => {
+      assertSessionReady(state);
+      if (parsed.sessionId !== state.activeSession!.meta.sessionId) {
+        throw {
+          code: AcpErrorCodes.SessionNotFound,
+          message: 'SessionNotFound',
+          data: { category: 'session' },
+        };
+      }
+
+      await rerenderPersonaForSession({
+        sessionDir: state.activeSession!.dir,
+        persona: state.activeSession!.meta.persona ?? 'lace',
+        cwd: state.activeSession!.meta.workDir,
+        state,
+        createToolExecutorForMode,
+      });
+      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+
+      return { rerendered: true };
     });
   });
 
