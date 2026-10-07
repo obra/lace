@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -8,6 +8,7 @@ import { createAgentServerState, registerAgentRpcMethods } from '../../../server
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import { appendDurableEvent, readDurableEvents } from '@lace/agent/storage/event-log';
+import { classifyPromptHandoff } from '@lace/agent/rpc/handlers/handoff-idempotency';
 import {
   getSessionDir,
   readSessionState,
@@ -68,6 +69,30 @@ describe('opaque durable handoff idempotency', () => {
       client.close();
       server.close();
     }
+  });
+
+  it('preserves active and unfinished prompt classifications when an injection shares its key', () => {
+    const content = [{ type: 'text', text: 'original request' }];
+    const events = [
+      {
+        eventSeq: 1,
+        timestamp: '2026-10-06T00:00:00.000Z',
+        type: 'context_injected',
+        data: { idempotencyKey: 'request-1', content },
+      },
+      {
+        eventSeq: 2,
+        timestamp: '2026-10-06T00:00:00.000Z',
+        type: 'prompt',
+        turnId: 'turn-1',
+        data: { idempotencyKey: 'request-1', content },
+      },
+    ];
+    expect(classifyPromptHandoff(events, 'request-1', content, 'turn-1')).toBe(
+      'duplicate-in-progress'
+    );
+    expect(classifyPromptHandoff(events, 'request-1', content)).toBe('duplicate-unsafe-retry');
+    expect(classifyPromptHandoff(events, 'unrelated-key', content)).toBe('persisted-new');
   });
 
   it('returns duplicate-already-handled for a repeated prompt idempotencyKey', async () => {
@@ -289,6 +314,120 @@ describe('opaque durable handoff idempotency', () => {
     }
   });
 
+  it.each([false, true])(
+    'does not persist a prompt for an injection key after consumption=%s',
+    async (consumed) => {
+      const state = createAgentServerState();
+      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+      try {
+        await client.request('initialize', defaultInitializeParams());
+        const session = (await client.request('session/new', {
+          cwd: workDir,
+          mcpServers: [],
+        })) as { sessionId: string };
+        const handoff = {
+          content: [{ type: 'text', text: 'Please acknowledge this request once.' }],
+          idempotencyKey: 'input-1',
+        };
+        expect(
+          await client.request('ent/session/inject', { ...handoff, priority: 'normal' })
+        ).toEqual({ durableHandoffStatus: 'persisted-new' });
+        if (consumed) {
+          await client.request('session/prompt', {
+            content: [{ type: 'text', text: 'Consume the pending request.' }],
+          });
+        }
+
+        expect(await client.request('session/prompt', handoff)).toEqual({
+          durableHandoffStatus: 'duplicate-already-handled',
+        });
+        const unrelated = (await client.request('session/prompt', {
+          ...handoff,
+          idempotencyKey: 'input-2',
+        })) as { durableHandoffStatus: string };
+        expect(unrelated.durableHandoffStatus).toBe('persisted-new');
+        const { events } = readDurableEvents(getSessionDir(session.sessionId), {
+          afterEventSeq: 0,
+          limit: 100,
+        });
+        expect(
+          events
+            .filter((event) => event.data?.idempotencyKey === handoff.idempotencyKey)
+            .map((event) => event.type)
+        ).toEqual(['context_injected']);
+      } finally {
+        client.close();
+        server.close();
+      }
+    }
+  );
+
+  it('fails closed when a prompt reuses an injection key with different content', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const session = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+      const idempotencyKey = 'input-1';
+      await client.request('ent/session/inject', {
+        content: [{ type: 'text', text: 'original request' }],
+        priority: 'normal',
+        idempotencyKey,
+      });
+
+      await expect(
+        client.request('session/prompt', {
+          content: [{ type: 'text', text: 'changed request' }],
+          idempotencyKey,
+        })
+      ).rejects.toMatchObject({
+        data: { durableHandoffStatus: 'duplicate-unsafe-retry' },
+      });
+      const { events } = readDurableEvents(getSessionDir(session.sessionId), {
+        afterEventSeq: 0,
+        limit: 100,
+      });
+      expect(events.filter((event) => event.type === 'prompt')).toHaveLength(0);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('rejects injection-to-prompt recovery when durable event evidence is corrupt', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const session = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+      })) as { sessionId: string };
+      const handoff = {
+        content: [{ type: 'text', text: 'original request' }],
+        idempotencyKey: 'input-1',
+      };
+      await client.request('ent/session/inject', { ...handoff, priority: 'normal' });
+      const sessionDir = getSessionDir(session.sessionId);
+      appendFileSync(join(sessionDir, 'events.jsonl'), '{broken event\n');
+
+      await expect(client.request('session/prompt', handoff)).rejects.toMatchObject({
+        data: { durableHandoffStatus: 'duplicate-unsafe-retry' },
+      });
+      const { events } = readDurableEvents(sessionDir, { afterEventSeq: 0, limit: 100 });
+      expect(events.filter((event) => event.type === 'prompt')).toHaveLength(0);
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
   it('rejects inject source metadata at runtime', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
@@ -354,4 +493,60 @@ describe('opaque durable handoff idempotency', () => {
       server.close();
     }
   });
+  it.each(['end_turn', 'process_died'])(
+    'retains ordinary injection deduplication after stopReason=%s',
+    async (stopReason) => {
+      const state = createAgentServerState();
+      const runSpy = vi
+        .spyOn(ConversationRunner.prototype, 'run')
+        .mockRejectedValue(new Error('controlled execution failure'));
+      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+      try {
+        await client.request('initialize', defaultInitializeParams());
+        const session = (await client.request('session/new', { cwd: workDir, mcpServers: [] })) as {
+          sessionId: string;
+        };
+        const dir = getSessionDir(session.sessionId);
+        const handoff = {
+          content: [{ type: 'text', text: 'saved request' }],
+          idempotencyKey: 'interrupted-request',
+          track: 'track-1',
+        };
+        let sessionState = readSessionState(dir);
+        for (const event of [
+          { type: 'turn_start', turnId: 'interrupted-turn', data: {} },
+          { type: 'context_injected', data: { ...handoff, priority: 'immediate' } },
+          { type: 'turn_end', turnId: 'interrupted-turn', data: { stopReason } },
+        ])
+          sessionState = appendDurableEvent(dir, sessionState, event).nextState;
+        writeSessionState(dir, sessionState);
+        if (stopReason === 'end_turn') {
+          expect(await client.request('session/prompt', handoff)).toEqual({
+            durableHandoffStatus: 'duplicate-already-handled',
+          });
+          expect(runSpy).not.toHaveBeenCalled();
+        } else {
+          await expect(client.request('session/prompt', handoff)).rejects.toMatchObject({
+            message: 'controlled execution failure',
+          });
+          expect(runSpy).toHaveBeenCalledTimes(1);
+          try {
+            await client.request('session/prompt', handoff);
+          } catch (error) {
+            expect(
+              (error as { data?: Record<string, unknown> }).data?.durableHandoffStatus
+            ).toBeUndefined();
+          }
+          expect(runSpy).toHaveBeenCalledTimes(2);
+          const source = readDurableEvents(dir, { afterEventSeq: 0, limit: 100 }).events.filter(
+            (e) => e.data.idempotencyKey === handoff.idempotencyKey
+          );
+          expect(source.map((e) => e.type)).toEqual(['context_injected']);
+        }
+      } finally {
+        client.close();
+        server.close();
+      }
+    }
+  );
 });
