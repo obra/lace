@@ -835,6 +835,35 @@ export const EntSessionCompactResponseSchema = z
   })
   .strict();
 
+const EntSessionRerenderPersonaParamsSchema = z
+  .object({
+    sessionId: z.string().min(1),
+  })
+  .strict();
+
+const EntSessionRerenderPersonaResultSchema = z
+  .object({
+    rerendered: z.literal(true),
+  })
+  .strict();
+
+export const EntSessionRerenderPersonaRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/rerender_persona'),
+    params: EntSessionRerenderPersonaParamsSchema,
+  })
+  .strict();
+
+export const EntSessionRerenderPersonaResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EntSessionRerenderPersonaResultSchema,
+  })
+  .strict();
+
 const EntSessionConfigureParamsSchema = z
   .object({
     connectionId: z.string().optional(),
@@ -2393,6 +2422,7 @@ export const EntProtocolRequestSchema = z.union([
   EntAgentPingRequestSchema,
   EntAgentStatusRequestSchema,
   EntSessionCompactRequestSchema,
+  EntSessionRerenderPersonaRequestSchema,
   EntSessionConfigureRequestSchema,
   EntSessionRewindRequestSchema,
   EntSessionCheckpointRequestSchema,
