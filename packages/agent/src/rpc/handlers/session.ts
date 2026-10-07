@@ -471,8 +471,12 @@ export async function composeAndWriteSystemPromptSet(params: {
   cwd: string;
   state: AgentServerState;
   createToolExecutorForMode: CreateToolExecutorFn;
+  // Marks the appended event as an intentional re-render of an existing prompt
+  // so the projection invariant check does not count it as a duplicate write.
+  rerender?: boolean;
 }): Promise<SessionState> {
-  const { sessionDir, sessionState, persona, cwd, state, createToolExecutorForMode } = params;
+  const { sessionDir, sessionState, persona, cwd, state, createToolExecutorForMode, rerender } =
+    params;
 
   const skillDirs = composeSkillDirs(
     { skillDirs: state.skillDirs ?? getSkillDirectories(cwd) },
@@ -516,7 +520,11 @@ export async function composeAndWriteSystemPromptSet(params: {
 
   const { nextState } = appendDurableEvent(sessionDir, sessionState, {
     type: 'system_prompt_set',
-    data: { type: 'system_prompt_set', text: fullSystemPrompt },
+    data: {
+      type: 'system_prompt_set',
+      text: fullSystemPrompt,
+      ...(rerender ? { rerender: true } : {}),
+    },
   });
   return nextState;
 }
@@ -563,6 +571,7 @@ export async function rerenderPersonaForSession(params: {
     cwd,
     state,
     createToolExecutorForMode,
+    rerender: true,
   });
   writeSessionState(sessionDir, sessionState);
   return sessionState;

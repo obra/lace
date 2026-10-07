@@ -1,7 +1,7 @@
 // ABOUTME: Unit tests for composeAndWriteSystemPromptSet's skip-if-unchanged
 // ABOUTME: behavior — re-rendering an identical persona prompt appends nothing.
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -15,7 +15,9 @@ import {
 import { defaultInitializeParams } from '../../../__tests__/helpers/initialize';
 import { getSessionDir, readSessionState } from '@lace/agent/storage/session-store';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
-import { composeAndWriteSystemPromptSet } from '../session';
+import { composeAndWriteSystemPromptSet, rerenderPersonaForSession } from '../session';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
+import { logger } from '@lace/agent/utils/logger';
 
 function systemPromptTexts(sessionDir: string): string[] {
   const events = readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER }).events as Array<{
@@ -146,6 +148,57 @@ describe('composeAndWriteSystemPromptSet — skip-if-unchanged', () => {
       expect(after.length).toBe(2);
       expect(after[1]).not.toBe(after[0]);
     } finally {
+      client.close();
+      server.close();
+      rmSync(otherWorkDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rebuild after a persona rerender uses the latest prompt without an invariant warning', async () => {
+    const state = createAgentServerState();
+    const aToB = new PassThrough();
+    const bToA = new PassThrough();
+    const client = new JsonRpcPeer(createNdjsonStdioTransport({ readable: bToA, writable: aToB }), {
+      idPrefix: 'c_',
+    });
+    const server = new JsonRpcPeer(createNdjsonStdioTransport({ readable: aToB, writable: bToA }), {
+      idPrefix: 'a_',
+    });
+    registerAgentRpcMethods(server, state);
+    const otherWorkDir = mkdtempSync(join(tmpdir(), 'lace-compose-sps-wd3-'));
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      const { sessionId } = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'lace',
+      })) as { sessionId: string };
+      const sessionDir = getSessionDir(sessionId);
+
+      // A different cwd makes the rendered prompt differ, so the rerender appends.
+      await rerenderPersonaForSession({
+        sessionDir,
+        persona: 'lace',
+        cwd: otherWorkDir,
+        state,
+        createToolExecutorForMode,
+      });
+
+      const texts = systemPromptTexts(sessionDir);
+      expect(texts.length).toBe(2);
+      expect(texts[1]).not.toBe(texts[0]);
+
+      warnSpy.mockClear();
+      const { systemPrompt } = buildProviderMessagesFromDurableEvents(sessionDir);
+      expect(systemPrompt).toBe(texts[1]);
+      const invariantWarns = warnSpy.mock.calls.filter((args) =>
+        String(args[0] ?? '').includes('invariant violation')
+      );
+      expect(invariantWarns).toEqual([]);
+    } finally {
+      warnSpy.mockRestore();
       client.close();
       server.close();
       rmSync(otherWorkDir, { recursive: true, force: true });
