@@ -17,7 +17,7 @@ type TextBlock = { type: 'text'; text: string };
 type ContentBlockShape = { type?: unknown; text?: unknown };
 type ContextInjectedData = { content?: unknown[] };
 type ContextCompactedData = { preserved?: unknown[] };
-type SystemPromptSetData = { text?: unknown };
+type SystemPromptSetData = { text?: unknown; rerender?: unknown };
 type MessageData = { content?: string | unknown[]; thinkingBlocks?: ThinkingBlock[] };
 type ToolUseData = { toolCallId?: unknown; name?: unknown; input?: unknown; result?: ToolResult };
 type PreservedMessage = {
@@ -228,7 +228,7 @@ export type ProjectionAccumulator = {
   systemPrompt: string;
   // system_prompt_set count scoped to the current compaction era; reset to 0 at
   // each context_compacted (a post-compaction rerender legitimately supersedes
-  // earlier prompts). >1 within one era is the invariant violation worth surfacing.
+  // earlier prompts). Events marked rerender:true are not counted. >1 within one era is the invariant violation worth surfacing.
   systemPromptCount: number;
 };
 
@@ -257,7 +257,9 @@ export function applyEventToProjection(
     const eventData = data as SystemPromptSetData;
     if (typeof eventData.text === 'string') {
       acc.systemPrompt = eventData.text; // last-one-wins for defensive multi-event support
-      acc.systemPromptCount++;
+      // An intentional rerender (persona refresh) supersedes the earlier prompt
+      // by design, so only original writes count toward the invariant.
+      if (eventData.rerender !== true) acc.systemPromptCount++;
     }
     return;
   }
