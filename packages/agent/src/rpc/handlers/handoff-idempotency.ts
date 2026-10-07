@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { DurableHandoffStatus } from '@lace/ent-protocol';
 import { readAllSessionEventLines, type DurableEvent } from '@lace/agent/storage/event-log';
+import { PROCESS_DIED_STOP_REASON } from '@lace/agent/storage/event-types';
 
 export type DurableHandoffResult = {
   durableHandoffStatus: DurableHandoffStatus;
@@ -33,7 +34,7 @@ export function classifyPromptHandoff(
   const prompt = events.find(
     (event) => event.type === 'prompt' && eventIdempotencyKey(event) === idempotencyKey
   );
-  if (!prompt) return 'persisted-new';
+  if (!prompt) return classifyContextInjectedHandoff(events, idempotencyKey, content);
   if (!isDeepStrictEqual(prompt.data?.content, content)) return 'duplicate-unsafe-retry';
   if (!prompt.turnId) return 'duplicate-unsafe-retry';
   if (activeTurnId === prompt.turnId) return 'duplicate-in-progress';
@@ -50,6 +51,51 @@ export function classifyPromptHandoff(
   }
 
   return 'duplicate-unsafe-retry';
+}
+
+export function isCompletedHandoffTurn(stopReason: unknown): boolean {
+  return stopReason === 'end_turn' || stopReason === 'refusal';
+}
+
+// A process death can bypass the live turn-exit drain. An explicit prompt retry may resume
+// that interrupted work without appending its already-owned source again. Normal completed
+// history and a later successful continuation remain no-ops; failed continuations stay pending.
+export function hasInterruptedImmediateHandoff(
+  events: DurableEvent[],
+  idempotencyKey: string
+): boolean {
+  const injection = events.find(
+    (event) => event.type === 'context_injected' && eventIdempotencyKey(event) === idempotencyKey
+  );
+  if (!injection || injection.data.priority !== 'immediate') return false;
+  if (
+    events.some((event) => event.type === 'prompt' && eventIdempotencyKey(event) === idempotencyKey)
+  )
+    return false;
+  let opening: DurableEvent | undefined;
+  for (const event of events) {
+    if (
+      event.type === 'turn_start' &&
+      event.eventSeq < injection.eventSeq &&
+      (!opening || event.eventSeq > opening.eventSeq)
+    )
+      opening = event;
+  }
+  if (!opening?.turnId) return false;
+  const interruptedEnd = events.find(
+    (event) =>
+      event.type === 'turn_end' &&
+      event.turnId === opening.turnId &&
+      event.eventSeq > injection.eventSeq &&
+      event.data.stopReason === PROCESS_DIED_STOP_REASON
+  );
+  if (!interruptedEnd) return false;
+  return !events.some(
+    (event) =>
+      event.type === 'turn_end' &&
+      event.eventSeq > interruptedEnd.eventSeq &&
+      isCompletedHandoffTurn(event.data.stopReason)
+  );
 }
 
 export function classifyContextInjectedHandoff(

@@ -36,6 +36,8 @@ import { getOrCreateSessionToolExecutor } from '@lace/agent/server';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
 import {
   classifyPromptHandoff,
+  hasInterruptedImmediateHandoff,
+  isCompletedHandoffTurn,
   handoffError,
   rejectHandoffSourceMetadata,
   readDurableEventsForHandoff,
@@ -133,18 +135,46 @@ export function registerPromptHandler(
       };
     }
     if (idempotencyKey) {
-      const status = await runExclusive(() => {
-        if (!state.activeSession) return 'not-persisted';
+      const handoff = await runExclusive(() => {
+        if (!state.activeSession) return { status: 'not-persisted' as const, resume: false };
         const readResult = readDurableEventsForHandoff(state.activeSession.dir);
-        if (!readResult.ok) return 'duplicate-unsafe-retry';
-        return classifyPromptHandoff(
-          readResult.events,
-          idempotencyKey,
-          promptContent,
-          state.activeTurn?.turnId
-        );
+        if (!readResult.ok) return { status: 'duplicate-unsafe-retry' as const, resume: false };
+        return {
+          status: classifyPromptHandoff(
+            readResult.events,
+            idempotencyKey,
+            promptContent,
+            state.activeTurn?.turnId
+          ),
+          resume: hasInterruptedImmediateHandoff(readResult.events, idempotencyKey),
+          dir: state.activeSession.dir,
+        };
       });
+      const { status } = handoff;
       if (status === 'duplicate-already-handled') {
+        if (handoff.resume) {
+          if (state.activeTurn || state.activeSession?.dir !== handoff.dir) {
+            throw {
+              code: AcpErrorCodes.SessionBusy,
+              message: 'SessionBusy',
+              data: { category: 'session', durableHandoffStatus: 'duplicate-in-progress' },
+            };
+          }
+          // Await the existing drain so the caller retains its owner through another crash.
+          // The source is already durable; only the continuation and its track are appended.
+          const continuation: unknown = await handlePrompt({
+            content: injectDrainContent(handoff.dir),
+            track: params.track,
+          });
+          if (
+            !continuation ||
+            typeof continuation !== 'object' ||
+            !('stopReason' in continuation) ||
+            !isCompletedHandoffTurn(continuation.stopReason)
+          ) {
+            throw new Error('Interrupted input continuation did not complete');
+          }
+        }
         return { durableHandoffStatus: status };
       }
       if (status === 'duplicate-in-progress') {
