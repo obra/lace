@@ -609,12 +609,15 @@ export function registerSessionOperationHandlers(
         };
       }
 
+      // Fails with McpToolsIncomplete, leaving the stored prompt untouched, when MCP
+      // discovery didn't finish in time; the caller can retry later.
       await rerenderPersonaForSession({
         sessionDir: state.activeSession!.dir,
         persona: state.activeSession!.meta.persona ?? 'lace',
         cwd: state.activeSession!.meta.workDir,
         state,
         createToolExecutorForMode,
+        requireCompleteMcpTools: true,
       });
       state.activeSession = loadSession(state.activeSession!.meta.sessionId);
 

@@ -2102,10 +2102,8 @@ permission requests, and content blocks, `toolUseId === toolCallId`.
 | 12   | CheckpointNotFound      |
 | 13   | StructuredOutputInvalid |
 | 14   | ConnectionNotFound      |
-| 11   | BudgetExceeded          |
-| 12   | CheckpointNotFound      |
-| 13   | StructuredOutputInvalid |
-| 14   | ConnectionNotFound      |
+| 15   | McpServerNotFound       |
+| 16   | McpToolsIncomplete      |
 
 ### 10.4 Error Reporting Contract
 
@@ -2118,6 +2116,13 @@ Errors fall into distinct categories for client handling:
 | **Tool**           | 4, `tool_use.status=failed` | Tool execution failed                  | Show to user      |
 | **Session**        | 1, 2, 5, 6, 11, 12          | Session state issue                    | Handle per code   |
 | **Protocol**       | -32700 to -32600            | Malformed request                      | Fix client        |
+| **MCP**            | 15, 16                      | MCP server unknown or tools not ready  | Handle per code   |
+
+`McpToolsIncomplete` (16) means MCP tool discovery didn't finish before the
+agent stopped waiting, so it refused to persist a result built without those
+tools (currently `ent/session/rerender_persona`). Nothing was changed; retry
+later. `data` is `{ category: "mcp", servers: string[] }`, naming the servers
+whose discovery hadn't finished.
 
 Error responses SHOULD include `data.category` to disambiguate:
 

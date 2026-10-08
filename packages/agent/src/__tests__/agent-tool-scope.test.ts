@@ -2,17 +2,17 @@
 
 import { describe, it, expect } from 'vitest';
 import type { ToolExecutor } from '../tools/executor';
-import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import { createToolExecutorForMode, getOrCreateSessionToolExecutor } from '../server';
-import type { AgentToolScope } from '../server-types';
+import type { AgentToolScope, ToolExecutorCacheValue } from '../server-types';
 
-type CacheValue = { executor: ToolExecutor; toolsForProvider: CoreTool[] };
+type CacheValue = ToolExecutorCacheValue;
 type Cache = Map<string, Promise<CacheValue>>;
 
 function makeFakeExecutor(): CacheValue {
   return {
     executor: { __id: Math.random() } as unknown as ToolExecutor,
     toolsForProvider: [],
+    mcpServersNotReady: [],
   };
 }
 

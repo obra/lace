@@ -1,11 +1,12 @@
 // ABOUTME: Tests for the per-session tool executor cache (cache hits, concurrency, invalidation)
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { ToolExecutor } from '../tools/executor';
-import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import { getOrCreateSessionToolExecutor, invalidateSessionToolExecutor } from '../server';
+import type { ToolExecutorCacheValue } from '../server-types';
+import { logger } from '../utils/logger';
 
-type CacheValue = { executor: ToolExecutor; toolsForProvider: CoreTool[] };
+type CacheValue = ToolExecutorCacheValue;
 type Cache = Map<string, Promise<CacheValue>>;
 
 function makeFakeExecutor(): CacheValue {
@@ -13,6 +14,7 @@ function makeFakeExecutor(): CacheValue {
   return {
     executor: { __id: Math.random() } as unknown as ToolExecutor,
     toolsForProvider: [],
+    mcpServersNotReady: [],
   };
 }
 
@@ -84,6 +86,38 @@ describe('getOrCreateSessionToolExecutor', () => {
     const [r1, r2] = await Promise.all([p1, p2]);
     expect(r1.executor).toBe(r2.executor);
     expect(buildCount).toBe(1);
+  });
+});
+
+describe('getOrCreateSessionToolExecutor with incomplete MCP discovery', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('warns naming the servers and rebuilds on the next call', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const cache: Cache = new Map();
+    let buildCount = 0;
+    const build = async (): Promise<CacheValue> => {
+      buildCount++;
+      return { ...makeFakeExecutor(), mcpServersNotReady: buildCount === 1 ? ['chat'] : [] };
+    };
+
+    const first = await getOrCreateSessionToolExecutor(cache, 'sess_a', 'execute', build);
+    expect(first.mcpServersNotReady).toEqual(['chat']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Turn running without MCP tools from servers whose discovery did not finish; next turn will rebuild',
+      { sessionId: 'sess_a', servers: ['chat'] }
+    );
+
+    const second = await getOrCreateSessionToolExecutor(cache, 'sess_a', 'execute', build);
+    const third = await getOrCreateSessionToolExecutor(cache, 'sess_a', 'execute', build);
+
+    expect(buildCount).toBe(2);
+    expect(second.mcpServersNotReady).toEqual([]);
+    expect(third).toBe(second);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
 

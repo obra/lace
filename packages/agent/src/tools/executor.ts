@@ -139,20 +139,25 @@ export class ToolExecutor {
   }
 
   /**
-   * Ensure MCP tool discovery is complete before proceeding (called before LLM calls)
+   * Wait for MCP tool discovery before building a tool list (called before LLM calls).
+   * Returns the ids of servers whose discovery had not finished when the wait gave up;
+   * an empty array means every running server's tools are registered. Discovery keeps
+   * going after a timeout and registers late tools, but a tool list built now lacks them.
    */
-  async ensureMCPToolsReady(timeoutMs: number = 5000): Promise<void> {
+  async ensureMCPToolsReady(timeoutMs: number = 5000): Promise<string[]> {
     if (this.mcpDiscoveryPromise) {
-      try {
-        await Promise.race([
-          this.mcpDiscoveryPromise,
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('MCP tool discovery timeout')), timeoutMs)
-          ),
-        ]);
-      } catch (error) {
-        logger.warn(`MCP tool discovery timed out after ${timeoutMs}ms:`, error);
-        // Continue with whatever tools we have
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const completed = await Promise.race([
+        this.mcpDiscoveryPromise.then(() => true),
+        new Promise<boolean>((resolve) => {
+          timer = setTimeout(() => resolve(false), timeoutMs);
+        }),
+      ]);
+      clearTimeout(timer);
+      if (!completed) {
+        logger.warn(`MCP tool discovery did not finish within ${timeoutMs}ms`, {
+          servers: this.mcpServersDiscovering(),
+        });
       }
     }
     // Surface (don't silently swallow) enabled servers that are DOWN, so a schema
@@ -170,6 +175,7 @@ export class ToolExecutor {
         servers: down.map((server) => ({ id: server.id, status: server.status })),
       });
     }
+    return this.mcpServersDiscovering();
   }
 
   private getNativeTools(): Tool[] {
@@ -197,6 +203,13 @@ export class ToolExecutor {
    */
   private mcpServerManager?: MCPServerManager;
   private mcpDiscoveryPromise?: Promise<void>;
+  // Server id by connectionKey. One server id can have several live connections
+  // (different placement, runtime or cwd), so pending discovery is tracked per connection.
+  private mcpConnectionsDiscovering = new Map<string, string>();
+
+  private mcpServersDiscovering(): string[] {
+    return [...new Set(this.mcpConnectionsDiscovering.values())];
+  }
 
   private async discoverAllMCPTools(): Promise<void> {
     if (!this.mcpServerManager) return;
@@ -211,9 +224,14 @@ export class ToolExecutor {
         .getAllServers()
         .filter((server) => server.status === 'running');
 
-      const discoveryPromises = runningServers.map((server) =>
-        this.discoverAndRegisterServerTools(server)
-      );
+      const discoveryPromises = runningServers.map(async (server) => {
+        this.mcpConnectionsDiscovering.set(server.connectionKey, server.id);
+        try {
+          await this.discoverAndRegisterServerTools(server);
+        } finally {
+          this.mcpConnectionsDiscovering.delete(server.connectionKey);
+        }
+      });
 
       await Promise.all(discoveryPromises);
     } catch (error) {
@@ -360,6 +378,14 @@ export class ToolExecutor {
    * Public so tests can shorten it.
    */
   static SLOW_TOOL_WARN_MS = 120_000;
+
+  /**
+   * How long building a tool list waits for MCP tool discovery before giving up
+   * and returning without the tools of servers that haven't answered yet.
+   *
+   * Public so tests can shorten it.
+   */
+  static MCP_DISCOVERY_TIMEOUT_MS = 10_000;
 
   /**
    * Execute a tool directly without approval complexity.

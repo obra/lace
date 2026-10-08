@@ -39,6 +39,7 @@ import {
   type JobState,
   type AgentServerState,
   type AgentToolScope,
+  type ToolExecutorCacheValue,
 } from './server-types';
 import { toolKindFromName } from './rpc/utils';
 import { requestPermissionFromClient, reissuePendingPermissionRequests } from './rpc/permissions';
@@ -66,10 +67,7 @@ export async function createToolExecutorForMode(
   personaRegistry?: PersonaRegistry,
   activePersona?: string,
   environmentRegistry?: EnvironmentRegistry
-): Promise<{
-  executor: ToolExecutor;
-  toolsForProvider: CoreTool[];
-}> {
+): Promise<ToolExecutorCacheValue> {
   const registry = personaRegistry ?? defaultPersonaRegistry;
   const envRegistry = environmentRegistry ?? defaultEnvironmentRegistry;
   const executor = new ToolExecutor();
@@ -78,10 +76,12 @@ export async function createToolExecutorForMode(
     environmentRegistry: envRegistry,
   });
 
+  let mcpServersNotReady: string[] = [];
   if (mcpServerManager) {
     executor.registerMCPTools(mcpServerManager);
-    // Block until MCP discovery resolves so the returned tool list is complete.
-    await executor.ensureMCPToolsReady(10000);
+    // Block until MCP discovery resolves so the returned tool list is complete, or
+    // report which servers it is still missing if discovery outlasts the guard.
+    mcpServersNotReady = await executor.ensureMCPToolsReady(ToolExecutor.MCP_DISCOVERY_TIMEOUT_MS);
   }
 
   if (jobManager) {
@@ -109,7 +109,7 @@ export async function createToolExecutorForMode(
   // Cast to CoreTool[] for provider compatibility - providers still use core Tool type
   const toolsForProvider = filteredTools as unknown as CoreTool[];
 
-  return { executor, toolsForProvider };
+  return { executor, toolsForProvider, mcpServersNotReady };
 }
 
 export function createAgentServerState(): AgentServerState {
@@ -155,7 +155,6 @@ export function getContainerMounts(
   return state.containerMounts;
 }
 
-type ToolExecutorCacheValue = { executor: ToolExecutor; toolsForProvider: CoreTool[] };
 type ToolExecutorCache = Map<string, Promise<ToolExecutorCacheValue>>;
 
 export function getOrCreateSessionToolExecutor(
@@ -172,10 +171,24 @@ export function getOrCreateSessionToolExecutor(
   // Insert the Promise synchronously so concurrent callers see the same in-flight build.
   const pending = build();
   cache.set(key, pending);
-  // If the build rejects, drop the entry so the next call retries.
-  pending.catch(() => {
-    if (cache.get(key) === pending) cache.delete(key);
-  });
+  // If the build rejects, or MCP discovery didn't finish before the build gave up,
+  // drop the entry so the next call retries. Discovery keeps running after the guard
+  // and fills the executor's registry, but the toolsForProvider snapshot never sees
+  // those tools, and the provider maps sanitized names (chat_send) back to real ones
+  // (chat/send) from that snapshot. Caching it would lose the tools for the session.
+  pending.then(
+    ({ mcpServersNotReady }) => {
+      if (mcpServersNotReady.length === 0) return;
+      logger.warn(
+        'Turn running without MCP tools from servers whose discovery did not finish; next turn will rebuild',
+        { sessionId, servers: mcpServersNotReady }
+      );
+      if (cache.get(key) === pending) cache.delete(key);
+    },
+    () => {
+      if (cache.get(key) === pending) cache.delete(key);
+    }
+  );
   return pending;
 }
 
