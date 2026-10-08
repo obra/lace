@@ -19,6 +19,7 @@ export const EntErrorCodes = {
   StructuredOutputInvalid: 13,
   ConnectionNotFound: 14,
   McpServerNotFound: 15,
+  McpToolsIncomplete: 16,
 } as const;
 
 export type EntErrorCode = (typeof EntErrorCodes)[keyof typeof EntErrorCodes];

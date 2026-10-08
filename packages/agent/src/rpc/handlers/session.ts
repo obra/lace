@@ -13,6 +13,7 @@ import {
 } from '../../storage/transcript-paths';
 import {
   AcpErrorCodes,
+  EntErrorCodes,
   SessionForkParamsSchema,
   isSessionId,
   type JsonRpcPeer,
@@ -474,9 +475,21 @@ export async function composeAndWriteSystemPromptSet(params: {
   // Marks the appended event as an intentional re-render of an existing prompt
   // so the projection invariant check does not count it as a duplicate write.
   rerender?: boolean;
+  // Throw McpToolsIncomplete instead of writing a prompt whose tool list lacks the
+  // tools of MCP servers whose discovery hadn't finished. The prompt is durable, so
+  // a degraded one would outlive the slow discovery that produced it.
+  requireCompleteMcpTools?: boolean;
 }): Promise<SessionState> {
-  const { sessionDir, sessionState, persona, cwd, state, createToolExecutorForMode, rerender } =
-    params;
+  const {
+    sessionDir,
+    sessionState,
+    persona,
+    cwd,
+    state,
+    createToolExecutorForMode,
+    rerender,
+    requireCompleteMcpTools,
+  } = params;
 
   const skillDirs = composeSkillDirs(
     { skillDirs: state.skillDirs ?? getSkillDirectories(cwd) },
@@ -485,7 +498,7 @@ export async function composeAndWriteSystemPromptSet(params: {
   );
   const skillRegistry = new SkillRegistry({ skillDirs });
 
-  const { toolsForProvider } = await createToolExecutorForMode(
+  const { toolsForProvider, mcpServersNotReady } = await createToolExecutorForMode(
     state.config.executionMode,
     state.mcpServerManager,
     undefined, // jobManager
@@ -495,6 +508,13 @@ export async function composeAndWriteSystemPromptSet(params: {
     persona,
     state.environmentRegistry
   );
+  if (requireCompleteMcpTools && mcpServersNotReady.length > 0) {
+    throw {
+      code: EntErrorCodes.McpToolsIncomplete,
+      message: 'McpToolsIncomplete',
+      data: { category: 'mcp', servers: mcpServersNotReady },
+    };
+  }
   const tools = toolsForProvider.map((t) => ({ name: t.name, description: t.description }));
 
   const promptConfig = await loadPromptConfig({
@@ -542,8 +562,10 @@ export async function rerenderPersonaForSession(params: {
   cwd: string;
   state: AgentServerState;
   createToolExecutorForMode: CreateToolExecutorFn;
+  requireCompleteMcpTools?: boolean;
 }): Promise<SessionState> {
-  const { sessionDir, persona, cwd, state, createToolExecutorForMode } = params;
+  const { sessionDir, persona, cwd, state, createToolExecutorForMode, requireCompleteMcpTools } =
+    params;
 
   // Re-apply the persona's model and connection so the persona file stays the
   // source of truth.
@@ -572,6 +594,7 @@ export async function rerenderPersonaForSession(params: {
     state,
     createToolExecutorForMode,
     rerender: true,
+    requireCompleteMcpTools,
   });
   writeSessionState(sessionDir, sessionState);
   return sessionState;

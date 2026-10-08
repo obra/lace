@@ -4,13 +4,25 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PassThrough } from 'node:stream';
-import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
+import { createNdjsonStdioTransport, EntErrorCodes, JsonRpcPeer } from '@lace/ent-protocol';
 import { createAgentServerState, registerAgentRpcMethods } from '../../server';
+import { HostToolRuntime } from '@lace/agent/tools/runtime/host';
+import { ToolExecutor } from '@lace/agent/tools/executor';
 import { defaultInitializeParams } from '../../__tests__/helpers/initialize';
 import { getSessionDir } from '@lace/agent/storage/session-store';
 import { readDurableEvents } from '@lace/agent/storage/event-log';
+
+const SLOW_FIRST_LIST_SERVER = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '__tests__',
+  'fixtures',
+  'slow-first-list-mcp-server.mjs'
+);
 
 function createPairedPeers(register: (peer: JsonRpcPeer) => void) {
   const aToB = new PassThrough();
@@ -98,6 +110,62 @@ describe('ent/session/rerender_persona', () => {
     } finally {
       client.close();
       server.close();
+    }
+  });
+
+  it('refuses to save a prompt rendered before MCP tool discovery finished', async () => {
+    const discoveryTimeoutMs = 200;
+    const originalDiscoveryTimeout = ToolExecutor.MCP_DISCOVERY_TIMEOUT_MS;
+    ToolExecutor.MCP_DISCOVERY_TIMEOUT_MS = discoveryTimeoutMs;
+    const personaPath = join(personasDir, 'rerender.md');
+    writeFileSync(personaPath, '---\nmodel: some-model\n---\nYou are a persona. MARKER-A');
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [personasDir] })
+      );
+      const { sessionId } = (await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'rerender',
+      })) as { sessionId: string };
+      const sessionDir = getSessionDir(sessionId);
+      const promptsBefore = readEvents(sessionDir).filter((e) => e.type === 'system_prompt_set');
+
+      // A running server whose first tools/list outlasts the discovery guard.
+      await state.mcpServerManager.startServer({
+        serverId: 'chat',
+        config: {
+          command: process.execPath,
+          args: [SLOW_FIRST_LIST_SERVER],
+          env: { SLOW_FIRST_LIST_MS: String(discoveryTimeoutMs * 3) },
+          enabled: true,
+          tools: {},
+          placement: 'host',
+        },
+        runtime: new HostToolRuntime({ id: 'test:rerender-mcp', cwd: workDir }),
+        hostCwd: workDir,
+      });
+
+      writeFileSync(personaPath, '---\nmodel: some-model\n---\nYou are a persona. MARKER-B');
+
+      await expect(client.request('ent/session/rerender_persona', { sessionId })).rejects.toEqual({
+        code: EntErrorCodes.McpToolsIncomplete,
+        message: 'McpToolsIncomplete',
+        data: { category: 'mcp', servers: ['chat'] },
+      });
+
+      const promptsAfter = readEvents(sessionDir).filter((e) => e.type === 'system_prompt_set');
+      expect(promptsAfter).toEqual(promptsBefore);
+    } finally {
+      ToolExecutor.MCP_DISCOVERY_TIMEOUT_MS = originalDiscoveryTimeout;
+      client.close();
+      server.close();
+      await state.mcpServerManager.shutdown();
     }
   });
 
