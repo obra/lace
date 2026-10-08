@@ -156,7 +156,7 @@ export class ToolExecutor {
       clearTimeout(timer);
       if (!completed) {
         logger.warn(`MCP tool discovery did not finish within ${timeoutMs}ms`, {
-          servers: [...this.mcpServersDiscovering],
+          servers: this.mcpServersDiscovering(),
         });
       }
     }
@@ -175,7 +175,7 @@ export class ToolExecutor {
         servers: down.map((server) => ({ id: server.id, status: server.status })),
       });
     }
-    return [...this.mcpServersDiscovering];
+    return this.mcpServersDiscovering();
   }
 
   private getNativeTools(): Tool[] {
@@ -203,7 +203,13 @@ export class ToolExecutor {
    */
   private mcpServerManager?: MCPServerManager;
   private mcpDiscoveryPromise?: Promise<void>;
-  private mcpServersDiscovering = new Set<string>();
+  // Server id by connectionKey. One server id can have several live connections
+  // (different placement, runtime or cwd), so pending discovery is tracked per connection.
+  private mcpConnectionsDiscovering = new Map<string, string>();
+
+  private mcpServersDiscovering(): string[] {
+    return [...new Set(this.mcpConnectionsDiscovering.values())];
+  }
 
   private async discoverAllMCPTools(): Promise<void> {
     if (!this.mcpServerManager) return;
@@ -219,11 +225,11 @@ export class ToolExecutor {
         .filter((server) => server.status === 'running');
 
       const discoveryPromises = runningServers.map(async (server) => {
-        this.mcpServersDiscovering.add(server.id);
+        this.mcpConnectionsDiscovering.set(server.connectionKey, server.id);
         try {
           await this.discoverAndRegisterServerTools(server);
         } finally {
-          this.mcpServersDiscovering.delete(server.id);
+          this.mcpConnectionsDiscovering.delete(server.connectionKey);
         }
       });
 

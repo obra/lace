@@ -44,6 +44,40 @@ describe('session tool executor cache across a slow MCP tool discovery (e2e)', (
     manager = undefined;
   });
 
+  it('reports a server not ready while any of its same-id connections is still discovering', async () => {
+    // The manager keys connections by id + placement + runtime + cwd, so one server id
+    // can have several live connections. A fast one finishing must not mask a slow one.
+    const mcpServerManager = new MCPServerManager();
+    manager = mcpServerManager;
+    for (const [hostCwd, slowFirstListMs] of [
+      [process.cwd(), 0],
+      [__dirname, DISCOVERY_TIMEOUT_MS * 3],
+    ] as const) {
+      await mcpServerManager.startServer({
+        serverId: 'chat',
+        config: {
+          command: process.execPath,
+          args: [SERVER],
+          env: { SLOW_FIRST_LIST_MS: String(slowFirstListMs) },
+          enabled: true,
+          tools: {},
+          placement: 'host',
+        },
+        runtime: new HostToolRuntime({ id: 'test:mcp-discovery-timeout', cwd: hostCwd }),
+        hostCwd,
+      });
+    }
+    expect(mcpServerManager.getAllServers().map((s) => [s.id, s.status])).toEqual([
+      ['chat', 'running'],
+      ['chat', 'running'],
+    ]);
+
+    const executor = new ToolExecutor();
+    executor.registerMCPTools(mcpServerManager);
+
+    expect(await executor.ensureMCPToolsReady(DISCOVERY_TIMEOUT_MS)).toEqual(['chat']);
+  });
+
   it('rebuilds a cached tool list whose MCP discovery timed out', async () => {
     ToolExecutor.MCP_DISCOVERY_TIMEOUT_MS = DISCOVERY_TIMEOUT_MS;
     const mcpServerManager = new MCPServerManager();
