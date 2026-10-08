@@ -1,7 +1,7 @@
 // ABOUTME: Stdio MCP test server exposing one tool, "send", whose FIRST tools/list
 // ABOUTME: is delayed by SLOW_FIRST_LIST_MS (default 0). Models a box slow right after boot.
 
-/* global process */
+/* global process, setTimeout */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
