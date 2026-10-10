@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
+import { unknownJobIdMessage } from './unknown-job-id';
 
 // Phase 1+2 intentionally omits maxNotifications / expiresMs from the spec's
 // TypeScript block; deferred to Phase 3 along with overflow auto-stop. See
@@ -75,16 +76,11 @@ Returns: \`{ subscribed: true, subscriptionId, jobId, on, filter? }\`.`;
     // exactly like a slow job. Check the live map first, then the event log —
     // an already-finished job has left the map and must still be accepted.
     if (!jobManager.getJob(args.jobId)) {
-      const known = jobManager.listJobs().some((j) => j.jobId === args.jobId);
-      if (!known) {
+      const history = jobManager.listJobs();
+      if (!history.some((j) => j.jobId === args.jobId)) {
         return {
           status: 'failed',
-          content: [
-            {
-              type: 'text',
-              text: `No job with id ${JSON.stringify(args.jobId)}. Subscribing would never fire. Use the jobId returned by \`delegate\`/\`bash(background=true)\`, or \`jobs_list\` to find it.`,
-            },
-          ],
+          content: [{ type: 'text', text: unknownJobIdMessage(args.jobId, history) }],
         };
       }
     }

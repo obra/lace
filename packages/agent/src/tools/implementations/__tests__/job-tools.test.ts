@@ -89,7 +89,7 @@ describe('JobOutputTool', () => {
     );
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('not found');
+    expect(result.content[0].text).toContain('No job with id "job_unknown"');
   });
 });
 
@@ -275,6 +275,7 @@ describe('JobKillTool', () => {
 
     const jobManager = {
       getJob: vi.fn().mockReturnValue(undefined),
+      listJobs: vi.fn().mockReturnValue([]),
       cancelJob: vi.fn(),
     } as unknown as JobManager;
 
@@ -284,7 +285,7 @@ describe('JobKillTool', () => {
     );
 
     expect(result.status).toBe('failed');
-    expect(result.content[0].text).toContain('not found');
+    expect(result.content[0].text).toContain('No job with id "job_unknown"');
   });
 
   it('kills the process and reports terminated once it actually exits', async () => {

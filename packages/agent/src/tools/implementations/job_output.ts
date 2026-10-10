@@ -6,6 +6,7 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import { DEFAULT_STALL_THRESHOLD_MS } from '../../server-types';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
+import { unknownJobIdMessage } from './unknown-job-id';
 
 const jobOutputSchema = z
   .object({
@@ -26,7 +27,7 @@ Parameters:
 - \`jobId\` (required): the job to inspect.
 - \`byteOffset\` (default 0): reserved for future incremental reads.
 
-Output remains readable after a job ends, including a job that was killed mid-flight — a partial result is still a result. \`not found\` means no job has ever had that id.
+Output remains readable after a job ends, including a job that was killed mid-flight — a partial result is still a result. \`No job with id\` means no job in this session has ever had that id; the refusal lists the most recent real ones.
 
 Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string, exitCode?: number, stalled?: true, stalledForMs?: number }\`. \`stalled: true\` means the job is still running but its output has not grown for the stall threshold (~15 min) — it may be wedged; you will also receive a one-shot \`job-stalled\` notification when this happens.`;
   schema = jobOutputSchema;
@@ -61,7 +62,7 @@ Returns: \`{ status: "running"|"completed"|"failed"|"cancelled", output: string,
     if (!job) {
       return {
         status: 'failed',
-        content: [{ type: 'text', text: `Job ${jobId} not found` }],
+        content: [{ type: 'text', text: unknownJobIdMessage(jobId, jobManager.listJobs()) }],
       };
     }
 

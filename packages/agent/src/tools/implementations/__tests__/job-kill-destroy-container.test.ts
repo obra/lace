@@ -250,7 +250,10 @@ describe('job_kill destroy_container', () => {
 
   it('destroy_container on an unknown job fails', async () => {
     const reaper = new WorkspaceReaper();
-    const jobManager = { getJob: vi.fn().mockReturnValue(undefined) } as unknown as JobManager;
+    const jobManager = {
+      getJob: vi.fn().mockReturnValue(undefined),
+      listJobs: vi.fn().mockReturnValue([]),
+    } as unknown as JobManager;
     const result = await new JobKillTool().execute(
       { jobId: 'nope', destroy_container: true },
       ctx({ jobManager, workspaceReaper: reaper, activeSessionId: PARENT })

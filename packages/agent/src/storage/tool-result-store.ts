@@ -45,6 +45,27 @@ function safeFileName(toolCallId: string): string {
   return sanitized.length > 0 ? sanitized : '_';
 }
 
+const RECENT_SIDECARS_SHOWN = 5;
+
+// Names the most recently spilled results, so an agent that retyped an id from
+// memory can pick the one it meant. Sidecar names are the sanitized ids, which
+// equal the real ids for the provider id shapes we see (letters, digits, _ and -).
+function recentSidecarsNote(dir: string): string {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir).filter((name) => name.endsWith('.txt'));
+  } catch {
+    return '';
+  }
+  if (names.length === 0) return '';
+  const recent = names
+    .map((name) => ({ name, mtimeMs: fs.statSync(path.join(dir, name)).mtimeMs }))
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, RECENT_SIDECARS_SHOWN)
+    .map(({ name }) => `- ${name.slice(0, -'.txt'.length)}`);
+  return ` Most recently spilled tool_call_ids in this session:\n${recent.join('\n')}`;
+}
+
 function sidecarPath(sessionId: string, toolCallId: string): string {
   const dir = path.join(getSessionDir(sessionId), 'tool-results');
   return path.join(dir, `${safeFileName(toolCallId)}.txt`);
@@ -88,7 +109,9 @@ export function readToolResultSidecar(
       throw new Error(
         `No spilled tool result found for tool_call_id "${toolCallId}" in this session ` +
           `(expected sidecar at ${filePath}). It may have ridden back whole (small enough ` +
-          `to not be digested) or belong to a different session.`
+          `to not be digested) or belong to a different session. Copy tool_call_ids from ` +
+          `the digested tool result itself, never from memory.` +
+          recentSidecarsNote(path.dirname(filePath))
       );
     }
     throw err;
