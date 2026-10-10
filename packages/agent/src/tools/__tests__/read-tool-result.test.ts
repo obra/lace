@@ -1,11 +1,12 @@
 // ABOUTME: Tests for the read_tool_result paging tool.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ReadToolResultTool } from '../implementations/read_tool_result';
 import { writeToolResultSidecar } from '@lace/agent/storage/tool-result-store';
+import { getSessionDir } from '@lace/agent/storage/session-store';
 import type { ToolContext } from '../types';
 
 const TEST_SESSION_ID = 'sess_550e8400-e29b-41d4-a716-446655440000';
@@ -140,6 +141,35 @@ describe('tools/read_tool_result', () => {
     expect(result.status).toBe('failed');
     expect(textOf(result)).toContain('tc_absent');
   });
+
+  // Agents retype tool_call_ids from memory; naming the real recent ones lets them
+  // pick the one they meant instead of guessing again.
+  it('names the five most recently spilled tool_call_ids when the id is unknown', async () => {
+    const ids = ['tc_1', 'tc_2', 'tc_3', 'tc_4', 'tc_5', 'tc_6'];
+    ids.forEach((id, i) => {
+      seed(id);
+      const when = new Date(Date.UTC(2026, 9, 10, i));
+      utimesSync(sidecarFile(id), when, when);
+    });
+
+    const result = await tool.execute(
+      { tool_call_id: 'toolu_guessed', head_lines: 1 },
+      makeContext({ activeSessionId: TEST_SESSION_ID })
+    );
+    const text = textOf(result);
+
+    expect(result.status).toBe('failed');
+    expect(text).toContain('toolu_guessed');
+    const listed = ['tc_6', 'tc_5', 'tc_4', 'tc_3', 'tc_2'].map((id) => text.indexOf(id));
+    expect(listed.every((i) => i >= 0)).toBe(true);
+    expect([...listed].sort((a, b) => a - b)).toEqual(listed);
+    expect(text).not.toContain('tc_1');
+    expect(text).toMatch(/copy .*from .*tool result/i);
+  });
+
+  function sidecarFile(toolCallId: string): string {
+    return join(getSessionDir(TEST_SESSION_ID), 'tool-results', `${toolCallId}.txt`);
+  }
 
   it('rejects unknown parameters (strict schema)', async () => {
     const result = await tool.execute(

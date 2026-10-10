@@ -6,6 +6,7 @@ import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
 import { terminateJob, type TerminateJobOptions } from '@lace/agent/jobs/job-control';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
+import { unknownJobIdMessage } from './unknown-job-id';
 
 const jobKillSchema = z
   .object({
@@ -57,6 +58,10 @@ Parameters:
 
     const job = jobManager.getJob(jobId);
     if (!job) {
+      const history = jobManager.listJobs();
+      if (!history.some((j) => j.jobId === jobId)) {
+        return fail(unknownJobIdMessage(jobId, history));
+      }
       return fail(`Job ${jobId} not found`);
     }
 
