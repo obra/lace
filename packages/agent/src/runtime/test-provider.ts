@@ -122,8 +122,9 @@ export function getTestProviderCallCount(): number {
 
 /**
  * Request-shape recorder (env-gated by LACE_TEST_PROVIDER_RECORD_REQUESTS, a
- * file path). Appends one JSON line per provider call with the role sequence of
- * the messages the provider was actually handed.
+ * file path). Appends one JSON line per provider call with the role sequence and content of
+ * the messages the provider was actually handed. Content lets recovery tests
+ * verify that durable input reaches the provider exactly once.
  *
  * This exists so an E2E test can assert on the shape of the request the agent
  * really dispatched, rather than re-deriving it from the transcript. The shape
@@ -139,7 +140,7 @@ function recordRequestShape(messages: ProviderMessage[]): void {
   const target = process.env.LACE_TEST_PROVIDER_RECORD_REQUESTS;
   if (!target) return;
   try {
-    appendFileSync(target, `${JSON.stringify({ roles: messages.map((m) => m.role) })}\n`);
+    appendFileSync(target, `${JSON.stringify({ roles: messages.map((m) => m.role), messages })}\n`);
   } catch {
     // A recorder that breaks the run it observes is worse than no recorder.
   }
