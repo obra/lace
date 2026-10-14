@@ -358,7 +358,12 @@ Your product process supervises the lace-agent child. Concerns:
   process loads the persistent sessionId. In-flight prompts at the moment of
   crash are lost; your inbound queue should not ack a prompt until the
   corresponding `session/prompt` returns. If you ack early and lose the
-  response, the user sees a stuck message.
+  response, the user sees a stuck message. When you redeliver that prompt with
+  the same `idempotencyKey` and content, lace runs a fresh turn for it, once: a
+  turn that ended only because the process died does not count as handled. If
+  that second turn also dies with the process, further redeliveries return
+  `duplicate-already-handled`, so a prompt that kills the process cannot loop.
+  Tool calls the dead turn already made may be repeated.
 - **Graceful shutdown.** SIGTERM should reach lace-agent (it handles its own
   cleanup). Don't kill -9 unless lace has been unresponsive for many seconds.
 - **stderr.** Lace logs to stderr. Forward it to your product's log stream, not
