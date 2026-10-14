@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { DurableHandoffStatus } from '@lace/ent-protocol';
 import { readAllSessionEventLines, type DurableEvent } from '@lace/agent/storage/event-log';
+import { PROCESS_DIED_STOP_REASON } from '@lace/agent/storage/event-types';
 
 export type DurableHandoffResult = {
   durableHandoffStatus: DurableHandoffStatus;
@@ -30,9 +31,12 @@ export function classifyPromptHandoff(
   content: unknown[],
   activeTurnId?: string
 ): DurableHandoffStatus {
-  const prompt = events.find(
+  const prompts = events.filter(
     (event) => event.type === 'prompt' && eventIdempotencyKey(event) === idempotencyKey
   );
+  // A key appears twice only after a resume (below), so the last prompt is the
+  // one whose turn decides the answer.
+  const prompt = prompts.at(-1);
   if (!prompt) return 'persisted-new';
   if (!isDeepStrictEqual(prompt.data?.content, content)) return 'duplicate-unsafe-retry';
   if (!prompt.turnId) return 'duplicate-unsafe-retry';
@@ -41,6 +45,21 @@ export function classifyPromptHandoff(
   const laterSameTurnEvents = events.filter(
     (event) => event.eventSeq > prompt.eventSeq && event.turnId === prompt.turnId
   );
+  // A turn closed by crash recovery never finished answering its prompt, and
+  // recovery deliberately starts no turn of its own, so the caller's retry is
+  // the only thing that can get the prompt answered. Let it run as a new
+  // handoff even if the dead turn got as far as tool calls: delivery is
+  // at-least-once, and a repeated effect beats a message nobody answers.
+  // Only the first prompt for a key resumes, so a prompt that kills the
+  // process every time cannot loop.
+  if (
+    prompts.length === 1 &&
+    laterSameTurnEvents.some(
+      (event) => event.type === 'turn_end' && event.data?.stopReason === PROCESS_DIED_STOP_REASON
+    )
+  ) {
+    return 'persisted-new';
+  }
   if (
     laterSameTurnEvents.some(
       (event) => event.type === 'message' || event.type === 'tool_use' || event.type === 'turn_end'
