@@ -25,7 +25,17 @@ export interface SkillMetadata extends SkillProperties {
   skillDir: string;
   /** Absolute path to the SKILL.md file */
   skillMdPath: string;
+  /** Namespace of the skill directory this skill came from, if it has one */
+  namespace?: string;
+  /** `<namespace>:<name>` for namespaced skills, otherwise the bare name */
+  qualifiedName: string;
 }
+
+/**
+ * A directory of skills. A bare string is a directory with no namespace; the
+ * object form gives every skill found in `dir` the namespace `namespace`.
+ */
+export type SkillDirEntry = string | { dir: string; namespace: string };
 
 /**
  * Result of a validation operation.

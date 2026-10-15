@@ -14,7 +14,7 @@ import { MCPServerManager } from './mcp/server-manager';
 import type { JobManager } from './jobs/job-manager';
 import type { ToolExecutor } from './tools/executor';
 import type { Tool } from './tools/tool';
-import type { SkillRegistry } from './skills';
+import type { SkillDirEntry, SkillRegistry } from './skills';
 import type { PersonaRegistry } from './config/persona-registry';
 import type { EnvironmentRegistry } from './config/environment-registry';
 import type { ContainerManager } from './containers/container-manager';
@@ -212,7 +212,7 @@ export type AgentServerState = {
   // Embedder-controlled skill directories (ordered, earlier wins). When unset,
   // skill registry construction falls back to getSkillDirectories(workDir).
   // Set by the initialize handler when the client supplies skillDirs.
-  skillDirs?: string[];
+  skillDirs?: SkillDirEntry[];
   // Host-only credential exec-tool directories supplied by the embedder. The
   // initialize handler registers each globally with trusted credential
   // provenance (owner: 'credential') and records the paths here. Defaults to []

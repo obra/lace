@@ -242,6 +242,104 @@ Body content.`
     expect(skills[0].name).toBe('valid-skill');
   });
 
+  describe('namespaced skill dirs', () => {
+    it('bare string dirs give skills no namespace and a bare qualified name', async () => {
+      const skillsDir = join(testDir, 'skills');
+      await mkdir(skillsDir, { recursive: true });
+      await createSkillDir(skillsDir, 'my-skill');
+
+      const registry = new SkillRegistry({ skillDirs: [skillsDir] });
+      const [skill] = registry.listSkills();
+
+      expect(skill.namespace).toBeUndefined();
+      expect(skill.qualifiedName).toBe('my-skill');
+      expect(registry.getSkill('my-skill')).not.toBeNull();
+    });
+
+    it('namespaced dirs give skills a namespace and a qualified name', async () => {
+      const skillsDir = join(testDir, 'org');
+      await mkdir(skillsDir, { recursive: true });
+      await createSkillDir(skillsDir, 'my-skill');
+
+      const registry = new SkillRegistry({
+        skillDirs: [{ dir: skillsDir, namespace: 'org-acme' }],
+      });
+      const [skill] = registry.listSkills();
+
+      expect(skill.name).toBe('my-skill');
+      expect(skill.namespace).toBe('org-acme');
+      expect(skill.qualifiedName).toBe('org-acme:my-skill');
+    });
+
+    it('lists only the first version of a skill but keeps the shadowed one reachable by qualified name', async () => {
+      const localDir = join(testDir, 'local');
+      const orgDir = join(testDir, 'org');
+      await mkdir(localDir, { recursive: true });
+      await mkdir(orgDir, { recursive: true });
+      await createSkillDir(localDir, 'my-skill', { description: 'Local', body: 'Local body' });
+      await createSkillDir(orgDir, 'my-skill', { description: 'Org', body: 'Org body' });
+
+      const registry = new SkillRegistry({
+        skillDirs: [
+          { dir: localDir, namespace: 'local' },
+          { dir: orgDir, namespace: 'org-acme' },
+        ],
+      });
+
+      const skills = registry.listSkills();
+      expect(skills).toHaveLength(1);
+      expect(skills[0].qualifiedName).toBe('local:my-skill');
+
+      // Bare name resolves to the winner.
+      expect(registry.getSkill('my-skill')!.description).toBe('Local');
+      expect(registry.getSkillContent('my-skill')!.body).toBe('Local body');
+
+      // Qualified names resolve to that exact version, shadowed or not.
+      expect(registry.getSkill('local:my-skill')!.description).toBe('Local');
+      expect(registry.getSkill('org-acme:my-skill')!.description).toBe('Org');
+      const shadowed = registry.getSkillContent('org-acme:my-skill');
+      expect(shadowed!.body).toBe('Org body');
+      expect(shadowed!.qualifiedName).toBe('org-acme:my-skill');
+      expect(shadowed!.skillDir).toBe(join(orgDir, 'my-skill'));
+    });
+
+    it('returns null for an unknown qualified name', async () => {
+      const orgDir = join(testDir, 'org');
+      await mkdir(orgDir, { recursive: true });
+      await createSkillDir(orgDir, 'my-skill');
+
+      const registry = new SkillRegistry({
+        skillDirs: [{ dir: orgDir, namespace: 'org-acme' }],
+      });
+
+      expect(registry.getSkill('other-ns:my-skill')).toBeNull();
+      expect(registry.getSkill('org-acme:missing')).toBeNull();
+      expect(registry.getSkillContent('other-ns:my-skill')).toBeNull();
+    });
+
+    it('mixes bare and namespaced dirs with first-wins by bare name', async () => {
+      const bareDir = join(testDir, 'bare');
+      const orgDir = join(testDir, 'org');
+      await mkdir(bareDir, { recursive: true });
+      await mkdir(orgDir, { recursive: true });
+      await createSkillDir(bareDir, 'shared', { description: 'Bare' });
+      await createSkillDir(orgDir, 'shared', { description: 'Org' });
+      await createSkillDir(orgDir, 'org-only');
+
+      const registry = new SkillRegistry({
+        skillDirs: [bareDir, { dir: orgDir, namespace: 'org-acme' }],
+      });
+
+      const qualifiedNames = registry
+        .listSkills()
+        .map((s) => s.qualifiedName)
+        .sort();
+      expect(qualifiedNames).toEqual(['org-acme:org-only', 'shared']);
+      expect(registry.getSkill('shared')!.description).toBe('Bare');
+      expect(registry.getSkill('org-acme:shared')!.description).toBe('Org');
+    });
+  });
+
   describe('refresh', () => {
     it('reloads skills after directory changes', async () => {
       const skillsDir = join(testDir, 'skills');

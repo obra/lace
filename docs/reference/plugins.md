@@ -195,13 +195,23 @@ directory is read once and cached (no hot-reload).
 
 Registers a directory of skill directories. Each sub-directory that contains a
 `SKILL.md` becomes a skill named by that sub-directory's name (which must match
-the `name` field in its `SKILL.md` frontmatter). Skills are **not** namespaced —
-the name is bare (e.g. `researcher`, not `acme:researcher`). All skill sources
-(plugins, user-disk, bundled) share a single flat namespace; collisions are
-resolved first-wins and emit a `warn`. Choose collision-safe skill names.
+the `name` field in its `SKILL.md` frontmatter). Plugin skills carry the
+plugin's `meta.namespace`: the agent's `<available_skills>` list names them
+`<namespace>:<skill>` (e.g. `acme:researcher`).
 
-(Contrast: tools and personas ARE `<namespace>:<entry>`-namespaced; skills are
-not.)
+Shadowing is still by bare skill name across every source, in this order:
+persona skills dir, plugin dirs, the bundled core dir, then the embedder's
+`skillDirs` (or the default `.lace/skills` / `.claude/skills` discovery). The
+first version found wins, is the only one listed, and is what `use_skill`
+returns for the bare name; each shadowed version emits a `warn`. A shadowed
+namespaced version stays reachable through `use_skill` by its qualified name
+(e.g. `use_skill acme:researcher`).
+
+Persona, bundled core, and default-discovery skills have no namespace and are
+listed by bare name. Embedders can namespace their own directories: each
+`initialize` `skillDirs` entry is either a path (no namespace) or
+`{ dir, namespace }`. A namespace follows the skill-name rule (1-64 lowercase
+letters, digits, and single inner hyphens).
 
 ### Per-persona tools and skills (`<persona>/tools/` and `<persona>/skills/`)
 

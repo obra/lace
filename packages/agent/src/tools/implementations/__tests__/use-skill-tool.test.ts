@@ -123,6 +123,73 @@ describe('UseSkillTool', () => {
     expect(text).toContain('not found');
   });
 
+  describe('namespaced skill dirs', () => {
+    let localDir: string;
+    let orgDir: string;
+
+    function createSkillIn(parent: string, name: string, body: string): void {
+      const skillDir = join(parent, name);
+      mkdirSync(skillDir, { recursive: true });
+      writeFileSync(
+        join(skillDir, 'SKILL.md'),
+        `---\nname: ${name}\ndescription: ${name} skill\n---\n\n${body}`
+      );
+    }
+
+    beforeEach(() => {
+      localDir = join(tempDir, 'local');
+      orgDir = join(tempDir, 'org');
+      createSkillIn(localDir, 'commit', 'Local commit body');
+      createSkillIn(orgDir, 'commit', 'Org commit body');
+      registry = new SkillRegistry({
+        skillDirs: [
+          { dir: localDir, namespace: 'local' },
+          { dir: orgDir, namespace: 'org-acme' },
+        ],
+      });
+    });
+
+    async function run(skill: string): Promise<{ status: string; text: string }> {
+      const result = await new UseSkillTool(registry).execute(
+        { skill },
+        { signal: new AbortController().signal }
+      );
+      return {
+        status: result.status,
+        text: (result.content[0] as { type: 'text'; text: string }).text,
+      };
+    }
+
+    it('resolves a bare name to the winner and shows its qualified name', async () => {
+      const { status, text } = await run('commit');
+      expect(status).toBe('completed');
+      expect(text).toContain('Skill: local:commit');
+      expect(text).toContain('Local commit body');
+    });
+
+    it('resolves a qualified name to that exact version, even when shadowed', async () => {
+      const { status, text } = await run('org-acme:commit');
+      expect(status).toBe('completed');
+      expect(text).toContain('Skill: org-acme:commit');
+      expect(text).toContain('Org commit body');
+      expect(text).not.toContain('Local commit body');
+    });
+
+    it('reports an unknown qualified name as not found', async () => {
+      const { status, text } = await run('other-ns:commit');
+      expect(status).toBe('failed');
+      expect(text).toContain("Skill 'other-ns:commit' not found");
+    });
+
+    it('refreshes on miss and finds a newly-added namespaced skill by qualified name', async () => {
+      createSkillIn(orgDir, 'fresh', 'Fresh body');
+      const { status, text } = await run('org-acme:fresh');
+      expect(status).toBe('completed');
+      expect(text).toContain('Skill: org-acme:fresh');
+      expect(text).toContain('Fresh body');
+    });
+  });
+
   it('includes skill body exactly as written', async () => {
     const complexBody = `# Complex Skill
 
