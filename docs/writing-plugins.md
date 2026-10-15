@@ -159,13 +159,13 @@ export function register(api: PluginApi): void {
 (exec tools). A skill is named by its sub-directory name (which must match the
 `name` field in its `SKILL.md` frontmatter) and listed to the agent as
 `<namespace>:<skill>` (e.g. `acme:researcher`). Shadowing between skill sources
-is still by bare skill name: the first version found wins and emits a `warn`
-for each one it shadows, but a shadowed plugin skill stays reachable by its
+is still by bare skill name: the first version found wins and emits a `warn` for
+each one it shadows, but a shadowed plugin skill stays reachable by its
 qualified name. See
 [Personas and Skills via directories](reference/plugins.md#personas-and-skills-via-directories).
-Built-in and user-defined tool/persona names
-stay bare (no prefix). MCP tool names continue to use `<serverId>/<toolName>` —
-that slash convention is MCP-specific and unaffected.
+Built-in and user-defined tool/persona names stay bare (no prefix). MCP tool
+names continue to use `<serverId>/<toolName>` — that slash convention is
+MCP-specific and unaffected.
 
 **Persona file format:** the same YAML frontmatter + Markdown body used by
 user-disk and bundled personas. See [Agent Personas](agent-personas.md) for the
