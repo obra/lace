@@ -51,6 +51,13 @@ export class SkillRegistry {
   private skills: Map<string, SkillEntry> = new Map();
   /** Every loaded version, keyed by qualified name */
   private versions: Map<string, SkillEntry> = new Map();
+  /**
+   * Shadows already warned about, as `<kept skillDir>|<ignored skillDir>`.
+   * Not cleared by refresh(): the registry rescans on every prompt render, and
+   * a deliberate shadow should be logged once, not once per turn. A new winner
+   * or a new shadowed copy is a new key, so it is still logged.
+   */
+  private readonly warnedShadows: Set<string> = new Set();
 
   constructor(options: SkillRegistryOptions) {
     this.skillDirs = options.skillDirs;
@@ -104,6 +111,13 @@ export class SkillRegistry {
    */
   private lookup(name: string): SkillEntry | undefined {
     return this.skills.get(name) ?? this.versions.get(name);
+  }
+
+  private warnShadowOnce(keptDir: string, ignoredDir: string, message: string): void {
+    const key = `${keptDir}|${ignoredDir}`;
+    if (this.warnedShadows.has(key)) return;
+    this.warnedShadows.add(key);
+    logger.warn(message);
   }
 
   /**
@@ -228,14 +242,23 @@ export class SkillRegistry {
 
     // Keep every version reachable by qualified name; an earlier directory
     // with the same namespace still wins for that qualified name.
-    if (!this.versions.has(qualifiedName)) {
+    const existingVersion = this.versions.get(qualifiedName);
+    if (!existingVersion) {
       this.versions.set(qualifiedName, entry);
+    } else if (namespace) {
+      this.warnShadowOnce(
+        existingVersion.metadata.skillDir,
+        skillDir,
+        `Skill "${qualifiedName}" is defined twice under namespace "${namespace}": keeping ${existingVersion.metadata.skillDir}, ignoring ${skillDir}`
+      );
     }
 
     // Earlier directory wins the bare name.
     const existingEntry = this.skills.get(name);
     if (existingEntry) {
-      logger.warn(
+      this.warnShadowOnce(
+        existingEntry.metadata.skillDir,
+        skillDir,
         `Skill "${name}" is shadowed: keeping ${existingEntry.metadata.skillDir}, ignoring ${skillDir}`
       );
       return;

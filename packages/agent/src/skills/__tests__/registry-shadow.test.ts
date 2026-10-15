@@ -73,4 +73,66 @@ describe('SkillRegistry cross-source shadow warning', () => {
     const warnCall = warnSpy.mock.calls.find((call) => String(call[0]).includes('my-skill'));
     expect(warnCall).toBeDefined();
   });
+
+  it('warns about a given shadow once, not on every refresh', async () => {
+    const dirA = join(testDir, 'dirA');
+    const dirB = join(testDir, 'dirB');
+    await createSkillDir(dirA, 'my-skill');
+    await createSkillDir(dirB, 'my-skill');
+
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const registry = new SkillRegistry({
+      skillDirs: [
+        { dir: dirA, namespace: 'org' },
+        { dir: dirB, namespace: 'role' },
+      ],
+    });
+    registry.refresh();
+    registry.refresh();
+
+    const shadowWarns = warnSpy.mock.calls.filter((call) => String(call[0]).includes('shadowed'));
+    expect(shadowWarns).toHaveLength(1);
+  });
+
+  it('warns again when the winner of a shadow changes', async () => {
+    const dirA = join(testDir, 'dirA');
+    const dirB = join(testDir, 'dirB');
+    await createSkillDir(dirB, 'my-skill');
+    await mkdir(dirA, { recursive: true });
+    const dirC = join(testDir, 'dirC');
+    await createSkillDir(dirC, 'my-skill');
+
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const registry = new SkillRegistry({
+      skillDirs: [
+        { dir: dirA, namespace: 'local' },
+        { dir: dirB, namespace: 'org' },
+        { dir: dirC, namespace: 'role' },
+      ],
+    });
+    await createSkillDir(dirA, 'my-skill');
+    registry.refresh();
+
+    const shadowWarns = warnSpy.mock.calls.filter((call) => String(call[0]).includes('shadowed'));
+    expect(shadowWarns).toHaveLength(3);
+  });
+
+  it('warns when two dirs share a namespace and define the same skill', async () => {
+    const dirA = join(testDir, 'dirA');
+    const dirB = join(testDir, 'dirB');
+    await createSkillDir(dirA, 'my-skill', { description: 'Dir A version' });
+    await createSkillDir(dirB, 'my-skill', { description: 'Dir B version' });
+
+    const warnSpy = vi.spyOn(logger, 'warn');
+    const registry = new SkillRegistry({
+      skillDirs: [
+        { dir: dirA, namespace: 'org' },
+        { dir: dirB, namespace: 'org' },
+      ],
+    });
+
+    expect(registry.getSkill('org:my-skill')!.description).toBe('Dir A version');
+    const dupWarn = warnSpy.mock.calls.find((call) => String(call[0]).includes('org:my-skill'));
+    expect(dupWarn).toBeDefined();
+  });
 });
