@@ -66,7 +66,10 @@ function parseSkillDirEntry(raw: unknown): SkillDirEntry {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     invalidParams();
   }
-  const { dir, namespace } = raw as Record<string, unknown>;
+  const { dir, namespace, ...rest } = raw as Record<string, unknown>;
+  if (Object.keys(rest).length > 0) {
+    invalidParams();
+  }
   if (typeof dir !== 'string' || dir.length === 0) {
     invalidParams();
   }

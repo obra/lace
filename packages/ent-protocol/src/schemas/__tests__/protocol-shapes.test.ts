@@ -110,6 +110,52 @@ describe('protocol shapes (representative examples)', () => {
       })
     ).toThrow();
 
+    // skillDirs entries may carry a namespace, mixed with bare paths.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-namespaced-skilldirs',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          skillDirs: [
+            { dir: '/tmp/local/skills', namespace: 'local' },
+            '/tmp/bare/skills',
+            { dir: '/tmp/org/skills', namespace: 'org-prime-radiant' },
+          ],
+        },
+      })
+    ).not.toThrow();
+
+    // malformed namespaced skillDirs entries are rejected.
+    for (const bad of [
+      { dir: '/tmp/x', namespace: '' },
+      { dir: '/tmp/x', namespace: 'Org' },
+      { dir: '/tmp/x', namespace: 'org:acme' },
+      { dir: '/tmp/x', namespace: '-org' },
+      { dir: '/tmp/x', namespace: 'org--acme' },
+      { dir: '/tmp/x' },
+      { namespace: 'org' },
+      { dir: '', namespace: 'org' },
+      { dir: '/tmp/x', namespace: 'org', extra: true },
+    ]) {
+      expect(() =>
+        EntProtocolRequestSchema.parse({
+          jsonrpc: '2.0',
+          id: 'init-bad-namespaced-skilldirs',
+          method: 'initialize',
+          params: {
+            protocolVersion: '1.0',
+            clientInfo: { name: 'test-client', version: '0.0.0' },
+            capabilities: { streaming: true },
+            skillDirs: [bad],
+          },
+        })
+      ).toThrow();
+    }
+
     // initialize with embedder-supplied containerMounts is accepted.
     expect(() =>
       EntProtocolRequestSchema.parse({

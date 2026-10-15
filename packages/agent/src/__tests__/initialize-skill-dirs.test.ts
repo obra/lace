@@ -79,6 +79,7 @@ describe('initialize skillDirs', () => {
     ['a missing namespace', { dir: '/x' }],
     ['a missing dir', { namespace: 'org' }],
     ['an empty dir', { dir: '', namespace: 'org' }],
+    ['an unknown key', { dir: '/x', namespace: 'org', priority: 1 }],
     ['a number', 42],
     ['null', null],
     ['an array', ['/x', 'org']],

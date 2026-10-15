@@ -145,7 +145,7 @@ export function register(api: PluginApi): void {
   // Contribute personas: each <entry>.md → persona named 'acme:<entry>'
   api.personas.addDir(path.join(__dirname, 'personas'));
 
-  // Contribute skills: each <skill-name>/ dir with SKILL.md → skill named by that dir (bare, not namespaced)
+  // Contribute skills: each <skill-name>/ dir with SKILL.md → skill listed as 'acme:<skill-name>'
   api.skills.addDir(path.join(__dirname, 'skills'));
 
   // Contribute exec tools: each +x binary → tool 'acme:<descriptor-name>'
@@ -156,11 +156,14 @@ export function register(api: PluginApi): void {
 **Naming:** plugin-contributed personas and exec tools are named
 `<namespace>:<entry>` where `namespace` is `meta.namespace` (e.g. `acme`) and
 `entry` is the file stem (personas) or the `name` returned by `lace-tool-schema`
-(exec tools). Skills are **not** namespaced — a skill is named by its
-sub-directory name (which must match the `name` field in its `SKILL.md`
-frontmatter), bare (e.g. `researcher`, not `acme:researcher`). All skill sources
-share a single flat namespace; collisions are first-wins and emit a `warn`, so
-choose collision-safe skill names. Built-in and user-defined tool/persona names
+(exec tools). A skill is named by its sub-directory name (which must match the
+`name` field in its `SKILL.md` frontmatter) and listed to the agent as
+`<namespace>:<skill>` (e.g. `acme:researcher`). Shadowing between skill sources
+is still by bare skill name: the first version found wins and emits a `warn`
+for each one it shadows, but a shadowed plugin skill stays reachable by its
+qualified name. See
+[Personas and Skills via directories](reference/plugins.md#personas-and-skills-via-directories).
+Built-in and user-defined tool/persona names
 stay bare (no prefix). MCP tool names continue to use `<serverId>/<toolName>` —
 that slash convention is MCP-specific and unaffected.
 

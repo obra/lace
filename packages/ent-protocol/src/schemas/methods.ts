@@ -146,11 +146,30 @@ const InitializeParamsSchema = z
     // of host-placement MCP servers declared in a persona against this base (the
     // server scripts live under the embedder's package, not lace's cwd).
     mcpBaseDir: NonEmptyStringSchema.optional(),
-    // Ordered skill directories (earlier paths win on name conflict). When
-    // omitted, the agent uses its default discovery (project + user level
+    // Ordered skill directories (earlier entries win on skill-name conflict).
+    // When omitted, the agent uses its default discovery (project + user level
     // `.lace/skills` and `.claude/skills`). When provided, these directories
     // are used exclusively — the embedder controls the skill search path.
-    skillDirs: z.array(NonEmptyStringSchema).optional(),
+    // An entry is a path (skills keep bare names) or { dir, namespace }: skills
+    // in `dir` are listed as `<namespace>:<skill>`, and a shadowed version
+    // stays reachable by that qualified name. Namespaces follow the skill-name
+    // rule: 1-64 lowercase letters, digits, and single inner hyphens.
+    skillDirs: z
+      .array(
+        z.union([
+          NonEmptyStringSchema,
+          z
+            .object({
+              dir: NonEmptyStringSchema,
+              namespace: z
+                .string()
+                .max(64)
+                .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/),
+            })
+            .strict(),
+        ])
+      )
+      .optional(),
     // Named-mount registry consulted when a persona with
     // `runtime.type: 'container'` is materialized. Each persona declares
     // logical mount names; this registry pins the matching host path,
