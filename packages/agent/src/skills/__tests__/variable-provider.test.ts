@@ -73,6 +73,32 @@ describe('SkillVariableProvider', () => {
     expect(xml).toContain('<description>Review pull requests</description>');
   });
 
+  it('names namespaced winners by qualified name and leaves un-namespaced skills bare', async () => {
+    const localDir = join(testDir, 'local');
+    const orgDir = join(testDir, 'org');
+    const bareDir = join(testDir, 'bare');
+    await mkdir(localDir, { recursive: true });
+    await mkdir(orgDir, { recursive: true });
+    await mkdir(bareDir, { recursive: true });
+    await createSkillDir(localDir, 'commit', { description: 'Local commit' });
+    await createSkillDir(orgDir, 'commit', { description: 'Org commit' });
+    await createSkillDir(bareDir, 'review-pr');
+
+    const registry = new SkillRegistry({
+      skillDirs: [
+        { dir: localDir, namespace: 'local' },
+        { dir: orgDir, namespace: 'org-acme' },
+        bareDir,
+      ],
+    });
+    const xml = new SkillVariableProvider(registry).getVariables().availableSkills as string;
+
+    expect(xml).toContain('<name>local:commit</name>\n<description>Local commit</description>');
+    expect(xml).not.toContain('org-acme:commit');
+    expect(xml).not.toContain('Org commit');
+    expect(xml).toContain('<name>review-pr</name>');
+  });
+
   it('returns empty block when no skills', async () => {
     const skillsDir = join(testDir, 'empty-skills');
     await mkdir(skillsDir, { recursive: true });

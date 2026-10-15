@@ -54,7 +54,7 @@ export class UseSkillTool extends Tool {
       );
     }
 
-    const output = [`Skill: ${skillName}`, '', '---', '', content.body].join('\n');
+    const output = [`Skill: ${content.qualifiedName}`, '', '---', '', content.body].join('\n');
 
     return this.createResult(output);
   }

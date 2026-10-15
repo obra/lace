@@ -10,7 +10,30 @@ describe('composeSkillDirs', () => {
     const dirs = composeSkillDirs({ skillDirs: ['/embedder/skills'] }, '/persona/skills', {
       coreDir: '/core/skills',
     });
-    expect(dirs).toEqual(['/persona/skills', '/plugin/skills', '/core/skills', '/embedder/skills']);
+    expect(dirs).toEqual([
+      '/persona/skills',
+      { dir: '/plugin/skills', namespace: 'acme' },
+      '/core/skills',
+      '/embedder/skills',
+    ]);
+  });
+  it('keeps embedder namespaces and order', () => {
+    const dirs = composeSkillDirs(
+      {
+        skillDirs: [
+          { dir: '/local', namespace: 'local' },
+          '/bare',
+          { dir: '/org', namespace: 'org-acme' },
+        ],
+      },
+      null,
+      {}
+    );
+    expect(dirs).toEqual([
+      { dir: '/local', namespace: 'local' },
+      '/bare',
+      { dir: '/org', namespace: 'org-acme' },
+    ]);
   });
   it('omits a null persona dir and an absent core dir', () => {
     const dirs = composeSkillDirs({ skillDirs: ['/e'] }, null, {});

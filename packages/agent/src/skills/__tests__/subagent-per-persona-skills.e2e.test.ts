@@ -162,7 +162,9 @@ describe('subagent per-persona skills e2e', () => {
     // ada's skill must NOT be visible when persona is "scout".
     expect(scoutRegistry.getSkill('ada-special-skill')).toBeNull();
     // ada's skills dir must not appear anywhere in scout's composed dirs.
-    expect(scoutChildSkillDirs.some((d) => d.includes('/ada/skills'))).toBe(false);
+    expect(
+      scoutChildSkillDirs.some((d) => (typeof d === 'string' ? d : d.dir).includes('/ada/skills'))
+    ).toBe(false);
   });
 
   it('no double-composition: raw parent tier never contains the persona skills dir', async () => {

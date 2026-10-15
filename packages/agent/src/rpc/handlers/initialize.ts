@@ -16,6 +16,7 @@ import { resolveResourcePath } from '../../utils/resource-resolver';
 import { logger } from '../../utils/logger';
 import { registerExecDirInto } from '../../tools/exec/register-exec';
 import { registries } from '@lace/agent/plugins';
+import { validateSkillName, type SkillDirEntry } from '../../skills';
 
 const MOUNT_NAME_PATTERN = /^[a-z][a-z0-9_-]*$/;
 
@@ -53,6 +54,30 @@ function parseContainerMounts(raw: unknown): Record<string, MountRegistryEntry> 
     };
   }
   return result;
+}
+
+// A skillDirs entry is a non-empty path, or { dir, namespace } where namespace
+// follows the skill-name rule (so `<namespace>:<skill>` is unambiguous).
+function parseSkillDirEntry(raw: unknown): SkillDirEntry {
+  if (typeof raw === 'string') {
+    if (raw.length === 0) invalidParams();
+    return raw;
+  }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    invalidParams();
+  }
+  const { dir, namespace } = raw as Record<string, unknown>;
+  if (typeof dir !== 'string' || dir.length === 0) {
+    invalidParams();
+  }
+  if (
+    typeof namespace !== 'string' ||
+    namespace.trim() !== namespace ||
+    !validateSkillName(namespace).valid
+  ) {
+    invalidParams();
+  }
+  return { dir, namespace };
 }
 
 /**
@@ -145,14 +170,7 @@ export function registerInitializeHandler(
 
     // Embedder-controlled skill directories; ordered, earlier paths win.
     if (Array.isArray(parsed.skillDirs)) {
-      const skillDirs: string[] = [];
-      for (const p of parsed.skillDirs) {
-        if (typeof p !== 'string' || p.length === 0) {
-          throw { code: -32602, message: 'InvalidParams', data: { category: 'protocol' } };
-        }
-        skillDirs.push(p);
-      }
-      state.skillDirs = skillDirs;
+      state.skillDirs = parsed.skillDirs.map(parseSkillDirEntry);
     }
 
     // Embedder-supplied host-only credential exec-tool directories. Registered

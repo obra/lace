@@ -25,7 +25,7 @@ import {
 } from './subagent-job-helpers';
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
-import { getSkillDirectories } from '@lace/agent/skills';
+import { getSkillDirectories, type SkillDirEntry } from '@lace/agent/skills';
 import { spawnSubagent, type SubagentProcessHandle } from './subagent-spawn';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { RuntimeExecutionBinding } from '@lace/agent/tools/runtime/types';
@@ -74,7 +74,7 @@ interface RpcErrorLike {
 
 // Deliberately ships the RAW embedder/workDir tier — the child re-composes
 // (persona → plugin → core → embedder) on its own initialize, preventing double-composition.
-function getSubagentHostSkillDirs(state: AgentServerState): string[] {
+function getSubagentHostSkillDirs(state: AgentServerState): SkillDirEntry[] {
   if (state.skillDirs !== undefined) return state.skillDirs;
   return getSkillDirectories(state.activeSession?.meta.workDir);
 }
@@ -229,7 +229,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
     // onExit handler uses this to distinguish unexpected child death (persist
     // diagnostic, close peer to wake pending RPCs) from clean teardown (no-op).
     let teardownInitiated = false;
-    let subagentHostSkillDirs: string[] = [];
+    let subagentHostSkillDirs: SkillDirEntry[] = [];
 
     try {
       subagentHostSkillDirs = getSubagentHostSkillDirs(state);

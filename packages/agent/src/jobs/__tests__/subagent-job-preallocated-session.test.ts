@@ -230,10 +230,19 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
     expect(job.subagentSessionId).toBe(preallocatedId);
   });
 
-  it('passes parent skillDirs through child initialize', async () => {
+  it.each([
+    ['bare', ['/host/sen-core/skills/innate', '/host/instance/user/skills/learned']],
+    [
+      'namespaced',
+      [
+        { dir: '/host/instance/user/skills/learned', namespace: 'local' },
+        '/host/bare/skills',
+        { dir: '/host/sen-core/skills/innate', namespace: 'sen-colleague' },
+      ],
+    ],
+  ])('passes parent %s skillDirs through child initialize', async (_label, skillDirs) => {
     const jobId = 'job_skill_dirs_test';
     const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
-    const skillDirs = ['/host/sen-core/skills/innate', '/host/instance/user/skills/learned'];
 
     let resolveCompletion: () => void = () => undefined;
     const completion = new Promise<void>((r) => {

@@ -44,7 +44,7 @@ export class SkillVariableProvider {
 
     const skillElements = skills
       .map((skill) => {
-        const name = escapeHtml(skill.name);
+        const name = escapeHtml(skill.qualifiedName);
         const description = escapeHtml(skill.description);
         return `<skill>\n<name>${name}</name>\n<description>${description}</description>\n</skill>`;
       })
