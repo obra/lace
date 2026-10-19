@@ -46,6 +46,7 @@ import type {
   ThinkingBlock,
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { createModelCallCorrelation } from '@lace/agent/providers/model-call-correlation';
 import { logger } from '@lace/agent/utils/logger';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
 import { buildCacheHealthLog } from '@lace/agent/core/conversation/cache-health';
@@ -789,9 +790,11 @@ export class ConversationRunner {
           // nextRequestOptions (a one-shot tool_choice nudge), outputFormat
           // applies to every call this turn so the final answer stays
           // schema-constrained even after tool-use iterations.
-          const requestOptions: RequestOptions | undefined = runOutputFormat
-            ? { ...nextRequestOptions, outputFormat: runOutputFormat }
-            : nextRequestOptions;
+          const requestOptions: RequestOptions = {
+            ...nextRequestOptions,
+            ...(runOutputFormat ? { outputFormat: runOutputFormat } : {}),
+            correlation: createModelCallCorrelation({ sessionId, turnId }),
+          };
           response = await provider.createStreamingResponse(
             providerMessages,
             toolsForProvider,
@@ -1092,6 +1095,7 @@ export class ConversationRunner {
           try {
             compacted = await this.compactSession({
               modelId,
+              turnId,
               contextWindow: provider.contextWindowForModel(modelId ?? 'default'),
               // The call that just overflowed reported no usage, so these hold
               // the last SUCCESSFUL call's figures — a lower bound on the
@@ -1541,6 +1545,7 @@ export class ConversationRunner {
         if (compactionRequest.requested || breakpointCompactCrossed) {
           const compacted = await this.compactSession({
             modelId,
+            turnId,
             contextWindow: contextWindowSize,
             // The very number `pressure` above was computed from. Handing the
             // strategy the window but not the measurement is what let it
@@ -1642,6 +1647,7 @@ export class ConversationRunner {
    */
   private async compactSession(params: {
     modelId?: string;
+    turnId?: string;
     guidance?: string;
     /**
      * Context window of the model this turn ran on. The strategy sizes the
@@ -1678,6 +1684,7 @@ export class ConversationRunner {
     const strategy = resolveCompactionStrategy(strategyName);
     const compactionCtx = buildCompactionContext({
       threadId: sessionId,
+      turnId: params.turnId,
       sessionDir,
       connectionId: this.config.connectionId,
       modelId: params.modelId ?? undefined,

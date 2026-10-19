@@ -55,7 +55,14 @@ describe('oneShotQuery', () => {
 
     expect(result).toEqual({ text: 'SUMMARY', usage });
     expect(createProviderStub).toHaveBeenCalledWith({ connectionId: 'c', modelId: 'm' });
-    expect(provider.createStreamingResponse).toHaveBeenCalledWith(messages, [], 'm', undefined);
+    expect(provider.createStreamingResponse).toHaveBeenCalledWith(
+      messages,
+      [],
+      'm',
+      undefined,
+      undefined,
+      { correlation: { modelCallId: expect.any(String) } }
+    );
     // Regression guard: never use the non-streaming path (it 400s on large max_tokens).
     expect(provider.createResponse).not.toHaveBeenCalled();
     expect(provider.cleanup).toHaveBeenCalledTimes(1);
@@ -94,7 +101,9 @@ describe('oneShotQuery', () => {
       messages,
       [],
       'm',
-      controller.signal
+      controller.signal,
+      undefined,
+      { correlation: { modelCallId: expect.any(String) } }
     );
   });
 });

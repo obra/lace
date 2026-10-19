@@ -3,6 +3,7 @@
 // ABOUTME: post-turn block to fire compaction (even at low pressure) and that
 // ABOUTME: guidance flows into buildCompactionContext.
 
+import * as compactionContext from '@lace/agent/compaction/build-context';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -291,16 +292,22 @@ describe('ConversationRunner - compact_session runner wiring', () => {
       }),
     });
 
+    const contextSpy = vi.spyOn(compactionContext, 'buildCompactionContext');
+    const turnId = `turn_${randomUUID()}`;
     const runner = new ConversationRunner(config, deps);
     await runner.run({
       content: [{ type: 'text', text: 'please compact' }],
       abortController: new AbortController(),
-      turnId: `turn_${randomUUID()}`,
+      turnId,
       startedAt: new Date().toISOString(),
     });
 
     const { events } = readDurableEvents(sessionDir, {});
     expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
+    expect(contextSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: sessionId, turnId })
+    );
+    contextSpy.mockRestore();
   });
 
   it('does NOT fire compaction when compact_session was not called and pressure is low', async () => {
