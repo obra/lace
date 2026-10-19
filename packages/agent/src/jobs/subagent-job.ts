@@ -195,6 +195,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       return;
     }
 
+    const parentSessionId = state.activeSession.meta.sessionId;
+    const parentTurnId = job.originTurnId;
+    const jobId = job.jobId;
     const executionEnv = job.executionEnv;
     delete job.executionEnv;
     const runtimeBindingForChild =
@@ -952,9 +955,26 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         });
       }
 
+      const childSessionId = job.subagentSessionId;
       const promptResult = (await childPeer.request('session/prompt', {
         content: job.subagentContent,
-      })) as { stopReason?: string; stopDetails?: LaceStopDetails | null } | undefined;
+      })) as
+        | { stopReason?: string; stopDetails?: LaceStopDetails | null; turnId?: unknown }
+        | undefined;
+
+      if (typeof promptResult?.turnId === 'string' && /^[!-~]{1,128}$/.test(promptResult.turnId)) {
+        try {
+          logger.info('job.subagent.turn', {
+            parentSessionId,
+            ...(parentTurnId ? { parentTurnId } : {}),
+            jobId,
+            childSessionId,
+            childTurnId: promptResult.turnId,
+          });
+        } catch {
+          // Optional diagnostics must not change the child job's outcome.
+        }
+      }
 
       if (job.status !== 'cancelled') {
         job.status = jobStatusFromStopReason(promptResult?.stopReason);

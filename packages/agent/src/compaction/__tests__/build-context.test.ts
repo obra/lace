@@ -16,6 +16,29 @@ describe('buildCompactionContext', () => {
     modelId: 'claude-3-5-sonnet',
   };
 
+  it.each([undefined, 'turn_auto'])(
+    'passes only available owner identity for compaction (%s)',
+    async (turnId) => {
+      const query = vi.fn().mockResolvedValue({ text: 'summary' });
+      const ctx = await buildCompactionContextForConnection(
+        { ...BASE_OPTS, turnId },
+        {
+          oneShotQuery: query,
+          resolveContextWindow: async () => 200_000,
+        }
+      );
+      await ctx.query!({ prompt: 'summarize' });
+      expect(query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          correlationOwner: {
+            sessionId: 'thread-1',
+            ...(turnId ? { turnId } : {}),
+          },
+        })
+      );
+    }
+  );
+
   it('returns ctx with guidance set when provided', () => {
     const ctx = buildCompactionContext({ ...BASE_OPTS, guidance: 'focus on errors' });
     expect(ctx.guidance).toBe('focus on errors');
@@ -38,6 +61,7 @@ describe('buildCompactionContext', () => {
       model: 'claude-3-5-sonnet',
       messages: [{ role: 'user', content: 'hello world' }],
       signal: undefined,
+      correlationOwner: { sessionId: 'thread-1' },
     });
   });
 

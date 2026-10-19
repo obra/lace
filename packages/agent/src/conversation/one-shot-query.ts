@@ -4,6 +4,8 @@
 import type { ProviderMessage, ProviderResponse } from '@lace/agent/providers/base-provider';
 import { createProviderForTurn as defaultCreateProviderForTurn } from '@lace/agent/providers/turn-factory';
 
+import { createModelCallCorrelation } from '@lace/agent/providers/model-call-correlation';
+
 type CreateProviderForTurn = typeof defaultCreateProviderForTurn;
 
 /**
@@ -29,13 +31,22 @@ export async function oneShotQuery(
     model: string;
     messages: ProviderMessage[];
     signal?: AbortSignal;
+    correlationOwner?: { sessionId?: string; turnId?: string };
   },
   deps?: { createProviderForTurn?: CreateProviderForTurn }
 ): Promise<{ text: string; usage?: ProviderResponse['usage'] }> {
   const factory = deps?.createProviderForTurn ?? defaultCreateProviderForTurn;
   const provider = await factory({ connectionId: opts.connectionId, modelId: opts.model });
   try {
-    const r = await provider.createStreamingResponse(opts.messages, [], opts.model, opts.signal);
+    const correlation = createModelCallCorrelation(opts.correlationOwner ?? {});
+    const r = await provider.createStreamingResponse(
+      opts.messages,
+      [],
+      opts.model,
+      opts.signal,
+      undefined,
+      { correlation }
+    );
     return { text: r.content, usage: r.usage };
   } finally {
     await provider.cleanup?.();

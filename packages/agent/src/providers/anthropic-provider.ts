@@ -25,6 +25,7 @@ import { normalizeAnthropicStop } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
 import type { CatalogProvider } from './catalog/types';
 import { ToolCall } from '@lace/agent/tools/types';
+import { proxyCorrelationHeaders } from './model-call-correlation';
 import { logger } from '@lace/agent/utils/logger';
 import { logProviderRequest, logProviderResponse } from '@lace/agent/utils/provider-logging';
 import { getBetasForRequest } from './anthropic/betas';
@@ -350,7 +351,9 @@ export class AnthropicProvider extends AIProvider {
         });
         let response: BetaMessage;
         try {
-          response = (await this.getAnthropicClient().beta.messages.create(requestPayload, {
+          const client = this.getAnthropicClient();
+          response = (await client.beta.messages.create(requestPayload, {
+            headers: proxyCorrelationHeaders(client.baseURL, options?.correlation),
             signal: guard.signal,
             timeout: NONSTREAMING_TIMEOUT_MS,
           })) as BetaMessage;
@@ -477,6 +480,7 @@ export class AnthropicProvider extends AIProvider {
         // on the caller's long-lived signal.
         try {
           const stream = client.beta.messages.stream(requestPayload, {
+            headers: proxyCorrelationHeaders(client.baseURL, options?.correlation),
             signal: guard.signal,
             timeout: STREAM_HEADERS_TIMEOUT_MS,
           });

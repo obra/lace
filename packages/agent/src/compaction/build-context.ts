@@ -47,6 +47,7 @@ interface BuildContextDeps {
 export async function buildCompactionContextForConnection(
   opts: {
     threadId: string;
+    turnId?: string;
     sessionDir: string;
     connectionId?: string;
     modelId?: string;
@@ -74,6 +75,7 @@ export async function buildCompactionContextForConnection(
 export function buildCompactionContext(
   opts: {
     threadId: string;
+    turnId?: string;
     sessionDir: string;
     connectionId?: string;
     modelId?: string;
@@ -128,7 +130,16 @@ export function buildCompactionContext(
       } else {
         messages = [{ role: 'user', content: qopts.prompt ?? '' }];
       }
-      return query({ connectionId: queryConnectionId, model, messages, signal: qopts.signal });
+      return query({
+        connectionId: queryConnectionId,
+        model,
+        messages,
+        signal: qopts.signal,
+        correlationOwner: {
+          sessionId: opts.threadId,
+          ...(opts.turnId ? { turnId: opts.turnId } : {}),
+        },
+      });
     },
   };
 }

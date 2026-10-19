@@ -1046,7 +1046,7 @@ describe('ConversationRunner', () => {
         // The retry call should have had tool_choice=required
         // (callCount 3 is the retry — lastOptions captured there)
         // After call 3 returns a tool call, call 4 happens without tool_choice
-        expect(provider.lastOptions).toBeUndefined(); // call 4 has no options
+        expect(provider.lastOptions?.toolChoice).toBeUndefined(); // call 4 has no tool-choice nudge
       });
 
       it('does not retry on max_output_tokens stop reason', async () => {

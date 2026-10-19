@@ -176,7 +176,15 @@ export interface ConversationState {
   previousResponseId?: string | null;
 }
 
+export type ModelCallCorrelation = {
+  sessionId?: string;
+  turnId?: string;
+  modelCallId: string;
+};
+
 export interface RequestOptions {
+  /** Diagnostic metadata; never part of the model request body. */
+  correlation?: ModelCallCorrelation;
   toolChoice?: 'auto' | 'required' | 'none';
   /**
    * Anthropic-direct only: constrain the model's final answer to a JSON schema

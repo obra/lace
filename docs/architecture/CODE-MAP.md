@@ -21,6 +21,9 @@
   [Plugin System Reference](../reference/plugins.md). For external tools (exec
   binaries, MCP servers) see [External Tools](../external-tools.md).
 
+- [Model-call correlation](model-call-correlation.md): optional runtime IDs,
+  local proxy request headers and returned worker-turn associations.
+
 ## Common Commands
 
 ```bash
