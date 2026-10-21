@@ -30,6 +30,7 @@ export interface MCPServerConfig {
   secretEnv?: Record<string, MCPSecretReference>;
   placement?: MCPPlacement;
   enabled: boolean;
+  forwardExecutionContext?: boolean;
   tools: Record<string, ToolPolicy>; // Tool name -> approval policy
 
   // Tool discovery cache

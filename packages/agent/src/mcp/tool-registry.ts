@@ -85,7 +85,13 @@ export class MCPToolRegistry extends EventEmitter {
       const result = await client.listTools();
 
       const adaptedTools = result.tools.map(
-        (mcpTool) => new MCPToolAdapter(mcpTool, server.id, client)
+        (mcpTool) =>
+          new MCPToolAdapter(
+            mcpTool,
+            server.id,
+            client,
+            server.config.forwardExecutionContext === true
+          )
       );
 
       this.toolsByConnection.set(connectionKey, adaptedTools);

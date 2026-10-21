@@ -200,12 +200,19 @@ mcpServers:
     env: { FOO: bar } # optional
     transport: stdio # optional — see below
     placement: host # optional — 'host' (default) or 'toolRuntime'
+    # forwardExecutionContext: true # trusted embedder/persona integrations only
     enabled: true # optional
 ```
 
 - `command` is the only required field.
 - The map key (`filesystem` above) is the **serverId** — tools surface as
   `filesystem/<toolName>`.
+- `forwardExecutionContext` defaults to false. When enabled on a trusted
+  embedder or persona server, Lace adds `_meta['io.sen.execution']` to tool
+  requests using the active session and turn IDs from its runtime context. For
+  Sen, enable it only on the host chat server. Missing IDs fail the tool call
+  closed. Tool arguments cannot set this request metadata. User-managed MCP
+  server upserts do not accept this option.
 
 ### What's actually supported
 

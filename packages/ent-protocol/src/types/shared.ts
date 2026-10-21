@@ -190,6 +190,7 @@ export interface MCPServerConfig {
   >;
   placement?: 'toolRuntime' | 'host';
   enabled: boolean;
+  forwardExecutionContext?: boolean;
   tools: Record<string, ToolPolicy>;
   discoveredTools?: DiscoveredTool[];
   lastDiscovery?: string;

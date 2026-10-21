@@ -122,6 +122,55 @@ describe('MCPToolRegistry', () => {
     );
   });
 
+  it('forwards trusted execution metadata for an opted-in server', async () => {
+    const callTool = vi.fn().mockResolvedValue({ content: [], isError: false });
+    const client = {
+      listTools: vi.fn().mockResolvedValue({
+        tools: [
+          {
+            name: 'send',
+            inputSchema: { type: 'object', properties: { text: { type: 'string' } } },
+          },
+        ],
+      }),
+      callTool,
+    };
+    mockServerManager.getServer.mockReturnValue({
+      id: 'sen-chat',
+      connectionKey: 'sen-chat',
+      config: {
+        command: 'node',
+        enabled: true,
+        tools: {},
+        forwardExecutionContext: true,
+      },
+      status: 'running',
+      client,
+    });
+    const toolsUpdated = new Promise<MinimalTool[]>((resolve) => {
+      registry.once('tools-updated', (_serverId, tools) => resolve(tools as MinimalTool[]));
+    });
+
+    mockServerManager.emit('server-status-changed', 'sen-chat', 'running');
+    const [tool] = await toolsUpdated;
+    await tool!.execute(
+      { text: 'hello' },
+      {
+        signal: new AbortController().signal,
+        activeSessionId: 'session-trusted',
+        turnId: 'turn-trusted',
+      }
+    );
+
+    expect(callTool).toHaveBeenCalledWith({
+      name: 'send',
+      arguments: { text: 'hello' },
+      _meta: {
+        'io.sen.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
+      },
+    });
+  });
+
   it('should filter disabled tools from available tools', () => {
     // Manually set up tools for testing
     const mockTool: MinimalTool = {

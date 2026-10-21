@@ -76,7 +76,8 @@ export class MCPToolAdapter extends Tool {
   constructor(
     private mcpTool: MCPTool,
     private serverId: string,
-    private client: Client
+    private client: Client,
+    private forwardExecutionContext = false
   ) {
     super();
     this.name = `${serverId}/${mcpTool.name}`;
@@ -89,13 +90,32 @@ export class MCPToolAdapter extends Tool {
   // TODO(D2): MCP session keying + identity
   protected async executeValidated(
     args: Record<string, unknown>,
-    _context?: ToolContext
+    context?: ToolContext
   ): Promise<ToolResult> {
     try {
+      let executionMeta: { 'io.sen.execution': { sessionId: string; turnId: string } } | undefined;
+      if (this.forwardExecutionContext) {
+        const sessionId = context?.activeSessionId;
+        const turnId = context?.turnId;
+        if (
+          typeof sessionId !== 'string' ||
+          sessionId.length === 0 ||
+          typeof turnId !== 'string' ||
+          turnId.length === 0
+        ) {
+          return this.createError(
+            'Cannot call this MCP tool without trusted session and turn context.',
+            { toolName: this.mcpTool.name, serverId: this.serverId }
+          );
+        }
+        executionMeta = { 'io.sen.execution': { sessionId, turnId } };
+      }
+
       // Use MCP SDK's high-level callTool method
       const result = await this.client.callTool({
         name: this.mcpTool.name,
         arguments: args,
+        ...(executionMeta ? { _meta: executionMeta } : {}),
       });
 
       // Convert MCP result to Lace ToolResult format

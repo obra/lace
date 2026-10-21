@@ -113,6 +113,50 @@ describe('ent/session/rerender_persona', () => {
     }
   });
 
+  it('keeps persona MCP execution forwarding in the reconciled host config', async () => {
+    writeFileSync(
+      join(personasDir, 'chat.md'),
+      [
+        '---',
+        'mcpServers:',
+        '  sen-chat:',
+        '    command: /usr/bin/true',
+        '    placement: host',
+        '    enabled: false',
+        '    forwardExecutionContext: true',
+        '    tools:',
+        '      send: allow',
+        '---',
+        'Use the customer chat server.',
+      ].join('\n')
+    );
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    try {
+      await client.request(
+        'initialize',
+        defaultInitializeParams({}, { userPersonasPaths: [personasDir] })
+      );
+      await client.request('session/new', {
+        cwd: workDir,
+        mcpServers: [],
+        persona: 'chat',
+      });
+
+      const configuredServer = state.mcpServerManager
+        .getAllServers()
+        .find((connection) => connection.id === 'sen-chat');
+      expect(configuredServer?.config.forwardExecutionContext).toBe(true);
+      expect(configuredServer?.config.placement).toBe('host');
+    } finally {
+      client.close();
+      server.close();
+      await state.mcpServerManager.shutdown();
+    }
+  });
+
   it('refuses to save a prompt rendered before MCP tool discovery finished', async () => {
     const discoveryTimeoutMs = 200;
     const originalDiscoveryTimeout = ToolExecutor.MCP_DISCOVERY_TIMEOUT_MS;

@@ -279,6 +279,7 @@ export function mcpServerConfigEquivalent(a: MCPServerConfig, b: MCPServerConfig
     a.placement === b.placement &&
     secretEnvRecordsEqual(a.secretEnv, b.secretEnv) &&
     a.enabled === b.enabled &&
+    a.forwardExecutionContext === b.forwardExecutionContext &&
     recordsShallowEqual(a.tools as Record<string, string>, b.tools as Record<string, string>)
   );
 }

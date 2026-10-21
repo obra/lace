@@ -204,6 +204,9 @@ export async function reconcileMcpServersForActiveSession(state: AgentServerStat
       ...(server.transport ? { transport: server.transport } : {}),
       ...(server.placement ? { placement: server.placement } : {}),
       ...(server.secretEnv ? { secretEnv: server.secretEnv } : {}),
+      ...(server.forwardExecutionContext !== undefined
+        ? { forwardExecutionContext: server.forwardExecutionContext }
+        : {}),
       enabled,
       tools,
     });

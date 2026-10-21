@@ -33,6 +33,7 @@ const MCPServerConfigSchema = z.object({
   secretEnv: z.record(z.string(), MCPSecretReferenceSchema).optional(),
   placement: z.enum(['toolRuntime', 'host']).optional(),
   enabled: z.boolean(),
+  forwardExecutionContext: z.boolean().optional(),
   tools: z.record(z.string(), ToolPolicySchema),
   // Tool discovery cache fields
   discoveredTools: z.array(DiscoveredToolSchema).optional(),

@@ -295,7 +295,13 @@ export class ToolExecutor {
       // Create MCPToolAdapter instances for each tool
       // Note: MCPToolAdapter extends core Tool - cast is safe, will be cleaned up when MCP moves to agent
       const tools = result.tools.map(
-        (mcpTool) => new MCPToolAdapter(mcpTool, server.id, server.client!) as unknown as Tool
+        (mcpTool) =>
+          new MCPToolAdapter(
+            mcpTool,
+            server.id,
+            server.client!,
+            server.config.forwardExecutionContext === true
+          ) as unknown as Tool
       );
 
       logger.debug(`Discovered ${tools.length} tools from MCP server ${server.id}`);

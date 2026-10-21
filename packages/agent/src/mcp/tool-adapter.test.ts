@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MCPToolAdapter } from './tool-adapter';
 import type { MCPTool } from './types';
+import type { ToolContext } from '@lace/agent/tools/types';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 describe('MCPToolAdapter', () => {
@@ -66,6 +67,103 @@ describe('MCPToolAdapter', () => {
         text: 'File contents here',
       },
     ]);
+
+    expect(mockCallTool).toHaveBeenCalledWith({
+      name: 'read_file',
+      arguments: { path: '/test.txt' },
+    });
+  });
+
+  it('forwards opted-in execution metadata from trusted context, not tool arguments', async () => {
+    const mockCallTool = mockClient.callTool as vi.MockedFunction<typeof mockClient.callTool>;
+    mockCallTool.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'sent' }],
+      isError: false,
+    });
+    const toolWithMetadataArgument: MCPTool = {
+      ...mockMCPTool,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          text: { type: 'string' },
+          _meta: { type: 'object' },
+        },
+        required: ['text'],
+      },
+    };
+    const adapter = new MCPToolAdapter(toolWithMetadataArgument, 'sen-chat', mockClient, true);
+    const context: ToolContext = {
+      signal: new AbortController().signal,
+      activeSessionId: 'session-trusted',
+      turnId: 'turn-trusted',
+    };
+
+    await adapter.execute(
+      {
+        text: 'hello',
+        _meta: {
+          'io.sen.execution': {
+            sessionId: 'session-from-tool-args',
+            turnId: 'turn-from-tool-args',
+          },
+        },
+      },
+      context
+    );
+
+    expect(mockCallTool).toHaveBeenCalledWith({
+      name: 'read_file',
+      arguments: {
+        text: 'hello',
+        _meta: {
+          'io.sen.execution': {
+            sessionId: 'session-from-tool-args',
+            turnId: 'turn-from-tool-args',
+          },
+        },
+      },
+      _meta: {
+        'io.sen.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
+      },
+    });
+  });
+
+  it.each([
+    { activeSessionId: undefined, turnId: 'turn-trusted' },
+    { activeSessionId: 'session-trusted', turnId: undefined },
+    { activeSessionId: '', turnId: 'turn-trusted' },
+    { activeSessionId: 'session-trusted', turnId: '' },
+  ])(
+    'fails closed when opted-in execution context is incomplete: $activeSessionId/$turnId',
+    async (ids) => {
+      const mockCallTool = mockClient.callTool as vi.MockedFunction<typeof mockClient.callTool>;
+      const adapter = new MCPToolAdapter(mockMCPTool, 'sen-chat', mockClient, true);
+      const context: ToolContext = {
+        signal: new AbortController().signal,
+        ...ids,
+      };
+
+      const result = await adapter.execute({ path: '/test.txt' }, context);
+
+      expect(result.status).toBe('failed');
+      expect(mockCallTool).not.toHaveBeenCalled();
+    }
+  );
+
+  it('does not add execution metadata for ordinary MCP servers', async () => {
+    const mockCallTool = mockClient.callTool as vi.MockedFunction<typeof mockClient.callTool>;
+    mockCallTool.mockResolvedValueOnce({
+      content: [{ type: 'text', text: 'read' }],
+      isError: false,
+    });
+    const adapter = new MCPToolAdapter(mockMCPTool, 'filesystem', mockClient);
+    const context: ToolContext = {
+      signal: new AbortController().signal,
+      activeSessionId: 'session-trusted',
+      turnId: 'turn-trusted',
+    };
+
+    await adapter.execute({ path: '/test.txt' }, context);
 
     expect(mockCallTool).toHaveBeenCalledWith({
       name: 'read_file',

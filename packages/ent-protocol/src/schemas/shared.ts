@@ -119,6 +119,7 @@ export const McpServerConfigSchema = z
     secretEnv: z.record(z.string(), RuntimeSecretReferenceSchema).optional(),
     placement: z.enum(['toolRuntime', 'host']).optional(),
     enabled: z.boolean().optional(),
+    forwardExecutionContext: z.boolean().optional(),
     tools: z.record(z.string(), z.enum(['allow', 'ask', 'deny', 'disable'])).optional(),
   })
   .strict();

@@ -1,10 +1,12 @@
 // ABOUTME: Tests for simplified callback-free ToolExecutor
 // ABOUTME: Validates simple execute() interface and tool registry functionality
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ToolExecutor } from './executor';
 import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
 import type { ToolCall, ToolContext } from './types';
+import type { MCPServerConnection } from '@lace/agent/config/mcp-types';
+import type { MCPServerManager } from '@lace/agent/mcp/server-manager';
 
 describe('Simplified ToolExecutor', () => {
   let executor: ToolExecutor;
@@ -118,6 +120,63 @@ describe('Simplified ToolExecutor', () => {
       // These methods exist for MCP integration
       expect(typeof executor.ensureMCPToolsReady).toBe('function');
       expect(typeof executor.registerMCPTools).toBe('function');
+    });
+
+    it('forwards trusted execution context for an opted-in MCP server', async () => {
+      const mcpClient = {
+        listTools: vi.fn().mockResolvedValue({
+          tools: [
+            {
+              name: 'send',
+              description: 'Send a message',
+              inputSchema: {
+                type: 'object',
+                properties: { text: { type: 'string' } },
+                required: ['text'],
+              },
+            },
+          ],
+        }),
+        callTool: vi.fn().mockResolvedValue({
+          content: [{ type: 'text', text: 'sent' }],
+          isError: false,
+        }),
+      };
+      const connection: MCPServerConnection = {
+        id: 'sen-chat',
+        connectionKey: 'sen-chat:host',
+        config: {
+          command: 'node',
+          enabled: true,
+          tools: { send: 'allow' },
+          forwardExecutionContext: true,
+        },
+        status: 'running',
+        client: mcpClient as unknown as MCPServerConnection['client'],
+      };
+      const manager = {
+        getAllServers: vi.fn().mockReturnValue([connection]),
+      } as unknown as MCPServerManager;
+
+      await executor.registerMCPToolsAndWait(manager);
+      const adapter = executor.getTool('sen-chat/send');
+      expect(adapter).toBeDefined();
+      await adapter!.execute(
+        { text: 'hello' },
+        {
+          ...mockContext,
+          activeSessionId: 'session-trusted',
+          turnId: 'turn-trusted',
+        }
+      );
+
+      expect(mcpClient.callTool).toHaveBeenCalledWith({
+        name: 'send',
+        arguments: { text: 'hello' },
+        _meta: {
+          'io.sen.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
+        },
+      });
     });
   });
 

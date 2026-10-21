@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { McpServerConfigSchema } from '@lace/ent-protocol';
-import { mergeMcpServers } from '../rpc/session-config';
+import { applyEmbedderMcpServers, mergeMcpServers } from '../rpc/session-config';
 import { MCPConfigLoader } from './mcp-config-loader';
 import type { MCPServerConfig, DiscoveredTool } from './mcp-types';
 
@@ -129,6 +129,22 @@ describe('MCPServerConfig Discovery Fields', () => {
     expect(
       McpServerConfigSchema.parse({ name: 'host', command: 'test', placement: 'host' }).placement
     ).toBe('host');
+  });
+
+  it('preserves opt-in execution context through protocol and session config normalization', () => {
+    const configured = {
+      name: 'sen-chat',
+      command: 'node',
+      placement: 'host' as const,
+      forwardExecutionContext: true,
+    };
+    const protocolConfig = McpServerConfigSchema.parse(configured);
+    const [merged] = mergeMcpServers(undefined, [protocolConfig]);
+    const [stored] = applyEmbedderMcpServers(undefined, [protocolConfig]);
+
+    expect(protocolConfig.forwardExecutionContext).toBe(true);
+    expect(merged?.forwardExecutionContext).toBe(true);
+    expect(stored?.forwardExecutionContext).toBe(true);
   });
 
   it('should default merged MCP placement by transport', () => {

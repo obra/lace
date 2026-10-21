@@ -65,6 +65,7 @@ describe('PersonaRegistry', () => {
         'mcpServers:',
         '  knowledge:',
         '    command: ./node_modules/.bin/tsx',
+        '    forwardExecutionContext: true',
         '    args:',
         '      - ./src/mcp/servers/knowledge.ts',
         '      - --flag',
@@ -90,6 +91,7 @@ describe('PersonaRegistry', () => {
     // Host placement (the default): relative command/args resolve under mcpBaseDir.
     expect(servers.knowledge.command).toBe('/pkg/root/node_modules/.bin/tsx');
     expect(servers.knowledge.args).toEqual(['/pkg/root/src/mcp/servers/knowledge.ts', '--flag']);
+    expect(servers.knowledge.forwardExecutionContext).toBe(true);
     // Absolute path and bare command name are left untouched.
     expect(servers['absolute-host'].command).toBe('node');
     expect(servers['absolute-host'].args).toEqual(['/opt/abs/index.js']);

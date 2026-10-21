@@ -642,6 +642,7 @@ export function registerSessionHandlers(
         args?: string[];
         env?: Record<string, string>;
         transport?: 'stdio' | 'sse' | 'http';
+        forwardExecutionContext?: boolean;
         enabled?: boolean;
         tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
       }>;
@@ -727,6 +728,13 @@ export function registerSessionHandlers(
         command: string;
         args?: string[];
         env?: Record<string, string>;
+        transport?: 'stdio' | 'sse' | 'http';
+        secretEnv?: Record<
+          string,
+          { namespace: 'session' | 'project' | 'host-service'; name: string }
+        >;
+        placement?: 'toolRuntime' | 'host';
+        forwardExecutionContext?: boolean;
         enabled?: boolean;
         tools?: Record<string, 'allow' | 'ask' | 'deny' | 'disable'>;
       }>;
@@ -755,6 +763,9 @@ export function registerSessionHandlers(
               ...(spec.transport ? { transport: spec.transport } : {}),
               ...(spec.secretEnv ? { secretEnv: spec.secretEnv } : {}),
               ...(spec.placement ? { placement: spec.placement } : {}),
+              ...(spec.forwardExecutionContext !== undefined
+                ? { forwardExecutionContext: spec.forwardExecutionContext }
+                : {}),
               ...(spec.enabled !== undefined ? { enabled: spec.enabled } : {}),
               ...(spec.tools
                 ? {

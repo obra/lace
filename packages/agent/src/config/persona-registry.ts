@@ -72,6 +72,7 @@ const personaConfigSchema = z
           secretEnv: z.record(z.string(), mcpSecretReferenceSchema).optional(),
           placement: z.enum(['toolRuntime', 'host']).optional(),
           enabled: z.boolean().optional(),
+          forwardExecutionContext: z.boolean().optional(),
           tools: z.record(z.string(), z.unknown()).optional(),
         })
       )

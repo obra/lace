@@ -2,7 +2,27 @@
 // ABOUTME: Covers permission logic including safeInternal tools
 
 import { describe, it, expect } from 'vitest';
-import { shouldAskPermission, toolKindFromName } from '@lace/agent/rpc/utils';
+import {
+  mcpServerConfigEquivalent,
+  shouldAskPermission,
+  toolKindFromName,
+} from '@lace/agent/rpc/utils';
+import type { MCPServerConfig } from '@lace/agent/config/mcp-types';
+
+describe('mcpServerConfigEquivalent', () => {
+  it('treats execution-context forwarding changes as a server config change', () => {
+    const current: MCPServerConfig = {
+      command: 'node',
+      enabled: true,
+      tools: { send: 'allow' },
+    };
+
+    expect(mcpServerConfigEquivalent(current, { ...current })).toBe(true);
+    expect(mcpServerConfigEquivalent(current, { ...current, forwardExecutionContext: true })).toBe(
+      false
+    );
+  });
+});
 
 describe('toolKindFromName', () => {
   it('returns read for file_read', () => {

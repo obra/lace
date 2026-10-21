@@ -25,6 +25,7 @@ describe('MCPConfigLoader', () => {
             command: 'node',
             args: ['fs-server.js'],
             enabled: true,
+            forwardExecutionContext: true,
             tools: {
               read_file: 'allow',
               write_file: 'ask',
@@ -38,6 +39,7 @@ describe('MCPConfigLoader', () => {
     expect(config.servers.filesystem.command).toBe('node');
     expect(config.servers.filesystem.args).toEqual(['fs-server.js']);
     expect(config.servers.filesystem.tools.read_file).toBe('allow');
+    expect(config.servers.filesystem.forwardExecutionContext).toBe(true);
   });
 
   it('should gracefully handle invalid server configurations', () => {
