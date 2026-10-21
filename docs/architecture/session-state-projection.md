@@ -34,6 +34,12 @@ back to a full rebuild over the whole log and seeds the cache from it.
 
 The incremental fold and the full rebuild apply the **same** per-event handler,
 so an incremental fold is byte-identical to a full rebuild over the same events.
+The handler receives each event's `timestamp` alongside its data; in a subagent
+session it renders that as a leading `<message_meta sent_at="..."/>` line on
+prompts and injects (see
+[prompt-cache-stability.md](prompt-cache-stability.md#subagent-sent_at-stamps)).
+Whether a session stamps is read from its `meta.json` once, when the cache is
+seeded.
 
 ## The projection is the persisted prefix only
 

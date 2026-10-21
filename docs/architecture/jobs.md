@@ -281,7 +281,11 @@ delegate runner. It:
     for `connectionId`, and `session/set_config_option` for `modelId`.
 12. Sends `session/prompt` with `subagentContent` and maps the returned stop
     reason to a job status. Stop details/refusals/provider failures are appended
-    as `[SUBAGENT STOP: ...]` diagnostic output.
+    as `[SUBAGENT STOP: ...]` diagnostic output. The child session's `meta.json`
+    records `parent`, so every prompt and injection the subagent receives (this
+    task prompt, `delegate(resume=...)` follow-ups, job notifications,
+    reminders) leads with a `<message_meta sent_at="..."/>` line; see
+    [prompt-cache-stability.md](prompt-cache-stability.md#subagent-sent_at-stamps).
 13. On errors, marks failed unless already cancelled and appends a
     `[SUBAGENT ERROR]` block including JSON-RPC code/data and buffered stderr
     when available.
