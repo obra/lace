@@ -11,14 +11,32 @@ export interface TemplateContext {
   [key: string]: unknown;
 }
 
+/**
+ * Default files for includes that resolve inside `root`. When such an include
+ * is missing locally, the same path relative to `root` is tried under each of
+ * `dirs` in order; the first existing file wins. A local file always wins.
+ */
+export interface IncludeFallbacks {
+  root: string;
+  dirs: readonly string[];
+}
+
 export class TemplateEngine {
   private readonly templateDirs: string[];
   private readonly processedIncludes = new Set<string>();
   private readonly useEmbedded: boolean;
+  private readonly includeFallbacks: IncludeFallbacks | undefined;
 
-  constructor(templateDirs: string | string[], opts: { useEmbedded?: boolean } = {}) {
+  constructor(
+    templateDirs: string | string[],
+    opts: { useEmbedded?: boolean; includeFallbacks?: IncludeFallbacks } = {}
+  ) {
     this.templateDirs = Array.isArray(templateDirs) ? templateDirs : [templateDirs];
     this.useEmbedded = opts.useEmbedded ?? false;
+    this.includeFallbacks = opts.includeFallbacks && {
+      root: path.resolve(opts.includeFallbacks.root),
+      dirs: opts.includeFallbacks.dirs.map((dir) => path.resolve(dir)),
+    };
   }
 
   get usesEmbedded(): boolean {
@@ -169,7 +187,9 @@ export class TemplateEngine {
    * - the token ends in an alphanumeric / underscore character (so trailing
    *   sentence punctuation is not captured into the path).
    *
-   * Missing files: warn and emit the original `@path` text literally. Circular
+   * Missing files: if the include resolves inside `includeFallbacks.root`, the
+   * fallback dirs are searched (see findIncludeFallback); otherwise, or if no
+   * fallback has it, warn and emit the original `@path` text literally. Circular
    * references: detected via a per-render Set and replaced with an HTML comment
    * marker to break the cycle without crashing.
    */
@@ -234,15 +254,30 @@ export class TemplateEngine {
         }
       }
 
-      // Fallback: locate include file across templateDirs
+      // Fallback: locate include file across templateDirs. foundPath is the
+      // file actually read; includeLocation is where the include resolved
+      // locally, which differs from foundPath when an include fallback is used.
       let foundPath: string | null = null;
+      let includeLocation = '';
       let foundTemplateDir = '';
       if (!foundContent) {
         for (const templateDir of this.templateDirs) {
           const fullIncludePath = path.resolve(templateDir, currentDir, includePath);
           const normalizedPath = path.normalize(fullIncludePath);
           if (fs.existsSync(normalizedPath)) {
-            foundPath = normalizedPath;
+            foundPath = includeLocation = normalizedPath;
+            foundTemplateDir = templateDir;
+            break;
+          }
+        }
+      }
+      if (!foundContent && !foundPath) {
+        for (const templateDir of this.templateDirs) {
+          const localPath = path.normalize(path.resolve(templateDir, currentDir, includePath));
+          const fallbackPath = this.findIncludeFallback(localPath);
+          if (fallbackPath) {
+            foundPath = fallbackPath;
+            includeLocation = localPath;
             foundTemplateDir = templateDir;
             break;
           }
@@ -266,8 +301,10 @@ export class TemplateEngine {
         this.processedIncludes.add(checkPath);
 
         const includeContent = foundContent || fs.readFileSync(foundPath!, 'utf-8');
+        // Nested includes resolve from the local location, so a fallback
+        // file's own includes also go through the local-then-fallback search.
         const includeDir = foundTemplateDir
-          ? path.dirname(path.relative(foundTemplateDir, foundPath!))
+          ? path.dirname(path.relative(foundTemplateDir, includeLocation))
           : path.dirname(includePath);
         const processed = this.processIncludes(includeContent, includeDir);
         out += processed;
@@ -284,6 +321,29 @@ export class TemplateEngine {
     }
     out += content.slice(lastIndex);
     return out;
+  }
+
+  /**
+   * For a missing include at `localPath` inside the fallback root, return the
+   * first existing file at the same root-relative path under a fallback dir.
+   * Paths outside root (including `..` escapes) never use fallbacks.
+   */
+  private findIncludeFallback(localPath: string): string | null {
+    if (!this.includeFallbacks) return null;
+    const relativeToRoot = path.relative(this.includeFallbacks.root, localPath);
+    if (
+      relativeToRoot === '' ||
+      relativeToRoot === '..' ||
+      relativeToRoot.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relativeToRoot)
+    ) {
+      return null;
+    }
+    for (const dir of this.includeFallbacks.dirs) {
+      const candidate = path.join(dir, relativeToRoot);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
   }
 
   /**

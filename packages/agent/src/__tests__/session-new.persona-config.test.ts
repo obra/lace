@@ -66,6 +66,50 @@ describe('initialize userPersonasPaths + session/new persona config', () => {
     expect(names).toContain('librarian');
   });
 
+  it('passes includeFallbacks from initialize to user persona rendering', async () => {
+    const userDir = join(tempDir, 'user');
+    const personasDir = join(userDir, 'agent-personas');
+    const pluginUserDir = join(tempDir, 'plugin', 'user');
+    mkdirSync(personasDir, { recursive: true });
+    mkdirSync(join(pluginUserDir, 'mutable_identity'), { recursive: true });
+    writeFileSync(join(personasDir, 'core.md'), 'Core: @../mutable_identity/identity.md');
+    writeFileSync(join(pluginUserDir, 'mutable_identity', 'identity.md'), 'plugin identity');
+
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await client.request('initialize', {
+      ...defaultInitializeParams({}, { userPersonasPaths: [personasDir] }),
+      includeFallbacks: { root: userDir, dirs: [pluginUserDir] },
+    });
+
+    expect(state.personaRegistry.renderPersona('core', {})).toBe('Core: plugin identity');
+  });
+
+  it.each([
+    ['a string value', '/inst/user'],
+    ['a null value', null],
+    ['an array value', ['/inst/user']],
+    ['no root', { dirs: ['/inst/plugin/user'] }],
+    ['an empty root', { root: '', dirs: ['/inst/plugin/user'] }],
+    ['no dirs', { root: '/inst/user' }],
+    ['a string dirs', { root: '/inst/user', dirs: '/inst/plugin/user' }],
+    ['an empty dir entry', { root: '/inst/user', dirs: [''] }],
+    ['a non-string dir entry', { root: '/inst/user', dirs: [42] }],
+    ['an unknown key', { root: '/inst/user', dirs: [], extra: true }],
+  ])('rejects includeFallbacks with %s', async (_label, includeFallbacks) => {
+    const state = createAgentServerState();
+    const { client } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+
+    await expect(
+      client.request('initialize', {
+        ...defaultInitializeParams({}, { userPersonasPaths: [userPersonasDir] }),
+        includeFallbacks,
+      })
+    ).rejects.toMatchObject({ code: -32602, message: 'InvalidParams' });
+    expect(state.initialized).toBe(false);
+  });
+
   it('applies persona frontmatter (model, mcpServers, tools) to session config', async () => {
     writeFileSync(
       join(userPersonasDir, 'frontmatter.md'),
