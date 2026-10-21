@@ -15,12 +15,14 @@ type ShardEvent = {
   eventSeq: number;
   type: string;
   data: Record<string, unknown>;
+  timestamp?: string;
 };
 
-const immediateInject = (eventSeq: number, text: string): ShardEvent => ({
+const immediateInject = (eventSeq: number, text: string, timestamp?: string): ShardEvent => ({
   eventSeq,
   type: 'context_injected',
   data: { priority: 'immediate', content: [{ type: 'text', text }] },
+  ...(timestamp ? { timestamp } : {}),
 });
 
 function shardLine(e: ShardEvent): string {
@@ -260,5 +262,73 @@ describe('InjectTailer behavioral equivalence vs readImmediateInjectsSince oracl
     ]);
     expect(tailerWatermark).toBe(oracle.newWatermark);
     expect(tailerWatermark).toBe(10);
+  });
+});
+
+describe('InjectTailer sent_at stamping for a subagent session', () => {
+  const persona = 'ada';
+  const day1 = new Date('2026-10-21T12:00:00.000Z');
+  let laceDir: string;
+  let sessionId: string;
+  let sessionDir: string;
+  let prevLaceDir: string | undefined;
+  let prevSessionDir: string | undefined;
+
+  beforeEach(() => {
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-injectstamp-'));
+    sessionId = `sess_${randomUUID()}`;
+    prevLaceDir = process.env.LACE_DIR;
+    prevSessionDir = process.env.LACE_SESSION_DIR;
+    process.env.LACE_DIR = laceDir;
+    process.env.LACE_SESSION_DIR = join(laceDir, 'agent-sessions');
+    sessionDir = getSessionDir(sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: '/tmp',
+        created: '2026-10-21T00:00:00.000Z',
+        parent: { sessionId: 'sess_parent', jobId: 'job_1' },
+      })
+    );
+  });
+
+  afterEach(() => {
+    if (prevLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = prevLaceDir;
+    if (prevSessionDir === undefined) delete process.env.LACE_SESSION_DIR;
+    else process.env.LACE_SESSION_DIR = prevSessionDir;
+    rmSync(laceDir, { recursive: true, force: true });
+  });
+
+  it('stamps each immediate inject with its own event time, matching the oracle', () => {
+    writeShard(
+      laceDir,
+      persona,
+      day1,
+      sessionId,
+      [{ eventSeq: 1, type: 'message', data: {} }],
+      'write'
+    );
+    const tailer = createInjectTailer(laceDir, sessionId, 1, { stampSentAt: true });
+    writeShard(
+      laceDir,
+      persona,
+      day1,
+      sessionId,
+      [
+        immediateInject(2, 'inject A', '2026-10-21T16:24:06.123Z'),
+        immediateInject(3, 'inject B', '2026-10-21T16:25:00.999Z'),
+      ],
+      'append'
+    );
+
+    const { injections } = tailer.readNew();
+    expect(injections).toEqual([
+      '<message_meta sent_at="2026-10-21T16:24:06Z"/>\ninject A',
+      '<message_meta sent_at="2026-10-21T16:25:00Z"/>\ninject B',
+    ]);
+    expect(readImmediateInjectsSince(sessionDir, 1).injections).toEqual(injections);
   });
 });

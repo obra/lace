@@ -17,6 +17,7 @@ import {
   readDurableEvents,
 } from '@lace/agent/storage/event-log';
 import { readSessionState, writeSessionState } from '@lace/agent/storage/session-store';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import {
   AIProvider,
   type ProviderMessage,
@@ -276,6 +277,8 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
     expect(injectedUserMsg).toBeDefined();
     expect(injectedUserMsg!.role).toBe('user');
     expect(injectedUserMsg!.content).toContain('URGENT: stop and report');
+    // A root session (no parent in meta.json) is never stamped.
+    expect(injectedUserMsg!.content).not.toContain('message_meta');
   });
 
   it('bareTextStopReminder returns the verify reminder when no injection was seen', () => {
@@ -770,5 +773,116 @@ describe('ConversationRunner - between-turn context_injected watermark', () => {
       return count + (text.split('BETWEEN-TURN-INJECT').length - 1);
     }, 0);
     expect(occurrences).toBe(1);
+  });
+});
+
+describe('ConversationRunner - subagent sent_at stamping', () => {
+  const STAMPED = /^<message_meta sent_at="\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"\/>\n/;
+  let laceDir: string;
+  let sessionDir: string;
+  let sessionId: string;
+  let cwd: string;
+  let savedLaceDir: string | undefined;
+
+  beforeEach(() => {
+    laceDir = mkdtempSync(join(tmpdir(), 'lace-runner-sentat-test-'));
+    sessionId = `sess_${randomUUID()}`;
+    sessionDir = join(laceDir, 'agent-sessions', sessionId);
+    cwd = join(tmpdir(), `lace-runner-sentat-test-cwd-${randomUUID().substring(0, 8)}`);
+    mkdirSync(sessionDir, { recursive: true });
+    mkdirSync(cwd, { recursive: true });
+    writeFileSync(
+      join(sessionDir, 'meta.json'),
+      JSON.stringify({
+        sessionId,
+        workDir: cwd,
+        created: new Date().toISOString(),
+        persona: 'test',
+        parent: { sessionId: 'sess_parent', jobId: 'job_1' },
+      })
+    );
+    writeFileSync(
+      join(sessionDir, 'state.json'),
+      JSON.stringify({ nextEventSeq: 2, nextStreamSeq: 1 })
+    );
+    writeFileSync(
+      join(sessionDir, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: new Date().toISOString(),
+        type: 'system_prompt_set',
+        data: { type: 'system_prompt_set', text: 'You are a test assistant.' },
+      }) + '\n'
+    );
+    savedLaceDir = process.env.LACE_DIR;
+    process.env.LACE_DIR = laceDir;
+    invalidatePersonaCache();
+  });
+
+  afterEach(() => {
+    if (savedLaceDir === undefined) delete process.env.LACE_DIR;
+    else process.env.LACE_DIR = savedLaceDir;
+    if (existsSync(laceDir)) rmSync(laceDir, { recursive: true, force: true });
+    if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('stamps the task prompt and a mid-turn inject, and sends exactly what the rebuild produces', async () => {
+    const state = readSessionState(sessionDir);
+    const { nextState } = appendDurableEvent(sessionDir, state, {
+      type: 'prompt',
+      data: { content: [{ type: 'text', text: 'do work' }] },
+    });
+    writeSessionState(sessionDir, nextState);
+
+    const provider = new ScriptedProvider([
+      {
+        beforeReturn: () => injectContextEvent(sessionDir, 'URGENT: stop and report'),
+        response: {
+          content: '',
+          toolCalls: [{ id: 'tc_1', name: 'bash', arguments: { command: 'echo hi' } }],
+          stopReason: 'tool_use',
+          usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
+        },
+      },
+      {
+        response: {
+          content: 'OK, reporting.',
+          toolCalls: [],
+          stopReason: 'stop',
+          usage: { promptTokens: 120, completionTokens: 5, totalTokens: 125 },
+        },
+      },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({ createProvider: vi.fn().mockImplementation(async () => provider) })
+    );
+
+    await runner.run({
+      content: [{ type: 'text', text: 'do work' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    const firstPrompt = provider.receivedMessages[0]![0]!;
+    expect(firstPrompt.role).toBe('user');
+    expect(firstPrompt.content).toMatch(STAMPED);
+    expect(firstPrompt.content).toMatch(/\ndo work$/);
+
+    const isUrgent = (m: ProviderMessage) =>
+      m.role === 'user' && typeof m.content === 'string' && m.content.includes('URGENT');
+    const sent = provider.receivedMessages[1]!.find(isUrgent);
+    expect(sent).toBeDefined();
+    expect(sent!.content).toMatch(/<message_meta sent_at="[^"]+"\/>\nURGENT: stop and report$/);
+
+    // The inject hit the log before the tool_use event, so the rebuild merges it
+    // into the prompt's user message while the live send appended it after the
+    // tool result. The message boundaries differ on main too; what this pins is
+    // that each stamped segment is byte-identical in both.
+    const rebuilt = buildProviderMessagesFromDurableEvents(sessionDir).messages;
+    const rebuiltText = rebuilt.map((m) => (typeof m.content === 'string' ? m.content : ''));
+    expect(rebuiltText[0]!.startsWith(firstPrompt.content as string)).toBe(true);
+    expect(rebuiltText.some((t) => t.includes(sent!.content as string))).toBe(true);
   });
 });

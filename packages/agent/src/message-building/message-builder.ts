@@ -11,6 +11,8 @@ import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 export { estimateProviderTokens };
 import { logger } from '@lace/agent/utils/logger';
 import { readParsedSessionEvents, type ParsedSessionEvent } from './parsed-events';
+import { stampSentAt, stampSentAtContent } from './sent-at';
+import { sessionStampsSentAt } from '@lace/agent/storage/session-store';
 
 // Typed shapes for parsing event data
 type TextBlock = { type: 'text'; text: string };
@@ -213,7 +215,9 @@ export type BuiltProviderMessages = {
  * event return systemPrompt: ''.
  */
 export function buildProviderMessagesFromDurableEvents(sessionDir: string): BuiltProviderMessages {
-  return buildProviderMessagesFromParsedEvents(readParsedSessionEvents(sessionDir));
+  return buildProviderMessagesFromParsedEvents(readParsedSessionEvents(sessionDir), {
+    stampSentAt: sessionStampsSentAt(sessionDir),
+  });
 }
 
 /**
@@ -230,10 +234,13 @@ export type ProjectionAccumulator = {
   // each context_compacted (a post-compaction rerender legitimately supersedes
   // earlier prompts). Events marked rerender:true are not counted. >1 within one era is the invariant violation worth surfacing.
   systemPromptCount: number;
+  // Subagent sessions only: prefix each prompt and context injection with a
+  // <message_meta sent_at="..."/> line rendered from the event's own timestamp.
+  stampSentAt: boolean;
 };
 
-export function newProjectionAccumulator(): ProjectionAccumulator {
-  return { state: initialFoldState(), systemPrompt: '', systemPromptCount: 0 };
+export function newProjectionAccumulator(stampSentAt = false): ProjectionAccumulator {
+  return { state: initialFoldState(), systemPrompt: '', systemPromptCount: 0, stampSentAt };
 }
 
 /**
@@ -247,12 +254,19 @@ export function newProjectionAccumulator(): ProjectionAccumulator {
  * text-merge, and the `context_compacted` reset to `preserved[]` + orphan
  * cleanup. Those special events close the open tool batch (batch = null) so a
  * following tool_use starts a fresh turn rather than coalescing across them.
+ *
+ * `timestamp` is the event's own write time. When the accumulator stamps
+ * (subagent sessions), prompts and injects get a sent_at line rendered from it
+ * here, never stored, so every rebuild of the same event renders the same bytes.
  */
 export function applyEventToProjection(
   acc: ProjectionAccumulator,
   type: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  timestamp?: string
 ): void {
+  const sentAt = acc.stampSentAt ? timestamp : undefined;
+
   if (type === 'system_prompt_set') {
     const eventData = data as SystemPromptSetData;
     if (typeof eventData.text === 'string') {
@@ -272,7 +286,10 @@ export function applyEventToProjection(
     // the already-extracted content through the reducer verbatim so the empty
     // drop and image preservation stay rebuild-only concerns.
     if (hasContent) {
-      acc.state = foldEvent(acc.state, { type: 'prompt', data: { content } });
+      acc.state = foldEvent(acc.state, {
+        type: 'prompt',
+        data: { content: stampSentAtContent(content, sentAt) },
+      });
     }
     return;
   }
@@ -283,11 +300,13 @@ export function applyEventToProjection(
     // Use appendOrMergeUser to avoid consecutive role:user messages when the
     // prior entry is a user[toolResults] turn — Anthropic combines consecutive
     // same-role messages in implementation-defined ways and it disrupts cache reach.
+    // The sent_at stamp goes on this inject's own text, so a merged message
+    // keeps one stamp per inject.
     const eventData = data as ContextInjectedData;
     const contentArr = Array.isArray(eventData.content) ? eventData.content : [];
     const content = extractTextFromContentBlocks(contentArr);
     if (content.trim()) {
-      const merged = appendOrMergeUser(acc.state.messages, content);
+      const merged = appendOrMergeUser(acc.state.messages, stampSentAt(content, sentAt));
       acc.state = { messages: merged, batch: null };
     } else {
       // Even an empty injection closes the open tool batch.
@@ -401,10 +420,11 @@ export function finalizeProjectionWarnings(acc: ProjectionAccumulator): void {
  * event through the shared applyEventToProjection handler.
  */
 export function buildProviderMessagesFromParsedEvents(
-  parsedEvents: ParsedSessionEvent[]
+  parsedEvents: ParsedSessionEvent[],
+  options: { stampSentAt?: boolean } = {}
 ): BuiltProviderMessages {
-  const acc = newProjectionAccumulator();
-  for (const e of parsedEvents) applyEventToProjection(acc, e.type, e.data);
+  const acc = newProjectionAccumulator(options.stampSentAt ?? false);
+  for (const e of parsedEvents) applyEventToProjection(acc, e.type, e.data, e.timestamp);
   finalizeProjectionWarnings(acc);
   return { messages: acc.state.messages, systemPrompt: acc.systemPrompt };
 }

@@ -25,6 +25,7 @@ import { readHead } from '@lace/agent/storage/seq-head';
 import { sessionShardFiles } from '@lace/agent/storage/event-log';
 import { readNewCompleteLines } from '@lace/agent/storage/inject-tailer';
 import { loadTurnEntryProjection, type TurnEntryProjection } from './turn-entry-projection';
+import { sessionStampsSentAt } from '@lace/agent/storage/session-store';
 
 /**
  * The conversation projection cached in memory across turns. It is the
@@ -54,6 +55,9 @@ export type CachedProjection = {
   // everything), so the next incremental read sees ONLY bytes appended after the
   // seed. A shard absent from the map is new this turn and is read from byte 0.
   offsets: Map<string, number>;
+  // Whether this session's prompts and injects carry a sent_at line (subagents
+  // only). Fixed for the session's life, so it is captured once at seed.
+  stampSentAt: boolean;
 };
 
 /** Derived messages of a cached projection. */
@@ -70,8 +74,8 @@ function absolutePath(workDir: string, raw: string): string {
  * paths; the differential test uses the default since its corpus reads
  * absolute paths.
  */
-export function initialCachedProjection(cwd = ''): CachedProjection {
-  const acc = newProjectionAccumulator();
+export function initialCachedProjection(cwd = '', stampSentAt = false): CachedProjection {
+  const acc = newProjectionAccumulator(stampSentAt);
   return {
     foldState: acc.state,
     systemPrompt: acc.systemPrompt,
@@ -81,6 +85,7 @@ export function initialCachedProjection(cwd = ''): CachedProjection {
     headSeq: 1,
     cwd,
     offsets: new Map<string, number>(),
+    stampSentAt,
   };
 }
 
@@ -101,13 +106,14 @@ export function foldTailIntoProjection(
     state: proj.foldState,
     systemPrompt: proj.systemPrompt,
     systemPromptCount: proj.systemPromptCount,
+    stampSentAt: proj.stampSentAt,
   };
   const filesRead = new Set(proj.filesRead);
   let maxFoldedSeq = proj.maxFoldedSeq;
   let headSeq = proj.headSeq;
 
   for (const e of events) {
-    applyEventToProjection(acc, e.type, e.data);
+    applyEventToProjection(acc, e.type, e.data, e.timestamp);
     if (e.type === 'tool_use') {
       const data = e.data as {
         name?: unknown;
@@ -139,6 +145,7 @@ export function foldTailIntoProjection(
     // read); carry the prior map forward so a fold over an in-memory event array
     // leaves them unchanged.
     offsets: proj.offsets,
+    stampSentAt: proj.stampSentAt,
   };
   return { ...next, messages: next.foldState.messages };
 }
@@ -157,8 +164,9 @@ function seedCachedProjection(
   cwd: string,
   tip: number | undefined
 ): CachedProjection {
-  const acc = newProjectionAccumulator();
-  for (const e of events) applyEventToProjection(acc, e.type, e.data);
+  const stampSentAt = sessionStampsSentAt(sessionDir);
+  const acc = newProjectionAccumulator(stampSentAt);
+  for (const e of events) applyEventToProjection(acc, e.type, e.data, e.timestamp);
   finalizeProjectionWarnings(acc);
   const maxSeq = events.length > 0 ? Math.max(...events.map((e) => e.eventSeq)) : 0;
   return {
@@ -174,6 +182,7 @@ function seedCachedProjection(
     // appended after this seed. A shard that appears later (new date/persona) is
     // absent here and is read from byte 0 on the next incremental pass.
     offsets: currentShardSizes(sessionDir),
+    stampSentAt,
   };
 }
 

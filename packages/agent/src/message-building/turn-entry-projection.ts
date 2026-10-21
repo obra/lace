@@ -9,6 +9,7 @@ import {
   type BuiltProviderMessages,
 } from './message-builder';
 import { deriveFilesReadFromParsedEvents } from '@lace/agent/storage/files-from-events';
+import { sessionStampsSentAt } from '@lace/agent/storage/session-store';
 
 export type TurnEntryProjection = BuiltProviderMessages & {
   filesRead: Set<string>;
@@ -20,7 +21,9 @@ export type TurnEntryProjection = BuiltProviderMessages & {
 
 export function loadTurnEntryProjection(sessionDir: string, cwd: string): TurnEntryProjection {
   const events = pe.readParsedSessionEvents(sessionDir);
-  const { messages, systemPrompt } = buildProviderMessagesFromParsedEvents(events);
+  const { messages, systemPrompt } = buildProviderMessagesFromParsedEvents(events, {
+    stampSentAt: sessionStampsSentAt(sessionDir),
+  });
   const filesRead = deriveFilesReadFromParsedEvents(events, cwd);
   const maxFoldedSeq = events.reduce((max, e) => (e.eventSeq > max ? e.eventSeq : max), 0);
   return { messages, systemPrompt, filesRead, maxFoldedSeq };

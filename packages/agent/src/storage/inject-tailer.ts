@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { listTranscriptFiles } from './transcript-paths';
 import { getSessionDir } from './session-store';
+import { stampSentAt } from '@lace/agent/message-building/sent-at';
 
 /**
  * Read newly-appended complete lines from `file` starting at byte `offset`.
@@ -113,7 +114,10 @@ export type InjectTailer = {
 export function createInjectTailer(
   laceDir: string,
   sessionId: string,
-  afterEventSeq: number
+  afterEventSeq: number,
+  // Subagent sessions: stamp each inject with its event's sent_at exactly as the
+  // projection rebuild does, so the text sent mid-turn equals the rebuilt text.
+  options: { stampSentAt?: boolean } = {}
 ): InjectTailer {
   const offsets = new Map<string, number>();
   let watermark = afterEventSeq;
@@ -124,21 +128,31 @@ export function createInjectTailer(
       // eventSeq order — mirroring readAllSessionEventLines' global sort so the
       // watermark advances over a strictly monotonic stream (cross-shard seqs can
       // otherwise interleave, e.g. a legacy file read before a new shard).
-      const parsedEvents: { eventSeq: number; type: unknown; data: unknown }[] = [];
+      const parsedEvents: {
+        eventSeq: number;
+        type: unknown;
+        data: unknown;
+        timestamp: unknown;
+      }[] = [];
       for (const file of sessionShardFiles(laceDir, sessionId)) {
         // A shard not yet in the map is new this turn; start from byte 0.
         const startOffset = offsets.get(file) ?? 0;
         const { lines, offset } = readNewCompleteLines(file, startOffset);
         offsets.set(file, offset);
         for (const line of lines) {
-          let parsed: { eventSeq?: unknown; type?: unknown; data?: unknown };
+          let parsed: { eventSeq?: unknown; type?: unknown; data?: unknown; timestamp?: unknown };
           try {
             parsed = JSON.parse(line) as typeof parsed;
           } catch {
             continue; // ignore malformed line
           }
           if (typeof parsed.eventSeq !== 'number') continue;
-          parsedEvents.push({ eventSeq: parsed.eventSeq, type: parsed.type, data: parsed.data });
+          parsedEvents.push({
+            eventSeq: parsed.eventSeq,
+            type: parsed.type,
+            data: parsed.data,
+            timestamp: parsed.timestamp,
+          });
         }
       }
       parsedEvents.sort((a, b) => a.eventSeq - b.eventSeq);
@@ -151,7 +165,10 @@ export function createInjectTailer(
         const data = e.data as { content?: unknown; priority?: unknown };
         if (data.priority !== 'immediate') continue;
         const text = extractInjectedText(data.content);
-        if (text.trim()) injections.push(text);
+        if (!text.trim()) continue;
+        const timestamp =
+          options.stampSentAt && typeof e.timestamp === 'string' ? e.timestamp : undefined;
+        injections.push(stampSentAt(text, timestamp));
       }
       return { injections, newWatermark: watermark };
     },

@@ -149,6 +149,17 @@ export function readSessionMeta(sessionDir: string): SessionMeta {
   return meta;
 }
 
+/**
+ * Whether messages in this session get a sent_at stamp (see
+ * message-building/sent-at.ts): true only for subagent sessions, which are the
+ * only sessions whose meta.json records a `parent`. A session directory with no
+ * meta.json (a bare test fixture) is treated as root.
+ */
+export function sessionStampsSentAt(sessionDir: string): boolean {
+  if (!fs.existsSync(path.join(sessionDir, 'meta.json'))) return false;
+  return readSessionMeta(sessionDir).parent !== undefined;
+}
+
 export function writeSessionMeta(sessionDir: string, meta: SessionMeta): void {
   fs.mkdirSync(sessionDir, { recursive: true });
   atomicWriteJson(path.join(sessionDir, 'meta.json'), meta, { mode: 0o600 });

@@ -2,6 +2,9 @@
 // ABOUTME: Pure-function tests over synthetic TypedDurableEvent[] fixtures
 
 import { describe, it, expect, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   buildTurnToTrackMap,
   groupEarlierEventsByTrack,
@@ -595,6 +598,44 @@ describe('compact()', () => {
       (p) => p.role === 'user' && contentText(p.content).includes('alarm fired')
     );
     expect(injectedEntry).toBeDefined();
+  });
+
+  it('stamps tail prompts and injects with sent_at when compacting a subagent session', async () => {
+    const sessionDir = mkdtempSync(join(tmpdir(), 'lace-compact-sentat-'));
+    try {
+      writeFileSync(
+        join(sessionDir, 'meta.json'),
+        JSON.stringify({
+          sessionId: 'sess_00000000-0000-4000-8000-0000000000c1',
+          workDir: '/tmp',
+          created: 'x',
+          parent: { sessionId: 'sess_parent', jobId: 'job_1' },
+        })
+      );
+      const events: TypedDurableEvent[] = [];
+      let seq = 1;
+      for (let i = 0; i < 11; i++) {
+        events.push(event(seq++, 'prompt', { content: [], track: `ext:T${i}` }));
+        events.push(turnStart(seq++, `turn_${i}`));
+        events.push(turnEnd(seq++, `turn_${i}`));
+      }
+      const injectSeq = seq;
+      events.push(event(seq++, 'context_injected', { content: [{ type: 'text', text: 'inj' }] }));
+      events.push(event(seq++, 'message', { content: 'seen' }));
+      const promptSeq = seq;
+      events.push(event(seq++, 'prompt', { content: [{ type: 'text', text: 'ack' }] }));
+      events.push(turnStart(seq++, 'turn_tail'));
+      events.push(turnEnd(seq++, 'turn_tail'));
+
+      const result = await compact(events, { threadId: 'sess_child', sessionDir });
+      const text = JSON.stringify(result.compactionEvent.data.preserved);
+      const stamp = (s: number) =>
+        `<message_meta sent_at=\\"2026-05-24T00:00:${String(s).padStart(2, '0')}Z\\"/>`;
+      expect(text).toContain(`${stamp(injectSeq)}\\ninj`);
+      expect(text).toContain(`${stamp(promptSeq)}\\nack`);
+    } finally {
+      rmSync(sessionDir, { recursive: true, force: true });
+    }
   });
 
   it('preserves image content blocks in tail prompts without flattening to text', async () => {

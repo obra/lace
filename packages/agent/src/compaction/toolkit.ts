@@ -10,6 +10,7 @@ import { foldEvents } from '@lace/agent/message-building/fold-event';
 import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 import { logger } from '@lace/agent/utils/logger';
 import type { FoldEventInput } from '@lace/agent/message-building/fold-event';
+import { stampSentAtContent } from '@lace/agent/message-building/sent-at';
 
 // ---------------------------------------------------------------------------
 // Tiny pure helpers copied from rpc/utils — toolkit must not import rpc/utils
@@ -580,17 +581,32 @@ type PreservedMessage = {
  * `context_injected` is a plain user push (no merge) — exactly what the reducer
  * does. `PreservedMessage` is structurally identical to the reducer's
  * `ProviderMessage`, so the reducer's messages are returned directly.
+ *
+ * `stampSentAt` (subagent sessions) prefixes each prompt and inject with its
+ * event's sent_at line, matching what the subagent was sent before compaction.
+ * The token estimators leave it off: a few tokens per message do not move them.
  */
-export function buildPreservedTail(events: TypedDurableEvent[]): PreservedMessage[] {
+export function buildPreservedTail(
+  events: TypedDurableEvent[],
+  options: { stampSentAt?: boolean } = {}
+): PreservedMessage[] {
   const foldInputs: FoldEventInput[] = [];
+  const sentAt = (e: TypedDurableEvent) => (options.stampSentAt ? e.timestamp : undefined);
+  const userContent = (raw: unknown, e: TypedDurableEvent) =>
+    typeof raw === 'string' || Array.isArray(raw)
+      ? stampSentAtContent(raw as string | ContentBlock[], sentAt(e))
+      : raw;
 
   for (const e of events) {
     if (isEventOfType(e, 'prompt')) {
-      foldInputs.push({ type: 'prompt', data: { content: e.data.content } });
+      foldInputs.push({ type: 'prompt', data: { content: userContent(e.data.content, e) } });
       continue;
     }
     if (isEventOfType(e, 'context_injected')) {
-      foldInputs.push({ type: 'context_injected', data: { content: e.data.content } });
+      foldInputs.push({
+        type: 'context_injected',
+        data: { content: userContent(e.data.content, e) },
+      });
       continue;
     }
     if (isEventOfType(e, 'message')) {
