@@ -213,7 +213,11 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
       },
       containerManager: null as unknown as ContainerManager,
       containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
-      personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      personaRegistry: {
+        getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
+      },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
@@ -277,7 +281,11 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
       },
       containerManager: null as unknown as ContainerManager,
       containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
-      personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      personaRegistry: {
+        getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
+      },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 
@@ -287,6 +295,62 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
 
     expect(initializeRequests).toHaveLength(1);
     expect(initializeRequests[0]).toMatchObject({ skillDirs });
+  });
+
+  it('passes parent includeFallbacks through child initialize', async () => {
+    const jobId = 'job_include_fallbacks_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+    const includeFallbacks = {
+      root: '/host/instance/user',
+      dirs: ['/host/instance/state/plugins/sen-colleague/user'],
+    };
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      subagentContent: [{ type: 'text', text: 'noop' }],
+    };
+
+    const state = {
+      initialized: true,
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: null as unknown as ContainerManager,
+      containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
+      personaRegistry: {
+        getUserPersonasPaths: () => ['/host/instance/user/agent-personas'],
+        getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => includeFallbacks,
+      },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
+    };
+
+    runSubagentJobProcess(job, makeSubagentJobDeps({ state }));
+
+    await completion;
+
+    expect(initializeRequests).toHaveLength(1);
+    expect(initializeRequests[0]).toMatchObject({ includeFallbacks });
   });
 
   it('calls session/resume (not session/new) when subagentSessionPreallocated is absent', async () => {
@@ -327,7 +391,11 @@ describe('runSubagentJobProcess — preallocated sessionId', () => {
       },
       containerManager: null as unknown as ContainerManager,
       containerMounts: {} as Readonly<Record<string, MountRegistryEntry>>,
-      personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      personaRegistry: {
+        getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
+      },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 

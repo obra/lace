@@ -11,7 +11,7 @@ import { resolveMcpServerCommandArgs } from './mcp-path-resolution';
 import { scanEmbeddedFiles, resolveResourcePath } from '@lace/agent/utils/resource-resolver';
 import { logger } from '@lace/agent/utils/logger';
 import { personaDirs } from '@lace/agent/plugins';
-import { TemplateEngine, type TemplateContext } from './template-engine';
+import { TemplateEngine, type IncludeFallbacks, type TemplateContext } from './template-engine';
 
 export interface PersonaInfo {
   name: string;
@@ -137,6 +137,9 @@ export interface PersonaRegistryOptions {
   // embedder spawns them from a cwd that differs from where the server scripts
   // live). Undefined ⇒ relative paths are left verbatim.
   mcpBaseDir?: string;
+  // Embedder-provided default files for user-persona @includes that are
+  // missing locally (see IncludeFallbacks). Applies to user sources only.
+  includeFallbacks?: IncludeFallbacks;
 }
 
 // ── PersonaSource interface ───────────────────────────────────────────────────
@@ -236,6 +239,7 @@ interface FileDirSourceOptions {
    * For plugin sources this is omitted; the source manages its own discovery.
    */
   getSharedCache?: () => Map<string, string>;
+  includeFallbacks?: IncludeFallbacks;
 }
 
 /**
@@ -273,7 +277,10 @@ class FileDirSource implements PersonaSource {
     this.namespace = opts.namespace;
     this.mcpBaseDir = opts.mcpBaseDir;
     this.getSharedCache = opts.getSharedCache;
-    this.engine = new TemplateEngine([this.dir], { useEmbedded: false });
+    this.engine = new TemplateEngine([this.dir], {
+      useEmbedded: false,
+      includeFallbacks: opts.includeFallbacks,
+    });
   }
 
   private logicalName(entry: string): string {
@@ -441,6 +448,7 @@ export class PersonaRegistry {
   private readonly bundledPersonasPath: string;
   private readonly userPersonasPaths: readonly string[];
   private readonly mcpBaseDir: string | undefined;
+  private readonly includeFallbacks: IncludeFallbacks | undefined;
 
   // Precedence-ordered sources: user > plugin > bundled.
   // Plugin FileDirSources are appended between the user FileDirSources and the
@@ -452,6 +460,7 @@ export class PersonaRegistry {
     this.bundledPersonasPath = opts.bundledPersonasPath;
     this.userPersonasPaths = opts.userPersonasPaths;
     this.mcpBaseDir = opts.mcpBaseDir;
+    this.includeFallbacks = opts.includeFallbacks;
 
     // One FileDirSource per user path (no namespace, user-defined, TTL cache
     // owned by PersonaRegistry and shared via callback filtered by dir).
@@ -463,6 +472,7 @@ export class PersonaRegistry {
           kind: 'user',
           mcpBaseDir: opts.mcpBaseDir,
           getSharedCache: () => this.userPersonasCache,
+          includeFallbacks: opts.includeFallbacks,
         })
     );
 
@@ -491,6 +501,11 @@ export class PersonaRegistry {
   /** Embedder package root for resolving relative host-placement MCP paths. */
   getMcpBaseDir(): string | undefined {
     return this.mcpBaseDir;
+  }
+
+  /** Default files for user-persona @includes, if the embedder supplied them. */
+  getIncludeFallbacks(): IncludeFallbacks | undefined {
+    return this.includeFallbacks;
   }
 
   /** Ordered list of user persona search paths (earlier wins). */

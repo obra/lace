@@ -46,6 +46,30 @@ Create your own personas in `~/.lace/agent-personas/`:
 
 User personas override built-in ones with the same name.
 
+### Include Fallbacks
+
+An `@path` include whose file is missing is left in the prompt as literal
+`@path` text. An embedder can supply default files instead by passing
+`includeFallbacks: { root, dirs }` to `initialize` alongside
+`userPersonasPaths`. For a user persona, when an include resolves to a missing
+file inside `root`, lace tries the same root-relative path under each entry of
+`dirs` in order and includes the first file that exists.
+
+- The local file always wins when it exists, so writing it shadows the default
+  as a whole. The two are never merged.
+- Includes that resolve outside `root` (including `..` escapes) never use
+  fallbacks.
+- Includes inside a fallback file resolve from the include's local location, so
+  they go through the same local-then-fallback search.
+- Plugin-contributed and bundled personas do not use fallbacks.
+- Subagents started with `delegate` inherit the same fallbacks.
+
+For example, with `root: "<inst>/user"` and
+`dirs: ["<inst>/plugins/a/user", "<inst>/plugins/b/user"]`, a persona in
+`<inst>/user/agent-personas/` that includes `@../mutable_identity/identity.md`
+gets `<inst>/user/mutable_identity/identity.md` if it exists, else
+`<inst>/plugins/a/user/mutable_identity/identity.md`, else the plugin `b` copy.
+
 ### Example Custom Persona
 
 ```markdown

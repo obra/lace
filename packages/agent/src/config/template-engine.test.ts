@@ -358,4 +358,97 @@ describe('TemplateEngine', () => {
       expect(result).toBe('Main: First: test');
     });
   });
+
+  describe('include fallbacks', () => {
+    // Layout mirrors an embedder instance: personas live under <inst>/user and
+    // plugins ship default files under their own <plugin>/user trees.
+    let userDir: string;
+    let personasDir: string;
+    let pluginA: string;
+    let pluginB: string;
+    let engine: TemplateEngine;
+
+    function write(filePath: string, content: string): void {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, content);
+    }
+
+    beforeEach(() => {
+      userDir = path.join(tempDir, 'user');
+      personasDir = path.join(userDir, 'agent-personas');
+      pluginA = path.join(tempDir, 'state', 'plugins', 'a', 'user');
+      pluginB = path.join(tempDir, 'state', 'plugins', 'b', 'user');
+      fs.mkdirSync(personasDir, { recursive: true });
+      engine = new TemplateEngine([personasDir], {
+        includeFallbacks: { root: userDir, dirs: [pluginA, pluginB] },
+      });
+      write(path.join(personasDir, 'core.md'), 'Core: @../mutable_identity/identity.md');
+    });
+
+    it('uses the local file when it exists', () => {
+      write(path.join(userDir, 'mutable_identity', 'identity.md'), 'local');
+      write(path.join(pluginA, 'mutable_identity', 'identity.md'), 'plugin a');
+
+      expect(engine.render('core.md', {})).toBe('Core: local');
+    });
+
+    it('uses the first fallback dir that has the file', () => {
+      write(path.join(pluginA, 'mutable_identity', 'identity.md'), 'plugin a');
+      write(path.join(pluginB, 'mutable_identity', 'identity.md'), 'plugin b');
+
+      expect(engine.render('core.md', {})).toBe('Core: plugin a');
+    });
+
+    it('uses a later fallback dir when earlier ones lack the file', () => {
+      write(path.join(pluginB, 'mutable_identity', 'identity.md'), 'plugin b');
+
+      expect(engine.render('core.md', {})).toBe('Core: plugin b');
+    });
+
+    it('leaves the @path text when no fallback dir has the file', () => {
+      expect(engine.render('core.md', {})).toBe('Core: @../mutable_identity/identity.md');
+    });
+
+    it('never uses fallbacks for an include outside root', () => {
+      const elsewhere = path.join(tempDir, 'elsewhere');
+      write(path.join(elsewhere, 'main.md'), 'Main: @identity.md');
+      write(path.join(pluginA, 'identity.md'), 'plugin a');
+      write(path.join(pluginA, '..', 'elsewhere', 'identity.md'), 'escaped');
+      const outsideEngine = new TemplateEngine([elsewhere], {
+        includeFallbacks: { root: userDir, dirs: [pluginA] },
+      });
+
+      expect(outsideEngine.render('main.md', {})).toBe('Main: @identity.md');
+    });
+
+    it('does not match a sibling dir that shares the root name as a prefix', () => {
+      write(path.join(personasDir, 'core.md'), 'Core: @../../user-other/identity.md');
+      write(path.join(pluginA, '..', 'user-other', 'identity.md'), 'escaped');
+
+      expect(engine.render('core.md', {})).toBe('Core: @../../user-other/identity.md');
+    });
+
+    it('resolves includes nested in a fallback file from the local location first', () => {
+      write(path.join(pluginA, 'mutable_identity', 'identity.md'), 'Identity: @voice.md');
+      write(path.join(userDir, 'mutable_identity', 'voice.md'), 'local voice');
+      write(path.join(pluginA, 'mutable_identity', 'voice.md'), 'plugin voice');
+
+      expect(engine.render('core.md', {})).toBe('Core: Identity: local voice');
+    });
+
+    it('resolves includes nested in a fallback file through the fallback dirs', () => {
+      write(path.join(pluginA, 'mutable_identity', 'identity.md'), 'Identity: @voice.md');
+      write(path.join(pluginB, 'mutable_identity', 'voice.md'), 'plugin b voice');
+
+      expect(engine.render('core.md', {})).toBe('Core: Identity: plugin b voice');
+    });
+
+    it('detects a fallback file that includes itself', () => {
+      write(path.join(pluginA, 'mutable_identity', 'identity.md'), 'Identity: @identity.md');
+
+      expect(engine.render('core.md', {})).toBe(
+        'Core: Identity: <!-- Circular include: identity.md -->'
+      );
+    });
+  });
 });

@@ -135,6 +135,7 @@ describe('runSubagentJobProcess — child_exit propagation', () => {
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
       },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };

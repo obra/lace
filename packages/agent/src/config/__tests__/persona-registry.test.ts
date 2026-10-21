@@ -407,4 +407,20 @@ describe('PersonaRegistry user search paths', () => {
     expect(byName.get('lace')?.path).toContain(tempA);
     expect(byName.get('only-bundled')?.isUserDefined).toBe(false);
   });
+
+  it('renders user persona includes through includeFallbacks when the local file is missing', () => {
+    const personasDir = path.join(tempA, 'agent-personas');
+    mkdirSync(personasDir, { recursive: true });
+    writeFileSync(path.join(personasDir, 'core.md'), 'Core: @../mutable_identity/identity.md');
+    mkdirSync(path.join(tempB, 'mutable_identity'), { recursive: true });
+    writeFileSync(path.join(tempB, 'mutable_identity', 'identity.md'), 'plugin identity');
+
+    const registry = new PersonaRegistry({
+      bundledPersonasPath: tempBundledDir,
+      userPersonasPaths: [personasDir],
+      includeFallbacks: { root: tempA, dirs: [tempB] },
+    });
+
+    expect(registry.renderPersona('core', {})).toBe('Core: plugin identity');
+  });
 });

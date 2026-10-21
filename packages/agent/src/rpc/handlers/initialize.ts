@@ -10,6 +10,7 @@ import type {
   MountRegistryEntry,
 } from '../../server-types';
 import { PersonaRegistry } from '../../config/persona-registry';
+import type { IncludeFallbacks } from '../../config/template-engine';
 import { EnvironmentRegistry } from '../../config/environment-registry';
 import { assertNoEnvironmentMountConflict } from '../../config/persona-mount-conflict';
 import { resolveResourcePath } from '../../utils/resource-resolver';
@@ -83,6 +84,30 @@ function parseSkillDirEntry(raw: unknown): SkillDirEntry {
   return { dir, namespace };
 }
 
+// includeFallbacks is { root, dirs } with a non-empty root and non-empty dir
+// entries; no other keys.
+function parseIncludeFallbacks(raw: unknown): IncludeFallbacks {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    invalidParams();
+  }
+  const { root, dirs, ...rest } = raw as Record<string, unknown>;
+  if (Object.keys(rest).length > 0) {
+    invalidParams();
+  }
+  if (typeof root !== 'string' || root.length === 0) {
+    invalidParams();
+  }
+  if (!Array.isArray(dirs)) {
+    invalidParams();
+  }
+  for (const dir of dirs) {
+    if (typeof dir !== 'string' || dir.length === 0) {
+      invalidParams();
+    }
+  }
+  return { root, dirs: dirs as string[] };
+}
+
 /**
  * Register the initialize RPC handler with the peer.
  * Validates client capabilities and sets up the initial server state.
@@ -121,6 +146,12 @@ export function registerInitializeHandler(
 
     const config = (parsed.config as Record<string, unknown> | undefined) ?? undefined;
 
+    // Embedder-provided default files for user-persona @includes.
+    const includeFallbacks =
+      parsed.includeFallbacks === undefined
+        ? undefined
+        : parseIncludeFallbacks(parsed.includeFallbacks);
+
     // Embedder-controlled persona search paths; ordered, earlier paths win.
     if (Array.isArray(parsed.userPersonasPaths)) {
       const userPaths: string[] = [];
@@ -135,6 +166,7 @@ export function registerInitializeHandler(
         userPersonasPaths: userPaths,
         // Base for resolving relative host-placement MCP paths.
         ...(typeof parsed.mcpBaseDir === 'string' ? { mcpBaseDir: parsed.mcpBaseDir } : {}),
+        ...(includeFallbacks ? { includeFallbacks } : {}),
       });
     }
 

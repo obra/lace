@@ -292,6 +292,13 @@ interface SlashCommand {
       maxThinkingTokens?: number,
       enableFileCheckpointing?: boolean,
       sandbox?: SandboxConfig
+    },
+
+    // Embedder persona setup (Ent extensions)
+    userPersonasPaths?: string[],  // Ordered persona dirs; earlier paths win
+    includeFallbacks?: {           // Default files for user-persona @includes
+      root: string,                // Includes resolving inside root may fall back
+      dirs: string[]               // Tried in order with the root-relative path
     }
   }
 }
@@ -308,6 +315,14 @@ interface SlashCommand {
   }
 }
 ```
+
+`includeFallbacks` applies to personas loaded from `userPersonasPaths`. When a
+persona's `@path` include resolves to a file inside `root` that does not exist,
+the agent tries the same root-relative path under each entry of `dirs` in order
+and includes the first file that exists. A local file always wins. Includes that
+resolve outside `root` never use fallbacks. `root` and every `dirs` entry must
+be non-empty strings, and no other keys are allowed; otherwise `initialize`
+fails with `-32602 InvalidParams`.
 
 ### 5.2 `session/new` (ACP-compatible)
 

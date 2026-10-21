@@ -137,6 +137,18 @@ const InitializeParamsSchema = z
     // Ordered persona search paths (earlier paths win). When omitted, the
     // agent uses its default user-persona directory under laceDir.
     userPersonasPaths: z.array(NonEmptyStringSchema).optional(),
+    // Default files for @includes in user personas (from userPersonasPaths).
+    // When an include resolves to a missing file inside `root`, the same
+    // root-relative path is tried under each of `dirs` in order; the first
+    // existing file wins. A local file always wins. Includes outside `root`
+    // never use fallbacks.
+    includeFallbacks: z
+      .object({
+        root: NonEmptyStringSchema,
+        dirs: z.array(NonEmptyStringSchema),
+      })
+      .strict()
+      .optional(),
     // Ordered environment-def search paths (earlier paths win). Environments are
     // the container definitions a role's `runtime.environment` resolves to. When
     // omitted, the agent uses its default agent-environments directory under
