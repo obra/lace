@@ -5,11 +5,11 @@
   "api_key": "$ANTHROPIC_API_KEY",
   "api_endpoint": "$ANTHROPIC_API_ENDPOINT",
   "default_large_model_id": "claude-sonnet-5",
-  "default_small_model_id": "claude-haiku-4-5-20251001",
+  "default_small_model_id": "claude-haiku-5-5",
   "model_aliases": {
     "opus": "claude-opus-4-8",
     "sonnet": "claude-sonnet-5",
-    "haiku": "claude-haiku-4-5-20251001"
+    "haiku": "claude-haiku-5-5"
   },
   "models": [
     {
@@ -100,6 +100,20 @@
       "context_window": 200000,
       "default_max_tokens": 50000,
       "can_reason": true,
+      "supports_attachments": true
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "name": "Claude Haiku 5.5",
+      "cost_per_1m_in": 0.1,
+      "cost_per_1m_out": 0.5,
+      "cost_per_1m_in_cached": 0.125,
+      "cost_per_1m_out_cached": 0.01,
+      "context_window": 1000000,
+      "default_max_tokens": 50000,
+      "can_reason": true,
+      "has_reasoning_effort": true,
+      "default_reasoning_effort": "medium",
       "supports_attachments": true
     },
     {
