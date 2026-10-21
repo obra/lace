@@ -5,7 +5,7 @@
   "api_key": "",
   "api_endpoint": "",
   "default_large_model_id": "anthropic.claude-opus-4-8",
-  "default_small_model_id": "anthropic.claude-haiku-4-5",
+  "default_small_model_id": "anthropic.claude-haiku-5-5",
   "models": [
     {
       "id": "anthropic.claude-opus-4-8",
@@ -42,6 +42,20 @@
       "cost_per_1m_out": 15,
       "cost_per_1m_in_cached": 3.75,
       "cost_per_1m_out_cached": 0.3,
+      "context_window": 1000000,
+      "default_max_tokens": 50000,
+      "can_reason": true,
+      "has_reasoning_effort": true,
+      "default_reasoning_effort": "medium",
+      "supports_attachments": true
+    },
+    {
+      "id": "anthropic.claude-haiku-5-5",
+      "name": "AWS Claude Haiku 5.5",
+      "cost_per_1m_in": 0.1,
+      "cost_per_1m_out": 0.5,
+      "cost_per_1m_in_cached": 0.125,
+      "cost_per_1m_out_cached": 0.01,
       "context_window": 1000000,
       "default_max_tokens": 50000,
       "can_reason": true,

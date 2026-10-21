@@ -62,6 +62,11 @@ const FLEET_MODELS: Record<
       maxOutputTokens: 50_000,
       supportsAttachments: true,
     },
+    'claude-haiku-5-5': {
+      contextWindow: 1_000_000,
+      maxOutputTokens: 50_000,
+      supportsAttachments: true,
+    },
   },
 };
 
