@@ -838,6 +838,9 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // The child re-parses personas, so it needs the same MCP base
       // dir to resolve relative host-placement command/args.
       const subagentMcpBaseDir = currentState.personaRegistry.getMcpBaseDir();
+      // The child renders the same user personas, so it needs the same
+      // default files for their @includes.
+      const subagentIncludeFallbacks = currentState.personaRegistry.getIncludeFallbacks();
 
       await childPeer.request('initialize', {
         protocolVersion: '1.0',
@@ -857,6 +860,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
         // ignore the warning entirely.
         containerMounts: currentState.containerMounts,
         ...(subagentMcpBaseDir ? { mcpBaseDir: subagentMcpBaseDir } : {}),
+        ...(subagentIncludeFallbacks ? { includeFallbacks: subagentIncludeFallbacks } : {}),
         skillDirs: subagentSkillDirs,
         // Forward the credential exec-tool dir as a top-level param (the child
         // re-registers it with trusted provenance at its own initialize); the

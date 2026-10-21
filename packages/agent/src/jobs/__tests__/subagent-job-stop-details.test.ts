@@ -136,6 +136,7 @@ describe('runSubagentJobProcess — surfaces stopDetails from session/prompt', (
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
       },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };

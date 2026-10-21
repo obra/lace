@@ -448,6 +448,7 @@ export class PersonaRegistry {
   private readonly bundledPersonasPath: string;
   private readonly userPersonasPaths: readonly string[];
   private readonly mcpBaseDir: string | undefined;
+  private readonly includeFallbacks: IncludeFallbacks | undefined;
 
   // Precedence-ordered sources: user > plugin > bundled.
   // Plugin FileDirSources are appended between the user FileDirSources and the
@@ -459,6 +460,7 @@ export class PersonaRegistry {
     this.bundledPersonasPath = opts.bundledPersonasPath;
     this.userPersonasPaths = opts.userPersonasPaths;
     this.mcpBaseDir = opts.mcpBaseDir;
+    this.includeFallbacks = opts.includeFallbacks;
 
     // One FileDirSource per user path (no namespace, user-defined, TTL cache
     // owned by PersonaRegistry and shared via callback filtered by dir).
@@ -499,6 +501,11 @@ export class PersonaRegistry {
   /** Embedder package root for resolving relative host-placement MCP paths. */
   getMcpBaseDir(): string | undefined {
     return this.mcpBaseDir;
+  }
+
+  /** Default files for user-persona @includes, if the embedder supplied them. */
+  getIncludeFallbacks(): IncludeFallbacks | undefined {
+    return this.includeFallbacks;
   }
 
   /** Ordered list of user persona search paths (earlier wins). */

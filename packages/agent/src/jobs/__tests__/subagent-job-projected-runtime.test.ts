@@ -262,6 +262,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
       },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
@@ -335,6 +336,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
       },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
@@ -415,6 +417,7 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
       },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };

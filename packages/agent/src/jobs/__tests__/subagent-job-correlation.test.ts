@@ -129,6 +129,7 @@ describe('runSubagentJobProcess — correlates returned child turns', () => {
       personaRegistry: {
         getUserPersonasPaths: () => [],
         getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
       },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };

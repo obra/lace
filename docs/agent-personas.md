@@ -62,6 +62,7 @@ file inside `root`, lace tries the same root-relative path under each entry of
 - Includes inside a fallback file resolve from the include's local location, so
   they go through the same local-then-fallback search.
 - Plugin-contributed and bundled personas do not use fallbacks.
+- Subagents started with `delegate` inherit the same fallbacks.
 
 For example, with `root: "<inst>/user"` and
 `dirs: ["<inst>/plugins/a/user", "<inst>/plugins/b/user"]`, a persona in
