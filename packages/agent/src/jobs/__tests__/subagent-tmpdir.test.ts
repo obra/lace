@@ -181,7 +181,11 @@ describe('subagent $TMPDIR (host)', () => {
       jobManager: { getJob: vi.fn(), addJob: vi.fn(), getStreamingMode: () => 'full' as const },
       containerManager: null as unknown as ContainerManager,
       containerMounts: {},
-      personaRegistry: { getUserPersonasPaths: () => [], getMcpBaseDir: () => undefined },
+      personaRegistry: {
+        getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
+      },
       environmentRegistry: { getEnvironmentsPaths: () => [] },
     };
 

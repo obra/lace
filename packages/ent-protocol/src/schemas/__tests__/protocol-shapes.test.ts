@@ -156,6 +156,45 @@ describe('protocol shapes (representative examples)', () => {
       ).toThrow();
     }
 
+    // initialize with embedder-supplied includeFallbacks is accepted.
+    expect(() =>
+      EntProtocolRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 'init-include-fallbacks',
+        method: 'initialize',
+        params: {
+          protocolVersion: '1.0',
+          clientInfo: { name: 'test-client', version: '0.0.0' },
+          capabilities: { streaming: true },
+          userPersonasPaths: ['/inst/user/agent-personas'],
+          includeFallbacks: { root: '/inst/user', dirs: ['/inst/plugin/user'] },
+        },
+      })
+    ).not.toThrow();
+
+    // malformed includeFallbacks are rejected.
+    for (const bad of [
+      { root: '', dirs: [] },
+      { root: '/inst/user', dirs: [''] },
+      { root: '/inst/user' },
+      { dirs: ['/inst/plugin/user'] },
+      { root: '/inst/user', dirs: [], extra: true },
+    ]) {
+      expect(() =>
+        EntProtocolRequestSchema.parse({
+          jsonrpc: '2.0',
+          id: 'init-bad-include-fallbacks',
+          method: 'initialize',
+          params: {
+            protocolVersion: '1.0',
+            clientInfo: { name: 'test-client', version: '0.0.0' },
+            capabilities: { streaming: true },
+            includeFallbacks: bad,
+          },
+        })
+      ).toThrow();
+    }
+
     // initialize with embedder-supplied containerMounts is accepted.
     expect(() =>
       EntProtocolRequestSchema.parse({

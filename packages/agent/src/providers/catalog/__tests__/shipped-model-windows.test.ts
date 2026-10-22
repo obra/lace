@@ -22,6 +22,7 @@ const EXPECTED_WINDOWS: Record<string, number> = {
   'claude-opus-5': 1_000_000,
   'claude-opus-4-8': 1_000_000,
   'claude-sonnet-5': 1_000_000,
+  'claude-haiku-5-5': 1_000_000,
   'claude-haiku-4-5-20251001': 200_000,
 };
 
@@ -45,7 +46,7 @@ describe('shipped Anthropic catalog', () => {
   const EXPECTED_ALIASES: Record<string, string> = {
     opus: 'claude-opus-4-8',
     sonnet: 'claude-sonnet-5',
-    haiku: 'claude-haiku-4-5-20251001',
+    haiku: 'claude-haiku-5-5',
   };
 
   for (const [alias, expected] of Object.entries(EXPECTED_ALIASES)) {
@@ -61,7 +62,7 @@ describe('shipped Anthropic catalog', () => {
     // behind the same way the aliases did, and just as quietly: nothing reports
     // which model a default resolved to.
     expect(catalog.default_large_model_id).toBe('claude-sonnet-5');
-    expect(catalog.default_small_model_id).toBe('claude-haiku-4-5-20251001');
+    expect(catalog.default_small_model_id).toBe('claude-haiku-5-5');
     expect(byId.has(catalog.default_large_model_id)).toBe(true);
     expect(byId.has(catalog.default_small_model_id)).toBe(true);
   });
@@ -72,5 +73,22 @@ describe('shipped Anthropic catalog', () => {
     for (const target of Object.values(catalog.model_aliases ?? {})) {
       expect(byId.has(target), `alias target ${target} is not in the catalog`).toBe(true);
     }
+  });
+});
+
+describe('shipped Bedrock catalog', () => {
+  const raw = readFileSync(path.resolve(__dirname, '../data/bedrock.json'), 'utf8');
+  const catalog = CatalogProviderSchema.parse(JSON.parse(raw));
+  const byId = new Map(catalog.models.map((m) => [m.id, m]));
+
+  it('describes anthropic.claude-haiku-5-5 with a 1000K context window', () => {
+    const model = byId.get('anthropic.claude-haiku-5-5');
+    expect(model, 'anthropic.claude-haiku-5-5 is missing from the static catalog').toBeDefined();
+    expect(model!.context_window).toBe(1_000_000);
+  });
+
+  it('defaults to the current-generation small model', () => {
+    expect(catalog.default_small_model_id).toBe('anthropic.claude-haiku-5-5');
+    expect(byId.has(catalog.default_small_model_id)).toBe(true);
   });
 });

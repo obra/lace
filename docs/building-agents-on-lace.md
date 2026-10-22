@@ -215,6 +215,10 @@ maxTurns: 50
 mustache variable substitution]
 ```
 
+A missing include file stays as literal `@path` text unless the embedder passes
+`includeFallbacks` to `initialize`; see
+[Include Fallbacks](agent-personas.md#include-fallbacks).
+
 Frontmatter is optional. If omitted, the persona is a template-only persona
 (just a system prompt; model/tools/MCPs come from session-level config or your
 delegate call).
