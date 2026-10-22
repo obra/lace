@@ -133,7 +133,7 @@ describe('MCPServerConfig Discovery Fields', () => {
 
   it('preserves opt-in execution context through protocol and session config normalization', () => {
     const configured = {
-      name: 'sen-chat',
+      name: 'context-tools',
       command: 'node',
       placement: 'host' as const,
       forwardExecutionContext: true,

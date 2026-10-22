@@ -93,7 +93,7 @@ export class MCPToolAdapter extends Tool {
     context?: ToolContext
   ): Promise<ToolResult> {
     try {
-      let executionMeta: { 'io.sen.execution': { sessionId: string; turnId: string } } | undefined;
+      let executionMeta: { 'io.lace.execution': { sessionId: string; turnId: string } } | undefined;
       if (this.forwardExecutionContext) {
         const sessionId = context?.activeSessionId;
         const turnId = context?.turnId;
@@ -108,7 +108,7 @@ export class MCPToolAdapter extends Tool {
             { toolName: this.mcpTool.name, serverId: this.serverId }
           );
         }
-        executionMeta = { 'io.sen.execution': { sessionId, turnId } };
+        executionMeta = { 'io.lace.execution': { sessionId, turnId } };
       }
 
       // Use MCP SDK's high-level callTool method

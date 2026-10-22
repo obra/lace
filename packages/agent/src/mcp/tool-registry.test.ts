@@ -136,8 +136,8 @@ describe('MCPToolRegistry', () => {
       callTool,
     };
     mockServerManager.getServer.mockReturnValue({
-      id: 'sen-chat',
-      connectionKey: 'sen-chat',
+      id: 'context-tools',
+      connectionKey: 'context-tools',
       config: {
         command: 'node',
         enabled: true,
@@ -151,7 +151,7 @@ describe('MCPToolRegistry', () => {
       registry.once('tools-updated', (_serverId, tools) => resolve(tools as MinimalTool[]));
     });
 
-    mockServerManager.emit('server-status-changed', 'sen-chat', 'running');
+    mockServerManager.emit('server-status-changed', 'context-tools', 'running');
     const [tool] = await toolsUpdated;
     await tool!.execute(
       { text: 'hello' },
@@ -166,7 +166,7 @@ describe('MCPToolRegistry', () => {
       name: 'send',
       arguments: { text: 'hello' },
       _meta: {
-        'io.sen.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
+        'io.lace.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
       },
     });
   });

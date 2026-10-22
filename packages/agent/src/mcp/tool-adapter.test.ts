@@ -91,7 +91,7 @@ describe('MCPToolAdapter', () => {
         required: ['text'],
       },
     };
-    const adapter = new MCPToolAdapter(toolWithMetadataArgument, 'sen-chat', mockClient, true);
+    const adapter = new MCPToolAdapter(toolWithMetadataArgument, 'context-tools', mockClient, true);
     const context: ToolContext = {
       signal: new AbortController().signal,
       activeSessionId: 'session-trusted',
@@ -102,7 +102,7 @@ describe('MCPToolAdapter', () => {
       {
         text: 'hello',
         _meta: {
-          'io.sen.execution': {
+          'io.lace.execution': {
             sessionId: 'session-from-tool-args',
             turnId: 'turn-from-tool-args',
           },
@@ -116,14 +116,14 @@ describe('MCPToolAdapter', () => {
       arguments: {
         text: 'hello',
         _meta: {
-          'io.sen.execution': {
+          'io.lace.execution': {
             sessionId: 'session-from-tool-args',
             turnId: 'turn-from-tool-args',
           },
         },
       },
       _meta: {
-        'io.sen.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
+        'io.lace.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
       },
     });
   });
@@ -137,7 +137,7 @@ describe('MCPToolAdapter', () => {
     'fails closed when opted-in execution context is incomplete: $activeSessionId/$turnId',
     async (ids) => {
       const mockCallTool = mockClient.callTool as vi.MockedFunction<typeof mockClient.callTool>;
-      const adapter = new MCPToolAdapter(mockMCPTool, 'sen-chat', mockClient, true);
+      const adapter = new MCPToolAdapter(mockMCPTool, 'context-tools', mockClient, true);
       const context: ToolContext = {
         signal: new AbortController().signal,
         ...ids,

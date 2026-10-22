@@ -143,8 +143,8 @@ describe('Simplified ToolExecutor', () => {
         }),
       };
       const connection: MCPServerConnection = {
-        id: 'sen-chat',
-        connectionKey: 'sen-chat:host',
+        id: 'context-tools',
+        connectionKey: 'context-tools:host',
         config: {
           command: 'node',
           enabled: true,
@@ -159,7 +159,7 @@ describe('Simplified ToolExecutor', () => {
       } as unknown as MCPServerManager;
 
       await executor.registerMCPToolsAndWait(manager);
-      const adapter = executor.getTool('sen-chat/send');
+      const adapter = executor.getTool('context-tools/send');
       expect(adapter).toBeDefined();
       await adapter!.execute(
         { text: 'hello' },
@@ -174,7 +174,7 @@ describe('Simplified ToolExecutor', () => {
         name: 'send',
         arguments: { text: 'hello' },
         _meta: {
-          'io.sen.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
+          'io.lace.execution': { sessionId: 'session-trusted', turnId: 'turn-trusted' },
         },
       });
     });

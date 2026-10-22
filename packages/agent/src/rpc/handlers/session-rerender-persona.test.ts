@@ -119,7 +119,7 @@ describe('ent/session/rerender_persona', () => {
       [
         '---',
         'mcpServers:',
-        '  sen-chat:',
+        '  context-tools:',
         '    command: /usr/bin/true',
         '    placement: host',
         '    enabled: false',
@@ -127,7 +127,7 @@ describe('ent/session/rerender_persona', () => {
         '    tools:',
         '      send: allow',
         '---',
-        'Use the customer chat server.',
+        'Use the configured tool server.',
       ].join('\n')
     );
 
@@ -147,7 +147,7 @@ describe('ent/session/rerender_persona', () => {
 
       const configuredServer = state.mcpServerManager
         .getAllServers()
-        .find((connection) => connection.id === 'sen-chat');
+        .find((connection) => connection.id === 'context-tools');
       expect(configuredServer?.config.forwardExecutionContext).toBe(true);
       expect(configuredServer?.config.placement).toBe('host');
     } finally {

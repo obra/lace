@@ -137,3 +137,8 @@ From `CLAUDE.md` and `docs/development.md`:
 This repository is publicly readable. Write commit messages, PR bodies and
 CHANGELOG entries so they stand on their own: don't include internal hostnames,
 private filesystem paths, links to private chat, or credentials.
+
+Use generic examples and test fixtures. Keep private product names, deployment
+plans and integration details out of public contributions. Before publishing,
+review the full diff, branch name and every outgoing commit message as well as
+the PR title and body.
