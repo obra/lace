@@ -17,6 +17,7 @@ import type {
 } from '@lace/agent/tools/runtime/types';
 import {
   readSessionState,
+  sessionStampsSentAt,
   writeSessionState,
   type SessionState,
 } from '@lace/agent/storage/session-store';
@@ -65,6 +66,7 @@ import { buildCompactionContext } from '@lace/agent/compaction/build-context';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { injectNotification } from '@lace/agent/notifications/inject-notification';
 import { createInjectTailer, extractInjectedText } from '@lace/agent/storage/inject-tailer';
+import { stampSentAt } from '@lace/agent/message-building/sent-at';
 import { getLaceDir } from '@lace/agent/config/lace-dir';
 
 /**
@@ -402,13 +404,14 @@ export function readImmediateInjectsSince(
   });
   const injections: string[] = [];
   let watermark = afterEventSeq;
+  const stamp = sessionStampsSentAt(sessionDir);
   for (const e of events) {
     if (e.eventSeq > watermark) watermark = e.eventSeq;
     if (e.type !== 'context_injected') continue;
     const data = (e as DurableEvent).data as { content?: unknown; priority?: unknown };
     if (data.priority !== 'immediate') continue;
     const text = extractInjectedText(data.content);
-    if (text.trim()) injections.push(text);
+    if (text.trim()) injections.push(stampSentAt(text, stamp ? e.timestamp : undefined));
   }
   return { injections, newWatermark: watermark };
 }
@@ -611,7 +614,10 @@ export class ConversationRunner {
     // reader, whose sessionDir basename drives shard discovery.
     // Re-seeded (not just re-read) after an emergency compaction rebuilds the
     // projection — see the emergency arm below.
-    let injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
+    const stampInjects = sessionStampsSentAt(sessionDir);
+    let injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq, {
+      stampSentAt: stampInjects,
+    });
     let finalAssistantContent = '';
     let stopReason: RunResult['stopReason'] = 'end_turn';
     let stopDetails: LaceStopDetails | null = null;
@@ -1152,7 +1158,8 @@ export class ConversationRunner {
             injectTailer = createInjectTailer(
               getLaceDir(),
               basename(sessionDir),
-              compactedEntry.maxFoldedSeq
+              compactedEntry.maxFoldedSeq,
+              { stampSentAt: stampInjects }
             );
             // A tail of pre-compaction generation must not be glued onto the
             // post-compaction answer. `pause_turn` accumulates text and

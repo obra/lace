@@ -373,6 +373,29 @@ describe('buildPreservedTail', () => {
     expect(tail[0].role).toBe('assistant');
     expect(tail[0].toolCalls?.length).toBe(2);
   });
+
+  it('stamps prompt and context_injected entries with their own event time for a subagent', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [{ type: 'text', text: 'task' }] }),
+      event(2, 'message', { content: 'ok' }),
+      event(3, 'context_injected', { content: [{ type: 'text', text: 'injected' }] }),
+    ];
+    const tail = buildPreservedTail(events, { stampSentAt: true });
+    expect(tail[0].content).toEqual([
+      { type: 'text', text: '<message_meta sent_at="2026-06-03T00:00:01Z"/>\ntask' },
+    ]);
+    expect(tail[1].content).toBe('ok');
+    expect(tail[2].content).toEqual([
+      { type: 'text', text: '<message_meta sent_at="2026-06-03T00:00:03Z"/>\ninjected' },
+    ]);
+  });
+
+  it('does not stamp by default (root sessions)', () => {
+    const events: TypedDurableEvent[] = [
+      event(1, 'prompt', { content: [{ type: 'text', text: 'task' }] }),
+    ];
+    expect(JSON.stringify(buildPreservedTail(events))).not.toContain('message_meta');
+  });
 });
 
 // ---------------------------------------------------------------------------

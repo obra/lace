@@ -5,6 +5,7 @@ import { isEventOfType } from '@lace/agent/storage/event-types';
 import type { TypedDurableEvent } from '@lace/agent/storage/event-types';
 import { renderCompactionPrefix } from './track-render';
 import type { CompactionContext, CompactResult } from './types';
+import { sessionStampsSentAt } from '@lace/agent/storage/session-store';
 import {
   UNTRACKED,
   splitAtTailBoundary,
@@ -223,7 +224,9 @@ export async function compact(
     });
   }
 
-  const preservedTail = buildPreservedTail(tail);
+  const preservedTail = buildPreservedTail(tail, {
+    stampSentAt: ctx.sessionDir !== undefined && sessionStampsSentAt(ctx.sessionDir),
+  });
 
   // Avoid adjacent user-role messages: if the first tail entry is also user-role,
   // merge the prefix into it rather than prepending a separate user entry.

@@ -6,6 +6,7 @@ import {
 import type { WireTool } from '@lace/agent/providers/base-provider';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
+import { stripSentAtMeta } from '@lace/agent/message-building/sent-at';
 import { appendFileSync } from 'node:fs';
 
 type TestProviderState = {
@@ -247,7 +248,11 @@ export class TestAgentProvider extends AIProvider {
         }
 
         const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
-        const lastUserText = lastUserMessage ? getTextContent(lastUserMessage.content) : undefined;
+        // A subagent's messages lead with a <message_meta sent_at="..."/> line; the
+        // command patterns below are anchored to the start of the text, so drop it.
+        const lastUserText = lastUserMessage
+          ? stripSentAtMeta(getTextContent(lastUserMessage.content))
+          : undefined;
 
         // Generate mock token usage based on message length
         // Use fixed values for predictable cost calculations in tests

@@ -99,6 +99,32 @@ rebuild only: system-prompt extraction; the `context_compacted` reset to the
 preserved array followed by `dropOrphanedToolBlocks` (the orphan-pair guard);
 and the `context_injected` text-merge into a trailing user message.
 
+### Subagent sent_at stamps
+
+In a subagent session (one whose `meta.json` records a `parent`), every `prompt`
+and `context_injected` the model receives leads with a metadata line giving the
+event's write time in UTC, to the second:
+
+```
+<message_meta sent_at="2026-10-21T16:24:06Z"/>
+original text
+```
+
+The line is rendered at projection time from the durable event's own `timestamp`
+and is never stored in the event, so every rebuild renders the same bytes and
+handoff idempotency still compares the original content. The stamp goes on each
+inject's own text before the merge, so a user message that merges several
+injects carries one stamp per inject. The same rendering runs in each place that
+produces this text: `applyEventToProjection` (full rebuild and the incremental
+cache), the mid-turn inject tailer and its full-scan oracle
+(`readImmediateInjectsSince`), and `buildPreservedTail` when a subagent is
+compacted. The compaction token estimators leave it off. Root sessions are never
+stamped: their embedder renders `sent_at` on its own message envelope. Runtime
+nudges that exist only in memory (the loop-check reminder, the bare-text stop
+reminder) have no event and carry no stamp. The helpers live in
+`message-building/sent-at.ts`; the subagent gate is `sessionStampsSentAt` in
+`storage/session-store.ts`.
+
 ## One read at turn entry
 
 Turn entry reads and parses the durable event log **once**, via

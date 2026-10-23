@@ -9,6 +9,9 @@ export type ParsedSessionEvent = {
   eventSeq: number;
   type: string;
   data: Record<string, unknown>;
+  // When the event was written (ISO-8601). Subagent projections render it as
+  // the message's sent_at; absent on lines that carry none.
+  timestamp?: string;
 };
 
 /**
@@ -19,11 +22,17 @@ export type ParsedSessionEvent = {
 export function parseSessionEventLine(line: string): ParsedSessionEvent | null {
   if (!line) return null;
   try {
-    const p = JSON.parse(line) as { eventSeq?: unknown; type?: unknown; data?: unknown };
+    const p = JSON.parse(line) as {
+      eventSeq?: unknown;
+      type?: unknown;
+      data?: unknown;
+      timestamp?: unknown;
+    };
     return {
       eventSeq: typeof p.eventSeq === 'number' ? p.eventSeq : 0,
       type: typeof p.type === 'string' ? p.type : '',
       data: typeof p.data === 'object' && p.data ? (p.data as Record<string, unknown>) : {},
+      ...(typeof p.timestamp === 'string' ? { timestamp: p.timestamp } : {}),
     };
   } catch {
     return null;
