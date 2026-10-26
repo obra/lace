@@ -86,7 +86,13 @@ export function registerAllHandlers(
     deps.reissuePendingPermissions,
     deps.ensureSchedulers
   );
-  registerSessionOperationHandlers(peer, state, deps.runExclusive, deps.createToolExecutorForMode);
+  registerSessionOperationHandlers(
+    peer,
+    state,
+    deps.runExclusive,
+    deps.createToolExecutorForMode,
+    deps.runPromptInternalRef
+  );
 
   // MCP server management
   registerMcpHandlers(peer, state, deps.runExclusive);

@@ -96,8 +96,9 @@ processes without a lock, and we'd rather not introduce one.
    the body and `appendDurableEvent` to write the event under `runExclusive`.
 4. If the target is the active session and no turn is in flight, the optional
    `idleWake` hooks schedule a synthetic internal turn via `setImmediate`, which
-   calls `runPromptInternal([])`. If a turn is already running, the runner picks
-   the event up at its next iteration boundary (see §5).
+   calls `runPromptInternal(injectDrainContent(sessionDir))`. If a turn is
+   already running, the runner picks the event up at its next iteration boundary
+   (see §5).
 
 ## 4. Components
 
@@ -242,16 +243,21 @@ hasActiveTurn: () => boolean;
 triggerInternalTurn: () => void;
 ```
 
-All three callers (reminder scheduler at `server.ts:195-217`, job notification
-at `job-notifications.ts:124-136`, subagent-exit relay does not need a wake
-because it writes from inside `runExclusive` and relies on the post-turn rescan)
-implement these the same way:
+`createIdleWake` in `packages/agent/src/notifications/idle-wake.ts` builds the
+hooks, and `wakeIfIdle` in `inject-notification.ts` applies them. Three callers
+use them: the reminder scheduler (`server.ts`), job notifications
+(`job-notifications.ts`), and the `ent/session/inject` handler
+(`injectIntoActiveSession` in `session-operations.ts`), which wakes only for
+`priority: 'immediate'`. The subagent-exit relay does not wake; it writes from
+inside `runExclusive` and relies on the post-turn rescan.
 
 - `isActive` compares `sessionDir` to `state.activeSession?.dir`.
 - `hasActiveTurn` returns `!!state.activeTurn`.
 - `triggerInternalTurn` schedules a `setImmediate` callback that **re-checks**
   `state.activeTurn` and `state.activeSession` before invoking
-  `runPromptInternal([])`.
+  `runPromptInternal(injectDrainContent(sessionDir))`. The internal prompt
+  runner claims `state.activeTurn` synchronously, so several wakes queued in the
+  same tick start one turn.
 
 The re-check matters. A turn may have started between the time the notification
 was written and the time `setImmediate` fires. Without the re-check we would run

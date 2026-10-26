@@ -25,6 +25,8 @@ import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from
 import type { ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
+import { createIdleWake } from '../../notifications/idle-wake';
+import { type IdleWakeHooks, wakeIfIdle } from '../../notifications/inject-notification';
 import { rerenderPersonaForSession } from './session';
 import type { Tool } from '../../tools/tool';
 import {
@@ -219,15 +221,15 @@ async function computeContextBreakdownForActiveSession(
  * with the runner's own appends and any other concurrent writers (alarm
  * scheduler, subagent-exited deliveries from a child process).
  *
- * Both the on-process `ent/session/inject` handler and the per-subagent
- * `childPeer.onRequest('ent/session/inject', ...)` registration share this
- * helper. The `peer` argument is always the top-level CLI peer (the one we
- * notify session/update on), never the childPeer.
+ * An immediate inject that lands while no turn is running starts an internal
+ * turn through `idleWake`, so it is seen without waiting for the next prompt.
+ * An inject during a turn is picked up by that turn or its exit drain.
  */
 export async function injectIntoActiveSession(
   state: AgentServerState,
   peer: JsonRpcPeer,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
+  idleWake: IdleWakeHooks,
   parsed: {
     content: unknown[];
     priority: 'immediate' | 'normal' | 'deferred';
@@ -302,6 +304,10 @@ export async function injectIntoActiveSession(
       state: readSessionState(state.activeSession.dir),
     };
 
+    if (parsed.priority === 'immediate') {
+      wakeIfIdle(idleWake, state.activeSession.dir);
+    }
+
     return idempotencyKey ? { durableHandoffStatus: 'persisted-new' } : undefined;
   });
 }
@@ -322,8 +328,11 @@ export function registerSessionOperationHandlers(
   peer: JsonRpcPeer,
   state: AgentServerState,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  createToolExecutorForMode: CreateToolExecutorFn
+  createToolExecutorForMode: CreateToolExecutorFn,
+  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
 ): void {
+  const idleWake = createIdleWake(state, runPromptInternalRef);
+
   peer.onRequest('ent/session/configure', async (params: unknown) => {
     assertActiveSession(state);
 
@@ -739,7 +748,7 @@ export function registerSessionOperationHandlers(
       parsed?.priority === 'deferred'
         ? parsed.priority
         : 'normal';
-    return await injectIntoActiveSession(state, peer, runExclusive, {
+    return await injectIntoActiveSession(state, peer, runExclusive, idleWake, {
       content: Array.isArray(parsed?.content) ? parsed.content : [],
       priority,
       idempotencyKey: parsed?.idempotencyKey,

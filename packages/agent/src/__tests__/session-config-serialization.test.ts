@@ -75,7 +75,8 @@ describe('session config serialization', () => {
         },
         async () => {
           throw new Error('unused');
-        }
+        },
+        { current: null }
       )
     );
 
