@@ -574,7 +574,9 @@ Notes on `strategy`:
 
 ### 6.2 `ent/session/inject` (notification)
 
-Inject context mid-turn. Not in ACP.
+Inject context mid-turn. Not in ACP. An `immediate` inject into an idle session
+starts an internal turn so the agent sees it without waiting for the next
+prompt.
 
 ```typescript
 {

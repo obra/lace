@@ -18,6 +18,7 @@ import {
   type SessionUpdate,
 } from '../server-types';
 import { injectNotification } from '../notifications/inject-notification';
+import { createIdleWake } from '../notifications/idle-wake';
 import {
   composeJobCompletedBody,
   composeJobFailedBody,
@@ -137,19 +138,7 @@ export function createQueueJobNotification(
         kind,
         identifiers: { 'job-id': job.jobId },
         body,
-        idleWake: {
-          isActive: (d) => d === state.activeSession?.dir,
-          hasActiveTurn: () => !!state.activeTurn,
-          triggerInternalTurn: () => {
-            if (runPromptInternalRef.current) {
-              setImmediate(() => {
-                if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-                  void runPromptInternalRef.current([]);
-                }
-              });
-            }
-          },
-        },
+        idleWake: createIdleWake(state, runPromptInternalRef),
       });
 
     state.jobManager.fanoutToInject(job.jobId, type, { preview }, doInject);

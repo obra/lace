@@ -3,7 +3,7 @@
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { loadSession, readSessionState, writeSessionState } from './storage/session-store';
 import { appendDurableEvent } from './storage/event-log';
-import { injectDrainContent } from './notifications/inject-drain-content';
+import { createIdleWake } from './notifications/idle-wake';
 import { ProviderCatalogManager } from './providers/catalog/manager';
 import { ProviderInstanceManager } from './providers/instance/manager';
 import { MCPServerManager } from './mcp/server-manager';
@@ -212,20 +212,7 @@ export async function ensureReminderSchedulerForActiveSession(
     state.reminderScheduler = undefined;
   }
   const sessionDir = state.activeSession.dir;
-  const idleWake = {
-    isActive: (d: string): boolean => d === state.activeSession?.dir,
-    hasActiveTurn: (): boolean => !!state.activeTurn,
-    triggerInternalTurn: (): void => {
-      if (!runPromptInternalRef.current) return;
-      setImmediate(() => {
-        if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-          // Same rule as the turn-exit drain: an empty prompt is only valid
-          // while the conversation still ends on a user message.
-          void runPromptInternalRef.current(injectDrainContent(state.activeSession.dir));
-        }
-      });
-    },
-  };
+  const idleWake = createIdleWake(state, runPromptInternalRef);
 
   state.reminderScheduler = new ReminderScheduler({
     sessionDir,

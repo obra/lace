@@ -72,7 +72,14 @@ export function injectNotification(opts: InjectNotificationOptions): void {
   // (subagent → parent), the parent's process owns state.json and will
   // observe the new eventSeq on its next read.
 
-  if (opts.idleWake && opts.idleWake.isActive(opts.sessionDir) && !opts.idleWake.hasActiveTurn()) {
-    opts.idleWake.triggerInternalTurn();
+  if (opts.idleWake) {
+    wakeIfIdle(opts.idleWake, opts.sessionDir);
+  }
+}
+
+/** Start an internal turn if `sessionDir` is the active session and no turn is running. */
+export function wakeIfIdle(idleWake: IdleWakeHooks, sessionDir: string): void {
+  if (idleWake.isActive(sessionDir) && !idleWake.hasActiveTurn()) {
+    idleWake.triggerInternalTurn();
   }
 }
