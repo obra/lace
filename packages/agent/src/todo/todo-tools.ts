@@ -107,9 +107,10 @@ export async function executeTodoWrite(
     const citedText = [input.title, input.description].filter((s) => s !== undefined).join('\n');
     const unknown = uncitedJobIds(citedText, context.jobManager);
     if (unknown.length > 0) {
+      const text = uncitedJobIdsMessage('todo_write', unknown, context.jobManager.listJobs());
       return {
         status: 'failed',
-        content: [{ type: 'text', text: uncitedJobIdsMessage('todo_write', unknown) }],
+        content: [{ type: 'text', text }],
       };
     }
   }
