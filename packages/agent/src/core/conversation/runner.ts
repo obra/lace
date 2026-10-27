@@ -2257,7 +2257,9 @@ export class ConversationRunner {
     // Note: bash with background=true is handled before permission check and never reaches here.
     // Handle todo tools (still use runtime handling - todo tools need sessionDir)
     if (toolName === 'todo_read' || toolName === 'todo_write') {
-      const todoContext = { sessionDir: this.config.sessionDir };
+      // jobManager lets todo_write refuse a job id this session never returned
+      // (PRI-3362) — always supplied on this path, unlike some unit-test contexts.
+      const todoContext = { sessionDir: this.config.sessionDir, jobManager: this.deps.jobManager };
 
       if (toolName === 'todo_read') {
         const result = await executeTodoRead(finalInput, todoContext);

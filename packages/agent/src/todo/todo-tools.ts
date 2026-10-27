@@ -5,14 +5,21 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseTodoMarkdown, serializeTodoMarkdown } from './markdown';
 import { generateTodoId, type TodoItem, type TodoStatus } from './types';
+import type { JobManager } from '../jobs/job-manager';
+import { uncitedJobIds, uncitedJobIdsMessage } from '../tools/implementations/unknown-job-id';
 
 const TODO_FILENAME = 'todo.md';
 
 /**
- * Context for todo tool execution
+ * Context for todo tool execution.
+ *
+ * `jobManager` is optional so call sites and tests that have no session job
+ * state (and no PRI-3362 guard to run) keep working unchanged; the real
+ * runtime path (runner.ts) always supplies it.
  */
 export interface TodoToolContext {
   sessionDir: string;
+  jobManager?: Pick<JobManager, 'getJob' | 'listJobs'>;
 }
 
 /**
@@ -90,6 +97,23 @@ export async function executeTodoWrite(
   input: { id?: string; title?: string; description?: string; status?: TodoStatus },
   context: TodoToolContext
 ): Promise<TodoToolResult> {
+  // PRI-3362 guard: refuse a title/description that cites a job_<uuid> id this
+  // session's JobManager has never returned. The common cause is composing the
+  // todo in the same tool-call batch as the delegate/bash(background=true) call
+  // that creates the job, before its real id comes back — the model guesses.
+  // listJobs() is event-log backed, so a job from before a compaction or a
+  // restart still counts as known; only a genuinely invented id is rejected.
+  if (context.jobManager) {
+    const citedText = [input.title, input.description].filter((s) => s !== undefined).join('\n');
+    const unknown = uncitedJobIds(citedText, context.jobManager);
+    if (unknown.length > 0) {
+      return {
+        status: 'failed',
+        content: [{ type: 'text', text: uncitedJobIdsMessage('todo_write', unknown) }],
+      };
+    }
+  }
+
   const items = readTodoList(context.sessionDir);
 
   // CREATE: No id provided - add new item
