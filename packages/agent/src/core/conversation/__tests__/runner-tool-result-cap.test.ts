@@ -12,6 +12,9 @@ import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { ToolExecutor } from '@lace/agent/tools/executor';
 import { Tool } from '@lace/agent/tools/tool';
+import { JobOutputTool } from '@lace/agent/tools/implementations/job_output';
+import type { JobManager } from '@lace/agent/jobs/job-manager';
+import type { JobState } from '@lace/agent/server-types';
 import {
   AIProvider,
   type ProviderMessage,
@@ -36,10 +39,13 @@ class PayloadTool extends Tool {
   }
 }
 
-/** Emits a single tool_use for `toolName`, then stops on the next call. */
+/** Emits a single tool_use for `toolName` (with optional fixed arguments), then stops on the next call. */
 class SingleToolProvider extends AIProvider {
   private callCount = 0;
-  constructor(private readonly toolName: string) {
+  constructor(
+    private readonly toolName: string,
+    private readonly toolArguments: Record<string, unknown> = {}
+  ) {
     super();
   }
   get providerName(): string {
@@ -69,7 +75,7 @@ class SingleToolProvider extends AIProvider {
     if (this.callCount === 1) {
       return {
         content: '',
-        toolCalls: [{ id: 'tc_payload', name: this.toolName, arguments: {} }],
+        toolCalls: [{ id: 'tc_payload', name: this.toolName, arguments: this.toolArguments }],
         stopReason: 'tool_use',
       };
     }
@@ -190,6 +196,77 @@ describe('runner tool-result capping', () => {
       maxTurns: 2,
     });
   }
+
+  /** Like `runWithPayload`, but drives the real `job_output` tool (PRI-3606: slicing params). */
+  function runWithJobOutput(jobOutput: string, toolArgs: Record<string, unknown>) {
+    const job = {
+      jobId: 'job_huge',
+      status: 'completed' as const,
+      exitCode: 0,
+      completion: Promise.resolve(),
+    } as unknown as JobState;
+    const jobManager = {
+      getJob: vi.fn().mockReturnValue(job),
+      listJobs: vi.fn().mockReturnValue([job]),
+      getJobOutput: vi.fn().mockReturnValue(jobOutput),
+    } as unknown as JobManager;
+
+    const provider = new SingleToolProvider('job_output', { jobId: 'job_huge', ...toolArgs });
+    const executor = new ToolExecutor();
+    executor.registerTools([new JobOutputTool()]);
+    executor.setJobManager(jobManager);
+    const config: RunnerConfig = {
+      sessionDir,
+      sessionId,
+      cwd,
+      executionMode: 'execute',
+      approvalMode: 'approve',
+    };
+    const deps = createMockDeps({
+      createProvider: vi.fn().mockImplementation(async () => provider),
+      createToolExecutor: vi.fn().mockReturnValue({
+        executor,
+        toolsForProvider: executor.getAllTools(),
+      }),
+      jobManager,
+    });
+    const runner = new ConversationRunner(config, deps);
+    return runner.run({
+      content: [{ type: 'text', text: 'go' }],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+      maxTurns: 2,
+    });
+  }
+
+  // PRI-3606: job_output's own slicing (head/tail/grep) is a pre-filter on the
+  // job's output, not a substitute for the runner's generic capping. A slice
+  // that's still oversized (e.g. a wide head_lines on a huge job) must go
+  // through the same digest+sidecar path as any other tool result.
+  it('still digests a job_output result that is sliced but still oversized', async () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 4000; i++) lines.push(`job output line ${i} with extra padding text here`);
+    const jobOutput = lines.join('\n');
+
+    await runWithJobOutput(jobOutput, { head_lines: 3000 });
+
+    const durable = durableToolResultText(sessionDir, 'tc_payload');
+    expect(durable).toContain('bytes elided');
+    expect(durable).toContain('read_tool_result');
+
+    // The sidecar holds the full (job_output-sliced) JSON result, recoverable
+    // like any other digested tool result — including job_output's own header
+    // (reporting the full, pre-slice output's totals, same as read_tool_result).
+    const sidecar = join(sessionDir, 'tool-results', 'tc_payload.txt');
+    expect(existsSync(sidecar)).toBe(true);
+    const sidecarContent = readFileSync(sidecar, 'utf8');
+    expect(sidecarContent).toContain('job job_huge output');
+    expect(sidecarContent).toContain('head 3000 line(s)');
+    expect(sidecarContent).toContain('job output line 0 ');
+    expect(sidecarContent).toContain('job output line 2999 ');
+    expect(sidecarContent).not.toContain('job output line 3999 ');
+  });
 
   it('digests an oversized result and spills the full payload to a sidecar', async () => {
     const lines: string[] = [];

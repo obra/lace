@@ -34,6 +34,16 @@ export interface SidecarSlice {
   grepWindowed?: boolean;
 }
 
+/** Head/tail/grep slicing options shared by read_tool_result and job_output. */
+export interface SliceOpts {
+  headLines?: number;
+  tailLines?: number;
+  grep?: string;
+  grepContextChars?: number;
+  headBytes?: number;
+  tailBytes?: number;
+}
+
 /**
  * Reduce a tool_call_id to a safe filename: only `[A-Za-z0-9_-]` survive; every
  * other character (including path separators and `..`) becomes `_`. This is the
@@ -78,45 +88,21 @@ export function writeToolResultSidecar(sessionId: string, toolCallId: string, fu
 }
 
 /**
- * Read back a slice of a previously-spilled tool result.
+ * Slice an in-memory string by head/tail/grep — the same semantics
+ * `read_tool_result` uses to page a spilled sidecar, but usable directly on
+ * any text (e.g. `job_output`'s in-memory job output), with no file I/O.
  *
- * - `grep` (if set): only lines containing the substring, capped at
- *   GREP_MAX_LINES (flagged via `grepCapped`).
+ * - `headBytes`/`tailBytes` (if set): raw byte paging, independent of line
+ *   structure, UTF-8-safe.
+ * - otherwise `grep` (if set): only lines containing the substring, capped at
+ *   GREP_MAX_LINES (flagged via `grepCapped`); a long single matching line is
+ *   windowed around each match instead of returned whole.
  * - otherwise: the first `headLines` and/or last `tailLines`. With neither, a
  *   default head slice.
  *
- * Always reports `totalBytes` and `lineCount` of the full file. Throws a clear
- * Error if the sidecar is absent.
+ * Always reports `totalBytes` and `lineCount` of the full input.
  */
-export function readToolResultSidecar(
-  sessionId: string,
-  toolCallId: string,
-  opts: {
-    headLines?: number;
-    tailLines?: number;
-    grep?: string;
-    grepContextChars?: number;
-    headBytes?: number;
-    tailBytes?: number;
-  }
-): SidecarSlice {
-  const filePath = sidecarPath(sessionId, toolCallId);
-  let full: string;
-  try {
-    full = fs.readFileSync(filePath, 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error(
-        `No spilled tool result found for tool_call_id "${toolCallId}" in this session ` +
-          `(expected sidecar at ${filePath}). It may have ridden back whole (small enough ` +
-          `to not be digested) or belong to a different session. Copy tool_call_ids from ` +
-          `the digested tool result itself, never from memory.` +
-          recentSidecarsNote(path.dirname(filePath))
-      );
-    }
-    throw err;
-  }
-
+export function sliceText(full: string, opts: SliceOpts): SidecarSlice {
   const totalBytes = Buffer.byteLength(full, 'utf8');
   // Drop a single trailing newline so a file ending in "\n" doesn't count an
   // empty final line.
@@ -187,6 +173,68 @@ export function readToolResultSidecar(
     totalBytes,
     lineCount,
   };
+}
+
+/**
+ * Describe which slice was returned, in the same wording `read_tool_result`
+ * uses in its header. Shared so `job_output` can report an identical-looking
+ * header for its own inline slicing.
+ */
+export function describeSlice(opts: SliceOpts, slice: SidecarSlice): string {
+  if (opts.grep !== undefined && opts.grep !== '') {
+    return `grep "${opts.grep}" → ${slice.matchedLines ?? 0} matching line(s)${
+      slice.grepCapped ? ' (capped)' : ''
+    }${slice.grepWindowed ? ' (long lines windowed)' : ''}`;
+  }
+  if (opts.headBytes !== undefined || opts.tailBytes !== undefined) {
+    return describeHeadTailBytes(opts.headBytes, opts.tailBytes);
+  }
+  return describeHeadTail(opts.headLines, opts.tailLines);
+}
+
+function describeHeadTail(headLines?: number, tailLines?: number): string {
+  const parts: string[] = [];
+  if (headLines !== undefined && headLines > 0) parts.push(`head ${headLines} line(s)`);
+  if (tailLines !== undefined && tailLines > 0) parts.push(`tail ${tailLines} line(s)`);
+  return parts.length > 0 ? parts.join(' + ') : 'default head slice';
+}
+
+function describeHeadTailBytes(headBytes?: number, tailBytes?: number): string {
+  const parts: string[] = [];
+  if (headBytes !== undefined && headBytes > 0) parts.push(`head ${headBytes} byte(s)`);
+  if (tailBytes !== undefined && tailBytes > 0) parts.push(`tail ${tailBytes} byte(s)`);
+  return parts.length > 0 ? parts.join(' + ') : 'default head slice';
+}
+
+/**
+ * Read back a slice of a previously-spilled tool result.
+ *
+ * Reads the full sidecar file and delegates the actual slicing to
+ * `sliceText`. Throws a clear Error if the sidecar is absent.
+ */
+export function readToolResultSidecar(
+  sessionId: string,
+  toolCallId: string,
+  opts: SliceOpts
+): SidecarSlice {
+  const filePath = sidecarPath(sessionId, toolCallId);
+  let full: string;
+  try {
+    full = fs.readFileSync(filePath, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      throw new Error(
+        `No spilled tool result found for tool_call_id "${toolCallId}" in this session ` +
+          `(expected sidecar at ${filePath}). It may have ridden back whole (small enough ` +
+          `to not be digested) or belong to a different session. Copy tool_call_ids from ` +
+          `the digested tool result itself, never from memory.` +
+          recentSidecarsNote(path.dirname(filePath))
+      );
+    }
+    throw err;
+  }
+
+  return sliceText(full, opts);
 }
 
 /**

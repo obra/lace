@@ -4,7 +4,7 @@
 import { z } from 'zod';
 import { Tool } from '../tool';
 import { NonEmptyString } from '../schemas/common';
-import { readToolResultSidecar } from '@lace/agent/storage/tool-result-store';
+import { readToolResultSidecar, describeSlice } from '@lace/agent/storage/tool-result-store';
 import type { ToolAnnotations, ToolContext, ToolResult } from '../types';
 
 const readToolResultSchema = z
@@ -84,16 +84,17 @@ Prefer \`grep\` over dumping head/tail for very large outputs so you pull only w
       };
     }
 
-    let sliceDesc: string;
-    if (grep !== undefined && grep !== '') {
-      sliceDesc = `grep "${grep}" → ${slice.matchedLines ?? 0} matching line(s)${
-        slice.grepCapped ? ' (capped)' : ''
-      }${slice.grepWindowed ? ' (long lines windowed)' : ''}`;
-    } else if (head_bytes !== undefined || tail_bytes !== undefined) {
-      sliceDesc = describeHeadTailBytes(head_bytes, tail_bytes);
-    } else {
-      sliceDesc = describeHeadTail(head_lines, tail_lines);
-    }
+    const sliceDesc = describeSlice(
+      {
+        headLines: head_lines,
+        tailLines: tail_lines,
+        grep,
+        grepContextChars: grep_context_chars,
+        headBytes: head_bytes,
+        tailBytes: tail_bytes,
+      },
+      slice
+    );
     const header = `[tool_call_id=${tool_call_id} — ${slice.lineCount} lines, ${slice.totalBytes} bytes total — returning ${sliceDesc}]`;
 
     return {
@@ -101,18 +102,4 @@ Prefer \`grep\` over dumping head/tail for very large outputs so you pull only w
       content: [{ type: 'text', text: `${header}\n${slice.content}` }],
     };
   }
-}
-
-function describeHeadTail(headLines?: number, tailLines?: number): string {
-  const parts: string[] = [];
-  if (headLines !== undefined && headLines > 0) parts.push(`head ${headLines} line(s)`);
-  if (tailLines !== undefined && tailLines > 0) parts.push(`tail ${tailLines} line(s)`);
-  return parts.length > 0 ? parts.join(' + ') : 'default head slice';
-}
-
-function describeHeadTailBytes(headBytes?: number, tailBytes?: number): string {
-  const parts: string[] = [];
-  if (headBytes !== undefined && headBytes > 0) parts.push(`head ${headBytes} byte(s)`);
-  if (tailBytes !== undefined && tailBytes > 0) parts.push(`tail ${tailBytes} byte(s)`);
-  return parts.length > 0 ? parts.join(' + ') : 'default head slice';
 }
