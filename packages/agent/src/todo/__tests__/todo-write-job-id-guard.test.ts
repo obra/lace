@@ -85,6 +85,27 @@ describe('PRI-3362: todo_write refuses an uncited job id', () => {
     expect(existsSync(join(sessionDir, 'todo.md'))).toBe(false);
   });
 
+  // Case 1b: when the session has real jobs, the refusal names the five most
+  // recent of them (like job_notify/job_output/job_kill's refusal), so the
+  // caller can pick the id it meant without a separate jobs_list call.
+  it("names the session's real recent jobs in the refusal", async () => {
+    const jobManager = newRealJobManager(sessionDir);
+    const { jobId: realJobId } = await jobManager.createJob('delegate', {
+      prompt: 'earlier real work',
+    });
+
+    const result = await executeTodoWrite(
+      {
+        title: 'Wait for worker',
+        description: `Watch ${INVENTED_JOB_ID} for results`,
+      },
+      { sessionDir, jobManager }
+    );
+
+    expect(result.status).toBe('failed');
+    expect(result.content[0].text).toContain(realJobId);
+  });
+
   // Case 2: an id returned by an earlier delegate/bash(background=true) call
   // THIS session actually made is accepted.
   it('accepts a job id this session actually returned earlier', async () => {
@@ -104,6 +125,27 @@ describe('PRI-3362: todo_write refuses an uncited job id', () => {
     expect(result.status).toBe('completed');
     expect(existsSync(join(sessionDir, 'todo.md'))).toBe(true);
     expect(readFileSync(join(sessionDir, 'todo.md'), 'utf-8')).toContain(realJobId);
+  });
+
+  // Case 2b: a real id cited in a different case is still accepted. The id
+  // regex matches job ids case-insensitively, but a JobManager always issues
+  // lower-case ids (randomUUID()'s output), so a bare case-sensitive lookup
+  // would wrongly refuse an upper-cased real id.
+  it('accepts a real job id even when cited in a different case', async () => {
+    const jobManager = newRealJobManager(sessionDir);
+    const { jobId: realJobId } = await jobManager.createJob('delegate', {
+      prompt: 'do some work',
+    });
+
+    const result = await executeTodoWrite(
+      {
+        title: 'Wait for worker',
+        description: `Watch ${realJobId.toUpperCase()} for results`,
+      },
+      { sessionDir, jobManager }
+    );
+
+    expect(result.status).toBe('completed');
   });
 
   // Case 3: the actual failure mode — a delegate (or bash background) call and
