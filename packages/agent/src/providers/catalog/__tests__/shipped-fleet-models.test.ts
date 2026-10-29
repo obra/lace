@@ -24,6 +24,10 @@ import type { ProviderInstancesConfig } from '../types';
  * max_output_tokens 131072, capabilities.vision true. Pricing is unknown
  * for these two, so the catalog omits the cost fields entirely (the schema
  * allows this).
+ *
+ * glm-5.3 and glm-5.3-background are LunaRoute's canonical names for the same
+ * model and servers as the -vision ids, and publish the same limits (pulled
+ * 2026-10-29). Pricing is unknown here too.
  */
 const FLEET_MODELS: Record<
   string,
@@ -38,6 +42,16 @@ const FLEET_MODELS: Record<
     'deepseek-4.1-flash-background': {
       contextWindow: 1_048_576,
       maxOutputTokens: 262_144,
+      supportsAttachments: true,
+    },
+    'glm-5.3': {
+      contextWindow: 524_288,
+      maxOutputTokens: 131_072,
+      supportsAttachments: true,
+    },
+    'glm-5.3-background': {
+      contextWindow: 524_288,
+      maxOutputTokens: 131_072,
       supportsAttachments: true,
     },
     'glm-5.3-vision': {
