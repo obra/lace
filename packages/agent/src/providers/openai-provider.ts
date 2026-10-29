@@ -53,6 +53,9 @@ interface OpenAIProviderConfig extends ProviderConfig {
   [key: string]: unknown; // Allow for additional properties
 }
 
+// See OpenAIProvider.boundedRetryFor.
+const GATEWAY_MODEL_NOT_FOUND_MAX_ATTEMPTS = 3;
+
 export class OpenAIProvider extends AIProvider {
   private _openai: OpenAI | null = null;
   private _encoderCache = new Map<string, Tiktoken>();
@@ -746,6 +749,36 @@ export class OpenAIProvider extends AIProvider {
     const config = this._config as OpenAIProviderConfig;
     const baseURL = config.baseURL as string | undefined;
     return !!baseURL && !baseURL.includes('api.openai.com');
+  }
+
+  /**
+   * PRI-3609: LunaRoute intermittently answers 404 "The model '<id>' does not
+   * exist" for a model it lists (about 5% of large /v1/responses calls). That is
+   * the gateway's fault, and one such 404 would otherwise end a worker's only
+   * turn. Retry exactly that shape, and only on a custom endpoint: the same
+   * answer from api.openai.com is a real configuration error.
+   *
+   * Capped at 3 attempts rather than the general 10. A transient gateway fault
+   * at this rate clears in one or two re-sends, while a model the gateway
+   * really lacks would otherwise cost ten full re-uploads of a large prompt
+   * and minutes of backoff before the error surfaces.
+   */
+  protected override boundedRetryFor(
+    error: unknown
+  ): { maxAttempts: number; warning: string; context: Record<string, unknown> } | undefined {
+    if (!this.isCustomEndpoint() || !error || typeof error !== 'object') return undefined;
+    const errorObj = error as { status?: unknown; message?: unknown; code?: unknown };
+    if (errorObj.status !== 404) return undefined;
+    const modelNotFound =
+      errorObj.code === 'model_not_found' ||
+      (typeof errorObj.message === 'string' &&
+        /The model '[^']+' does not exist/.test(errorObj.message));
+    if (!modelNotFound) return undefined;
+    return {
+      maxAttempts: GATEWAY_MODEL_NOT_FOUND_MAX_ATTEMPTS,
+      warning: 'Retrying gateway model-not-found 404 on a custom base URL (PRI-3609)',
+      context: { baseURL: (this._config as OpenAIProviderConfig).baseURL },
+    };
   }
 
   /**

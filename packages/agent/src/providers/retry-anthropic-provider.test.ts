@@ -139,6 +139,28 @@ describe('AnthropicProvider retry functionality', () => {
       expect(mockCreate).toHaveBeenCalledTimes(1);
     });
 
+    // PRI-3609: only OpenAI-compatible gateways get a model-not-found retry. An
+    // Anthropic 404 is a real configuration error, even behind a custom base URL.
+    it('should not retry a model-not-found 404, even on a custom base URL', async () => {
+      const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
+      const gatewayProvider = new AnthropicProvider({
+        apiKey: 'test-key',
+        baseURL: 'https://gw.example.com',
+      });
+
+      const notFoundError = {
+        status: 404,
+        message: "404 The model 'claude-nope' does not exist",
+        code: 'model_not_found',
+      };
+      mockCreate.mockRejectedValue(notFoundError);
+
+      await expect(gatewayProvider.createResponse(messages, [], 'claude-nope')).rejects.toEqual(
+        notFoundError
+      );
+      expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
+
     it('should use full 10 retry attempts', async () => {
       const messages: ProviderMessage[] = [{ role: 'user', content: 'Hello' }];
 

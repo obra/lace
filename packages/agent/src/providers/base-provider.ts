@@ -789,6 +789,19 @@ export abstract class AIProvider extends EventEmitter {
   }
 
   /**
+   * An error `isRetryableError` refuses, but that this provider retries anyway
+   * under a tighter attempt cap, logging `warning` on every retry so the
+   * workaround stays visible. Undefined means the ordinary classification
+   * applies. Used for a known vendor fault that would otherwise read as a
+   * permanent configuration error (see OpenAIProvider, PRI-3609).
+   */
+  protected boundedRetryFor(
+    _error: unknown
+  ): { maxAttempts: number; warning: string; context?: Record<string, unknown> } | undefined {
+    return undefined;
+  }
+
+  /**
    * Extracts rate limit delay from error message or headers
    * Returns delay in milliseconds, or null if not found
    */
@@ -1120,14 +1133,18 @@ export abstract class AIProvider extends EventEmitter {
         lastError = error;
 
         // Check if we should retry
-        const isRetryable = this.isRetryableError(error);
+        const boundedRetry = this.boundedRetryFor(error);
+        const isRetryable = boundedRetry !== undefined || this.isRetryableError(error);
+        const attemptCap = boundedRetry
+          ? Math.min(maxAttempts, boundedRetry.maxAttempts)
+          : maxAttempts;
         const canRetryCheck = options?.canRetry ? options.canRetry() : true;
-        const shouldRetry = attempt < maxAttempts && isRetryable && canRetryCheck;
+        const shouldRetry = attempt < attemptCap && isRetryable && canRetryCheck;
 
         // Log retry decision for debugging
         logger.debug('Retry decision', {
           attempt,
-          maxAttempts,
+          maxAttempts: attemptCap,
           isRetryable,
           canRetryCheck,
           shouldRetry,
@@ -1140,14 +1157,25 @@ export abstract class AIProvider extends EventEmitter {
 
         if (!shouldRetry) {
           // If we've exhausted all attempts, emit exhausted event
-          if (attempt === maxAttempts && this.isRetryableError(error)) {
+          if (attempt === attemptCap && isRetryable) {
             this.emit('retry_exhausted', {
-              attempts: maxAttempts,
+              attempts: attemptCap,
               lastError: error as Error,
             });
           }
 
           throw error;
+        }
+
+        if (boundedRetry) {
+          logger.warn(boundedRetry.warning, {
+            provider: this.providerName,
+            attempt,
+            maxAttempts: attemptCap,
+            ...boundedRetry.context,
+            error:
+              error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200),
+          });
         }
 
         // PRI-2901: past the blip attempts, stop re-sending the prompt. Each
