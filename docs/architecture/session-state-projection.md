@@ -55,9 +55,10 @@ After a tool round-trip, a text-only response receives at most one reminder with
 `toolChoice: required` when an immediate mid-turn arrival is pending, the
 response is empty, or its final substantive sentence or line declares future
 work and another model round remains. Completed reports can end naturally;
-earlier intent, a negated promise, or a standalone turn-closing declaration does
-not by itself require another tool call. The wording predicate only selects the
-reminder. It never changes the terminal outcome to `incomplete`.
+earlier intent, the specific negated prefix “not something I’ll / I will”, or a
+standalone turn-closing declaration does not by itself require another tool
+call. The wording predicate only selects the reminder. It never changes the
+terminal outcome to `incomplete`.
 
 The pending-arrival marker clears when a nonempty tool-result batch enters
 provider history. An arrival admitted on a later iteration establishes a fresh
