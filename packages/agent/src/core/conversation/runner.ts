@@ -2297,6 +2297,7 @@ export class ConversationRunner {
       { id: toolCallId, name: toolName, arguments: finalInput },
       {
         signal: abortController.signal,
+        ...(this.deps.memory ? { memory: this.deps.memory } : {}),
         workingDirectory: cwd,
         runtime,
         runtimeBinding,

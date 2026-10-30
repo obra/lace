@@ -1,3 +1,4 @@
+import { sessionMemory } from '../../memory/session';
 // ABOUTME: Prompt RPC handler - thin adapter over core/conversation/runner
 
 import { randomUUID } from 'node:crypto';
@@ -132,6 +133,7 @@ export function registerPromptHandler(
         },
       };
     }
+    sessionMemory(state, state.activeSession);
     if (idempotencyKey) {
       const status = await runExclusive(() => {
         if (!state.activeSession) return 'not-persisted';
@@ -430,6 +432,7 @@ export function registerPromptHandler(
 
       // Build runner dependencies
       const deps: RunnerDependencies = {
+        memory: sessionMemory(state, state.activeSession)?.reader,
         getTemporaryContext: () => state.temporaryContext ?? null,
         onUpdate: emitUpdate,
         runExclusive,

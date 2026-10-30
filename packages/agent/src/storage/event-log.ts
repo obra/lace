@@ -428,6 +428,15 @@ export function summarizeDurableEvents(sessionDir: string): {
   return { messageCount, turnCount, lastActive };
 }
 
+const appendListeners = new Set<() => void>();
+/** Wake lifetime-owned observers after a durable local append. */
+export function onDurableEventAppend(listener: () => void): () => void {
+  appendListeners.add(listener);
+  return () => {
+    appendListeners.delete(listener);
+  };
+}
+
 export function appendDurableEvent(
   sessionDir: string,
   state: SessionState,
@@ -565,6 +574,14 @@ export function appendDurableEvent(
     });
   } catch (err) {
     console.error('event_journal write failed:', err);
+  }
+
+  for (const listener of appendListeners) {
+    try {
+      listener();
+    } catch (error) {
+      logger.warn('event_append_observer.failed', { error: String(error) });
+    }
   }
 
   return {

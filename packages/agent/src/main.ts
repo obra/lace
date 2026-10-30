@@ -129,6 +129,7 @@ const shutdown = async () => {
   } catch {
     // Best-effort; never block process exit on reminder bookkeeping.
   }
+  await state.memory?.close();
   peer?.close();
   await state.mcpServerManager.shutdown();
   try {

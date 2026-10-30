@@ -8,7 +8,10 @@ import type { MountRegistryEntry } from '@lace/agent/server-types';
 import type { RuntimeExecutionBinding, RuntimePath, ToolRuntime } from './runtime/types';
 import type { WorkspaceReaper } from '@lace/agent/jobs/workspace-reaper';
 
+import type { MemoryReader } from '../memory/types';
+
 export interface ToolContext {
+  memory?: MemoryReader;
   // Execution control - required for cancellation
   signal: AbortSignal;
 

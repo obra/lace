@@ -2,6 +2,7 @@
 // This module contains type definitions and configuration constants used across
 // the server implementation, including session updates, job state, and server configuration.
 
+import type { MemoryRuntime } from './memory/types';
 import type { ChildProcess } from 'node:child_process';
 import type { z } from 'zod';
 import { SessionUpdateNotificationSchema } from '@lace/ent-protocol';
@@ -143,6 +144,7 @@ export type JobState = {
 
 // Server State Type
 export type AgentServerState = {
+  memory?: MemoryRuntime;
   initialized: boolean;
   activeSession: LoadedSession | null;
   /** Sticky request-only text; excluded from loaded and persisted session state. */

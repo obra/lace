@@ -52,6 +52,7 @@ export type SessionMeta = {
 };
 
 export type SessionState = {
+  memoryInstanceId?: string;
   nextEventSeq: number;
   nextStreamSeq: number;
   /** Accumulated token usage cost in USD for this session */
@@ -190,7 +191,13 @@ export function readSessionState(sessionDir: string): SessionState {
       statePath
     );
   }
+  if (
+    parsed.memoryInstanceId !== undefined &&
+    (typeof parsed.memoryInstanceId !== 'string' || !parsed.memoryInstanceId.trim())
+  )
+    throw new SessionStorageError('Session memory affinity is corrupt', statePath);
   return {
+    ...(parsed.memoryInstanceId ? { memoryInstanceId: parsed.memoryInstanceId } : {}),
     nextEventSeq: typeof parsed.nextEventSeq === 'number' ? parsed.nextEventSeq : 1,
     nextStreamSeq: typeof parsed.nextStreamSeq === 'number' ? parsed.nextStreamSeq : 1,
     sessionCostUsd: typeof parsed.sessionCostUsd === 'number' ? parsed.sessionCostUsd : undefined,

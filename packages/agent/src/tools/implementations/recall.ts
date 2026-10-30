@@ -163,7 +163,7 @@ export class RecallTool extends Tool {
     }
   }
 
-  private async search(args: RecallSearchInput, _context: ToolContext): Promise<ToolResult> {
+  private async search(args: RecallSearchInput, context: ToolContext): Promise<ToolResult> {
     const db = getRecallIndex();
 
     const where: string[] = ['content MATCH ?'];
@@ -248,24 +248,45 @@ export class RecallTool extends Tool {
     // surviving tail. Read content and error envelopes still use strict redact.
     const hits = rows.map((r) => ({ ...r, preview: redactSnippet(r.preview) }));
 
+    const memories = context.memory
+      ? JSON.parse(
+          redact(
+            JSON.stringify(
+              (await context.memory.search(args.query, limit)).map((note) => ({
+                ...note,
+                preview: redactSnippet(note.preview),
+              }))
+            )
+          )
+        )
+      : undefined;
     if (hits.length === 0) {
       const personaPart = appliedPersonaFilter
         ? ` (persona=${redact(JSON.stringify(appliedPersonaFilter))})`
         : '';
       return this.createResult({
         hits: [],
+        ...(memories ? { memories } : {}),
         hint: `0 hits for query=${redact(JSON.stringify(args.query))}${personaPart}. Try: drop the persona filter, widen the time range, or check spelling.`,
       });
     }
 
-    return this.createResult({ hits });
+    return this.createResult({ hits, ...(memories ? { memories } : {}) });
   }
 
-  private async read(args: RecallReadInput, _context: ToolContext): Promise<ToolResult> {
+  private async read(args: RecallReadInput, memoryContext: ToolContext): Promise<ToolResult> {
     // Every user-supplied string that lands in an error envelope or hint
     // must pass through redact() — see spec §Redaction. The raw input may
     // itself contain a leaked secret (the model just hallucinated an
     // event_id that includes one) and we must not echo it back unfiltered.
+    if (args.event_id.startsWith('memory:')) {
+      if (!memoryContext.memory)
+        return this.createResult({ error: 'Derived memory is unavailable for this session.' });
+      const note = await memoryContext.memory.read(args.event_id.slice(7));
+      return this.createResult(
+        note ? JSON.parse(redact(JSON.stringify(note))) : { error: 'Derived memory not found.' }
+      );
+    }
     const safeEventId = redact(args.event_id);
     const match = /^([^:]+):(\d+)$/.exec(args.event_id);
     if (!match) {

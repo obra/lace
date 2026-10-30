@@ -7,6 +7,17 @@ conversation thread from the current session (`thread`). It is a record of what
 happened, not the current state of the world, so agents should re-check live for
 facts that can change.
 
+A trusted host may also configure
+[automatic derived memory](../architecture/automatic-memory.md). Then search
+adds a bounded `memories` group with distinct `memory:<id>` handles, revision,
+preview, producer attribution and current support status. Transcript hits retain
+their existing shape and filters. Derived notes are instance-wide; transcript
+persona/session/time/track filters do not select them. A memory-handle read
+returns the current note and original source references, explicitly marking
+superseded, missing or unavailable support. It checks current role authority; an
+unconfigured session cannot use derived memory. These are model-authored
+attributed syntheses, not independently verified facts.
+
 ## Actions
 
 `action` is required and is one of `search`, `read` or `thread`.

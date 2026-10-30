@@ -1,3 +1,4 @@
+import { sessionMemory } from '../memory/session';
 // ABOUTME: Slash command handling for built-in commands like /compact, /mode, /help
 
 import { randomUUID } from 'node:crypto';
@@ -198,6 +199,7 @@ export async function handleSlashCommand(
       }
 
       try {
+        const memory = sessionMemory(state, state.activeSession);
         const workDir = state.activeSession.meta.workDir;
         const sessionConfig = state.activeSession.state.config;
         const inheritedPersona = state.activeSession.meta.persona;
@@ -221,6 +223,7 @@ export async function handleSlashCommand(
           ...(inheritedPersona ? { persona: inheritedPersona } : {}),
         });
         writeSessionState(newSessionDir, {
+          ...(memory ? { memoryInstanceId: memory.memoryInstanceId } : {}),
           nextEventSeq: 0,
           nextStreamSeq: 0,
           config: sessionConfig,

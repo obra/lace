@@ -291,3 +291,33 @@ describe('memory authority', () => {
     expect(() => assertMemoryCollectionAccess(db, child, 'knowledge', true)).not.toThrow();
   });
 });
+
+describe('host memory identity preflight', () => {
+  it('reads existing identity without creating a missing authority or claiming ownership', async () => {
+    const { readMemoryInstanceId } = await import('../authority');
+    const dir = mkdtempSync(join(tmpdir(), 'lace-memory-preflight-'));
+    const path = join(dir, 'authority.sqlite');
+    try {
+      expect(() => readMemoryInstanceId(path)).toThrow();
+      expect(existsSync(path)).toBe(false);
+      const db = openMemoryDatabase(path, 'stable-instance');
+      db.close();
+      expect(readMemoryInstanceId(path)).toBe('stable-instance');
+      const reopened = new Database(path, { readonly: true });
+      expect(memoryOwnerGeneration(reopened)).toBeNull();
+      reopened.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('refuses existing-only ownership when the authority disappeared', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lace-memory-existing-'));
+    const path = join(dir, 'absent.sqlite');
+    try {
+      expect(() => claimMemoryOwner('instance', path, 'root', { create: false })).toThrow();
+      expect(existsSync(path)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});

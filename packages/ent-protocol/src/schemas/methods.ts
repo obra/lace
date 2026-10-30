@@ -3,6 +3,7 @@ import { SessionIdSchema } from '../ids';
 import { JsonRpcIdSchema, JsonRpcVersionSchema } from './jsonrpc';
 import {
   ConnectionInfoSchema,
+  MemoryConfigurationSchema,
   ContentBlockSchema,
   IsoTimestampSchema,
   McpServerConfigSchema,
@@ -99,6 +100,7 @@ const AgentCapabilitiesSchema = z
 
 const InitializeParamsSchema = z
   .object({
+    memory: MemoryConfigurationSchema.optional(),
     protocolVersion: z.literal('1.0'),
     clientInfo: z
       .object({

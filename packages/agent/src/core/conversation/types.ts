@@ -1,3 +1,4 @@
+import type { MemoryReader } from '../../memory/types';
 // ABOUTME: Types for ConversationRunner - the extracted agentic loop
 
 import type { AIProvider, LaceStopDetails } from '@lace/agent/providers/base-provider';
@@ -65,6 +66,7 @@ export interface RunnerConfig {
  * These are callbacks that the runner uses to interact with the outside world.
  */
 export interface RunnerDependencies {
+  memory?: MemoryReader;
   /** Read current request-only text immediately before each model request. */
   getTemporaryContext?: () => string | null;
   /** Callback for emitting session updates to clients */
