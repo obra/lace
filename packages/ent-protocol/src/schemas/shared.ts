@@ -436,3 +436,23 @@ export const PersonaInfoSchema = z
   })
   .strict();
 export type PersonaInfo = z.infer<typeof PersonaInfoSchema>;
+
+export const MemoryRoleGrantSchema = z
+  .object({
+    producerId: z.string().min(1),
+    canRead: z.boolean(),
+    canMutate: z.boolean(),
+    collections: z.array(z.string().min(1)),
+    writableCollections: z.array(z.string().min(1)),
+  })
+  .strict();
+export const MemoryRolesSchema = z.record(z.string().min(1), MemoryRoleGrantSchema);
+export type MemoryRoles = z.infer<typeof MemoryRolesSchema>;
+export const MemoryBindingSchema = MemoryRoleGrantSchema.extend({
+  instanceId: z.string().min(1),
+  actorId: z.string().min(1),
+  role: z.string().min(1),
+  ownerGeneration: z.string().min(1),
+  isRoot: z.boolean(),
+}).strict();
+export type HostMemoryBinding = z.infer<typeof MemoryBindingSchema>;
