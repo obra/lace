@@ -1,7 +1,6 @@
 // ABOUTME: Pins the Gemini generateContent REQUEST OBJECT (JSON.stringify) for
-// the shared fixture corpus. Gemini exposes no baseURL passthrough and manages
-// no prompt cache, so the object lace hands the SDK is the right gate. Mirrors
-// the mock in gemini-provider.test.ts.
+// the shared fixture corpus. Mirrors the mock in gemini-provider.test.ts;
+// gemini-provider-sdk-request.test.ts separately checks actual SDK serialization.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

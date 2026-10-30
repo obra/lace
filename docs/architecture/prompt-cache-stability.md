@@ -1,19 +1,18 @@
 # Prompt-cache stability
 
-This document describes how Lace keeps a turn's request prefix byte-stable so
-the model provider's prompt cache holds, and the tests and signals that enforce
-it. It is code-path oriented: if behavior changes, update the references below
-alongside the code.
+This document describes how Lace keeps request prefixes stable to support
+provider prompt caching, and the tests and signals that check that behavior.
+Local byte stability alone does not prove server-side cache reuse. If behavior
+changes, update the references below alongside the code.
 
 ## Why byte-stability matters
 
-Each turn sends the conversation so far plus a small live tail. Providers cache
-the longest prefix of a request they have seen before and bill the cached
-portion at a steep discount. The cache keys on content, so the discount survives
-only when the serialized prefix is **byte-for-byte identical** to the previous
-turn's. A single stray byte early in the request — a reordered key, a
-re-rendered timestamp, a differently-sorted directory listing — invalidates the
-cache from that byte onward.
+Each turn sends the conversation so far plus a small live tail. Provider cache
+rules differ, but reusable prefixes depend on stable content and ordering. Lace
+checks **byte-for-byte identical** serialization locally to catch drift from
+reordered keys, re-rendered timestamps or directory listings. These checks do
+not establish a provider's tokenization, cache eligibility, retention or billing
+behavior.
 
 The stakes differ by provider, but the discipline is the same for all:
 
@@ -43,10 +42,20 @@ prefix plus a deterministic conversion is what every provider's cache wants.
 
 The providers serialize differently — Anthropic uses a `system` array (with
 `cache_control` markers) and `messages`; OpenAI prepends a `{role:'system'}`
-chat message into `messages`; Gemini keeps the system prompt in
-`systemInstruction` and the turns in `contents`. A session that switches
+chat message into `messages`; Gemini supplies the system prompt and function
+declarations through the SDK's `GenerateContentParameters.config` as
+`systemInstruction` and `tools`, with turns in `contents`. The Google SDK emits
+those configuration fields as top-level wire fields and converts output limits
+to `generationConfig`. Putting instructions or tools at the top level of the SDK
+input silently omits them from its wire request. A session that switches
 provider keeps its conversation history but cold-starts its cache, because each
 provider serializes a different prefix shape into a different cache namespace.
+
+When a user message also carries tool results, required results precede that
+message's text and images. Gemini places `functionResponse` parts first; OpenAI
+Chat places all correlated `tool` messages before the user message. Anthropic
+and OpenAI Responses apply the same ordering in their native shapes. Result
+order, call IDs, success/error data and supported images are preserved.
 
 ### Anthropic cache markers
 
@@ -132,8 +141,16 @@ Capture differs by provider, because what reaches the cache differs:
   literal bytes carry the cache.
 - **OpenAI and Gemini** capture the **request object** Lace hands the SDK, via
   the same SDK module mock the provider's own unit test uses, then
-  `JSON.stringify` it. This is the object Lace controls; server-side (OpenAI)
-  and absent (Gemini) cache mechanisms make object-level fidelity sufficient.
+  `JSON.stringify` it. These fixtures pin Lace's SDK input, not actual wire
+  serialization. `gemini-provider-sdk-request.test.ts` separately checks that
+  the installed SDK sends instructions, declarations and output limits through
+  intercepted fetch calls with synthetic credentials and responses.
+
+`gemini-provider-sdk-ordering.test.ts` and `tool-result-ordering-sdk.test.ts`
+exercise real SDK serialization for streaming and nonstreaming calls with mixed
+user content and multiple tool results. They check result correlation, error
+data, images and unchanged inputs for Gemini, Chat, Anthropic and Responses.
+They make no live API acceptance or cache-hit claim.
 
 Each golden test also captures twice in one run and asserts the two captures are
 equal before comparing to the committed snapshot, so any nondeterminism in the

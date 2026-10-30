@@ -174,17 +174,19 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          tools: expect.arrayContaining([
-            expect.objectContaining({
-              functionDeclarations: expect.arrayContaining([
-                expect.objectContaining({
-                  name: 'test_tool',
-                  description: 'A test tool',
-                  parameters: mockTool.inputSchema,
-                }),
-              ]),
-            }),
-          ]),
+          config: expect.objectContaining({
+            tools: expect.arrayContaining([
+              expect.objectContaining({
+                functionDeclarations: expect.arrayContaining([
+                  expect.objectContaining({
+                    name: 'test_tool',
+                    description: 'A test tool',
+                    parameters: mockTool.inputSchema,
+                  }),
+                ]),
+              }),
+            ]),
+          }),
         })
       );
     });
@@ -364,7 +366,7 @@ describe('GeminiProvider', () => {
 
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
-          systemInstruction: 'You are a helpful assistant',
+          config: expect.objectContaining({ systemInstruction: 'You are a helpful assistant' }),
           contents: expect.arrayContaining([
             expect.objectContaining({
               role: 'user',
