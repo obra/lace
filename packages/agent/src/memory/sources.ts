@@ -128,6 +128,7 @@ function supplied(source: Source, content: ContentBlock[], images: boolean): Sup
 }
 
 export class MemorySources {
+  private documentCommit?: string;
   constructor(
     private notes: MemoryNotes,
     private configuration: MemoryConfiguration
@@ -139,6 +140,7 @@ export class MemorySources {
     if ((await git(root, ['rev-parse', '--show-toplevel'])).trim() !== root)
       throw new Error('Memory document gitRoot must identify its repository root');
     const commit = (await git(root, ['rev-parse', '--verify', 'HEAD^{commit}'])).trim();
+    if (commit === this.documentCommit) return;
     // Literal pathspecs prevent host configuration from accidentally widening discovery.
     const listing = await git(
       root,
@@ -152,21 +154,25 @@ export class MemorySources {
       const path = match[3];
       const blob = match[2];
       heads.set(path, blob);
-      this.notes.discover({
-        id: `document:${path}`,
-        version: blob,
-        reference: { kind: 'document', gitRoot: root, path, commit, blob },
-      });
     }
-    this.notes.db
-      .transaction(() => {
-        this.notes.db.prepare('UPDATE memory_documents SET version=NULL').run();
-        for (const [path, version] of heads)
+    this.notes.write(() => this.notes.db.prepare('UPDATE memory_documents SET version=NULL').run());
+    const entries = [...heads];
+    for (let offset = 0; offset < entries.length; offset += 128) {
+      this.notes.write(() => {
+        for (const [path, blob] of entries.slice(offset, offset + 128)) {
+          this.notes.discover({
+            id: `document:${path}`,
+            version: blob,
+            reference: { kind: 'document', gitRoot: root, path, commit, blob },
+          });
           this.notes.db
             .prepare('INSERT OR REPLACE INTO memory_documents(path,version) VALUES(?,?)')
-            .run(path, version);
-      })
-      .immediate();
+            .run(path, blob);
+        }
+      });
+      await yieldTurn();
+    }
+    this.documentCommit = commit;
   }
   async discover(): Promise<void> {
     await this.documents();
@@ -257,9 +263,11 @@ export class MemorySources {
             start = newline + 1;
           }
           offset += end + 1;
-          this.notes.db
-            .prepare('INSERT OR REPLACE INTO memory_scan VALUES(?,?,?)')
-            .run(file, identity, offset);
+          this.notes.write(() =>
+            this.notes.db
+              .prepare('INSERT OR REPLACE INTO memory_scan VALUES(?,?,?)')
+              .run(file, identity, offset)
+          );
           await yieldTurn();
         }
       } finally {

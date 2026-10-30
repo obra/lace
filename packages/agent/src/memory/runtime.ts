@@ -41,7 +41,17 @@ export function createMemoryRuntime(
     notes = db
       .transaction(() => {
         assertMemoryAccess(db, binding, !!configuration.extraction);
-        const store = new MemoryNotes(db, binding.isRoot && binding.canMutate);
+        const store = new MemoryNotes(db, binding.isRoot && binding.canMutate, () => {
+          assertMemoryAccess(db, binding, true);
+          if (
+            (
+              db.prepare('SELECT attempt FROM memory_worker WHERE singleton=1').get() as {
+                attempt: string;
+              }
+            )?.attempt !== attempt
+          )
+            throw new Error('Extraction attempt replaced');
+        });
         if (configuration.extraction)
           db.prepare('INSERT OR REPLACE INTO memory_worker VALUES(1,?)').run(attempt);
         return store;
@@ -87,7 +97,7 @@ export function createMemoryRuntime(
     const available = notes.pending();
     if (!available.length) return false;
     const primary: SuppliedSource[] = [];
-    const withheld: Array<{ id: string; reason: string }> = [];
+    const withheld = notes.omissions();
     let textBytes = 0;
     let imageBytes = 0;
     const images = await supportsImages();
@@ -104,7 +114,7 @@ export function createMemoryRuntime(
           textBytes + loaded.textBytes > L.sourceBytes ||
           imageBytes + loaded.imageBytes > L.imageBytes
         ) {
-          withheld.push({ id: source.id, reason: 'Request input budget' });
+          withheld.push({ id: sourceHandle(source), reason: 'Request input budget' });
           return false;
         }
         primary.push(loaded);
@@ -113,7 +123,7 @@ export function createMemoryRuntime(
         return true;
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
-        withheld.push({ id: source.id, reason });
+        withheld.push({ id: sourceHandle(source), reason });
         if (isPrimary) notes.status(source, 'omitted', reason);
         return false;
       }
@@ -134,7 +144,7 @@ export function createMemoryRuntime(
     }
     const offered = primary.map(({ id, version, reference }) => ({ id, version, reference }));
     const workId = notes.offer(
-      offered,
+      primary,
       candidates,
       JSON.stringify(configuration.extraction),
       primaries

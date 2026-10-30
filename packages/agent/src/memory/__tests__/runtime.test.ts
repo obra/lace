@@ -117,6 +117,7 @@ describe('configured automatic memory', () => {
   afterEach(async () => {
     for (const runtime of runtimes) await runtime.close();
     closeRecallIndex();
+    logger.configure('info', undefined, false);
     vi.unstubAllEnvs();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -252,11 +253,20 @@ describe('configured automatic memory', () => {
         },
       },
     });
-    const runtime = open(() => ({ text: '{"changes":[]}', stopReason: 'end_turn', toolCalls: [] }));
+    const runtime = open((opts: any) => {
+      const body = JSON.parse(opts.messages[0].content[0].text);
+      expect(
+        body.withheld.some((source: any) => source.reason.includes('No spilled tool result'))
+      ).toBe(true);
+      return { text: '{"changes":[]}', stopReason: 'end_turn', toolCalls: [] };
+    });
     await runtime.wake();
     const db = openMemoryDatabase(databasePath, 'instance', false);
     expect(db.prepare("SELECT status FROM memory_sources WHERE id LIKE 'event:%'").get()).toEqual({
       status: 'unavailable',
+    });
+    expect(db.prepare('SELECT outcome FROM memory_receipts').get()).toEqual({
+      outcome: 'completed',
     });
     db.close();
   });
@@ -471,5 +481,189 @@ describe('configured automatic memory', () => {
     expect(revised?.text).toBe('Jesse now prefers roomy rows.');
     expect(revised?.support).toHaveLength(1);
     expect(revised?.support[0].status).toBe('current');
+  });
+  it('does not overwrite a newer accepted note revision with a held proposal', async () => {
+    let first = true;
+    let started!: () => void;
+    let release!: (result: any) => void;
+    let request: any;
+    const waiting = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const runtime = open((opts: any) => {
+      if (first) {
+        first = false;
+        return proposals(opts);
+      }
+      request = opts;
+      started();
+      return new Promise((resolve) => {
+        release = resolve;
+      });
+    });
+    await runtime.wake();
+    const original = await read(runtime);
+    event(1, 'Another independently supplied fact');
+    const work = runtime.wake();
+    await waiting;
+    const { MemoryNotes } = await import('../notes');
+    const { sourceHandle } = await import('../types');
+    const db = openMemoryDatabase(databasePath, 'instance', false);
+    const notes = new MemoryNotes(db, false);
+    const head = notes.note(original.id)!;
+    const competing = notes.offer(head.sources, [head], 'controlled competing acceptance', []);
+    const attempt = (db.prepare('SELECT attempt FROM memory_worker').get() as { attempt: string })
+      .attempt;
+    notes.accept(
+      binding,
+      attempt,
+      competing,
+      head.sources,
+      [head],
+      {
+        changes: [
+          {
+            text: 'A newer accepted compact preference.',
+            sourceIds: head.sources.map(sourceHandle),
+            target: { noteId: head.id, revision: 1 },
+          },
+        ],
+      },
+      () => {},
+      []
+    );
+    const body = JSON.parse(request.messages[0].content[0].text);
+    release({
+      text: JSON.stringify({
+        changes: [
+          {
+            text: 'Stale compact preference.',
+            sourceIds: [body.sources[0].id],
+            target: { noteId: head.id, revision: 1 },
+          },
+        ],
+      }),
+      stopReason: 'end_turn',
+      toolCalls: [],
+    });
+    await work;
+    db.close();
+    expect(await runtime.reader(binding).read(head.id)).toMatchObject({
+      revision: 2,
+      text: 'A newer accepted compact preference.',
+    });
+  });
+
+  it('coalesces maintenance ticks during held inference and discovers a later child append', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    let started!: () => void;
+    let release!: (result: any) => void;
+    let requests = 0;
+    const waiting = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    try {
+      const runtime = open((opts: any) => {
+        if (++requests > 1) return proposals(opts);
+        started();
+        return new Promise((resolve) => {
+          release = resolve;
+        });
+      });
+      const work = runtime.wake();
+      await waiting;
+      await vi.advanceTimersByTimeAsync(90_000);
+      expect(requests).toBe(1);
+      event(1, 'Late child event');
+      release({ text: '{"changes":[]}', stopReason: 'end_turn', toolCalls: [] });
+      await work;
+      expect((await read(runtime)).support[0].reference.kind).toBe('event');
+      expect(requests).toBe(2);
+      await runtime.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rebuilds note search from current heads while transcript-index replacement does not replay extraction', async () => {
+    const runtime = open(proposals);
+    await runtime.wake();
+    const note = await read(runtime);
+    await runtime.close();
+    closeRecallIndex();
+    const db = openMemoryDatabase(databasePath, 'instance', false);
+    db.exec('DROP TABLE memory_fts');
+    db.close();
+    rmSync(join(dir, 'state/recall/index.sqlite'), { force: true });
+    let replayed = false;
+    const restarted = open(() => {
+      replayed = true;
+      throw new Error('unexpected extraction replay');
+    });
+    await restarted.wake();
+    expect((await read(restarted)).id).toBe(note.id);
+    expect(replayed).toBe(false);
+  });
+
+  it('records provider exceptions as failure and withholds unsupported images', async () => {
+    event(1, '', {
+      type: 'prompt',
+      data: {
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+        ],
+      },
+    });
+    const runtime = createMemoryRuntime(
+      {
+        databasePath,
+        binding,
+        extraction: { connectionId: 'fake', modelId: 'fake' },
+        documentSources: { gitRoot: join(dir, 'git'), paths: ['knowledge.md'] },
+      },
+      {
+        supportsImages: async () => false,
+        query: async () => {
+          throw new Error('controlled provider failure');
+        },
+      }
+    );
+    runtimes.push(runtime);
+    await runtime.wake();
+    await runtime.wake();
+    const db = openMemoryDatabase(databasePath, 'instance', false);
+    expect(
+      db.prepare("SELECT status,reason FROM memory_sources WHERE id LIKE 'event:%'").get()
+    ).toMatchObject({ status: 'omitted', reason: 'Unsupported image input for configured model' });
+    expect(db.prepare('SELECT outcome,detail FROM memory_receipts').all()).toEqual([
+      { outcome: 'failed', detail: 'controlled provider failure' },
+    ]);
+    db.close();
+  });
+
+  it('cannot write discovery metadata after its owner generation is replaced', async () => {
+    let started!: () => void;
+    let release!: (result: any) => void;
+    let request: any;
+    const waiting = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const runtime = open((opts: any) => {
+      request = opts;
+      started();
+      return new Promise((resolve) => {
+        release = resolve;
+      });
+    });
+    const work = runtime.wake();
+    await waiting;
+    claimMemoryOwner('instance', databasePath, 'root', { create: false });
+    commit('A document committed under the next owner');
+    release(proposals(request));
+    await work;
+    const db = openMemoryDatabase(databasePath, 'instance', false);
+    expect(db.prepare('SELECT count(*) AS count FROM memory_sources').get()).toEqual({ count: 1 });
+    expect(db.prepare('SELECT count(*) AS count FROM memory_receipts').get()).toEqual({ count: 0 });
+    db.close();
   });
 });

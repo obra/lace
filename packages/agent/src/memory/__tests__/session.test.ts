@@ -89,8 +89,12 @@ describe('trusted memory initialization and session affinity', () => {
     const unconfigured = pair();
     await initialize(unconfigured.client, null);
     await expect(
-      unconfigured.client.request('session/load', { sessionId: created.sessionId })
-    ).rejects.toBeDefined();
+      unconfigured.client.request('session/load', {
+        sessionId: created.sessionId,
+        cwd: dir,
+        mcpServers: [],
+      })
+    ).rejects.toMatchObject({ message: expect.stringContaining('Session memory authority') });
     expect(unconfigured.state.activeSession).toBeNull();
   });
   it('rejects child extraction configuration before activating the server', async () => {
@@ -120,5 +124,49 @@ describe('trusted memory initialization and session affinity', () => {
       root.client.request('session/new', { cwd: dir, mcpServers: [] })
     ).rejects.toBeDefined();
     expect(root.state.activeSession).toBeNull();
+  });
+  it('preserves affinity across load, fork and clear and derives persona-change reads', async () => {
+    const root = pair();
+    await initialize(root.client);
+    const created = (await root.client.request('session/new', { cwd: dir, mcpServers: [] })) as {
+      sessionId: string;
+    };
+    const forked = (await root.client.request('session/fork', {
+      sessionId: created.sessionId,
+    })) as { sessionId: string };
+    await root.client.request('session/load', {
+      sessionId: forked.sessionId,
+      cwd: dir,
+      mcpServers: [],
+    });
+    expect(root.state.activeSession?.state.memoryInstanceId).toBe('instance');
+    const { handleSlashCommand } = await import('../../conversation/slash-commands');
+    const { ToolExecutor } = await import('../../tools/executor');
+    await handleSlashCommand(
+      root.state,
+      'clear',
+      '',
+      'turn-clear',
+      async () => {},
+      async () => {},
+      async () => ({ executor: new ToolExecutor(), toolsForProvider: [], mcpServersNotReady: [] })
+    );
+    expect(root.state.activeSession?.meta.sessionId).not.toBe(forked.sessionId);
+    expect(root.state.activeSession?.state.memoryInstanceId).toBe('instance');
+    const { sessionMemory } = await import('../session');
+    const active = root.state.activeSession!;
+    sessionMemory(root.state, active);
+    active.meta.persona = 'reader';
+    expect(sessionMemory(root.state, active)?.reader).toBeDefined();
+    active.meta.persona = 'lace';
+    expect(sessionMemory(root.state, active)?.reader).toBeDefined();
+    const db = openMemoryDatabase(databasePath, 'instance', false);
+    configureMemoryRoles(db, binding, {
+      lace: grant,
+      reader: { ...grant, producerId: 'persona:reader', canRead: false, canMutate: false },
+    });
+    active.meta.persona = 'reader';
+    expect(() => sessionMemory(root.state, active)).toThrow();
+    db.close();
   });
 });

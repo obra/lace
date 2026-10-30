@@ -25,7 +25,8 @@ export type SourceReference =
     }
   | { kind: 'document'; gitRoot: string; path: string; commit: string; blob: string };
 export type Source = { id: string; version: string; reference: SourceReference };
-export const sourceHandle = (source: Source): string => `${source.id}@${source.version}`;
+export const sourceHandle = (source: Pick<Source, 'id' | 'version'>): string =>
+  `${source.id}@${source.version}`;
 export type SuppliedSource = Source & {
   sourceStatus?: string;
   content: ContentBlock[];
