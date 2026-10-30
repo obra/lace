@@ -48,3 +48,31 @@ A sampled divergence canary (gated by `LACE_PROJECTION_CANARY`) re-derives the
 full projection and compares it against the cached one. On a mismatch it logs an
 error and drops the cache entry so the next turn cold-rebuilds from the log. The
 canary is O(events), so it is sampled, never run every turn.
+
+## Bounded stop reminders (draft proposal)
+
+After a tool round-trip, a text-only response receives at most one reminder with
+`toolChoice: required` when an immediate mid-turn arrival is pending, the
+response is empty, or its final substantive sentence or line declares future
+work and another model round remains. Completed reports can end naturally;
+earlier intent, a negated promise, or a standalone turn-closing declaration does
+not by itself require another tool call. The wording predicate only selects the
+reminder. It never changes the terminal outcome to `incomplete`.
+
+The pending-arrival marker clears when a nonempty tool-result batch enters
+provider history. An arrival admitted on a later iteration establishes a fresh
+marker. Provider pauses and reminder retries preserve pending arrivals. A tool
+result is progress for reminder purposes, not evidence that the arrival was
+answered or a user received a reply.
+
+This proposal has unresolved compatibility with Sen's delegate outcome contract.
+A delegate that reads a file, repeatedly promises to write it, and never writes
+can now return `end_turn`, which the existing job mapper reports as `completed`.
+The unchanged therapist end-to-end regression rejects that outcome. Its negative
+contract must be reconciled with legitimate completed work followed by
+human-dependent deferral before merging this draft.
+
+Turn and cost limits, tool-error handling, cancellation, and the mapping of an
+explicit `incomplete` outcome remain in their existing owners. Neither native
+`end_turn` nor a completed delegate status certifies successful work or user
+delivery. This draft adds no completion classifier or settlement API.

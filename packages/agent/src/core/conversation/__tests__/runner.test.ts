@@ -985,7 +985,7 @@ describe('ConversationRunner', () => {
             };
           }
 
-          // Second call: bare text "Done" — triggers retry
+          // Completion after the tool result should end this turn.
           if (this.callCount === 2) {
             return {
               content: 'Done. Task complete.',
@@ -1017,7 +1017,7 @@ describe('ConversationRunner', () => {
         }
       }
 
-      it('retries with tool_choice=required when model returns bare text', async () => {
+      it('ends completed work without requiring an unrelated verification tool call', async () => {
         const provider = new BareTextRetryProvider();
         const onUpdate = vi.fn().mockResolvedValue(undefined);
         const config: RunnerConfig = {
@@ -1030,23 +1030,18 @@ describe('ConversationRunner', () => {
         const deps = createToolAwareMockDeps(() => provider, { onUpdate });
         const runner = new ConversationRunner(config, deps);
 
-        await runner.run({
+        const result = await runner.run({
           content: [{ type: 'text', text: 'Build the project' }],
           abortController: new AbortController(),
           turnId: `turn_${randomUUID()}`,
           startedAt: new Date().toISOString(),
         });
 
-        // Should have made at least 3 calls:
-        // 1. Initial tool call (bash echo hello)
-        // 2. Bare text "Done" — triggers retry
-        // 3. Retry with tool_choice=required → file_read
-        expect(provider.callCount).toBeGreaterThanOrEqual(3);
-
-        // The retry call should have had tool_choice=required
-        // (callCount 3 is the retry — lastOptions captured there)
-        // After call 3 returns a tool call, call 4 happens without tool_choice
-        expect(provider.lastOptions?.toolChoice).toBeUndefined(); // call 4 has no tool-choice nudge
+        expect(result.stopReason).toBe('end_turn');
+        expect(provider.callCount).toBe(2);
+        expect(provider.lastOptions?.toolChoice).toBeUndefined();
+        const tools = readDurableEvents(sessionDir, { types: ['tool_use'] }).events;
+        expect(tools.map((event) => event.data.toolCallId)).toEqual(['tc_1']);
       });
 
       it('does not retry on max_output_tokens stop reason', async () => {
@@ -1279,7 +1274,7 @@ describe('ConversationRunner', () => {
             };
           }
 
-          // Third call: end with text (triggers bare text retry since completedTurns > 0)
+          // Completion ends the chain after the two tool calls.
           if (this.callCount === 3) {
             return {
               content: 'All done.',
@@ -1321,8 +1316,7 @@ describe('ConversationRunner', () => {
           startedAt: new Date().toISOString(),
         });
 
-        // 4 calls: tool call, tool call, bare text, bare text retry
-        expect(provider.callCount).toBe(4);
+        expect(provider.callCount).toBe(3);
 
         // First call: no conversation state
         expect(provider.receivedStates[0]).toBeUndefined();
@@ -1332,9 +1326,6 @@ describe('ConversationRunner', () => {
 
         // Third call: should have the responseId from the second call
         expect(provider.receivedStates[2]).toEqual({ previousResponseId: 'resp_second' });
-
-        // Fourth call (bare text retry): should have the responseId from the third call
-        expect(provider.receivedStates[3]).toEqual({ previousResponseId: 'resp_third' });
       });
 
       it('handles provider returning no responseId gracefully', async () => {
@@ -1493,7 +1484,7 @@ describe('ConversationRunner', () => {
             // Second call: bare text (triggers retry)
             if (this.callCount === 2) {
               return {
-                content: 'Done!',
+                content: 'I will now verify the output.',
                 toolCalls: [],
                 stopReason: 'stop',
                 usage: { promptTokens: 100, completionTokens: 10, totalTokens: 110 },
@@ -2023,9 +2014,9 @@ describe('ConversationRunner', () => {
               };
             }
             if (callCount === 2) {
-              // Bare text — triggers bare-text retry since completedTurns > 0
+              // Declared work without a tool call requires a retry.
               return {
-                content: 'done',
+                content: 'I will now verify the output.',
                 toolCalls: [],
                 stopReason: 'end_turn',
                 usage: {

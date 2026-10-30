@@ -1,9 +1,7 @@
-// ABOUTME: Pins kata #31 (round 2) — subagent terminates with stopReason='end_turn'
-// ABOUTME: when the model returns text-only intent after a successful tool round-trip.
-// ABOUTME: Tests 1+3 FAIL on current code (production-shape bug). Tests 2+4 PASS.
-// ABOUTME: TEST-ONLY. The fix is a separate worker's job — do not modify the runner here.
+// ABOUTME: Exercises bounded wording-triggered completion reminders after tool use.
+// ABOUTME: Keeps terminal completion independent of prose about future work.
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +18,10 @@ import {
 } from '@lace/agent/providers/base-provider';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { ToolCall, ToolContext, ToolResult as CoreToolResult } from '@lace/agent/tools/types';
+import { ToolExecutor } from '@lace/agent/tools/executor';
+import { FileReadTool } from '@lace/agent/tools/implementations/file_read';
+import { FileWriteTool } from '@lace/agent/tools/implementations/file_write';
+import { readDurableEvents } from '@lace/agent/storage/event-log';
 
 /**
  * Provider whose responses are a per-call script. The first model call gets
@@ -166,7 +168,7 @@ function createMockDeps(
   };
 }
 
-describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2)', () => {
+describe('ConversationRunner — completion reminders after tool use', () => {
   let sessionDir: string;
   let cwd: string;
 
@@ -208,48 +210,22 @@ describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2
     };
   }
 
-  function runOnce(provider: AIProvider, toolExecutor: ReturnType<typeof makeToolExecutor>) {
+  function runOnce(
+    provider: AIProvider,
+    toolExecutor: ReturnType<typeof makeToolExecutor>,
+    maxTurns?: number
+  ) {
     const runner = new ConversationRunner(makeConfig(), createMockDeps(provider, toolExecutor));
     return runner.run({
       content: [{ type: 'text', text: 'prompt under test' }],
       abortController: new AbortController(),
       turnId: `turn_${randomUUID()}`,
       startedAt: new Date().toISOString(),
+      maxTurns,
     });
   }
 
-  /**
-   * SCENARIO 1 — production-shape bug (generic tool).
-   *
-   * Production parallel:
-   *   • subagent (any persona)
-   *   • Turn 1: model emits a tool_use (e.g. file_read)
-   *   • Tool returns a result the model can act on
-   *   • Turn 2: model returns *intent text only* — "I will now do X" — with
-   *     stopReason='end_turn' and no tool_use.
-   *   • Runner currently accepts this as terminal → subagent finishes with
-   *     stopReason='end_turn' and the intent string as final content. The work
-   *     the model promised to do never happens. (Job logs as 'completed' but
-   *     produces a degenerate output.)
-   *
-   * Behaviour pinned by this test:
-   *   When the model declares intent (future-tense, no tool_use) on a turn
-   *   that follows a tool round-trip, the runner MUST NOT exit with
-   *   stopReason='end_turn'. Some other stopReason (e.g. a new
-   *   'incomplete'/'no_action', or the existing 'max_turns') should be
-   *   returned so the parent agent / caller can distinguish "subagent did
-   *   the work and explained it" from "subagent declared it would and
-   *   didn't".
-   *
-   * What a fix needs to make this pass:
-   *   • Detect "no tool_calls after a tool round-trip + future-tense intent
-   *     marker in the content" and either retry harder, surface an
-   *     'incomplete' status, or otherwise signal non-clean termination.
-   *   • The runner already has a one-shot retriedWithToolChoice path. Making
-   *     this test pass requires extending that beyond a single retry, or
-   *     reclassifying the terminal stopReason for this pattern.
-   */
-  it('FAILING — intent-text after tool round-trip should NOT terminate with stopReason=end_turn', async () => {
+  it('reminds once for a standalone promise and accepts repeated future intent', async () => {
     const provider = new ScriptedProvider([
       // Turn 1: tool_use(generic_tool) — pretend the model decided to act.
       {
@@ -266,7 +242,6 @@ describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2
         usage: { promptTokens: 12, completionTokens: 8, totalTokens: 20 },
       },
       // Turn 3 (in case the runner retries): still intent text, no tool_use.
-      // A robust fix must not accept this either.
       {
         content: 'Yes, I will now apply the change.',
         toolCalls: [],
@@ -282,18 +257,82 @@ describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2
       } as Omit<CoreToolResult, 'id'>,
     ]);
 
+    const requests = vi.spyOn(provider, 'createStreamingResponse');
     const result = await runOnce(provider, toolExecutor);
 
-    // Sanity: tool round-trip actually happened, and provider was asked again.
-    expect(provider.callCount).toBeGreaterThanOrEqual(2);
-
-    // FAILING ASSERTION — pins the bug:
-    // Today the runner returns stopReason='end_turn' here with intent text
-    // as the final content. A fix must surface a non-end_turn stopReason so
-    // callers can tell the subagent did not actually complete the work it
-    // declared.
-    expect(result.stopReason).not.toBe('end_turn');
+    expect(requests.mock.calls.filter((call) => call[5]?.toolChoice === 'required')).toHaveLength(
+      1
+    );
+    expect(provider.callCount).toBe(3);
+    expect(result.stopReason).toBe('end_turn');
   });
+
+  it('allows conditional external deferral after reading the real todo', async () => {
+    const artifact = join(cwd, 'todo.md');
+    const todo = 'Ask Ada for the delivery date; hold the todo until she answers.\n';
+    writeFileSync(artifact, todo);
+    const report = "I'll hold the todo until she answers.";
+    const provider = new ScriptedProvider([
+      {
+        content: 'Reading the pending todo.',
+        toolCalls: [{ id: 'read-todo', name: 'file_read', arguments: { path: artifact } }],
+        stopReason: 'tool_use',
+      },
+      { content: report, toolCalls: [], stopReason: 'end_turn' },
+      {
+        content: 'Checking the pending condition.',
+        toolCalls: [{ id: 'verify-todo', name: 'file_read', arguments: { path: artifact } }],
+        stopReason: 'tool_use',
+      },
+      { content: report, toolCalls: [], stopReason: 'end_turn' },
+    ]);
+    const requests = vi.spyOn(provider, 'createStreamingResponse');
+    const executor = new ToolExecutor();
+    executor.registerTools([new FileReadTool()]);
+
+    const result = await runOnce(provider, executor);
+
+    expect(readFileSync(artifact, 'utf8')).toBe(todo);
+    expect(
+      readDurableEvents(sessionDir, { types: ['tool_use'] }).events.map((event) => ({
+        id: event.data.toolCallId,
+        outcome: event.data.result?.outcome,
+      }))
+    ).toEqual([
+      { id: 'read-todo', outcome: 'completed' },
+      { id: 'verify-todo', outcome: 'completed' },
+    ]);
+    expect(result.stopReason).toBe('end_turn');
+    expect(result.content).toEqual([{ type: 'text', text: report }]);
+    expect(provider.callCount).toBe(4);
+    expect(requests.mock.calls.filter((call) => call[5]?.toolChoice === 'required')).toHaveLength(
+      1
+    );
+  });
+
+  it.each([2, 20])(
+    'ends first future-intent text on final round %s without an unusable reminder',
+    async (maxTurns) => {
+      const report = 'I will now apply the change.';
+      const responses: ProviderResponse[] = Array.from({ length: maxTurns - 1 }, (_, index) => ({
+        content: 'Checking the input.',
+        toolCalls: [{ id: `check-${index}`, name: 'generic_tool', arguments: {} }],
+        stopReason: 'tool_use',
+      }));
+      responses.push({ content: report, toolCalls: [], stopReason: 'end_turn' });
+      const provider = new ScriptedProvider(responses);
+      const requests = vi.spyOn(provider, 'createStreamingResponse');
+
+      const result = await runOnce(provider, makeToolExecutor([]), maxTurns);
+
+      expect(result.stopReason).toBe('end_turn');
+      expect(result.content).toEqual([{ type: 'text', text: report }]);
+      expect(provider.callCount).toBe(maxTurns);
+      expect(requests.mock.calls.filter((call) => call[5]?.toolChoice === 'required')).toHaveLength(
+        0
+      );
+    }
+  );
 
   /**
    * SCENARIO 2 — negative test: pure text turn 1 (no prior tool) is legitimate.
@@ -328,23 +367,7 @@ describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2
     expect(result.content[0]?.text).toBe('The answer to your question is 42.');
   });
 
-  /**
-   * SCENARIO 3 — therapist-persona production reproduction.
-   *
-   * Direct parallel to the production smoke trace:
-   *   • Persona has tools: [file_read, file_write].
-   *   • Turn 1: file_read tool_use on persona/persona.md.
-   *   • Tool result: file content is empty.
-   *   • Turn 2: "The file is essentially empty. I'll add a brief note at the
-   *     end in Ada's voice." — text-only, stopReason='end_turn', no tool_use.
-   *   • Production observed: subagent terminated as 'completed', host file
-   *     unchanged.
-   *
-   * Same pinned behaviour as Scenario 1, but with the exact production phrase
-   * and tool. This catches a fix that hand-tunes for one wording but misses
-   * the therapist phrasing or vice versa.
-   */
-  it('FAILING — therapist-style file_read + intent-text should NOT terminate with stopReason=end_turn', async () => {
+  it('reminds once for an observation followed by a promise and accepts the final text', async () => {
     const provider = new ScriptedProvider([
       {
         content: 'Let me read the persona file first.',
@@ -375,12 +398,8 @@ describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2
 
     const result = await runOnce(provider, toolExecutor);
 
-    expect(provider.callCount).toBeGreaterThanOrEqual(2);
-
-    // FAILING ASSERTION — pins the production bug.
-    // A subagent that says "I'll add a brief note" without calling
-    // file_write must not be reported as a clean end_turn.
-    expect(result.stopReason).not.toBe('end_turn');
+    expect(provider.callCount).toBe(3);
+    expect(result.stopReason).toBe('end_turn');
   });
 
   /**
@@ -451,5 +470,121 @@ describe('ConversationRunner — intent-text-after-tool-result (kata #31 round 2
 
     expect(result.stopReason).toBe('end_turn');
     expect(result.content[0]?.text).toContain('Done');
+  });
+
+  describe.each([
+    {
+      shape: 'multiple paragraphs',
+      report:
+        "I'll report the result.\n\nThe requested update is saved.\n\nNothing further to change.",
+    },
+    {
+      shape: 'one compact paragraph',
+      report: "I'll report the result. The requested update is saved.",
+    },
+    {
+      shape: 'a negated contracted promise',
+      report:
+        "The missing detail is a gap for the handoff owner, not something I'll invent on their behalf.",
+    },
+    {
+      shape: 'a negated uncontracted promise',
+      report: 'The missing detail is not something I will invent on their behalf.',
+    },
+    {
+      shape: 'a terminal turn-closing declaration',
+      report: "The requested update is saved, so I'll end the turn.",
+    },
+    {
+      shape: 'an uncontracted turn-closing declaration',
+      report: 'The requested update is saved. I will end the turn.',
+    },
+  ])('completed report in $shape', ({ report }) => {
+    it.each([false, true])(
+      'finishes naturally after real work (verification retry already used: %s)',
+      async (verify) => {
+        const artifact = join(cwd, 'result.txt');
+        const responses: ProviderResponse[] = [
+          {
+            content: 'Writing the requested update.',
+            toolCalls: [
+              {
+                id: 'write-result',
+                name: 'file_write',
+                arguments: { path: artifact, content: 'The requested update.\n' },
+              },
+            ],
+            stopReason: 'tool_use',
+          },
+        ];
+        if (verify) {
+          responses.push(
+            {
+              content: 'The file is written. I will now verify it.',
+              toolCalls: [],
+              stopReason: 'end_turn',
+            },
+            {
+              content: 'Checking the saved update.',
+              toolCalls: [{ id: 'read-result', name: 'file_read', arguments: { path: artifact } }],
+              stopReason: 'tool_use',
+            }
+          );
+        }
+        responses.push({ content: report, toolCalls: [], stopReason: 'end_turn' });
+        const provider = new ScriptedProvider(responses);
+        const requests = vi.spyOn(provider, 'createStreamingResponse');
+        const executor = new ToolExecutor();
+        executor.registerTools([new FileReadTool(), new FileWriteTool()]);
+
+        const result = await runOnce(provider, executor);
+
+        expect(readFileSync(artifact, 'utf8')).toBe('The requested update.\n');
+        expect(result.stopReason).toBe('end_turn');
+        expect(result.content[0]?.text).toBe(report);
+        expect(provider.callCount).toBe(verify ? 4 : 2);
+        expect(
+          requests.mock.calls.filter((call) => call[5]?.toolChoice === 'required')
+        ).toHaveLength(verify ? 1 : 0);
+      }
+    );
+  });
+
+  it.each([
+    "The missing detail is not something I'll invent, but I'll verify the source.",
+    "I'll write the follow-up, then I'll end the turn.",
+    "I'll write the follow-up, so I'll end the turn.",
+    "I'll end the turn after I write the follow-up.",
+    "I'll end the turn and write the follow-up.",
+    "After I verify the saved file, I'll end the turn.",
+    'Once I check the saved file, I will end the turn.',
+  ])('reminds once for future work despite turn-closing language: %s', async (report) => {
+    const artifact = join(cwd, 'result.txt');
+    const provider = new ScriptedProvider([
+      {
+        content: 'Writing the requested update.',
+        toolCalls: [
+          {
+            id: 'write-result',
+            name: 'file_write',
+            arguments: { path: artifact, content: 'The requested update.\n' },
+          },
+        ],
+        stopReason: 'tool_use',
+      },
+      { content: report, toolCalls: [], stopReason: 'end_turn' },
+    ]);
+    const requests = vi.spyOn(provider, 'createStreamingResponse');
+    const executor = new ToolExecutor();
+    executor.registerTools([new FileReadTool(), new FileWriteTool()]);
+
+    const result = await runOnce(provider, executor);
+
+    expect(readFileSync(artifact, 'utf8')).toBe('The requested update.\n');
+    expect(result.stopReason).toBe('end_turn');
+    expect(provider.callCount).toBe(3);
+    expect(requests.mock.calls.filter((call) => call[5]?.toolChoice === 'required')).toHaveLength(
+      1
+    );
   });
 });

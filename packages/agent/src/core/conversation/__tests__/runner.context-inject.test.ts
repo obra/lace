@@ -33,10 +33,11 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
       if (['bash', 'file_read', 'file_write'].includes(name)) return mockTool;
       return null;
     }),
-    execute: vi.fn().mockResolvedValue({
+    execute: vi.fn().mockImplementation(async (toolCall: { id: string }) => ({
+      id: toolCall.id,
       status: 'completed',
       content: [{ type: 'text', text: 'mock result' }],
-    }),
+    })),
   };
 
   const mockJobManager = {
@@ -270,7 +271,6 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
       'TEMPORARY-ONE',
       'TEMPORARY-TWO',
       null,
-      null,
     ]);
     expect(provider.receivedMessages[1].at(-1)?.toolResults).toHaveLength(1);
     expect(JSON.stringify(provider.receivedMessages)).not.toContain('TEMPORARY-');
@@ -345,6 +345,156 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
     expect(injectedUserMsg).toBeDefined();
     expect(injectedUserMsg!.role).toBe('user');
     expect(injectedUserMsg!.content).toContain('URGENT: stop and report');
+  });
+
+  it.each(['message', 'notification'] as const)(
+    'accepts final-round completion after tool progress on a mid-turn %s',
+    async (arrival) => {
+      const marker = arrival === 'notification' ? '<notification kind="job-completed">' : 'Jesse:';
+      const toolResponse = (id: string, name: string): ProviderResponse => ({
+        content: '',
+        toolCalls: [{ id, name, arguments: {} }],
+        stopReason: 'tool_use',
+      });
+      const provider = new ScriptedProvider([
+        {
+          beforeReturn: () => injectContextEvent(sessionDir, marker + ' result available'),
+          response: toolResponse('initial-work', 'bash'),
+        },
+        { response: toolResponse('handle-arrival', 'file_read') },
+        { response: toolResponse('publish-result', 'file_write') },
+        {
+          response: {
+            content: 'Tool work is complete.',
+            toolCalls: [],
+            stopReason: 'end_turn',
+          },
+        },
+      ]);
+      const deps = createMockDeps({ createProvider: async () => provider });
+      const runner = new ConversationRunner(
+        { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+        deps
+      );
+      const result = await runner.run({
+        content: [{ type: 'text', text: 'Handle and report the result' }],
+        maxTurns: 4,
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+      expect(provider.callCount).toBe(4);
+      expect(result.stopReason).toBe('end_turn');
+      const tools = readDurableEvents(sessionDir, { limit: 100 }).events.filter(
+        (event) => event.type === 'tool_use'
+      );
+      expect(tools.map((event) => event.data.toolCallId)).toEqual([
+        'initial-work',
+        'handle-arrival',
+        'publish-result',
+      ]);
+      expect(tools.map((event) => event.data.result)).toEqual(
+        Array(3).fill(expect.objectContaining({ outcome: 'completed' }))
+      );
+      expect(
+        provider.receivedMessages[3]
+          .flatMap((message) => message.toolResults ?? [])
+          .map((result) => result.id)
+      ).toEqual(['initial-work', 'handle-arrival', 'publish-result']);
+    }
+  );
+
+  it('requires tool handling for a fresh arrival after an earlier arrival was handled', async () => {
+    const toolResponse = (id: string): ProviderResponse => ({
+      content: '',
+      toolCalls: [{ id, name: 'bash', arguments: {} }],
+      stopReason: 'tool_use',
+    });
+    const provider = new ScriptedProvider([
+      {
+        beforeReturn: () =>
+          injectContextEvent(sessionDir, '<notification kind="job-completed">first'),
+        response: toolResponse('initial-work'),
+      },
+      {
+        beforeReturn: () => injectContextEvent(sessionDir, 'Jesse: handle the second result'),
+        response: toolResponse('handle-first'),
+      },
+      {
+        response: {
+          content: 'The first result is complete.',
+          toolCalls: [],
+          stopReason: 'end_turn',
+        },
+      },
+      { response: toolResponse('handle-second') },
+      {
+        response: { content: 'Both results are complete.', toolCalls: [], stopReason: 'end_turn' },
+      },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({ createProvider: async () => provider })
+    );
+    const result = await runner.run({
+      content: [{ type: 'text', text: 'Handle incoming results' }],
+      maxTurns: 5,
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    expect(provider.callCount).toBe(5);
+    expect(provider.receivedOptions[3]?.toolChoice).toBe('required');
+    expect(result.stopReason).toBe('end_turn');
+    expect(
+      readDurableEvents(sessionDir, { limit: 100 })
+        .events.filter((event) => event.type === 'tool_use')
+        .map((event) => event.data.toolCallId)
+    ).toEqual(['initial-work', 'handle-first', 'handle-second']);
+  });
+
+  it('keeps unhandled arrival protection through a provider pause', async () => {
+    const toolResponse = (id: string): ProviderResponse => ({
+      content: '',
+      toolCalls: [{ id, name: 'bash', arguments: {} }],
+      stopReason: 'tool_use',
+    });
+    const provider = new ScriptedProvider([
+      {
+        beforeReturn: () =>
+          injectContextEvent(sessionDir, '<notification kind="job-completed">result'),
+        response: toolResponse('initial-work'),
+      },
+      { response: { content: '', toolCalls: [], stopReason: 'pause_turn' } },
+      {
+        response: {
+          content: 'No further action is needed.',
+          toolCalls: [],
+          stopReason: 'end_turn',
+        },
+      },
+      { response: toolResponse('handle-arrival') },
+      { response: { content: 'Result handled.', toolCalls: [], stopReason: 'end_turn' } },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({ createProvider: async () => provider })
+    );
+    const result = await runner.run({
+      content: [{ type: 'text', text: 'Handle incoming results' }],
+      maxTurns: 4,
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    expect(provider.callCount).toBe(5);
+    expect(provider.receivedOptions[3]?.toolChoice).toBe('required');
+    expect(result.stopReason).toBe('end_turn');
+    expect(
+      provider.receivedMessages[4]
+        .flatMap((message) => message.toolResults ?? [])
+        .map((result) => result.id)
+    ).toContain('handle-arrival');
   });
 
   it('bareTextStopReminder returns the verify reminder when no injection was seen', () => {
