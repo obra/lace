@@ -165,6 +165,10 @@ describe('ent/session/compact — track-based strategy', () => {
       const sessionDir = getSessionDir(newResult.sessionId);
       writeMinimalConversation(sessionDir);
 
+      await client.request('ent/session/temporary_context/set', {
+        text: 'Sticky across compaction.',
+      });
+
       const result = (await client.request('ent/session/compact', {
         strategy: 'track-based',
       })) as {
@@ -174,6 +178,12 @@ describe('ent/session/compact — track-based strategy', () => {
         strategy?: string;
       };
 
+      expect(await client.request('ent/session/temporary_context/peek', {})).toEqual({
+        text: 'Sticky across compaction.',
+      });
+      expect(JSON.stringify(readDurableEvents(sessionDir, {}).events)).not.toContain(
+        'Sticky across compaction.'
+      );
       expect(typeof result.previousTokens).toBe('number');
       expect(typeof result.currentTokens).toBe('number');
       expect(typeof result.messagesCompacted).toBe('number');

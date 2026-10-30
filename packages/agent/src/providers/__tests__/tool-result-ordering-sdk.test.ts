@@ -216,119 +216,135 @@ describe('Anthropic and OpenAI tool-result ordering through actual SDKs', () => 
 
   for (const route of ['anthropic', 'responses', 'chat'] as const) {
     for (const method of ['createResponse', 'createStreamingResponse'] as const) {
-      it.each(['string', 'blocks'] as const)(
-        `${route} ${method} places multiple tool results before %s user content`,
-        async (contentShape) => {
-          const captures: WireRequest[] = [];
-          const streaming = method === 'createStreamingResponse';
-          vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-            const request = new Request(input, init);
-            const url = new URL(request.url);
-            expect(url.pathname).toBe(
-              route === 'anthropic'
-                ? '/v1/messages'
-                : route === 'chat'
-                  ? '/v1/chat/completions'
-                  : '/v1/responses'
-            );
-            expect(url.origin).toBe(
-              route === 'anthropic'
-                ? 'https://api.anthropic.com'
-                : route === 'chat'
-                  ? 'https://ordering.invalid'
-                  : 'https://api.openai.com'
-            );
-            expect(url.search).toBe(route === 'anthropic' ? '?beta=true' : '');
-            const raw = await request.text();
-            captures.push(JSON.parse(raw) as WireRequest);
-            return syntheticResponse(route, streaming);
-          });
-          const required: ProviderMessage[] = [
-            { role: 'user', content: 'Inspect the record and screenshot.' },
-            {
-              role: 'assistant',
-              content: 'Inspecting both sources.',
-              toolCalls: [
-                { id: 'call_image', name: 'read_image', arguments: { path: 'shot.png' } },
-                { id: 'call_file', name: 'read_file', arguments: { path: 'missing.txt' } },
-              ],
-            },
-            {
-              role: 'user',
-              content:
-                contentShape === 'string'
-                  ? 'Required followup.'
-                  : [
-                      { type: 'text', text: 'Required followup.' },
-                      {
-                        type: 'image',
-                        source: {
-                          type: 'base64',
-                          media_type: 'image/png',
-                          data: 'dXNlci1pbWFnZQ==',
+      for (const temporaryContext of [undefined, 'FRESH-TEMPORARY']) {
+        it.each(['string', 'blocks'] as const)(
+          `${route} ${method} context=${temporaryContext !== undefined} places multiple tool results before %s user content`,
+          async (contentShape) => {
+            const captures: WireRequest[] = [];
+            const streaming = method === 'createStreamingResponse';
+            vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+              const request = new Request(input, init);
+              const url = new URL(request.url);
+              expect(url.pathname).toBe(
+                route === 'anthropic'
+                  ? '/v1/messages'
+                  : route === 'chat'
+                    ? '/v1/chat/completions'
+                    : '/v1/responses'
+              );
+              expect(url.origin).toBe(
+                route === 'anthropic'
+                  ? 'https://api.anthropic.com'
+                  : route === 'chat'
+                    ? 'https://ordering.invalid'
+                    : 'https://api.openai.com'
+              );
+              expect(url.search).toBe(route === 'anthropic' ? '?beta=true' : '');
+              const raw = await request.text();
+              captures.push(JSON.parse(raw) as WireRequest);
+              return syntheticResponse(route, streaming);
+            });
+            const required: ProviderMessage[] = [
+              { role: 'user', content: 'Inspect the record and screenshot.' },
+              {
+                role: 'assistant',
+                content: 'Inspecting both sources.',
+                toolCalls: [
+                  { id: 'call_image', name: 'read_image', arguments: { path: 'shot.png' } },
+                  { id: 'call_file', name: 'read_file', arguments: { path: 'missing.txt' } },
+                ],
+              },
+              {
+                role: 'user',
+                content:
+                  contentShape === 'string'
+                    ? 'Required followup.'
+                    : [
+                        { type: 'text', text: 'Required followup.' },
+                        {
+                          type: 'image',
+                          source: {
+                            type: 'base64',
+                            media_type: 'image/png',
+                            data: 'dXNlci1pbWFnZQ==',
+                          },
                         },
-                      },
-                      { type: 'text', text: 'Required image context.' },
+                        { type: 'text', text: 'Required image context.' },
+                      ],
+                toolResults: [
+                  {
+                    id: 'call_image',
+                    status: 'completed',
+                    content: [
+                      { type: 'text', text: 'Screenshot.' },
+                      { type: 'image', mimeType: 'image/png', data: 'dG9vbC1pbWFnZQ==' },
+                      { type: 'text', text: 'Image complete.' },
                     ],
-              toolResults: [
-                {
-                  id: 'call_image',
-                  status: 'completed',
-                  content: [
-                    { type: 'text', text: 'Screenshot.' },
-                    { type: 'image', mimeType: 'image/png', data: 'dG9vbC1pbWFnZQ==' },
-                    { type: 'text', text: 'Image complete.' },
-                  ],
-                },
-                {
-                  id: 'call_file',
-                  status: 'failed',
-                  content: [{ type: 'text', text: 'File not found.' }],
-                },
-              ],
-            },
-          ];
-          const original = structuredClone(required);
-          const provider =
-            route === 'anthropic'
-              ? new AnthropicProvider({ apiKey: 'synthetic-offline-key', maxTokens: 512 })
-              : new OpenAIProvider({
-                  apiKey: 'synthetic-offline-key',
-                  maxTokens: 512,
-                  ...(route === 'chat'
-                    ? { baseURL: 'https://ordering.invalid/v1' }
-                    : { supportsResponseChaining: false }),
-                });
-          provider.setSystemPrompt('Inspect both sources.');
-          try {
-            const response = await provider[method](
-              required,
-              [],
-              route === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o'
-            );
-            expect(response.content).toBe('OK');
-            expect(captures).toHaveLength(1);
-            const body = captures[0];
-            expect(route === 'responses' ? body.input : body.messages).toMatchObject(
-              expectedHistory(route, contentShape === 'blocks')
-            );
-            if (route === 'anthropic') {
-              // Cache stamping may promote a string to blocks; compare content with markers intact.
-              const first = (body.messages?.[0] as { content: unknown }).content;
-              expect(
-                typeof first === 'string' ? [{ type: 'text', text: first }] : first
-              ).toMatchObject([{ type: 'text', text: 'Inspect the record and screenshot.' }]);
+                  },
+                  {
+                    id: 'call_file',
+                    status: 'failed',
+                    content: [{ type: 'text', text: 'File not found.' }],
+                  },
+                ],
+              },
+            ];
+            const original = structuredClone(required);
+            const provider =
+              route === 'anthropic'
+                ? new AnthropicProvider({ apiKey: 'synthetic-offline-key', maxTokens: 512 })
+                : new OpenAIProvider({
+                    apiKey: 'synthetic-offline-key',
+                    maxTokens: 512,
+                    ...(route === 'chat'
+                      ? { baseURL: 'https://ordering.invalid/v1' }
+                      : { supportsResponseChaining: false }),
+                  });
+            provider.setSystemPrompt('Inspect both sources.');
+            try {
+              const response = await provider[method](
+                required,
+                [],
+                route === 'anthropic' ? 'claude-sonnet-4-6' : 'gpt-4o',
+                undefined,
+                { previousResponseId: 'old-context-response' },
+                { temporaryContext }
+              );
+              expect(response.content).toBe('OK');
+              expect(captures).toHaveLength(1);
+              const body = captures[0];
+              expect(route === 'responses' ? body.input : body.messages).toMatchObject([
+                ...expectedHistory(route, contentShape === 'blocks'),
+                ...(temporaryContext
+                  ? [
+                      {
+                        role: 'user',
+                        content:
+                          route === 'anthropic'
+                            ? [{ type: 'text', text: temporaryContext }]
+                            : temporaryContext,
+                      },
+                    ]
+                  : []),
+              ]);
+              if (route === 'anthropic') {
+                // Cache stamping may promote a string to blocks; compare content with markers intact.
+                const first = (body.messages?.[0] as { content: unknown }).content;
+                expect(
+                  typeof first === 'string' ? [{ type: 'text', text: first }] : first
+                ).toMatchObject([{ type: 'text', text: 'Inspect the record and screenshot.' }]);
+              }
+              if (route === 'responses') {
+                expect(body.store).toBe(false);
+                expect(body.previous_response_id).toBeUndefined();
+              }
+              expect(required).toEqual(original);
+            } finally {
+              provider.removeAllListeners();
             }
-            if (route === 'responses') {
-              expect(body.store).toBe(false);
-              expect(body.previous_response_id).toBeUndefined();
-            }
-            expect(required).toEqual(original);
-          } finally {
-            provider.removeAllListeners();
           }
-        }
-      );
+        );
+      }
     }
   }
 });

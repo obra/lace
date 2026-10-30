@@ -44,7 +44,10 @@ describe('GeminiProvider SDK requests', () => {
       const response = await provider[method](
         [{ role: 'user', content: 'Find the synthetic record.' }],
         [tool],
-        'gemini-2.5-flash'
+        'gemini-2.5-flash',
+        undefined,
+        undefined,
+        { temporaryContext: 'FRESH-TEMPORARY' }
       );
 
       expect(bodies).toHaveLength(1);
@@ -65,7 +68,10 @@ describe('GeminiProvider SDK requests', () => {
             ],
           },
         ],
-        contents: [{ role: 'user', parts: [{ text: 'Find the synthetic record.' }] }],
+        contents: [
+          { role: 'user', parts: [{ text: 'Find the synthetic record.' }] },
+          { role: 'user', parts: [{ text: 'FRESH-TEMPORARY' }] },
+        ],
         generationConfig: { maxOutputTokens: 512 },
       });
       expect(response.content).toBe('OK');

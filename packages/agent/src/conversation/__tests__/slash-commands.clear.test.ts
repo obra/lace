@@ -113,6 +113,7 @@ describe('/clear writes system_prompt_set in the new session', () => {
     const state: AgentServerState = {
       initialized: true,
       activeSession: sourceSession,
+      temporaryContext: 'old session only',
       config: {
         executionMode: 'execute',
         approvalMode: 'ask',
@@ -153,6 +154,7 @@ describe('/clear writes system_prompt_set in the new session', () => {
       makeMockCreateToolExecutorForMode()
     );
 
+    expect(state.temporaryContext).toBeNull();
     expect(result).not.toBeNull();
     expect(result?.stopReason).toBe('end_turn');
     expect(capturedNewSessionId).not.toBeNull();

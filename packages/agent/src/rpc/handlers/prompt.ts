@@ -430,6 +430,7 @@ export function registerPromptHandler(
 
       // Build runner dependencies
       const deps: RunnerDependencies = {
+        getTemporaryContext: () => state.temporaryContext ?? null,
         onUpdate: emitUpdate,
         runExclusive,
         rerenderPersonaAfterCompaction: async () => {

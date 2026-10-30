@@ -442,6 +442,7 @@ async function activateStoredSession(
   }
 
   state.activeSession = loadedWithMcpServers;
+  state.temporaryContext = null;
   rehydrateServerConfigFromSession(state, state.activeSession.state);
 
   // MCP servers before schedulers: the reminder scheduler fires anything overdue
@@ -897,6 +898,7 @@ export function registerSessionHandlers(
     }
 
     state.activeSession = loadSession(sessionId);
+    state.temporaryContext = null;
     await ensureSchedulers();
     await reconcileMcpServersForActiveSession(state);
 
@@ -1178,6 +1180,7 @@ export function registerSessionHandlers(
     }
     state.activeTurn = null;
     state.activeSession = null;
+    state.temporaryContext = null;
 
     return {};
   });

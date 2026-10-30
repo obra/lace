@@ -152,6 +152,7 @@ export class BedrockProvider extends AIProvider {
     // "invalid beta flag"). We therefore never thread opts.outputFormat here.
     return buildBetaMessagePayload({
       providerName: this.providerName,
+      temporaryContext: opts?.temporaryContext,
       messages,
       systemPrompt: this.getEffectiveSystemPrompt(messages),
       tools,

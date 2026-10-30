@@ -38,6 +38,7 @@ export interface BuildBetaPayloadInput {
   /** Provider label used in the request-metadata log line (e.g. 'anthropic', 'bedrock'). */
   providerName: string;
   messages: ProviderMessage[];
+  temporaryContext?: string | null;
   systemPrompt: string;
   tools: WireTool[];
   model: string;
@@ -119,7 +120,12 @@ export function buildBetaMessagePayload(
   const payload: Anthropic.Beta.Messages.MessageCreateParams = {
     model: input.model,
     max_tokens: input.maxTokens,
-    messages: cappedMessages as unknown as BetaMessageParam[],
+    messages: (input.temporaryContext
+      ? [
+          ...cappedMessages,
+          { role: 'user', content: [{ type: 'text', text: input.temporaryContext }] },
+        ]
+      : cappedMessages) as unknown as BetaMessageParam[],
     system: systemWithCaching,
     tools: anthropicTools,
     betas: input.betas,

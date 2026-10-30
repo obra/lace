@@ -1033,6 +1033,50 @@ export const EntSessionInjectResponseSchema = z
   })
   .strict();
 
+// One process-local sticky value on the active session; never a durable event.
+export const TemporaryContextSetParamsSchema = z.object({ text: NonEmptyStringSchema }).strict();
+export const TemporaryContextEmptyParamsSchema = z.object({}).strict();
+export const EntSessionTemporaryContextSetRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/temporary_context/set'),
+    params: TemporaryContextSetParamsSchema,
+  })
+  .strict();
+export const EntSessionTemporaryContextPeekRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/temporary_context/peek'),
+    params: TemporaryContextEmptyParamsSchema.optional(),
+  })
+  .strict();
+export const EntSessionTemporaryContextClearRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/temporary_context/clear'),
+    params: TemporaryContextEmptyParamsSchema.optional(),
+  })
+  .strict();
+export const EntSessionTemporaryContextSetResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: TemporaryContextEmptyParamsSchema,
+  })
+  .strict();
+export const EntSessionTemporaryContextPeekResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: z.object({ text: z.string().nullable() }).strict(),
+  })
+  .strict();
+export const EntSessionTemporaryContextClearResponseSchema =
+  EntSessionTemporaryContextSetResponseSchema;
+
 const EntSessionEventsParamsSchema = z
   .object({
     afterEventSeq: z.number().optional(),
@@ -2458,6 +2502,9 @@ export const EntProtocolRequestSchema = z.union([
   EntSessionRewindRequestSchema,
   EntSessionCheckpointRequestSchema,
   EntSessionInjectRequestSchema,
+  EntSessionTemporaryContextSetRequestSchema,
+  EntSessionTemporaryContextPeekRequestSchema,
+  EntSessionTemporaryContextClearRequestSchema,
   EntSessionEventsRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,

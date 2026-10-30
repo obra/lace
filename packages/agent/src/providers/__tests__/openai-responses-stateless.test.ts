@@ -160,6 +160,49 @@ describe('OpenAI Responses API chaining', () => {
   for (const streaming of [false, true]) {
     const mode = streaming ? 'streaming' : 'non-streaming';
 
+    it(`replaces and clears temporary context without retaining a server chain (${mode})`, async () => {
+      const provider = new OpenAIProvider({ apiKey: 'synthetic-offline-key' });
+      const sent = stubResponsesEndpoint(streaming, [
+        [HOP1_ID, hop1Output],
+        [HOP2_ID, hop1Output],
+        ['resp_3', hop2Output],
+      ]);
+      const send = (streaming ? provider.createStreamingResponse : provider.createResponse).bind(
+        provider
+      );
+      await send([USER_MESSAGE], [], 'gpt-5', undefined, undefined, {
+        temporaryContext: 'first temporary text',
+      });
+      const history = [USER_MESSAGE, ASSISTANT_TOOL_CALL, TOOL_RESULT];
+      await send(
+        history,
+        [],
+        'gpt-5',
+        undefined,
+        { previousResponseId: HOP1_ID },
+        { temporaryContext: 'replacement temporary text' }
+      );
+      await send(
+        history,
+        [],
+        'gpt-5',
+        undefined,
+        { previousResponseId: HOP2_ID },
+        { temporaryContext: null }
+      );
+      for (const body of sent) {
+        expect(body.store).toBe(false);
+        expect(body.previous_response_id).toBeUndefined();
+        expect(body.context_management).toBeUndefined();
+      }
+      expect(sent[0].input.at(-1)).toEqual({ role: 'user', content: 'first temporary text' });
+      expect(sent[1].input).toEqual([
+        ...FULL_HISTORY,
+        { role: 'user', content: 'replacement temporary text' },
+      ]);
+      expect(sent[2].input).toEqual(FULL_HISTORY);
+    });
+
     it(`chains hop 2 onto hop 1 by default (${mode})`, async () => {
       const provider = new OpenAIProvider({ apiKey: 'sk-test-fake' });
 

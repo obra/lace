@@ -120,6 +120,7 @@ export function createAgentServerState(): AgentServerState {
   return {
     initialized: false,
     activeSession: null,
+    temporaryContext: null,
     config: { executionMode: 'execute', approvalMode: 'ask' },
     activeTurn: null,
     providerCatalog: new ProviderCatalogManager(),

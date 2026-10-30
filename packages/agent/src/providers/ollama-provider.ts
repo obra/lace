@@ -3,6 +3,8 @@
 
 import { Ollama, ChatResponse, Tool as OllamaTool } from 'ollama';
 import { AIProvider } from './base-provider';
+import { appendTemporaryContext } from './temporary-context';
+import type { RequestOptions, ConversationState } from './base-provider';
 import {
   ProviderMessage,
   ProviderResponse,
@@ -142,8 +144,11 @@ export class OllamaProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     return this.withRetry(
       async () => {
         // Validate connection, model availability, and convert messages
@@ -229,8 +234,11 @@ export class OllamaProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     let streamingStarted = false;
     let streamCreated = false;
 

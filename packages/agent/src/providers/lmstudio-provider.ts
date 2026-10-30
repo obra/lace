@@ -3,6 +3,8 @@
 
 import { LMStudioClient } from '@lmstudio/sdk';
 import { AIProvider } from './base-provider';
+import { appendTemporaryContext } from './temporary-context';
+import type { RequestOptions, ConversationState } from './base-provider';
 import {
   ProviderMessage,
   ProviderResponse,
@@ -108,8 +110,11 @@ export class LMStudioProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     return this.withRetry(
       async () => {
         await this._ensureModelLoaded(model);
@@ -646,8 +651,11 @@ export class LMStudioProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     let streamingStarted = false;
     let modelLoaded = false;
 

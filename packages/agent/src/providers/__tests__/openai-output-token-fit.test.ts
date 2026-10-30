@@ -204,6 +204,14 @@ describe('OpenAI Responses output limit fits the context window (shipped LunaRou
     }
   });
 
+  it('includes request-only context when fitting the Responses output budget', async () => {
+    const sent = stubEndpoint(responsesJson);
+    await provider.createResponse(userMessageOf(1), [], MODEL, undefined, undefined, {
+      temporaryContext: 't'.repeat(498_999 * 4),
+    });
+    expect(sent[0]?.max_output_tokens).toBe(198_576);
+  });
+
   for (const { label, messageTokens, expected } of CASES) {
     it(`sends max_output_tokens ${expected} at ${label} (non-streaming)`, async () => {
       const sent = stubEndpoint(responsesJson);
@@ -344,6 +352,21 @@ describe('OpenAI Chat Completions output limit fits the context window', () => {
     provider.setSystemPrompt(SYSTEM_PROMPT);
     return provider;
   }
+
+  it('includes request-only context in Chat output sizing and fallback usage', async () => {
+    const provider = makeProvider();
+    const sent = stubEndpoint(() => chatCompletionJson(null));
+    const response = await provider.createResponse(
+      userMessageOf(1),
+      [],
+      MODEL,
+      undefined,
+      undefined,
+      { temporaryContext: 't'.repeat(498_999 * 4) }
+    );
+    expect(sent[0]?.max_completion_tokens).toBe(198_576);
+    expect(response.usage!.promptTokens).toBeGreaterThanOrEqual(500_000);
+  });
 
   for (const streaming of [false, true]) {
     it(`sizes hop 2 by hop 1's reported prompt_tokens (${streaming ? 'streaming' : 'non-streaming'})`, async () => {

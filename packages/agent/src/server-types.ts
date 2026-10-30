@@ -145,6 +145,8 @@ export type JobState = {
 export type AgentServerState = {
   initialized: boolean;
   activeSession: LoadedSession | null;
+  /** Sticky request-only text; excluded from loaded and persisted session state. */
+  temporaryContext?: string | null;
   config: {
     executionMode: 'plan' | 'execute';
     approvalMode:
