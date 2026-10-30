@@ -1,6 +1,7 @@
 // ABOUTME: Prompt RPC handler - thin adapter over core/conversation/runner
 
 import { randomUUID } from 'node:crypto';
+import { reserveCompletion, scheduleImmediateInjectDrain } from '../../completion';
 import { AcpErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
 import {
   loadSession,
@@ -8,13 +9,8 @@ import {
   writeSessionState,
   type SessionState,
 } from '@lace/agent/storage/session-store';
-import {
-  appendDurableEvent,
-  findLastTurnEndEventSeq,
-  hasPendingImmediateInjects,
-} from '@lace/agent/storage/event-log';
+import { appendDurableEvent, findLastTurnEndEventSeq } from '@lace/agent/storage/event-log';
 import { PROMPT_HANDLER_CAUGHT_STOP_REASON } from '@lace/agent/storage/event-types';
-import { injectDrainContent } from '@lace/agent/notifications/inject-drain-content';
 import { logger } from '@lace/agent/utils/logger';
 import { findUserCommand } from '@lace/agent/user-commands';
 import type {
@@ -41,43 +37,6 @@ import {
   readDurableEventsForHandoff,
   withDurableHandoffStatus,
 } from './handoff-idempotency';
-
-/**
- * Schedule a follow-up internal turn if an immediate-priority `context_injected`
- * event landed during the just-ended turn (eventSeq > `watermark`) but was not
- * consumed before the turn exited.
- *
- * Under async-only delegation a job-completion `<notification>` (an immediate
- * `context_injected` durable event) is the ONLY way a parent learns a subagent
- * finished, so an inject that races the turn boundary must still wake the parent.
- * This runs on every turn-exit path (success, abort, slash, error); each passes
- * the watermark appropriate to what it consumed.
- *
- * The re-entrancy guard is load-bearing: the wake is deferred to a `setImmediate`
- * and re-checks `!state.activeTurn` inside it so we never start a second turn
- * while one is already running, and `state.activeSession` may have changed.
- */
-function scheduleImmediateInjectDrain(
-  state: AgentServerState,
-  runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null },
-  watermark: number
-): void {
-  if (!state.activeSession) return;
-  if (
-    hasPendingImmediateInjects(state.activeSession.dir, watermark) &&
-    runPromptInternalRef.current
-  ) {
-    setImmediate(() => {
-      if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-        // Empty content only surfaces the inject while it is still the trailing
-        // message. If the turn answered something else after it landed, the
-        // conversation now ends on an assistant message and dispatching that is
-        // a prefill the model may refuse — carry a nudge instead.
-        void runPromptInternalRef.current(injectDrainContent(state.activeSession.dir));
-      }
-    });
-  }
-}
 
 /**
  * Register the session/prompt RPC handler.
@@ -189,6 +148,8 @@ export function registerPromptHandler(
     const startedAt = new Date().toISOString();
     const abortController = new AbortController();
 
+    const admissionSessionId = state.activeSession.meta.sessionId;
+    const releaseCompletion = reserveCompletion(state);
     state.activeTurn = { turnId, startedAt, status: 'running', abortController };
     // Raise the deploy-guard flag now; the beacon's interval would leave a
     // window where a just-started turn still looks idle to the host.
@@ -284,7 +245,12 @@ export function registerPromptHandler(
         // The aborted turn consumed no injects, so drain anything newer than the
         // watermark this turn started from (NOT the cancelled turn_end we just
         // wrote, which would strand an inject that landed during the turn).
-        scheduleImmediateInjectDrain(state, runPromptInternalRef, preTurnInjectWatermark);
+        scheduleImmediateInjectDrain(
+          state,
+          runPromptInternalRef,
+          admissionSessionId,
+          preTurnInjectWatermark
+        );
         return result;
       }
 
@@ -319,7 +285,12 @@ export function registerPromptHandler(
           // started from. (For /clear, state.activeSession is now the NEW
           // session whose fresh transcript has no pending injects, so this
           // correctly no-ops there.)
-          scheduleImmediateInjectDrain(state, runPromptInternalRef, preTurnInjectWatermark);
+          scheduleImmediateInjectDrain(
+            state,
+            runPromptInternalRef,
+            admissionSessionId,
+            preTurnInjectWatermark
+          );
           return slashResult;
         }
 
@@ -568,8 +539,10 @@ export function registerPromptHandler(
       scheduleImmediateInjectDrain(
         state,
         runPromptInternalRef,
+        admissionSessionId,
         result.lastSeenEventSeq ??
-          (state.activeSession ? (findLastTurnEndEventSeq(state.activeSession.dir) ?? 0) : 0)
+          (state.activeSession ? (findLastTurnEndEventSeq(state.activeSession.dir) ?? 0) : 0),
+        result.lastSeenEventSeq
       );
 
       // RPC response uses the protocol-shaped usage.
@@ -631,8 +604,14 @@ export function registerPromptHandler(
         if (state.activeTurn?.turnId === turnId) {
           state.activeTurn = null;
         }
-        scheduleImmediateInjectDrain(state, runPromptInternalRef, preTurnInjectWatermark);
+        scheduleImmediateInjectDrain(
+          state,
+          runPromptInternalRef,
+          admissionSessionId,
+          preTurnInjectWatermark
+        );
       }
+      releaseCompletion();
     }
   };
 

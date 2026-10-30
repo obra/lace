@@ -781,6 +781,15 @@ export const EntAgentPingResponseSchema = z
 
 const EntAgentStatusResultSchema = z
   .object({
+    completion: z
+      .object({
+        sessionId: SessionIdSchema,
+        terminalTurnId: NonEmptyStringSchema.optional(),
+        observedStreamSeq: z.number().int().nonnegative(),
+        settled: z.boolean(),
+      })
+      .strict()
+      .optional(),
     models: z.array(ModelInfoSchema),
     mcpServers: z.array(McpServerStatusSchema),
     currentSession: z
@@ -2182,6 +2191,10 @@ const SessionUpdateJobFinishedSchema = z
   })
   .strict();
 
+const SessionUpdateCompletionStatusSchema = z
+  .object({ type: z.literal('completion_status') })
+  .strict();
+
 const SessionUpdateTurnStartSchema = z
   .object({
     type: z.literal('turn_start'),
@@ -2358,6 +2371,7 @@ const SessionUpdateInnerNonJobSchema = z.discriminatedUnion('type', [
   SessionUpdateContextInjectedSchema,
   SessionUpdatePlanSchema,
   SessionUpdateToolUseSchema,
+  SessionUpdateCompletionStatusSchema,
   SessionUpdateTurnStartSchema,
   SessionUpdateTurnEndSchema,
   SessionUpdateMcpConfigChangedSchema,
@@ -2396,6 +2410,7 @@ const _SessionUpdateInnerSchema = z.discriminatedUnion('type', [
   SessionUpdateJobStartedSchema,
   SessionUpdateJobFinishedSchema,
   SessionUpdateJobUpdateSchema,
+  SessionUpdateCompletionStatusSchema,
   SessionUpdateTurnStartSchema,
   SessionUpdateTurnEndSchema,
   SessionUpdateMcpConfigChangedSchema,
@@ -2423,6 +2438,7 @@ const SessionUpdateParamsSchema = z.discriminatedUnion('type', [
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobStartedSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobFinishedSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateJobUpdateSchema),
+  SessionUpdateBaseParamsSchema.merge(SessionUpdateCompletionStatusSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnStartSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateTurnEndSchema),
   SessionUpdateBaseParamsSchema.merge(SessionUpdateMcpConfigChangedSchema),
