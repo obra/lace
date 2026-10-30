@@ -57,7 +57,9 @@ empty.
 
 Immediately before each model call, the runner snapshots the current text. A set
 or clear affects the next request. An already submitted request and its
-transport retries keep their snapshot.
+transport retries keep their snapshot. The supported OpenAI
+streaming-verification fallback preserves the same options and materialized text
+when switching to a non-streaming call on the selected API.
 
 ```text
 system instructions + tools

@@ -1315,8 +1315,8 @@ export class OpenAIProvider extends AIProvider {
               'OpenAI streaming requires organization verification, falling back to non-streaming mode',
               { model }
             );
-            // Fall back to non-streaming mode
-            return this._createResponseImpl(messages, tools, model, signal);
+            // Keep the materialized request snapshot on the same API path.
+            return this._createChatCompletionsResponse(messages, tools, model, signal, options);
           }
 
           const errorObj = error as Error;
@@ -1692,7 +1692,14 @@ export class OpenAIProvider extends AIProvider {
               { model }
             );
             // Fall back to non-streaming Responses API
-            return this._createResponsesAPIResponse(messages, tools, model, signal);
+            return this._createResponsesAPIResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
           }
 
           const errorObj = error as Error;
