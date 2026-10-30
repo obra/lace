@@ -1,7 +1,12 @@
 // ABOUTME: Google Gemini provider implementation
 // ABOUTME: Wraps Google GenAI SDK in the common provider interface
 
-import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
+import {
+  GoogleGenAI,
+  GenerateContentResponse,
+  type GenerateContentParameters,
+  type Schema,
+} from '@google/genai';
 import { AIProvider } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { normalizeGeminiStop } from './stop-reason';
@@ -63,17 +68,18 @@ export class GeminiProvider extends AIProvider {
         {
           name: tool.name,
           description: tool.description,
-          parameters: tool.inputSchema,
+          // The SDK normalizes JSON Schema's lowercase types to its Type enum.
+          parameters: tool.inputSchema as unknown as Schema,
         },
       ],
     }));
 
-    const requestPayload = {
+    const requestPayload: GenerateContentParameters = {
       model,
       contents,
-      systemInstruction,
-      tools: geminiTools.length > 0 ? geminiTools : undefined,
       config: {
+        systemInstruction,
+        tools: geminiTools.length > 0 ? geminiTools : undefined,
         maxOutputTokens: this._config.maxTokens || this.getModelMaxOutputTokens(model, 8192),
       },
     };

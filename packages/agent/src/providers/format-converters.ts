@@ -468,9 +468,9 @@ export function convertToOpenAIFormat(messages: ProviderMessage[]): Record<strin
               content: result.content.map(toolResultBlockAsText).join('\n'),
             }));
 
-          // If there's also text/image content, include the user message first
+          // Required tool results precede same-turn user text and images.
           if (hasContent(msg.content)) {
-            return [{ role: 'user', content: toOpenAIContent(msg.content) }, ...toolMessages];
+            return [...toolMessages, { role: 'user', content: toOpenAIContent(msg.content) }];
           }
 
           return toolMessages;
@@ -630,39 +630,7 @@ export function convertToGeminiFormat(messages: ProviderMessage[], model: string
     .map((msg): Content => {
       const parts: Part[] = [];
 
-      // Add content blocks (text and images)
-      if (typeof msg.content === 'string') {
-        if (msg.content.trim()) {
-          parts.push({ text: msg.content });
-        }
-      } else {
-        for (const block of msg.content) {
-          if (block.type === 'text' && block.text.trim()) {
-            parts.push({ text: block.text });
-          } else if (block.type === 'image') {
-            // Gemini uses inlineData for base64 images
-            parts.push({
-              inlineData: {
-                mimeType: block.source.media_type,
-                data: block.source.data,
-              },
-            });
-          }
-        }
-      }
-
-      if (msg.role === 'assistant' && msg.toolCalls) {
-        // Add function calls
-        msg.toolCalls.forEach((toolCall) => {
-          parts.push({
-            functionCall: {
-              name: toolCall.name,
-              args: toolCall.arguments,
-            },
-          });
-        });
-      }
-
+      // Required tool responses precede same-turn user text and images.
       if (msg.role === 'user' && msg.toolResults) {
         // Add function responses
         msg.toolResults.forEach((result) => {
@@ -697,6 +665,39 @@ export function convertToGeminiFormat(messages: ProviderMessage[], model: string
                 output,
                 ...(result.status !== 'completed' ? { error: 'Tool execution failed' } : {}),
               },
+            },
+          });
+        });
+      }
+
+      // Add content blocks (text and images)
+      if (typeof msg.content === 'string') {
+        if (msg.content.trim()) {
+          parts.push({ text: msg.content });
+        }
+      } else {
+        for (const block of msg.content) {
+          if (block.type === 'text' && block.text.trim()) {
+            parts.push({ text: block.text });
+          } else if (block.type === 'image') {
+            // Gemini uses inlineData for base64 images
+            parts.push({
+              inlineData: {
+                mimeType: block.source.media_type,
+                data: block.source.data,
+              },
+            });
+          }
+        }
+      }
+
+      if (msg.role === 'assistant' && msg.toolCalls) {
+        // Add function calls
+        msg.toolCalls.forEach((toolCall) => {
+          parts.push({
+            functionCall: {
+              name: toolCall.name,
+              args: toolCall.arguments,
             },
           });
         });
