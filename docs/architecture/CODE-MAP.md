@@ -27,6 +27,9 @@
 - [Temporary request context](temporary-request-context.md): sticky Ent
   request-only text, session lifetime and provider cache boundaries.
 
+- [Memory authority and permissions](memory-authority.md): internal database
+  identity, ownership and permission foundation; no runtime integration.
+
 ## Common Commands
 
 ```bash
