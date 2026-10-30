@@ -1,5 +1,6 @@
 // ABOUTME: Agent status and health check RPC handlers
 
+import { readCompletion } from '../../completion';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { summarizeDurableEvents } from '../../storage/event-log';
 import { derivePendingPermissionsFromDurableEvents } from '../../storage/permissions-from-events';
@@ -86,6 +87,7 @@ export function registerAgentStatusHandlers(
     });
 
     return {
+      completion: readCompletion(state),
       models: [],
       mcpServers,
       currentSession: state.activeSession

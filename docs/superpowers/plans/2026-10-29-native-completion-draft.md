@@ -13,8 +13,8 @@ owners retain reservations across their asynchronous gaps. A completion update
 only wakes observers to request fresh status. Keep one owner for each operation.
 
 **Spec:** The previously approved native completion status, followed by Jesse's
-instruction to park this optional proposal in a draft. No merging or host rollout
-is authorized by this extraction.
+instruction to park this optional proposal in a draft. No merging or host
+rollout is authorized by this extraction.
 
 **Tech stack:** Existing TypeScript, Vitest, Ent and Node 24.
 
@@ -58,8 +58,8 @@ is authorized by this extraction.
 
 **Files:** New `packages/agent/src/completion.ts`; selected hunks in
 `packages/agent/src/{server.ts,jobs/job-notifications.ts}`, RPC handlers
-`{agent-status,prompt}.ts`, `packages/ent-protocol/src/schemas/methods.ts`, focused
-native-completion and existing prompt/job/status/protocol tests, and
+`{agent-status,prompt}.ts`, `packages/ent-protocol/src/schemas/methods.ts`,
+focused native-completion and existing prompt/job/status/protocol tests, and
 `docs/architecture/notifications.md`.
 
 - [ ] Read exact main owners and reference commits. Identify the memory-specific

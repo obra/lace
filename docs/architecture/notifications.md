@@ -447,3 +447,46 @@ relevant decisions:
   land an event into another process's session, it must route through that
   process's RPC peer (today: `session/update` discriminants). Adding a
   `flock`-style writer is on the "do not without strong reason" list.
+
+## 13. Native completion observation
+
+`ent/agent/status` exposes `completion` for the active session. It contains
+`sessionId`, the latest durable `terminalTurnId` (when present),
+`observedStreamSeq`, and `settled`. A settled boundary has a durable terminal
+turn, no open turn or unfinished native job, no prompt-handler or job-finalizer
+reservation, no queued immediate drain, and no unread immediate inject. The
+status handler takes this synchronous snapshot after its asynchronous permission
+recovery work.
+
+The prompt handler retains ownership through its finalization and drain
+scheduling. A job finalizer reserves before `job_finished` becomes observable
+and releases after its notification is injected or suppressed by subscriptions.
+The shared idle-wake helper and prompt-exit path use the same deferred drain.
+Each drain captures its producing session and retains a reservation through
+admission or discard. Its admitted prompt owns the turn before the drain
+releases ownership. A competing prompt that already consumed the inject makes
+the drain a no-op; a changed session prevents it from entering the replacement
+session. Job finalizers also suppress notification publication into a
+replacement session.
+
+Reservation release emits a `completion_status` session update, including when a
+queued drain is discarded without starting a turn. This update only wakes a
+fresh status read. Consumers must match the session and terminal turn and
+require `observedStreamSeq` to cover their observed updates. They must discard a
+response if newer relevant updates arrived while it was in flight. A status read
+never emits another completion wake.
+
+Settlement observes that native activity has quiesced at that boundary. It does
+not establish successful work, delegate collection, user delivery, or answer
+quality. Those remain separate caller contracts. Reservations and known inject
+consumption belong to this process; this observation does not durably certify
+work from an earlier process after restart.
+
+Only the producing session's runner-reported inject watermark advances known
+consumption. Abort, slash, and failure paths retain their scheduling fallback
+without treating it as consumption. A failed followup can therefore remain
+unsettled with an unread notification. Retained injects whose consumption is
+unknown after a load also prevent settlement; observation adds no automatic
+retry policy. Failed terminal notification delivery keeps its finalizer
+reservation unresolved rather than treating a write failure as deliberate
+suppression.
