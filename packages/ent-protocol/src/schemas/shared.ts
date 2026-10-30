@@ -466,7 +466,14 @@ export const MemoryConfigurationSchema = z
       .strict()
       .optional(),
     documentSources: z
-      .object({ gitRoot: NonEmptyStringSchema, paths: z.array(NonEmptyStringSchema) })
+      .object({
+        gitRoot: NonEmptyStringSchema,
+        paths: z.array(NonEmptyStringSchema),
+        extensions: z
+          .array(z.string().regex(/^\.[A-Za-z0-9]+$/))
+          .min(1)
+          .optional(),
+      })
       .strict()
       .optional(),
   })

@@ -1,5 +1,11 @@
+import { InitializeRequestSchema } from '../methods';
 import { describe, expect, it } from 'vitest';
-import { MemoryBindingSchema, MemoryRoleGrantSchema, MemoryRolesSchema } from '../shared';
+import {
+  MemoryBindingSchema,
+  MemoryConfigurationSchema,
+  MemoryRoleGrantSchema,
+  MemoryRolesSchema,
+} from '../shared';
 
 const grant = {
   producerId: 'persona:librarian',
@@ -44,5 +50,42 @@ describe('memory permission schemas', () => {
     expect(MemoryRoleGrantSchema.safeParse({ ...grant, canRead: 'true' }).success).toBe(false);
     expect(MemoryRoleGrantSchema.safeParse({ ...grant, extra: true }).success).toBe(false);
     expect(MemoryBindingSchema.safeParse({ ...binding, extra: true }).success).toBe(false);
+  });
+});
+
+describe('memory document extension selection', () => {
+  const memory = {
+    databasePath: '/instance/memory.sqlite',
+    binding,
+    documentSources: { gitRoot: '/instance', paths: ['user/knowledge', 'user/journal'] },
+  };
+  it('retains the optional positive suffix allowlist in canonical initialize configuration', () => {
+    const request = InitializeRequestSchema.parse({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '1.0',
+        clientInfo: { name: 'host', version: '1' },
+        capabilities: {},
+        memory: { ...memory, documentSources: { ...memory.documentSources, extensions: ['.md'] } },
+      },
+    });
+    expect(request.params.memory?.documentSources?.extensions).toEqual(['.md']);
+    expect(MemoryConfigurationSchema.parse(memory)).toEqual(memory);
+  });
+  it.each([
+    { extensions: [] },
+    { extensions: ['md'] },
+    { extensions: ['*.md'] },
+    { extensions: ['../md'] },
+    { extensions: ['.'] },
+  ])('rejects a malformed extension selection $extensions', ({ extensions }) => {
+    expect(
+      MemoryConfigurationSchema.safeParse({
+        ...memory,
+        documentSources: { ...memory.documentSources, extensions },
+      }).success
+    ).toBe(false);
   });
 });

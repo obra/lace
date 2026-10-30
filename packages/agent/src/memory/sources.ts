@@ -160,6 +160,8 @@ export class MemorySources {
       const match = /^(100644|100755) blob ([a-f0-9]+)\t([\s\S]+)$/.exec(entry);
       if (!match) continue;
       const path = match[3];
+      if (config.extensions && !config.extensions.some((extension) => path.endsWith(extension)))
+        continue;
       const blob = match[2];
       heads.set(path, blob);
     }

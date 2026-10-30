@@ -14,15 +14,22 @@ memory: {
   documentSources: {
     gitRoot: '/service/instance',
     paths: ['journal', 'knowledge'],
+    extensions: ['.md'], // Optional positive suffix allowlist
   },
 }
 ```
 
 `extraction` and `documentSources` are optional and root-only. Document paths
 are literal relative files or directories within the host-visible Git repository
-root. The root must be a real repository root. Child Lace processes run on the
-host too; their fresh initialization includes only the database path and a newly
-derived non-root binding. It omits extraction and document settings.
+root. Optional `extensions` restricts discovered files to the listed literal,
+case-sensitive suffixes; `['.md']` admits new Markdown entries while excluding
+sibling generated caches. Each suffix is a dot followed by letters or digits,
+and an explicit list must be nonempty. Omitting this field preserves admission
+of all regular files beneath the literal roots. This selects originals during
+discovery; it does not introduce glob syntax or change snapshotting. The root
+must be a real repository root. Child Lace processes run on the host too; their
+fresh initialization includes only the database path and a newly derived
+non-root binding. It omits extraction and document settings.
 
 Derived notes are ordinary instance-wide memory: reads require current
 `canRead`, acceptance requires current `canMutate`. Writable document collection
