@@ -296,7 +296,12 @@ export class MemorySources {
       (ref.kind === 'event' && hash(JSON.stringify(content)) !== source.version)
     )
       throw new Error('Source event unavailable or replaced');
-    return supplied(source, content, images);
+    const input = supplied(source, content, images);
+    if (ref.kind === 'event') {
+      const event = JSON.parse(retainedLine(ref)) as { timestamp?: unknown };
+      if (typeof event.timestamp === 'string') input.recordedAt = event.timestamp;
+    }
+    return input;
   }
   async status(source: Source): Promise<string> {
     try {

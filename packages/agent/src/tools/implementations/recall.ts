@@ -12,6 +12,8 @@ import { stripTrailingLoneSurrogate } from '../../compaction/toolkit';
 import { getSessionDir, readSessionMeta } from '../../storage/session-store';
 import type { TypedDurableEvent } from '../../storage/event-types';
 import { resolveRecallExtractor } from './recall-extractor';
+import { attachCurrentAccounts } from '../../memory/recall-accounts';
+import { sourceReadHandle } from '../../memory/types';
 
 // Flat schema with an `action` enum discriminator. Per-action required-field
 // checks happen at runtime in executeValidated. The flat shape is required
@@ -249,18 +251,28 @@ export class RecallTool extends Tool {
     // Use redactSnippet (strict + prefix-only) on previews because FTS5's
     // snippet() can truncate a secret mid-token; the prefix pass catches the
     // surviving tail. Read content and error envelopes still use strict redact.
-    const hits = rows.map((r) => ({ ...r, preview: redactSnippet(r.preview) }));
+    const transcriptHits = rows.map((r) => ({ ...r, preview: redactSnippet(r.preview) }));
 
     let memories;
+    let memoryHeads: Array<{ id: string; revision: number }> = [];
     let memoriesHint: string | undefined;
     if (context.memory) {
       try {
+        const selectedMemories = await context.memory.search(args.query, limit);
+        memoryHeads = selectedMemories.map((note) => ({
+          id: note.event_id.slice(7),
+          revision: note.revision,
+        }));
         memories = JSON.parse(
           redact(
             JSON.stringify(
-              (await context.memory.search(args.query, limit)).map((note) => ({
+              selectedMemories.map((note) => ({
                 ...note,
                 preview: redactSnippet(note.preview),
+                support: note.support.map((source) => ({
+                  handle: sourceReadHandle(source),
+                  status: source.status,
+                })),
               }))
             )
           )
@@ -279,12 +291,18 @@ export class RecallTool extends Tool {
         } else throw error;
       }
     }
+    const guarded = await attachCurrentAccounts(transcriptHits, context.memory, memoryHeads);
+    const hits = JSON.parse(redact(JSON.stringify(guarded.groups))) as typeof transcriptHits;
+    const omissions = guarded.omitted.length
+      ? { omitted: JSON.parse(redact(JSON.stringify(guarded.omitted))) }
+      : {};
     if (hits.length === 0) {
       const personaPart = appliedPersonaFilter
         ? ` (persona=${redact(JSON.stringify(appliedPersonaFilter))})`
         : '';
       return this.createResult({
         hits: [],
+        ...omissions,
         ...(memories ? { memories } : {}),
         ...(memoriesHint ? { memories_hint: memoriesHint } : {}),
         hint: `0 hits for query=${redact(JSON.stringify(args.query))}${personaPart}. Try: drop the persona filter, widen the time range, or check spelling.`,
@@ -293,6 +311,7 @@ export class RecallTool extends Tool {
 
     return this.createResult({
       hits,
+      ...omissions,
       ...(memories ? { memories } : {}),
       ...(memoriesHint ? { memories_hint: memoriesHint } : {}),
     });
@@ -308,7 +327,19 @@ export class RecallTool extends Tool {
         return this.createResult({ error: 'Derived memory is unavailable for this session.' });
       const note = await memoryContext.memory.read(args.event_id.slice(7));
       return this.createResult(
-        note ? JSON.parse(redact(JSON.stringify(note))) : { error: 'Derived memory not found.' }
+        note
+          ? JSON.parse(
+              redact(
+                JSON.stringify({
+                  ...note,
+                  support: note.support.map((source) => ({
+                    handle: sourceReadHandle(source),
+                    status: source.status,
+                  })),
+                })
+              )
+            )
+          : { error: 'Derived memory not found.' }
       );
     }
     const safeEventId = redact(args.event_id);
@@ -440,7 +471,17 @@ export class RecallTool extends Tool {
       return verbatim !== undefined ? { ...truncated, verbatim } : truncated;
     });
 
-    return this.createResult({ events });
+    const guarded = await attachCurrentAccounts(events, memoryContext.memory);
+    return this.createResult(
+      JSON.parse(
+        redact(
+          JSON.stringify({
+            events: guarded.groups,
+            ...(guarded.omitted.length ? { omitted: guarded.omitted } : {}),
+          })
+        )
+      )
+    );
   }
 
   /**
@@ -512,9 +553,18 @@ export class RecallTool extends Tool {
       };
     });
 
+    const guarded = await attachCurrentAccounts(outEvents, context.memory);
+    const accountOutput = JSON.parse(
+      redact(
+        JSON.stringify({
+          events: guarded.groups,
+          ...(guarded.omitted.length ? { omitted: guarded.omitted } : {}),
+        })
+      )
+    );
     if (droppedEvents > 0 || clippedBytes > 0) {
       return this.createResult({
-        events: outEvents,
+        ...accountOutput,
         truncated: {
           events: droppedEvents,
           bytes: clippedBytes,
@@ -522,7 +572,7 @@ export class RecallTool extends Tool {
         },
       });
     }
-    return this.createResult({ events: outEvents });
+    return this.createResult(accountOutput);
   }
 }
 

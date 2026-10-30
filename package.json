@@ -28,7 +28,8 @@
     "test:run": "npm run test",
     "test:watch": "npm run test:watch --workspace=packages/agent",
     "test:coverage": "npm run test:coverage --workspace=packages/agent",
-    "update-catalogs": "npx tsx scripts/update-provider-catalogs.ts"
+    "update-catalogs": "npx tsx scripts/update-provider-catalogs.ts",
+    "memory:setup-model": "tsx scripts/setup-memory-model.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.114.0",
