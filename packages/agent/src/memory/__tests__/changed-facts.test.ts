@@ -415,3 +415,68 @@ it.each(['prompt', 'context_injected', 'tool_use'])(
     );
   }
 );
+
+it('defers a fresh correction when earlier originals fill the candidate union even with shared support capacity', async () => {
+  const shared = event(1, 'Original orchard responsibilities.');
+  for (let index = 0; index < 16; index++)
+    seed(`apples-${index}`, `Apple orchard responsibility ${index}`, [shared]);
+  seed('oranges', 'Orange orchard responsibility belongs to Bea.', [shared]);
+  event(2, 'Apple orchard responsibilities were confirmed.');
+  event(3, 'Orange orchard responsibility returned to Alice.');
+  const batches: any[] = [];
+  let correctionStatus: unknown;
+  open(
+    (request: any) => {
+      const body = JSON.parse(request.messages[0].content[0].text);
+      batches.push(body);
+      const correction = body.sources.find((source: any) =>
+        source.text.includes('returned to Alice')
+      );
+      const candidate = body.candidates.find((note: any) => note.id === 'oranges');
+      if (correction && candidate)
+        correctionStatus = db
+          .prepare('SELECT status FROM memory_sources WHERE id=?')
+          .get(`event:${sessionId}:3`);
+      return correction && candidate
+        ? {
+            ...empty,
+            text: JSON.stringify({
+              changes: [
+                {
+                  text: 'Alice now owns the orange orchard after Bea.',
+                  sourceIds: [correction.id],
+                  target: { noteId: candidate.id, revision: candidate.revision },
+                },
+              ],
+            }),
+          }
+        : empty;
+    },
+    {
+      generation: 'shared-union',
+      async encode(texts: string[]) {
+        return texts.map((text) => (text.includes('Orange') ? [0, 1] : [1, 0]));
+      },
+    }
+  );
+  await runtime.wake();
+  expect(notes.note('oranges')).toMatchObject({
+    revision: 2,
+    text: 'Alice now owns the orange orchard after Bea.',
+  });
+  expect(batches).toHaveLength(2);
+  expect(correctionStatus).toEqual({ status: 'pending' });
+  expect(batches[0].sources.some((source: any) => source.text.includes('returned to Alice'))).toBe(
+    false
+  );
+  expect(
+    batches[0].withheld.some(
+      (entry: any) => entry.id === 'memory:oranges' && entry.reason.includes('deferred')
+    )
+  ).toBe(true);
+  expect(batches[1].candidates.some((candidate: any) => candidate.id === 'oranges')).toBe(true);
+  expect(batches[1].sources.some((source: any) => source.id === sourceHandle(shared))).toBe(true);
+  expect(
+    db.prepare('SELECT status FROM memory_sources WHERE id=?').get(`event:${sessionId}:3`)
+  ).toEqual({ status: 'completed' });
+});

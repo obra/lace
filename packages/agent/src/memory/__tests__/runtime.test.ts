@@ -581,7 +581,10 @@ describe('configured automatic memory', () => {
       event(1, 'Late child event');
       release({ text: '{"changes":[]}', stopReason: 'end_turn', toolCalls: [] });
       await work;
-      expect((await read(runtime)).support[0].reference.kind).toBe('event');
+      expect((await read(runtime)).support[0]).toEqual({
+        handle: `${sessionId}:1`,
+        status: 'current',
+      });
       expect(requests).toBe(2);
       await runtime.close();
     } finally {

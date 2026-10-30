@@ -177,6 +177,14 @@ export function createMemoryRuntime(
       for (const note of related.notes) {
         if (candidates.some((candidate) => candidate.id === note.id)) continue;
         if (candidates.length + stagedCandidates.length >= L.candidates) {
+          if (primaries.length) {
+            withheld.push({
+              id: `memory:${note.id}`,
+              reason: 'Candidate union budget; fresh original deferred',
+            });
+            split = true;
+            break;
+          }
           rejected.push({ id: `memory:${note.id}`, reason: 'Candidate union budget; unexamined' });
           continue;
         }
