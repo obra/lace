@@ -24,6 +24,9 @@
 - [Model-call correlation](model-call-correlation.md): optional runtime IDs,
   local proxy request headers and returned worker-turn associations.
 
+- [Temporary request context](temporary-request-context.md): sticky Ent
+  request-only text, session lifetime and provider cache boundaries.
+
 ## Common Commands
 
 ```bash

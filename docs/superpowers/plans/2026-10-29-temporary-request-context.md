@@ -97,7 +97,7 @@ where it actually removes duplication.
 - [x] Run inspected relevant offline tests serially with output saved; inspect
       failures before any rerun. Run all package typechecks, scoped lint and
       formatting. Build only owned TypeScript outputs when required for types.
-- [ ] Self-review and commit explicit owned files with normal hooks and detailed
+- [x] Self-review and commit explicit owned files with normal hooks and detailed
       intent/evidence. Report exact commands, RED/GREEN evidence, commit and
       limitations. Root owns two independent Sol reviews and required Sen doc
       checks. Do not create further agents or expand scope.

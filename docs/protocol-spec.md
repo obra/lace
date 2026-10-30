@@ -572,6 +572,26 @@ Notes on `strategy`:
 }
 ```
 
+### Temporary request context
+
+The active initialized session exposes three requests:
+
+| Method                                | Params                                  | Result                     |
+| ------------------------------------- | --------------------------------------- | -------------------------- |
+| `ent/session/temporary_context/set`   | `{ text: string }` (nonempty, verbatim) | `{}`                       |
+| `ent/session/temporary_context/peek`  | `{}` or omitted                         | `{ text: string \| null }` |
+| `ent/session/temporary_context/clear` | `{}` or omitted                         | `{}`                       |
+
+Parameters are strict; unknown fields are invalid. Set replaces the only value;
+peek never consumes it. Context is always sticky until set/clear and survives
+turns, tool rounds and compaction. Successful new, load/resume activation and
+close clear it. It is process-local and is never persisted, restored, forked or
+delegated. Each model request snapshots current context after required history;
+updates leave submitted payloads and retries unchanged. No session event is
+emitted. See
+[Temporary request context](architecture/temporary-request-context.md) for
+examples and exact provider cache behavior.
+
 ### 6.2 `ent/session/inject` (notification)
 
 Inject context mid-turn. Not in ACP. An `immediate` inject into an idle session
