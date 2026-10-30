@@ -3,6 +3,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   AcpErrorCodes,
+  TemporaryContextSetParamsSchema,
+  TemporaryContextEmptyParamsSchema,
   EntErrorCodes,
   type DurableHandoffStatus,
   type JsonRpcPeer,
@@ -80,7 +82,7 @@ async function computeContextBreakdownForActiveSession(
   // prompt now lives exclusively in the returned systemPrompt string (Phase 2 of
   // cache-control hardening). Estimate its tokens directly.
   const systemPromptTokens = estimateTokens(systemPrompt);
-  let userTokens = 0;
+  let userTokens = estimateTokens(state.temporaryContext ?? '');
   let assistantTokens = 0;
   let toolCallTokens = 0;
   let toolResultTokens = 0;
@@ -332,6 +334,29 @@ export function registerSessionOperationHandlers(
   runPromptInternalRef: { current: ((content: unknown[]) => Promise<void>) | null }
 ): void {
   const idleWake = createIdleWake(state, runPromptInternalRef);
+
+  peer.onRequest('ent/session/temporary_context/set', (params: unknown) => {
+    assertActiveSession(state);
+    const parsed = TemporaryContextSetParamsSchema.safeParse(params);
+    if (!parsed.success) throwInvalidParams(parsed.error.message);
+    state.temporaryContext = parsed.data.text;
+    return {};
+  });
+  peer.onRequest('ent/session/temporary_context/peek', (params: unknown) => {
+    assertActiveSession(state);
+    if (!TemporaryContextEmptyParamsSchema.safeParse(params === undefined ? {} : params).success) {
+      throwInvalidParams('params must be an empty object');
+    }
+    return { text: state.temporaryContext ?? null };
+  });
+  peer.onRequest('ent/session/temporary_context/clear', (params: unknown) => {
+    assertActiveSession(state);
+    if (!TemporaryContextEmptyParamsSchema.safeParse(params === undefined ? {} : params).success) {
+      throwInvalidParams('params must be an empty object');
+    }
+    state.temporaryContext = null;
+    return {};
+  });
 
   peer.onRequest('ent/session/configure', async (params: unknown) => {
     assertActiveSession(state);

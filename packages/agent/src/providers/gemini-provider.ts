@@ -8,6 +8,8 @@ import {
   type Schema,
 } from '@google/genai';
 import { AIProvider } from './base-provider';
+import { appendTemporaryContext } from './temporary-context';
+import type { RequestOptions, ConversationState } from './base-provider';
 import { ProviderMessage, ProviderResponse, ProviderConfig, ProviderInfo } from './base-provider';
 import { normalizeGeminiStop } from './stop-reason';
 import { ToolCall } from '@lace/agent/tools/types';
@@ -162,8 +164,11 @@ export class GeminiProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     return this.withRetry(
       async () => {
         const requestPayload = this._createRequestPayload(messages, tools, model);
@@ -186,8 +191,11 @@ export class GeminiProvider extends AIProvider {
     messages: ProviderMessage[],
     tools: WireTool[] = [],
     model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     let streamingStarted = false;
     let streamCreated = false;
 

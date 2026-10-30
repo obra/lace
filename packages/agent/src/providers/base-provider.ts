@@ -183,6 +183,8 @@ export type ModelCallCorrelation = {
 };
 
 export interface RequestOptions {
+  /** Request-only tail. Null keeps a cleared Responses turn stateless; undefined preserves defaults. */
+  temporaryContext?: string | null;
   /** Diagnostic metadata; never part of the model request body. */
   correlation?: ModelCallCorrelation;
   toolChoice?: 'auto' | 'required' | 'none';

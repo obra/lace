@@ -286,6 +286,7 @@ export class AnthropicProvider extends AIProvider {
 
     return buildBetaMessagePayload({
       providerName: this.providerName,
+      temporaryContext: opts?.temporaryContext,
       messages,
       systemPrompt: this.getEffectiveSystemPrompt(messages),
       tools,

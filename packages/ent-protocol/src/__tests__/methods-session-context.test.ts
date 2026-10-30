@@ -5,11 +5,53 @@ import {
   EntSessionTokenUsageResponseSchema,
   SessionPromptRequestSchema,
   EntSessionInjectRequestSchema,
+  EntProtocolRequestSchema,
+  EntSessionTemporaryContextPeekResponseSchema,
 } from '../schemas/methods';
 
 const baseRequest = { jsonrpc: '2.0', id: 1 } as const;
 
 describe('Ent protocol session context schemas', () => {
+  it('accepts only the set/peek/clear temporary context contract', () => {
+    expect(
+      EntProtocolRequestSchema.parse({
+        ...baseRequest,
+        method: 'ent/session/temporary_context/set',
+        params: { text: 'sticky text' },
+      })
+    ).toMatchObject({ params: { text: 'sticky text' } });
+    for (const operation of ['peek', 'clear']) {
+      expect(
+        EntProtocolRequestSchema.safeParse({
+          ...baseRequest,
+          method: `ent/session/temporary_context/${operation}`,
+        }).success
+      ).toBe(true);
+      expect(
+        EntProtocolRequestSchema.safeParse({
+          ...baseRequest,
+          method: `ent/session/temporary_context/${operation}`,
+          params: { text: 'unexpected' },
+        }).success
+      ).toBe(false);
+    }
+    for (const params of [{ text: '' }, { text: 'x', lifetime: 'turn' }, { text: 1 }, {}]) {
+      expect(
+        EntProtocolRequestSchema.safeParse({
+          ...baseRequest,
+          method: 'ent/session/temporary_context/set',
+          params,
+        }).success
+      ).toBe(false);
+    }
+    for (const text of ['sticky text', null]) {
+      expect(
+        EntSessionTemporaryContextPeekResponseSchema.parse({ ...baseRequest, result: { text } })
+          .result
+      ).toEqual({ text });
+    }
+  });
+
   it('accepts ent/session/token_usage request with and without params', () => {
     expect(() =>
       EntSessionTokenUsageRequestSchema.parse({

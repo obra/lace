@@ -46,6 +46,7 @@ import type {
   ThinkingBlock,
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { appendTemporaryContext } from '@lace/agent/providers/temporary-context';
 import { createModelCallCorrelation } from '@lace/agent/providers/model-call-correlation';
 import { logger } from '@lace/agent/utils/logger';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
@@ -633,6 +634,7 @@ export class ConversationRunner {
     // standby/verify wrap-up.
     let injectedArrival: MidTurnArrival = 'none';
     let nextRequestOptions: RequestOptions | undefined;
+    let usedTemporaryContext = false;
     // Carries forward the parsed structured object from the last provider
     // response that produced one, surfaced on the RunResult for the prompt
     // handler. Only set when this turn requested an outputFormat.
@@ -790,7 +792,10 @@ export class ConversationRunner {
           // nextRequestOptions (a one-shot tool_choice nudge), outputFormat
           // applies to every call this turn so the final answer stays
           // schema-constrained even after tool-use iterations.
+          const temporaryContext = this.deps.getTemporaryContext?.() ?? null;
+          usedTemporaryContext ||= temporaryContext !== null;
           const requestOptions: RequestOptions = {
+            ...(usedTemporaryContext ? { temporaryContext } : {}),
             ...nextRequestOptions,
             ...(runOutputFormat ? { outputFormat: runOutputFormat } : {}),
             correlation: createModelCallCorrelation({ sessionId, turnId }),
@@ -1175,7 +1180,9 @@ export class ConversationRunner {
             // schemas, and images, so it under-reports and can stay quiet on a
             // session that will 400 again. Say so loudly; the retry still
             // runs, and the emergency budget bounds the churn.
-            const compactedEstimate = estimateProviderTokens(providerMessages);
+            const compactedEstimate = estimateProviderTokens(
+              appendTemporaryContext(providerMessages, this.deps.getTemporaryContext?.())
+            );
             const windowSize = provider.contextWindowForModel(modelId ?? 'default');
             if (compactedEstimate >= windowSize) {
               logger.error('runner: compacted history STILL exceeds the context window', {

@@ -87,6 +87,7 @@ function createMockDeps(overrides: Partial<RunnerDependencies> = {}): RunnerDepe
 class ScriptedProvider extends AIProvider {
   callCount = 0;
   receivedMessages: ProviderMessage[][] = [];
+  receivedOptions: (RequestOptions | undefined)[] = [];
 
   constructor(
     private readonly script: Array<{
@@ -129,6 +130,7 @@ class ScriptedProvider extends AIProvider {
     _conversationState?: ConversationState,
     _options?: RequestOptions
   ): Promise<ProviderResponse> {
+    this.receivedOptions.push(_options ? { ..._options } : undefined);
     // Snapshot the messages we received (deep enough for assertions)
     this.receivedMessages.push(messages.map((m) => ({ ...m })));
 
@@ -213,6 +215,73 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
     else process.env.LACE_DIR = savedLaceDir;
     if (existsSync(laceDir)) rmSync(laceDir, { recursive: true, force: true });
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('snapshots sticky temporary context each round and turn without persisting it', async () => {
+    let text: string | null = 'TEMPORARY-ONE';
+    const toolResponse: ProviderResponse = {
+      content: '',
+      toolCalls: [{ id: 'tc_temporary', name: 'bash', arguments: { command: 'echo hi' } }],
+      stopReason: 'tool_use',
+      usage: { promptTokens: 100, completionTokens: 1, totalTokens: 101 },
+    };
+    const done: ProviderResponse = {
+      content: 'done',
+      toolCalls: [],
+      stopReason: 'stop',
+      usage: { promptTokens: 100, completionTokens: 1, totalTokens: 101 },
+    };
+    const provider = new ScriptedProvider([
+      {
+        response: toolResponse,
+        beforeReturn: () => {
+          text = 'TEMPORARY-TWO';
+        },
+      },
+      {
+        response: {
+          ...toolResponse,
+          toolCalls: [{ ...toolResponse.toolCalls![0], id: 'tc_temporary_2' }],
+        },
+        beforeReturn: () => {
+          text = null;
+        },
+      },
+      { response: done },
+      { response: done },
+      { response: done },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: vi.fn().mockResolvedValue(provider),
+        getTemporaryContext: () => text,
+      })
+    );
+    const run = () =>
+      runner.run({
+        content: [{ type: 'text', text: 'do work' }],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+    await run();
+    expect(provider.receivedOptions.map((o) => o?.temporaryContext)).toEqual([
+      'TEMPORARY-ONE',
+      'TEMPORARY-TWO',
+      null,
+      null,
+    ]);
+    expect(provider.receivedMessages[1].at(-1)?.toolResults).toHaveLength(1);
+    expect(JSON.stringify(provider.receivedMessages)).not.toContain('TEMPORARY-');
+    text = 'TEMPORARY-STICKY';
+    await run();
+    await run();
+    expect(provider.receivedOptions.slice(-2).map((o) => o?.temporaryContext)).toEqual([
+      'TEMPORARY-STICKY',
+      'TEMPORARY-STICKY',
+    ]);
+    expect(JSON.stringify(readDurableEvents(sessionDir, {}).events)).not.toContain('TEMPORARY-');
   });
 
   it("appends a mid-turn priority='immediate' injection as role: 'user' on the next provider call", async () => {

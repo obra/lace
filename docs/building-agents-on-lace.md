@@ -38,6 +38,16 @@ a session, send a prompt, stream updates, list jobs, manage MCP servers. Your
 product spawns lace as a child process and talks to it via Ent. That's the
 contract.
 
+## Request-only caller context
+
+Use `ent/session/temporary_context/set`, `.../peek` and `.../clear` to manage
+one sticky value at the end of every model request. It remains process-local to
+the active session across turns and compaction, and is reset by successful new,
+load/resume and close. It creates no durable event and is separate from memory.
+Set/clear during a call affect the next request. See
+[Temporary request context](architecture/temporary-request-context.md) for RPC
+examples, lifecycle, history isolation and provider cache guarantees.
+
 ## The anti-pattern: in-process embedding
 
 It is technically possible to import lace's internals and run them in-process.

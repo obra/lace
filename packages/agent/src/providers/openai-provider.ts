@@ -36,6 +36,7 @@ import { normalizeOpenAIChatStop, normalizeOpenAIResponsesStop } from './stop-re
 import type { LaceStopReason, LaceStopDetails } from './stop-reason';
 import { tryClassifyAsContextWindow } from './utils/error-classifier';
 import { fitOutputTokensToContextWindow, projectInputTokens } from './utils/output-token-budget';
+import { appendTemporaryContext } from './temporary-context';
 import { estimateProviderTokens } from '@lace/agent/utils/token-estimation';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { ToolCall } from '@lace/agent/tools/types';
@@ -541,7 +542,8 @@ export class OpenAIProvider extends AIProvider {
     // A provider that can't look up stored responses gets every request stateless:
     // no previous_response_id, so the full-history branch below builds `input`, and
     // store:false since nothing will ever chain onto it.
-    const chainingSupported = this.supportsResponseChaining();
+    const chainingSupported =
+      options?.temporaryContext === undefined && this.supportsResponseChaining();
     const previousResponseId = chainingSupported ? requestedPreviousResponseId : null;
 
     // Extract system/developer instructions via the base helper so both
@@ -838,6 +840,7 @@ export class OpenAIProvider extends AIProvider {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support
     // Responses API) unless the catalog entry opted this endpoint into Responses via api_style.
     if (this.isCustomEndpoint() && !this.customEndpointUsesResponsesAPI()) {
@@ -1043,6 +1046,7 @@ export class OpenAIProvider extends AIProvider {
     conversationState?: ConversationState,
     options?: RequestOptions
   ): Promise<ProviderResponse> {
+    messages = appendTemporaryContext(messages, options?.temporaryContext);
     // For custom OpenAI-compatible endpoints, use Chat Completions (they may not support
     // Responses API) unless the catalog entry opted this endpoint into Responses via api_style.
     if (this.isCustomEndpoint() && !this.customEndpointUsesResponsesAPI()) {
@@ -1311,8 +1315,8 @@ export class OpenAIProvider extends AIProvider {
               'OpenAI streaming requires organization verification, falling back to non-streaming mode',
               { model }
             );
-            // Fall back to non-streaming mode
-            return this._createResponseImpl(messages, tools, model, signal);
+            // Keep the materialized request snapshot on the same API path.
+            return this._createChatCompletionsResponse(messages, tools, model, signal, options);
           }
 
           const errorObj = error as Error;
@@ -1688,7 +1692,14 @@ export class OpenAIProvider extends AIProvider {
               { model }
             );
             // Fall back to non-streaming Responses API
-            return this._createResponsesAPIResponse(messages, tools, model, signal);
+            return this._createResponsesAPIResponse(
+              messages,
+              tools,
+              model,
+              signal,
+              conversationState,
+              options
+            );
           }
 
           const errorObj = error as Error;

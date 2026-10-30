@@ -243,6 +243,7 @@ export async function handleSlashCommand(
 
         // Switch to the new session (reload to pick up the new event).
         state.activeSession = loadSession(newSessionId);
+        state.temporaryContext = null;
 
         // Notify the client that the session has changed
         await emitUpdate(0, {

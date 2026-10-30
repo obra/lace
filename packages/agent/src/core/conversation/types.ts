@@ -65,6 +65,8 @@ export interface RunnerConfig {
  * These are callbacks that the runner uses to interact with the outside world.
  */
 export interface RunnerDependencies {
+  /** Read current request-only text immediately before each model request. */
+  getTemporaryContext?: () => string | null;
   /** Callback for emitting session updates to clients */
   onUpdate: (turnSeq: number, update: SessionUpdate) => Promise<void>;
 

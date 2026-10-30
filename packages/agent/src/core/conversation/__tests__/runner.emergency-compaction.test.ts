@@ -50,6 +50,7 @@ const CLEAN_TURN: ProviderResponse = {
 class ScriptedProvider extends AIProvider {
   callCount = 0;
   readonly sentMessages: ProviderMessage[][] = [];
+  readonly sentTemporaryContexts: (string | null | undefined)[] = [];
   readonly sentSystemPrompts: string[] = [];
   readonly sentPreviousResponseIds: (string | undefined)[] = [];
 
@@ -110,6 +111,7 @@ class ScriptedProvider extends AIProvider {
     state?: ConversationState,
     _options?: RequestOptions
   ): Promise<ProviderResponse> {
+    this.sentTemporaryContexts.push(_options?.temporaryContext);
     this.sentMessages.push(structuredClone(messages));
     this.sentSystemPrompts.push(this.systemPrompt);
     this.sentPreviousResponseIds.push(state?.previousResponseId ?? undefined);
@@ -361,6 +363,17 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     // The 200K model's retry actually fits the window it just bounced off.
     expect(narrowRetryTokens).toBeLessThan(200_000);
     expect(narrowRetryTokens).toBeLessThan(wideRetryTokens);
+  });
+
+  it('keeps temporary context outside compaction input and reads it for the retry', async () => {
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    await run(provider, { getTemporaryContext: () => 'TEMPORARY-COMPACTION-CONTEXT' }).promise;
+    expect(provider.sentTemporaryContexts).toEqual([
+      'TEMPORARY-COMPACTION-CONTEXT',
+      'TEMPORARY-COMPACTION-CONTEXT',
+    ]);
+    expect(JSON.stringify(provider.sentMessages)).not.toContain('TEMPORARY-COMPACTION-CONTEXT');
+    expect(JSON.stringify(durableEvents())).not.toContain('TEMPORARY-COMPACTION-CONTEXT');
   });
 
   it('compacts and retries the turn once, so the turn completes', async () => {

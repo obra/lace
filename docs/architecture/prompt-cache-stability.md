@@ -73,6 +73,21 @@ Just before the Anthropic request is serialized, `sanitizeLoneSurrogates`
 UTF-16 surrogates with U+FFFD so the body is valid JSON. It returns the same
 object when nothing changes, so it never perturbs a clean prefix.
 
+### Temporary context stays after the marked prefix
+
+The [temporary request context API](temporary-request-context.md) supplies one
+sticky process-local value separately from canonical history. Anthropic direct
+and Bedrock apply all explicit breakpoints and the four-marker cap to required
+history first, then append a separate unmarked user text block. Changes to that
+text or its size leave the marked prefix bytes unchanged. It is excluded from
+event persistence and compaction input.
+
+OpenAI Responses disables chaining and uses `store: false` for requests with
+temporary context, including the remaining requests of a turn after a clear.
+Other requests retain provider defaults. Chat Completions, Gemini and local
+adapters append the same trailing text. This does not disable any provider's
+automatic cache or configure local KV behavior.
+
 ## One reducer
 
 Events become messages through a single pure reducer,
