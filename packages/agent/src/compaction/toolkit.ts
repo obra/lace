@@ -39,7 +39,7 @@ export function coreToolResultFromProtocol(
   const content: CoreToolResult['content'] = result.content.map((c) => {
     if (c.type === 'text') return { type: 'text', text: c.text };
     if (c.type === 'json') return { type: 'text', text: JSON.stringify(c.data, null, 2) };
-    if (c.type === 'image') return { type: 'image', data: c.data };
+    if (c.type === 'image') return { type: 'image', data: c.data, mimeType: c.mediaType };
     if (c.type === 'error') return { type: 'text', text: c.message };
     return { type: 'text', text: '' };
   });

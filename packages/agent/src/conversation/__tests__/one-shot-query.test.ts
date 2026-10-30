@@ -107,3 +107,42 @@ describe('oneShotQuery', () => {
     );
   });
 });
+
+describe('one-shot extraction ownership', () => {
+  it('sets prompt and output budget on the exclusively owned provider and returns terminal metadata', async () => {
+    const providerConfig: Record<string, unknown> = {};
+    let prompt = '';
+    let cleaned = false;
+    const toolCalls = [{ id: 't', name: 'unexpected', arguments: {} }];
+    const provider = {
+      config: providerConfig,
+      setSystemPrompt(value: string) {
+        prompt = value;
+      },
+      async createStreamingResponse() {
+        return {
+          content: JSON.stringify({ prompt, maxTokens: providerConfig.maxTokens }),
+          toolCalls,
+          stopReason: 'tool_use',
+          stopDetails: null,
+        };
+      },
+      async cleanup() {
+        cleaned = true;
+      },
+    } as unknown as AIProvider;
+    const result = await oneShotQuery(
+      {
+        connectionId: 'fake',
+        model: 'fake',
+        messages: [],
+        systemPrompt: 'independent extraction',
+        maxTokens: 16384,
+      },
+      { createProviderForTurn: async () => provider }
+    );
+    expect(JSON.parse(result.text)).toEqual({ prompt: 'independent extraction', maxTokens: 16384 });
+    expect(result).toMatchObject({ toolCalls, stopReason: 'tool_use', stopDetails: null });
+    expect(cleaned).toBe(true);
+  });
+});

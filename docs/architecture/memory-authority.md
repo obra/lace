@@ -2,8 +2,10 @@
 
 `packages/agent/src/memory/authority.ts` is an internal Lace foundation for one
 SQLite memory database per instance. It provides identity, current ownership and
-memory permission checks. It has no runtime consumer yet and does not enable
-memory tools, recall, either memory writer or Sen integration.
+memory permission checks. The configured
+[automatic memory runtime](automatic-memory.md) uses it for background derived
+notes and existing recall. Sen host enablement is separate; existing document
+writers remain in charge of their files.
 
 ## Database identity and ownership
 
@@ -20,11 +22,15 @@ shared-memory files use mode `0600`. Failed opens close their connection.
 Readers must pass `create = false`; a missing authority must remain unavailable.
 
 The trusted host must acquire its existing instance runtime lock **before**
-calling `claimMemoryOwner(instanceId, path, expectedRootRole)`. The claim uses
-an immediate transaction to pin the root role and rotate the owner generation.
-`memoryOwnerGeneration(db)` reads that generation. Rotation fences retained
-bindings, including bindings used through already-open connections. This module
-does not acquire a lock or establish that a previous runtime has shut down.
+calling `claimMemoryOwner(instanceId, path, expectedRootRole, options?)`. Hosts
+reopening retained authority use `{ create: false }` to prevent a missing-file
+race from creating a replacement. `readMemoryInstanceId(path)` performs a
+readonly, existing-file identity preflight without ownership, schema, pragma or
+permission changes. The claim uses an immediate transaction to pin the root role
+and rotate the owner generation. `memoryOwnerGeneration(db)` reads that
+generation. Rotation fences retained bindings, including bindings used through
+already-open connections. This module does not acquire a lock or establish that
+a previous runtime has shut down.
 
 ## Memory permissions
 
@@ -60,14 +66,16 @@ bindings; a compatible baseline read-only binding can remain valid.
 
 The returned SQLite handle is trusted internal implementation plumbing. It is
 not a public host API or protection against arbitrary SQL from in-process code.
-Future note and document writers must call the permission assertions on the same
+Note and document writers must call the permission assertions on the same
 connection **inside their acceptance transaction**. A successful check is not
 reusable authority across a later policy replacement or owner claim.
 
-Later source and writer components must initialize their own tables on this same
-database and consume this authority rather than duplicate it. Source storage,
-lifecycle reads, deliberate writing, independent extraction, recall, automatic
-presentation and Sen adoption remain separate work. Before any integration
-admits or resumes memory-bearing sessions, it must also reject a missing
-database when retained session identity says memory already exists. That
-admission check is not implemented by this unconnected foundation.
+The automatic runtime initializes its small source-reference, work, note and FTS
+tables on this database under current root mutation authority. Delegates only
+read existing note state. Ordinary derived notes require note mutation
+permission; they do not select a writable document collection. Acceptance checks
+permissions inside its immediate transaction. Session admission and prompting
+enforce the persisted instance affinity and reject missing, mismatched or stale
+authority. See [automatic memory](automatic-memory.md) for source coverage,
+shutdown and limitations. Deliberate manual writing, correction/forget protocols
+and Sen production adoption remain separate work.

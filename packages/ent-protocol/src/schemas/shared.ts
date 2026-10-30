@@ -456,3 +456,26 @@ export const MemoryBindingSchema = MemoryRoleGrantSchema.extend({
   isRoot: z.boolean(),
 }).strict();
 export type HostMemoryBinding = z.infer<typeof MemoryBindingSchema>;
+
+export const MemoryConfigurationSchema = z
+  .object({
+    databasePath: NonEmptyStringSchema,
+    binding: MemoryBindingSchema,
+    extraction: z
+      .object({ connectionId: NonEmptyStringSchema, modelId: NonEmptyStringSchema })
+      .strict()
+      .optional(),
+    documentSources: z
+      .object({
+        gitRoot: NonEmptyStringSchema,
+        paths: z.array(NonEmptyStringSchema),
+        extensions: z
+          .array(z.string().regex(/^\.[A-Za-z0-9]+$/))
+          .min(1)
+          .optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type MemoryConfiguration = z.infer<typeof MemoryConfigurationSchema>;

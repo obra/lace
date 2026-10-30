@@ -1,3 +1,4 @@
+import { childMemoryConfiguration } from '../memory/session';
 // ABOUTME: Subagent job execution - handles spawning and managing AI subagent processes
 
 import { randomUUID } from 'node:crypto';
@@ -842,7 +843,13 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
       // default files for their @includes.
       const subagentIncludeFallbacks = currentState.personaRegistry.getIncludeFallbacks();
 
+      const childMemory = childMemoryConfiguration(
+        currentState,
+        job.persona ?? 'lace',
+        job.subagentSessionId ?? job.jobId
+      );
       await childPeer.request('initialize', {
+        ...(childMemory ? { memory: childMemory } : {}),
         protocolVersion: '1.0',
         clientInfo: { name: 'lace-agent', version: '0.1.0' },
         capabilities: {

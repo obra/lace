@@ -1,3 +1,5 @@
+import { MemoryConfigurationSchema } from '@lace/ent-protocol';
+import { createMemoryRuntime } from '../../memory/runtime';
 // ABOUTME: Initialize RPC handler for client connection setup and capability negotiation
 
 import type { JsonRpcPeer, ToolInfo } from '@lace/ent-protocol';
@@ -228,7 +230,10 @@ export function registerInitializeHandler(
     }
     state.credentialToolsPaths = credentialToolsPaths;
 
+    if (parsed.memory !== undefined)
+      state.memory = createMemoryRuntime(MemoryConfigurationSchema.parse(parsed.memory));
     state.initialized = true;
+    void state.memory?.wake();
     if (config?.executionMode === 'plan') state.config.executionMode = 'plan';
     if (config?.executionMode === 'execute') state.config.executionMode = 'execute';
 

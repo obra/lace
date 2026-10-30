@@ -222,19 +222,52 @@ export function readToolResultSidecar(
   try {
     full = fs.readFileSync(filePath, 'utf8');
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      throw new Error(
-        `No spilled tool result found for tool_call_id "${toolCallId}" in this session ` +
-          `(expected sidecar at ${filePath}). It may have ridden back whole (small enough ` +
-          `to not be digested) or belong to a different session. Copy tool_call_ids from ` +
-          `the digested tool result itself, never from memory.` +
-          recentSidecarsNote(path.dirname(filePath))
-      );
-    }
-    throw err;
+    throw sidecarReadError(err, filePath, toolCallId);
   }
 
   return sliceText(full, opts);
+}
+
+function sidecarReadError(error: unknown, filePath: string, toolCallId: string): unknown {
+  if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return error;
+  return new Error(
+    `No spilled tool result found for tool_call_id "${toolCallId}" in this session ` +
+      `(expected sidecar at ${filePath}). It may have ridden back whole (small enough ` +
+      `to not be digested) or belong to a different session. Copy tool_call_ids from ` +
+      `the digested tool result itself, never from memory.` +
+      recentSidecarsNote(path.dirname(filePath))
+  );
+}
+
+/** Read an entire original only when it fits the byte budget, including growth during the read. */
+export function readToolResultOriginal(
+  sessionId: string,
+  toolCallId: string,
+  maxBytes: number
+): string {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 0)
+    throw new RangeError('Invalid original byte budget');
+  const filePath = sidecarPath(sessionId, toolCallId);
+  let fd: number;
+  try {
+    fd = fs.openSync(filePath, 'r');
+  } catch (error) {
+    throw sidecarReadError(error, filePath, toolCallId);
+  }
+  try {
+    if (fs.fstatSync(fd).size > maxBytes) throw new Error('Oversize sidecar input');
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let bytes = 0;
+    while (bytes < buffer.length) {
+      const read = fs.readSync(fd, buffer, bytes, buffer.length - bytes, null);
+      if (!read) break;
+      bytes += read;
+    }
+    if (bytes > maxBytes) throw new Error('Oversize sidecar input');
+    return buffer.subarray(0, bytes).toString('utf8');
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /**

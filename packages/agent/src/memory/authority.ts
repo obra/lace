@@ -82,11 +82,12 @@ export function memoryOwnerGeneration(db: Db): string | null {
 export function claimMemoryOwner(
   instanceId: string,
   path: string,
-  expectedRootRole: string
+  expectedRootRole: string,
+  options?: { create?: boolean }
 ): string {
   if (typeof expectedRootRole !== 'string' || expectedRootRole.trim().length === 0)
     throw new Error('Memory root role is required');
-  const create = !existsSync(path);
+  const create = options?.create !== false && !existsSync(path);
   const db = openMemoryDatabase(path, instanceId, create);
   try {
     return db
@@ -193,4 +194,25 @@ export function resolveMemoryBinding(
   };
   assertMemoryAccess(db, binding);
   return binding;
+}
+
+/** Host preflight reads identity without claiming ownership or mutating the file. */
+export function readMemoryInstanceId(path: string): string {
+  const db = new Database(path, { readonly: true, fileMustExist: true });
+  try {
+    const rows = db.prepare('SELECT singleton, instance_id FROM memory_authority').all() as Array<{
+      singleton: number;
+      instance_id: unknown;
+    }>;
+    if (
+      rows.length !== 1 ||
+      rows[0].singleton !== 1 ||
+      typeof rows[0].instance_id !== 'string' ||
+      !rows[0].instance_id.trim()
+    )
+      throw new MemoryAccessDenied('Memory identity unavailable');
+    return rows[0].instance_id;
+  } finally {
+    db.close();
+  }
 }

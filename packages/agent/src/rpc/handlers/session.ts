@@ -1,3 +1,4 @@
+import { sessionMemory } from '../../memory/session';
 // ABOUTME: Session lifecycle RPC handlers for creating, loading, and managing sessions
 
 import { randomUUID } from 'node:crypto';
@@ -293,6 +294,9 @@ async function activateStoredSession(
     }
     throw error;
   }
+
+  const memory = sessionMemory(state, loaded);
+  if (memory) loaded.state.memoryInstanceId = memory.memoryInstanceId;
 
   // If the prior process died mid-turn, tell the agent so on its next turn.
   // Without this the interrupted turn is silently closed
@@ -856,6 +860,16 @@ export function registerSessionHandlers(
         cwd: parsed.cwd,
       });
 
+    const memory = sessionMemory(state, {
+      meta: {
+        sessionId,
+        workDir: parsed.cwd,
+        created,
+        ...(requestedPersona ? { persona: requestedPersona } : {}),
+        ...(parsed.parent ? { parent: parsed.parent } : {}),
+      },
+      state: { nextEventSeq: 1, nextStreamSeq: 1 },
+    });
     let sessionDir: string;
     try {
       sessionDir = getSessionDir(sessionId);
@@ -867,6 +881,7 @@ export function registerSessionHandlers(
         ...(parsed.parent ? { parent: parsed.parent } : {}),
       });
       writeSessionState(sessionDir, {
+        ...(memory ? { memoryInstanceId: memory.memoryInstanceId } : {}),
         nextEventSeq: 1,
         nextStreamSeq: 1,
         config: {
@@ -1016,6 +1031,7 @@ export function registerSessionHandlers(
       }
     }
 
+    const sourceMemory = sessionMemory(state, sourceSession);
     const forkedSessionDir = getSessionDir(forkedSessionId);
     writeSessionMeta(forkedSessionDir, {
       sessionId: forkedSessionId,
@@ -1026,6 +1042,7 @@ export function registerSessionHandlers(
 
     // Copy state from source session with optional MCP server overrides
     const forkedState: SessionState = {
+      ...(sourceMemory ? { memoryInstanceId: sourceMemory.memoryInstanceId } : {}),
       nextEventSeq: sourceSession.state.nextEventSeq,
       nextStreamSeq: sourceSession.state.nextStreamSeq,
       config: {

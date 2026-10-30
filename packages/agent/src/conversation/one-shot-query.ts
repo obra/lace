@@ -31,13 +31,23 @@ export async function oneShotQuery(
     model: string;
     messages: ProviderMessage[];
     signal?: AbortSignal;
+    systemPrompt?: string;
+    maxTokens?: number;
     correlationOwner?: { sessionId?: string; turnId?: string };
   },
   deps?: { createProviderForTurn?: CreateProviderForTurn }
-): Promise<{ text: string; usage?: ProviderResponse['usage'] }> {
+): Promise<{
+  text: string;
+  usage?: ProviderResponse['usage'];
+  stopReason?: ProviderResponse['stopReason'];
+  stopDetails?: ProviderResponse['stopDetails'];
+  toolCalls?: ProviderResponse['toolCalls'];
+}> {
   const factory = deps?.createProviderForTurn ?? defaultCreateProviderForTurn;
   const provider = await factory({ connectionId: opts.connectionId, modelId: opts.model });
   try {
+    if (opts.systemPrompt !== undefined) provider.setSystemPrompt(opts.systemPrompt);
+    if (opts.maxTokens !== undefined) provider.config.maxTokens = opts.maxTokens;
     const correlation = createModelCallCorrelation(opts.correlationOwner ?? {});
     const r = await provider.createStreamingResponse(
       opts.messages,
@@ -47,7 +57,13 @@ export async function oneShotQuery(
       undefined,
       { correlation }
     );
-    return { text: r.content, usage: r.usage };
+    return {
+      text: r.content,
+      usage: r.usage,
+      ...(r.stopReason !== undefined ? { stopReason: r.stopReason } : {}),
+      ...(r.stopDetails !== undefined ? { stopDetails: r.stopDetails } : {}),
+      ...(r.toolCalls.length ? { toolCalls: r.toolCalls } : {}),
+    };
   } finally {
     await provider.cleanup?.();
   }
