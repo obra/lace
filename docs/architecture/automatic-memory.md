@@ -53,11 +53,15 @@ completed tool results. It excludes compaction summaries and `recall` tool
 output. This prevents direct derived-note self-feed; it cannot universally
 identify an assistant echo of a past note. Spilled tool text is read from its
 complete sidecar within the source limit, rather than the reader's default
-200-line head. Missing sidecars, unsupported content, oversized input and
-partial transcript lines remain unavailable, omitted or unprocessed; they are
-never successful empty extractions. Images retain base64 bytes and
-PNG/JPEG/GIF/WebP media types when the configured catalog model declares
-attachment support. Other image coverage is explicitly omitted.
+200-line head. The original reader checks the opened descriptor's size and reads
+at most the budget plus one sentinel byte before decoding, so oversize or
+growing spills are rejected without reading the whole file. Missing sidecars,
+unsupported content, oversized input and partial transcript lines remain
+unavailable, omitted or unprocessed; they are never successful empty
+extractions. Canonical Ent image blocks are normalized to provider-native blocks
+for extraction. Images retain base64 bytes and PNG/JPEG/GIF/WebP media types
+when the configured catalog model declares attachment support. Other image
+coverage is explicitly omitted.
 
 For documents, discovery pins Git HEAD once, enumerates only configured paths
 and reads immutable blobs. First discovery uses the current committed tree;

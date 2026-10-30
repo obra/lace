@@ -35,9 +35,9 @@ export class MemoryNotes {
       CREATE TABLE IF NOT EXISTS memory_offers (id TEXT PRIMARY KEY, manifest TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS memory_receipts (work_id TEXT PRIMARY KEY, outcome TEXT NOT NULL, detail TEXT);
       CREATE TABLE IF NOT EXISTS memory_worker (singleton INTEGER PRIMARY KEY CHECK(singleton=1), attempt TEXT NOT NULL);
-      CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED, text, tokenize='porter unicode61');
+      CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED, content, tokenize='porter unicode61');
     `);
-    if (rebuild) db.exec('INSERT INTO memory_fts(id,text) SELECT id,text FROM memory_notes');
+    if (rebuild) db.exec('INSERT INTO memory_fts(id,content) SELECT id,text FROM memory_notes');
   }
   write<T>(work: () => T): T {
     const run = () => {
@@ -183,7 +183,7 @@ export class MemoryNotes {
           .prepare('INSERT OR REPLACE INTO memory_notes VALUES(?,?,?,?,?)')
           .run(id, revision, change.text, binding.producerId, references);
         this.db.prepare('DELETE FROM memory_fts WHERE id=?').run(id);
-        this.db.prepare('INSERT INTO memory_fts(id,text) VALUES(?,?)').run(id, change.text);
+        this.db.prepare('INSERT INTO memory_fts(id,content) VALUES(?,?)').run(id, change.text);
       }
       for (const source of primaries) this.status(source, 'completed');
       this.db

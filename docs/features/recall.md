@@ -48,6 +48,11 @@ silently match nothing.
 - A term containing punctuation, such as `github-token`, is read as column
   syntax and fails. Wrap it in double quotes to search for it literally.
 
+The indexed `content:` qualifier works for both transcript hits and configured
+derived notes. A valid transcript-specific column expression still returns its
+original transcript hits; when derived notes cannot evaluate that column, their
+group is empty with a `memories_hint`.
+
 A syntax error returns zero hits with a hint rather than failing the turn. A
 `no such column` error leads with the quoting fix. A search with no hits
 suggests dropping filters or widening the date range.

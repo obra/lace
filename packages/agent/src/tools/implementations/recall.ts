@@ -251,8 +251,11 @@ export class RecallTool extends Tool {
     // surviving tail. Read content and error envelopes still use strict redact.
     const hits = rows.map((r) => ({ ...r, preview: redactSnippet(r.preview) }));
 
-    const memories = context.memory
-      ? JSON.parse(
+    let memories;
+    let memoriesHint: string | undefined;
+    if (context.memory) {
+      try {
+        memories = JSON.parse(
           redact(
             JSON.stringify(
               (await context.memory.search(args.query, limit)).map((note) => ({
@@ -261,8 +264,21 @@ export class RecallTool extends Tool {
               }))
             )
           )
-        )
-      : undefined;
+        );
+      } catch (error) {
+        // Transcript-only column expressions have already succeeded above.
+        if (
+          error instanceof Error &&
+          'code' in error &&
+          error.code === 'SQLITE_ERROR' &&
+          error.message.startsWith('no such column:')
+        ) {
+          memories = [];
+          memoriesHint =
+            'Derived notes do not support the transcript-specific column in this query.';
+        } else throw error;
+      }
+    }
     if (hits.length === 0) {
       const personaPart = appliedPersonaFilter
         ? ` (persona=${redact(JSON.stringify(appliedPersonaFilter))})`
@@ -270,11 +286,16 @@ export class RecallTool extends Tool {
       return this.createResult({
         hits: [],
         ...(memories ? { memories } : {}),
+        ...(memoriesHint ? { memories_hint: memoriesHint } : {}),
         hint: `0 hits for query=${redact(JSON.stringify(args.query))}${personaPart}. Try: drop the persona filter, widen the time range, or check spelling.`,
       });
     }
 
-    return this.createResult({ hits, ...(memories ? { memories } : {}) });
+    return this.createResult({
+      hits,
+      ...(memories ? { memories } : {}),
+      ...(memoriesHint ? { memories_hint: memoriesHint } : {}),
+    });
   }
 
   private async read(args: RecallReadInput, memoryContext: ToolContext): Promise<ToolResult> {

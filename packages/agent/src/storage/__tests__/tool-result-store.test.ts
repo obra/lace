@@ -1,10 +1,16 @@
 // ABOUTME: Tests for the per-session tool-result sidecar store.
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readToolResultSidecar, writeToolResultSidecar } from '../tool-result-store';
+import {
+  readToolResultOriginal,
+  readToolResultSidecar,
+  writeToolResultSidecar,
+} from '../tool-result-store';
 import { getSessionDir } from '../session-store';
 
 const TEST_SESSION_ID = 'sess_550e8400-e29b-41d4-a716-446655440000';
@@ -22,6 +28,8 @@ describe('storage/tool-result-store', () => {
   afterEach(() => {
     if (originalLaceDir === undefined) delete process.env.LACE_DIR;
     else process.env.LACE_DIR = originalLaceDir;
+    vi.restoreAllMocks();
+    syncBuiltinESMExports();
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -164,5 +172,60 @@ describe('storage/tool-result-store', () => {
     // And it round-trips under the same (sanitized) id.
     const slice = readToolResultSidecar(TEST_SESSION_ID, evil, { headLines: 1 });
     expect(slice.content).toBe('secret');
+  });
+  it('reads the complete original within its byte budget through the existing sanitized identity', () => {
+    const full = 'café';
+    const callId = '../tc_budget';
+    writeToolResultSidecar(TEST_SESSION_ID, callId, full);
+    const wholeRead = fs.readFileSync;
+    vi.spyOn(fs, 'readFileSync').mockImplementation(((path: any, ...args: any[]) => {
+      if (String(path).includes('tool-results')) throw new Error('Unbounded original read');
+      return (wholeRead as any)(path, ...args);
+    }) as typeof fs.readFileSync);
+    syncBuiltinESMExports();
+    expect(readToolResultOriginal(TEST_SESSION_ID, callId, 5)).toBe('café');
+  });
+
+  it('rejects an oversized opened original before reading or decoding its contents', () => {
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_oversize', '123456');
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('Unbounded original read');
+    });
+    vi.spyOn(fs, 'readSync').mockImplementation(() => {
+      throw new Error('Oversize original was read');
+    });
+    syncBuiltinESMExports();
+    expect(() => readToolResultOriginal(TEST_SESSION_ID, 'tc_oversize', 5)).toThrow(
+      'Oversize sidecar input'
+    );
+  });
+
+  it('rejects the growth sentinel after descriptor size inspection without returning a truncated original', () => {
+    writeToolResultSidecar(TEST_SESSION_ID, 'tc_growth', 'café');
+    const file = join(getSessionDir(TEST_SESSION_ID), 'tool-results', 'tc_growth.txt');
+    const originalStat = fs.fstatSync;
+    const originalRead = fs.readSync;
+    vi.spyOn(fs, 'fstatSync').mockImplementation(((fd: number) => {
+      const snapshot = originalStat(fd);
+      fs.appendFileSync(file, '!');
+      return snapshot;
+    }) as typeof fs.fstatSync);
+    vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+      throw new Error('Unbounded original read');
+    });
+    vi.spyOn(fs, 'readSync').mockImplementation(((
+      fd: number,
+      buffer: Buffer,
+      offset: number,
+      length: number,
+      position: number | null
+    ) => {
+      expect(length).toBeLessThanOrEqual(6);
+      return originalRead(fd, buffer, offset, length, position);
+    }) as typeof fs.readSync);
+    syncBuiltinESMExports();
+    expect(() => readToolResultOriginal(TEST_SESSION_ID, 'tc_growth', 5)).toThrow(
+      'Oversize sidecar input'
+    );
   });
 });

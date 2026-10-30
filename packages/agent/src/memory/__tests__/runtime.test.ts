@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { HostMemoryBinding } from '@lace/ent-protocol';
+import { SessionPromptRequestSchema, type HostMemoryBinding } from '@lace/ent-protocol';
+import { appendDurableEvent } from '../../storage/event-log';
+import { getSessionDir, writeSessionMeta } from '../../storage/session-store';
 import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../authority';
 import { createMemoryRuntime } from '../runtime';
 import { RecallTool } from '../../tools/implementations/recall';
@@ -665,5 +669,134 @@ describe('configured automatic memory', () => {
     expect(db.prepare('SELECT count(*) AS count FROM memory_sources').get()).toEqual({ count: 1 });
     expect(db.prepare('SELECT count(*) AS count FROM memory_receipts').get()).toEqual({ count: 0 });
     db.close();
+  });
+  it.each(['prompt', 'context_injected'] as const)(
+    'offers schema-valid canonical text and image %s input together',
+    async (type) => {
+      const request = SessionPromptRequestSchema.parse({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'session/prompt',
+        params: {
+          content: [
+            { type: 'text', text: 'Jesse selected the compact picture.' },
+            { type: 'image', data: 'aGVsbG8=', mediaType: 'image/png' },
+          ],
+        },
+      });
+      const sessionDir = getSessionDir(sessionId);
+      writeSessionMeta(sessionDir, {
+        sessionId,
+        workDir: dir,
+        created: '2026-10-29T00:00:00Z',
+        persona: 'root',
+      });
+      appendDurableEvent(
+        sessionDir,
+        { nextEventSeq: 1, nextStreamSeq: 1 },
+        { type, data: { content: request.params.content } }
+      );
+      const runtime = open((opts: any) => {
+        const blocks = opts.messages[0].content;
+        const body = JSON.parse(blocks[0].text);
+        expect(
+          body.sources.some((source: any) =>
+            source.text.includes('Jesse selected the compact picture.')
+          )
+        ).toBe(true);
+        expect(blocks).toContainEqual({
+          type: 'image',
+          source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
+        });
+        return proposals(opts);
+      });
+      await runtime.wake();
+      expect((await read(runtime)).support).toHaveLength(2);
+      const db = openMemoryDatabase(databasePath, 'instance', false);
+      expect(db.prepare("SELECT status FROM memory_sources WHERE id LIKE 'event:%'").get()).toEqual(
+        { status: 'completed' }
+      );
+      db.close();
+    }
+  );
+
+  it.each(['content:compact', 'content:compact OR persona:root'])(
+    'preserves transcript hits for configured qualified query %s',
+    async (query) => {
+      const sessionDir = getSessionDir(sessionId);
+      writeSessionMeta(sessionDir, {
+        sessionId,
+        workDir: dir,
+        created: '2026-10-29T00:00:00Z',
+        persona: 'root',
+      });
+      appendDurableEvent(
+        sessionDir,
+        { nextEventSeq: 1, nextStreamSeq: 1 },
+        { type: 'message', data: { content: 'A compact transcript marker.' } }
+      );
+      const runtime = open(proposals);
+      await runtime.wake();
+      const tool = new RecallTool();
+      const signal = new AbortController().signal;
+      const ordinary = JSON.parse(
+        (await tool.execute({ action: 'search', query }, { signal })).content[0].text!
+      );
+      expect(ordinary.hits).toHaveLength(1);
+      const configured = JSON.parse(
+        (
+          await tool.execute(
+            { action: 'search', query },
+            { signal, memory: runtime.reader(binding) }
+          )
+        ).content[0].text!
+      );
+      expect(configured.hits).toEqual(ordinary.hits);
+      expect(configured).not.toHaveProperty('error');
+      if (query === 'content:compact') expect(configured.memories).toHaveLength(1);
+      else {
+        expect(configured.memories).toEqual([]);
+        expect(configured.memories_hint).toBeDefined();
+      }
+    }
+  );
+
+  it('rejects an oversize sidecar at the source boundary without a whole-file read', async () => {
+    const { writeToolResultSidecar } = await import('../../storage/tool-result-store');
+    writeToolResultSidecar(sessionId, 'oversize_memory', 'x'.repeat(64 * 1024 + 1));
+    event(1, '', {
+      type: 'tool_use',
+      data: {
+        name: 'file_read',
+        toolCallId: 'oversize_memory',
+        input: {},
+        result: {
+          outcome: 'completed',
+          content: [{ type: 'text', text: '10 bytes elided of 20 total read_tool_result(' }],
+        },
+      },
+    });
+    const originalRead = fs.readFileSync;
+    vi.spyOn(fs, 'readFileSync').mockImplementation(((path: any, ...args: any[]) => {
+      if (String(path).includes('tool-results')) throw new Error('Unbounded memory sidecar read');
+      return (originalRead as any)(path, ...args);
+    }) as typeof fs.readFileSync);
+    syncBuiltinESMExports();
+    try {
+      const runtime = open(() => ({
+        text: '{"changes":[]}',
+        stopReason: 'end_turn',
+        toolCalls: [],
+      }));
+      await runtime.wake();
+      const db = openMemoryDatabase(databasePath, 'instance', false);
+      expect(
+        db.prepare("SELECT status,reason FROM memory_sources WHERE id LIKE 'event:%'").get()
+      ).toEqual({ status: 'unavailable', reason: 'Error: Oversize sidecar input' });
+      db.close();
+    } finally {
+      vi.restoreAllMocks();
+      syncBuiltinESMExports();
+    }
   });
 });

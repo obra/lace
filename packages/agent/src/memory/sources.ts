@@ -11,7 +11,7 @@ import { agentSessionsDir, getSessionDir } from '../storage/session-store';
 import { readAllSessionEventLines } from '../storage/event-log';
 import { transcriptsRoot } from '../storage/transcript-paths';
 import { getLaceDir } from '../config/lace-dir';
-import { readToolResultSidecar } from '../storage/tool-result-store';
+import { readToolResultOriginal } from '../storage/tool-result-store';
 import type { ContentBlock } from '../providers/base-provider';
 import type { MemoryNotes } from './notes';
 import {
@@ -47,11 +47,8 @@ function eventContent(
       if (block.type === 'text' && typeof block.text === 'string') {
         if (block.text.includes('bytes elided of') && block.text.includes('read_tool_result(')) {
           if (!spilled) {
-            const full = readToolResultSidecar(ref.sessionId, data.toolCallId, {
-              headBytes: L.sourceBytes + 1,
-            });
-            if (full.totalBytes > L.sourceBytes) throw new Error('Oversize sidecar input');
-            blocks.push({ type: 'text', text: full.content });
+            const full = readToolResultOriginal(ref.sessionId, data.toolCallId, L.sourceBytes);
+            blocks.push({ type: 'text', text: full });
             spilled = true;
           }
         } else blocks.push({ type: 'text', text: block.text });
@@ -78,7 +75,18 @@ function eventContent(
       type: 'text',
       text: `Transcript event type=${event.type}; session=${ref.sessionId}; seq=${ref.eventSeq}`,
     },
-    ...data.content,
+    ...data.content.map((block: any) => {
+      if (
+        block?.type === 'image' &&
+        typeof block.data === 'string' &&
+        typeof block.mediaType === 'string'
+      )
+        return {
+          type: 'image',
+          source: { type: 'base64', media_type: block.mediaType, data: block.data },
+        };
+      return block;
+    }),
   ] as ContentBlock[];
 }
 function retainedLine(ref: Extract<SourceReference, { kind: 'event' }>): string {
