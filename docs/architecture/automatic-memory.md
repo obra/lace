@@ -120,13 +120,13 @@ unavailable, budget-limited or unexamined candidates, as well as text-fallback
 reasons. Only fresh originals actually supplied in an extraction become
 completed.
 
-The extractor preserves dates, attribution, distinct people/scopes, material
-transition history and uncertainty. A departure can make a former assignment
-unsafe without naming a successor. Ingestion order is not fact time. Retained
-event `recordedAt` is separate metadata for prompts, messages, context
-injections and completed tools; adding it does not change source hashes or
-authenticate the author or a claim's effective date. Existing strict proposal
-and acceptance checks remain in force.
+The extraction instructions require preserving dates, attribution, distinct
+people/scopes, material transition history and uncertainty. A departure can make
+a former assignment unsafe without naming a successor. Ingestion order is not
+fact time. Retained event `recordedAt` is separate metadata for prompts,
+messages, context injections and completed tools; adding it does not change
+source hashes or authenticate the author or a claim's effective date. Existing
+strict proposal and acceptance checks remain in force.
 
 The only proposal shape is:
 
