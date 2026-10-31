@@ -3,7 +3,7 @@ import type { Database } from 'better-sqlite3';
 import type { HostMemoryBinding } from '@lace/ent-protocol';
 import { randomUUID, createHash } from 'node:crypto';
 import { assertMemoryAccess } from './authority';
-import { sourceHandle, type Note, type Source } from './types';
+import { sourceHandle, type Note, type Source, type OriginalReference } from './types';
 import type { Proposal } from './extraction';
 
 type SourceRow = { id: string; version: string; reference: string; status: string };
@@ -34,6 +34,9 @@ export class MemoryNotes {
       );
       CREATE TABLE IF NOT EXISTS memory_offers (id TEXT PRIMARY KEY, manifest TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS memory_receipts (work_id TEXT PRIMARY KEY, outcome TEXT NOT NULL, detail TEXT);
+      CREATE TABLE IF NOT EXISTS memory_vectors (
+        note_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, generation TEXT NOT NULL, vector TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS memory_worker (singleton INTEGER PRIMARY KEY CHECK(singleton=1), attempt TEXT NOT NULL);
       CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED, content, tokenize='porter unicode61');
     `);
@@ -91,25 +94,65 @@ export class MemoryNotes {
   }
   candidates(): Note[] {
     return (
-      this.db.prepare('SELECT id FROM memory_notes ORDER BY rowid DESC LIMIT 16').all() as {
+      this.db.prepare('SELECT id FROM memory_notes ORDER BY rowid').all() as {
         id: string;
       }[]
     ).map(({ id }) => this.note(id)!);
   }
+  vector(note: Note, generation: string): number[] | undefined {
+    const row = this.db
+      .prepare('SELECT vector FROM memory_vectors WHERE note_id=? AND revision=? AND generation=?')
+      .get(note.id, note.revision, generation) as { vector: string } | undefined;
+    return row ? (JSON.parse(row.vector) as number[]) : undefined;
+  }
+  cacheVector(note: Note, generation: string, vector: number[]): void {
+    this.write(() => {
+      if (this.note(note.id)?.revision !== note.revision)
+        throw new Error('Candidate revision changed');
+      this.db
+        .prepare('INSERT OR REPLACE INTO memory_vectors VALUES(?,?,?,?)')
+        .run(note.id, note.revision, generation, JSON.stringify(vector));
+    });
+  }
+  linked(source: OriginalReference): Note[] {
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT note_id AS id FROM memory_revisions, json_each(memory_revisions.sources) AS source
+      WHERE (? = 'event' AND json_extract(source.value,'$.reference.kind')='event'
+        AND json_extract(source.value,'$.reference.sessionId')=? AND json_extract(source.value,'$.reference.eventSeq')=?)
+      OR (? = 'document' AND json_extract(source.value,'$.id')=? AND json_extract(source.value,'$.version')=?)`
+      )
+      .all(
+        source.kind,
+        source.kind === 'event' ? source.sessionId : null,
+        source.kind === 'event' ? source.eventSeq : null,
+        source.kind,
+        source.kind === 'document' ? source.id : null,
+        source.kind === 'document' ? source.version : null
+      ) as { id: string }[];
+    return rows.map(({ id }) => {
+      const note = this.note(id);
+      if (!note) throw new Error('Linked current account missing');
+      return note;
+    });
+  }
   offer(
-    sources: Array<Source & { sourceStatus?: string }>,
+    sources: Array<Source & { sourceStatus?: string; recordedAt?: string }>,
     candidates: Note[],
     extractor: string,
-    primaries: Source[]
+    primaries: Source[],
+    withheld: Array<{ id: string; reason: string }> = []
   ): string {
     const manifest = JSON.stringify({
       version: 1,
       extractor,
-      sources: sources.map(({ id, version, reference, sourceStatus }) => ({
+      withheld,
+      sources: sources.map(({ id, version, reference, sourceStatus, recordedAt }) => ({
         id,
         version,
         reference,
         sourceStatus,
+        recordedAt,
       })),
       primaries: primaries.map(sourceHandle),
       candidates: candidates.map(({ id, revision }) => ({ id, revision })),

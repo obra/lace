@@ -89,6 +89,45 @@ superseded or missing from the current tree. A proposal may support new claims
 only with current supplied originals. A source handle identifies its exact
 source version.
 
+Related-note selection searches current heads across all note ages with the
+local EmbeddingGemma 2 text encoder. Notes have disposable vectors in the same
+database, keyed by exact note revision and encoder/preprocessing generation. New
+original text ranks current prose by semantic similarity alone. There is no
+identifier promotion or recency boost. Runtime reads local model assets only.
+Missing or failed assets produce a recorded `text-only` fallback using safely
+quoted literal OR terms against note FTS; that fallback is not semantic
+retrieval.
+
+Install the fixed public q8 text assets explicitly with
+`npm run memory:setup-model`. The default directory is
+`<LACE_DIR>/models/embeddinggemma-2-ONNX`; a host can set
+`LACE_MEMORY_MODEL_DIR` to a shared model directory containing `config.json`,
+tokenizer files and `onnx/model_quantized.onnx` plus its data file. Setup
+downloads only the pinned revision and verifies exact sizes and SHA-256 hashes.
+Runtime verifies local assets and loads one lazy process-wide text model, with
+vision and audio disabled, 2 intra-op / 1 inter-op CPU threads, serialized
+batches of four, and the projected normalized 768-dimensional
+`sentence_embedding`. The 512-token encoder window preserves BOS/content/EOS;
+the extractor still receives complete admitted originals. This bounded window
+and the 16-candidate union cannot ensure complete contradiction coverage.
+Missing-model initialization is not retried on every worker wake.
+
+Each admitted fresh original gets related-note reconciliation before further
+fresh originals consume support capacity. A batch splits when needed. Candidate
+support is admitted atomically: unavailable or oversized support leaves no
+partial capacity consumption. Offers retain candidate IDs and reasons for
+unavailable, budget-limited or unexamined candidates, as well as text-fallback
+reasons. Only fresh originals actually supplied in an extraction become
+completed.
+
+The extraction instructions require preserving dates, attribution, distinct
+people/scopes, material transition history and uncertainty. A departure can make
+a former assignment unsafe without naming a successor. Ingestion order is not
+fact time. Retained event `recordedAt` is separate metadata for prompts,
+messages, context injections and completed tools; adding it does not change
+source hashes or authenticate the author or a claim's effective date. Existing
+strict proposal and acceptance checks remain in force.
+
 The only proposal shape is:
 
 ```json
@@ -137,13 +176,32 @@ extraction producer and current support status. Transcript filters apply to
 transcript hits; derived notes are instance-wide and are not filtered as
 transcript events. `read` on a memory handle reads the current note head
 directly and returns its supporting references with current, superseded, missing
-or unavailable status. It never silently substitutes a new original version.
-Both operations check current read authority and apply recall redaction.
-`thread` is unchanged.
+or unavailable status. It never silently substitutes a new original version. All
+three transcript actions attach compact `current_accounts` to any original that
+directly supported a retained note revision. The lookup joins those existing
+revision source references to current heads: event session/sequence identities
+must match exactly, and document identities include the exact source version.
+Shared originals keep every linked current head, deduplicated by note ID within
+each event group. Links are not followed recursively.
+
+An attachment includes note ID/revision/prose, producer attribution and usable
+support handles. Event handles are `<sessionId>:<eventSeq>` for ordinary
+`recall(read)` expansion; pinned document handles retain the exact document
+version; document handles identify committed support and are not accepted as
+`recall(read)` event handles. Automatic original/document retrieval remains
+separate. Internal byte offsets, locator paths and content hashes remain in
+validated storage rather than being repeated in attached model-visible groups.
+Attachments share a 64 KiB budget per recall result. If a required account lacks
+current readable support, changes during awaited reads, or exceeds the
+attachment bound, the entire affected original group is omitted with an explicit
+reason. Read context and thread events use the same guard as search hits.
+Current authority and source support are revalidated after asynchronous reads.
+Unconfigured transcript recall is unchanged, including its public limits,
+filtering, ordering and chronology.
 
 A derived memory is model-authored synthesis with attributed support, not
-independently verified truth. No automatic prompt insertion, embeddings, ranking
-experiments, new manual memory tool, correction/forget protocol or source
+independently verified truth. No automatic prompt insertion, experimental
+identifier ranking, new manual memory tool, correction/forget protocol or source
 archive is included. Procedures continue to use skills. Sen integration and
 production enablement require their own host configuration and validation.
 Controlled behavior tests demonstrate durability and permission contracts;

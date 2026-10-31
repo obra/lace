@@ -29,8 +29,10 @@
 
 - [Memory authority and permissions](memory-authority.md): internal database
   identity, ownership and permission checks for configured memory.
-- [Automatic memory](automatic-memory.md): bounded retained-source discovery,
-  background extraction, atomic derived notes and existing recall integration.
+- [Automatic memory](automatic-memory.md): local model setup, related
+  current-note vectors, bounded reconciliation and current-account transcript
+  attachments, alongside retained-source discovery, background extraction,
+  atomic derived notes and existing recall integration.
 
 ## Common Commands
 

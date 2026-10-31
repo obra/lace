@@ -8,20 +8,28 @@ import { logger } from '../utils/logger';
 import { assertMemoryAccess, openMemoryDatabase, resolveMemoryBinding } from './authority';
 import { MemoryNotes } from './notes';
 import { MemorySources } from './sources';
+import { localMemoryEncoder, type MemoryEncoder } from './encoder';
+import { relatedNotes } from './related';
 import { extract, type MemoryQuery } from './extraction';
 import {
   MEMORY_LIMITS as L,
   sourceHandle,
+  sourceReadHandle,
   type MemoryConfiguration,
   type MemoryRuntime,
   type Source,
   type SuppliedSource,
   type Note,
+  type Support,
 } from './types';
 
 export function createMemoryRuntime(
   input: MemoryConfiguration,
-  deps: { query?: MemoryQuery; supportsImages?: () => Promise<boolean> } = {}
+  deps: {
+    query?: MemoryQuery;
+    supportsImages?: () => Promise<boolean>;
+    encoder?: MemoryEncoder;
+  } = {}
 ): MemoryRuntime {
   const configuration = MemoryConfigurationSchema.parse(input);
   const binding = configuration.binding;
@@ -97,57 +105,137 @@ export function createMemoryRuntime(
     const available = notes.pending();
     if (!available.length) return false;
     const primary: SuppliedSource[] = [];
+    const primaries: SuppliedSource[] = [];
+    const candidates: Note[] = [];
     const withheld = notes.omissions();
     let textBytes = 0;
     let imageBytes = 0;
     const images = await supportsImages();
-    async function offer(source: Source, isPrimary: boolean): Promise<boolean> {
-      if (primary.some((s) => sourceHandle(s) === sourceHandle(source))) return true;
-      try {
-        const input = await sources.load(source, images);
-        const sourceStatus = await sources.status(source);
-        if ((isPrimary && sourceStatus !== 'current') || sourceStatus === 'unavailable')
-          throw new Error('Source missing, superseded or unavailable');
-        const loaded = { ...input, sourceStatus };
-        if (
-          primary.length >= L.sources ||
-          textBytes + loaded.textBytes > L.sourceBytes ||
-          imageBytes + loaded.imageBytes > L.imageBytes
-        ) {
-          withheld.push({ id: sourceHandle(source), reason: 'Request input budget' });
-          return false;
-        }
-        primary.push(loaded);
-        textBytes += loaded.textBytes;
-        imageBytes += loaded.imageBytes;
-        return true;
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        withheld.push({ id: sourceHandle(source), reason });
-        if (isPrimary) notes.status(source, 'omitted', reason);
-        return false;
+    function checkWorker() {
+      if (closed || controller.signal.aborted) throw new Error('Extraction closed');
+      assertMemoryAccess(db, binding, true);
+      if (
+        (
+          db.prepare('SELECT attempt FROM memory_worker WHERE singleton=1').get() as {
+            attempt: string;
+          }
+        )?.attempt !== attempt
+      )
+        throw new Error('Extraction attempt replaced');
+    }
+    checkWorker();
+    async function load(source: Source, isPrimary: boolean): Promise<SuppliedSource> {
+      const input = await sources.load(source, images);
+      const sourceStatus = await sources.status(source);
+      checkWorker();
+      if ((isPrimary && sourceStatus !== 'current') || sourceStatus === 'unavailable')
+        throw new Error('Source missing, superseded or unavailable');
+      return { ...input, sourceStatus };
+    }
+    function fits(inputs: SuppliedSource[]) {
+      return (
+        primary.length + inputs.length <= L.sources &&
+        textBytes + inputs.reduce((sum, source) => sum + source.textBytes, 0) <= L.sourceBytes &&
+        imageBytes + inputs.reduce((sum, source) => sum + source.imageBytes, 0) <= L.imageBytes
+      );
+    }
+    function admit(inputs: SuppliedSource[]) {
+      primary.push(...inputs);
+      for (const source of inputs) {
+        textBytes += source.textBytes;
+        imageBytes += source.imageBytes;
       }
     }
-    for (const source of available) await offer(source, true);
-    if (!primary.length) return false;
-    const primaries = [...primary];
-    const candidates: Note[] = [];
-    for (const note of notes.candidates()) {
-      // A candidate's prose alone is never support for keeping its claims.
-      const needed = note.sources.filter(
-        (s) => !primary.some((p) => sourceHandle(p) === sourceHandle(s))
+    for (const source of available) {
+      let fresh: SuppliedSource;
+      try {
+        fresh = await load(source, true);
+      } catch (error) {
+        checkWorker();
+        const reason = error instanceof Error ? error.message : String(error);
+        withheld.push({ id: sourceHandle(source), reason });
+        notes.status(source, 'omitted', reason);
+        continue;
+      }
+      const already = primary.some((input) => sourceHandle(input) === sourceHandle(source));
+      if (!fits(already ? [] : [fresh])) break;
+      const related = await relatedNotes(
+        notes,
+        deps.encoder ?? localMemoryEncoder,
+        fresh.content
+          .filter((block) => block.type === 'text')
+          .map((block) => block.text)
+          .join('\n'),
+        checkWorker
       );
-      if (primary.length + needed.length > L.sources) continue;
-      let complete = true;
-      for (const source of needed) if (!(await offer(source, false))) complete = false;
-      if (complete) candidates.push(note);
+      if (related.reason) withheld.push({ id: sourceHandle(source), reason: related.reason });
+      // Stage a fresh original and its entire candidate support before committing capacity.
+      const staged = already ? [] : [fresh];
+      const stagedCandidates: Note[] = [];
+      const rejected: Array<{ id: string; reason: string }> = [];
+      let split = false;
+      for (const note of related.notes) {
+        if (candidates.some((candidate) => candidate.id === note.id)) continue;
+        if (candidates.length + stagedCandidates.length >= L.candidates) {
+          if (primaries.length) {
+            withheld.push({
+              id: `memory:${note.id}`,
+              reason: 'Candidate union budget; fresh original deferred',
+            });
+            split = true;
+            break;
+          }
+          rejected.push({ id: `memory:${note.id}`, reason: 'Candidate union budget; unexamined' });
+          continue;
+        }
+        const needed: SuppliedSource[] = [];
+        try {
+          for (const ref of note.sources) {
+            if (
+              [...primary, ...staged, ...needed].some(
+                (input) => sourceHandle(input) === sourceHandle(ref)
+              )
+            )
+              continue;
+            needed.push(await load(ref, false));
+          }
+          if (!fits([...staged, ...needed])) {
+            if (primaries.length) {
+              split = true;
+              break;
+            }
+            throw new Error('Candidate support request budget');
+          }
+          staged.push(...needed);
+          stagedCandidates.push(note);
+        } catch (error) {
+          checkWorker();
+          rejected.push({
+            id: `memory:${note.id}`,
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+      if (split) {
+        withheld.push({
+          id: sourceHandle(source),
+          reason: 'Fresh original deferred with candidate support to next batch',
+        });
+        break;
+      }
+      admit(staged);
+      candidates.push(...stagedCandidates);
+      withheld.push(...rejected);
+      primaries.push(fresh);
     }
+    if (!primaries.length) return false;
     const offered = primary.map(({ id, version, reference }) => ({ id, version, reference }));
     const workId = notes.offer(
       primary,
       candidates,
       JSON.stringify(configuration.extraction),
-      primaries
+      primaries,
+      withheld
     );
     try {
       const proposal = await extract(
@@ -248,6 +336,76 @@ export function createMemoryRuntime(
     reader(readBinding) {
       checkReader(readBinding);
       return {
+        async accountsFor(originals, expectedHeads = []) {
+          checkReader(readBinding);
+          if (!notes.available()) return originals.map(() => ({ accounts: [] }));
+          const groups = originals.map((original) => {
+            try {
+              return { original, heads: notes.linked(original) };
+            } catch (error) {
+              return { original, heads: [], reason: String(error) };
+            }
+          });
+          const checked = new Map<string, { note: Note; refs: Support[] }>();
+          for (const group of groups) {
+            for (const note of group.heads) {
+              if (checked.has(note.id)) continue;
+              checked.set(note.id, { note, refs: await support(note.sources) });
+              checkReader(readBinding);
+            }
+          }
+          // No awaited work follows these authority/head/source checks. All groups share this fence.
+          checkReader(readBinding);
+          for (const expected of expectedHeads) {
+            if (notes.note(expected.id)?.revision !== expected.revision)
+              throw new Error('Current account revision changed during recall');
+          }
+          return groups.map((group) => {
+            try {
+              if (group.reason) throw new Error(group.reason);
+              const current = notes.linked(group.original);
+              if (
+                current.length !== group.heads.length ||
+                current.some(
+                  (head) =>
+                    !group.heads.some(
+                      (note) => note.id === head.id && note.revision === head.revision
+                    )
+                )
+              )
+                throw new Error('Linked current accounts changed during recall');
+              const accounts = group.heads.map((head) => {
+                const { note, refs } = checked.get(head.id)!;
+                if (notes.note(note.id)?.revision !== note.revision)
+                  throw new Error('Current account revision changed during recall');
+                if (!refs.length || refs.some((ref) => ref.status !== 'current'))
+                  throw new Error('Required current account support unavailable or non-current');
+                sources.validateAtAcceptance(
+                  refs.map((ref) => ({
+                    ...ref,
+                    sourceStatus: 'current',
+                    content: [],
+                    textBytes: 0,
+                    imageBytes: 0,
+                  }))
+                );
+                return {
+                  id: note.id,
+                  revision: note.revision,
+                  text: note.text,
+                  attribution: note.producer,
+                  support: refs.map((ref) => ({
+                    handle: sourceReadHandle(ref),
+                    status: ref.status,
+                  })),
+                };
+              });
+              return { accounts };
+            } catch (error) {
+              return { reason: error instanceof Error ? error.message : String(error) };
+            }
+          });
+        },
         async search(query, limit) {
           checkReader(readBinding);
           if (!notes.available()) return [];
@@ -260,6 +418,8 @@ export function createMemoryRuntime(
             if (!note) continue;
             const refs = await support(note.sources);
             checkReader(readBinding);
+            if (notes.note(note.id)?.revision !== note.revision)
+              throw new Error('Current account revision changed during recall');
             results.push({
               event_id: `memory:${id}`,
               revision: note.revision,
@@ -268,6 +428,10 @@ export function createMemoryRuntime(
               support: refs,
             });
           }
+          checkReader(readBinding);
+          for (const result of results)
+            if (notes.note(result.event_id.slice(7))?.revision !== result.revision)
+              throw new Error('Current account revision changed during recall');
           return results;
         },
         async read(id) {
@@ -277,6 +441,8 @@ export function createMemoryRuntime(
           if (!note) return undefined;
           const refs = await support(note.sources);
           checkReader(readBinding);
+          if (notes.note(note.id)?.revision !== note.revision)
+            throw new Error('Current account revision changed during recall');
           const { sources: _sources, ...head } = note;
           return { ...head, support: refs };
         },
