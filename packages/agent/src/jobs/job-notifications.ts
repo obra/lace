@@ -2,6 +2,7 @@
 // ABOUTME: and writes them via injectNotification. Also exports the progress
 // ABOUTME: timer + finalize-job helpers that drive the lifecycle.
 
+import { reserveCompletion } from '../completion';
 import { existsSync, statSync } from 'node:fs';
 import { getLastLines } from './job-file-utils';
 import {
@@ -244,7 +245,7 @@ export function createSetupStallTimer(
 export function createFinalizeJob(
   state: AgentServerState,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  emitSessionUpdate: (update: SessionUpdate) => Promise<void>,
+  emitSessionUpdate: (update: SessionUpdate, context?: { sessionId: string }) => Promise<void>,
   queueJobNotification: (job: JobState, type: JobNotificationType) => void
 ) {
   return async (job: JobState, options: { exitCode?: number } = {}) => {
@@ -254,69 +255,84 @@ export function createFinalizeJob(
       return;
     }
 
-    // 'interrupted' is a derived status (log-running with no live process
-    // after a restart) and never appears on a JobState we own; the branch
-    // exists to narrow the type alongside 'running'.
-    if (job.status === 'running' || job.status === 'interrupted') {
-      job.status = 'failed';
-    }
+    const session = state.activeSession;
+    const releaseCompletion = reserveCompletion(state);
+    let notificationSettled = false;
+    try {
+      // 'interrupted' is a derived status (log-running with no live process
+      // after a restart) and never appears on a JobState we own; the branch
+      // exists to narrow the type alongside 'running'.
+      if (job.status === 'running' || job.status === 'interrupted') {
+        job.status = 'failed';
+      }
 
-    if (typeof options.exitCode === 'number') {
-      job.exitCode = options.exitCode;
-    }
+      if (typeof options.exitCode === 'number') {
+        job.exitCode = options.exitCode;
+      }
 
-    job.proc = undefined;
-    job.childPeer = undefined;
-    // subagentSessionId is deliberately kept: a finished delegate's container
-    // can outlive the job (the shim keeps it for resume), and
-    // job_kill(destroy_container) needs the child id to route its release.
-    // Cancel is gated on childPeer, which is cleared above.
-    job.childTransportClose = undefined;
-    job.finished = true;
+      job.proc = undefined;
+      job.childPeer = undefined;
+      // subagentSessionId is deliberately kept: a finished delegate's container
+      // can outlive the job (the shim keeps it for resume), and
+      // job_kill(destroy_container) needs the child id to route its release.
+      // Cancel is gated on childPeer, which is cleared above.
+      job.childTransportClose = undefined;
+      job.finished = true;
 
-    await runExclusive(() => {
-      let sessionState = readSessionState(state.activeSession!.dir);
-      const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
-        type: 'job_finished',
-        data: {
+      await runExclusive(() => {
+        if (state.activeSession?.dir !== session.dir) return;
+        let sessionState = readSessionState(state.activeSession!.dir);
+        const { nextState } = appendDurableEvent(state.activeSession!.dir, sessionState, {
+          type: 'job_finished',
+          data: {
+            jobId: job.jobId,
+            parentJobId: job.parentJobId,
+            outcome: job.status,
+            ...(typeof options.exitCode === 'number' ? { exitCode: options.exitCode } : {}),
+          },
+        });
+        sessionState = nextState;
+        writeSessionState(state.activeSession!.dir, sessionState);
+        state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+      });
+
+      if (state.activeSession?.dir !== session.dir) return;
+      await emitSessionUpdate(
+        {
+          type: 'job_finished',
           jobId: job.jobId,
           parentJobId: job.parentJobId,
+          ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
           outcome: job.status,
-          ...(typeof options.exitCode === 'number' ? { exitCode: options.exitCode } : {}),
         },
-      });
-      sessionState = nextState;
-      writeSessionState(state.activeSession!.dir, sessionState);
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
-    });
+        { sessionId: session.meta.sessionId }
+      );
 
-    await emitSessionUpdate({
-      type: 'job_finished',
-      jobId: job.jobId,
-      parentJobId: job.parentJobId,
-      ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
-      outcome: job.status,
-    });
+      // Clear progress timer if running
+      if (job.progressTimer) {
+        clearInterval(job.progressTimer);
+        job.progressTimer = undefined;
+      }
+      if (job.stallTimer) {
+        clearInterval(job.stallTimer);
+        job.stallTimer = undefined;
+      }
 
-    // Clear progress timer if running
-    if (job.progressTimer) {
-      clearInterval(job.progressTimer);
-      job.progressTimer = undefined;
+      // Queue completion notification for the agent
+      const notificationType: JobNotificationType =
+        job.status === 'completed'
+          ? 'completed'
+          : job.status === 'cancelled'
+            ? 'cancelled'
+            : 'failed';
+      if (state.activeSession?.dir === session.dir) queueJobNotification(job, notificationType);
+      notificationSettled = true;
+    } finally {
+      // A failed publication remains unresolved; departure definitively suppresses its wake.
+      if (notificationSettled || state.activeSession?.dir !== session.dir) {
+        job.resolveCompletion();
+        releaseCompletion();
+      }
     }
-    if (job.stallTimer) {
-      clearInterval(job.stallTimer);
-      job.stallTimer = undefined;
-    }
-
-    // Queue completion notification for the agent
-    const notificationType: JobNotificationType =
-      job.status === 'completed'
-        ? 'completed'
-        : job.status === 'cancelled'
-          ? 'cancelled'
-          : 'failed';
-    queueJobNotification(job, notificationType);
-
-    job.resolveCompletion();
   };
 }

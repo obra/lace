@@ -2,7 +2,7 @@
 // ABOUTME: when an immediate inject lands on the active session while it is idle.
 
 import type { AgentServerState } from '../server-types';
-import { injectDrainContent } from './inject-drain-content';
+import { scheduleImmediateInjectDrain } from '../completion';
 import type { IdleWakeHooks } from './inject-notification';
 
 /**
@@ -18,14 +18,8 @@ export function createIdleWake(
     isActive: (d: string): boolean => d === state.activeSession?.dir,
     hasActiveTurn: (): boolean => !!state.activeTurn,
     triggerInternalTurn: (): void => {
-      if (!runPromptInternalRef.current) return;
-      setImmediate(() => {
-        if (!state.activeTurn && state.activeSession && runPromptInternalRef.current) {
-          // Same rule as the turn-exit drain: an empty prompt is only valid
-          // while the conversation still ends on a user message.
-          void runPromptInternalRef.current(injectDrainContent(state.activeSession.dir));
-        }
-      });
+      if (!state.activeSession) return;
+      scheduleImmediateInjectDrain(state, runPromptInternalRef, state.activeSession.meta.sessionId);
     },
   };
 }

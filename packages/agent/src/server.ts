@@ -1,5 +1,6 @@
 // ABOUTME: Agent server entry point - orchestrates RPC handlers and delegates to specialized modules
 
+import { observeCompletion } from './completion';
 import type { JsonRpcPeer } from '@lace/ent-protocol';
 import { loadSession, readSessionState, writeSessionState } from './storage/session-store';
 import { appendDurableEvent } from './storage/event-log';
@@ -366,11 +367,16 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   const emitSessionUpdate = async (
     update: SessionUpdate,
-    context?: { turnId?: string; turnSeq?: number; jobId?: string }
+    context?: { turnId?: string; turnSeq?: number; jobId?: string; sessionId?: string }
   ) => {
     if (!state.activeSession) return;
 
     await runExclusive(() => {
+      if (
+        !state.activeSession ||
+        (context?.sessionId && context.sessionId !== state.activeSession.meta.sessionId)
+      )
+        return;
       const sessionState = readSessionState(state.activeSession!.dir);
       peer.notify('session/update', {
         sessionId: state.activeSession!.meta.sessionId,
@@ -387,6 +393,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       state.activeSession = loadSession(state.activeSession!.meta.sessionId);
     });
   };
+
+  observeCompletion(state, (sessionId) => {
+    void emitSessionUpdate({ type: 'completion_status' }, { sessionId }).catch((error: unknown) => {
+      logger.warn('Failed to publish completion wake', { sessionId, error: String(error) });
+    });
+  });
 
   // Reference to the prompt handler logic, assigned when session/prompt is registered.
   // This allows queueJobNotification to trigger turns internally when notifications

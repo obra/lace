@@ -173,64 +173,44 @@ not the consumer).
 
 ### Watermark initialization
 
-Line 203: `let lastSeenEventSeq = findLastTurnEndEventSeq(sessionDir) ?? 0;`
-
-This is the crucial fix. The naive choice — "start from the latest event seq" —
-would silently swallow any `context_injected` event written **between** turns
-(after the previous `turn_end`, before `run()` was called). By starting from the
-last `turn_end`, the first iteration's `readImmediateInjectsSince` picks up
-everything queued in the meantime.
+The runner initializes `lastSeenEventSeq` from `turnEntry.maxFoldedSeq`. The
+turn-entry projection already includes durable events written between turns,
+including immediate injections. Starting the tailer at the last terminal event
+would append those already represented injections a second time.
 
 ### In-turn pickup loop
 
-Lines 219–233: at the top of every iteration the runner calls
-`readImmediateInjectsSince(sessionDir, lastSeenEventSeq)` (definition at line
-72). It returns all `context_injected priority='immediate'` events newer than
-the watermark and the new high-water mark. Found events become `role: 'user'`
-messages on the _current_ turn's `providerMessages` — the agent sees them in the
-same provider call.
+The runner creates one incremental inject tailer per turn, seeded at that
+projection watermark. At each iteration, `readNew()` reads newly appended JSONL
+bytes and advances `lastSeenEventSeq`. New immediate injections become user
+messages in the current provider history before the next model request. An
+emergency compaction rebuild reseeds the tailer from the rebuilt projection.
 
-This re-read also catches `ent/session/inject` RPCs that landed mid-turn
-(PRI-1691 — see the comment at lines 67–71).
+### Post-turn rescan
 
-### Post-turn rescan (Bug 3 fix)
+After the runner returns and the prompt handler clears `state.activeTurn`,
+`scheduleImmediateInjectDrain` checks for immediate injections newer than the
+runner's returned `lastSeenEventSeq`. This catches an injection that arrived
+after the final tail read but before the terminal event was written. The
+terminal event's sequence alone does not prove the runner saw that injection.
 
-`packages/agent/src/rpc/handlers/prompt.ts:328-347` — after the runner's `run()`
-returns and `state.activeTurn` is cleared, the prompt handler re-scans:
+The helper in `packages/agent/src/completion.ts` captures the admitted session,
+then rechecks that session, active-turn state and pending injections in its
+existing deferred wake. `injectDrainContent` supplies the appropriate followup
+content. A competing prompt that consumes the injection makes the wake a no-op.
+The same helper serves the shared idle-wake path.
 
-```ts
-const lastTurnEnd = findLastTurnEndEventSeq(state.activeSession.dir) ?? 0;
-if (
-  hasPendingImmediateInjects(state.activeSession.dir, lastTurnEnd) &&
-  runPromptInternalRef.current
-) {
-  setImmediate(() => {
-    if (
-      !state.activeTurn &&
-      state.activeSession &&
-      runPromptInternalRef.current
-    ) {
-      void runPromptInternalRef.current([]);
-    }
-  });
-}
-```
-
-This closes the race described in §6: a notification can land in the
-microseconds between the runner's last `readImmediateInjectsSince` and the final
-`turn_end` write. The idle-wake `setImmediate` that fired during that window
-observed `activeTurn=true` and no-opped. Without this rescan, the event would
-sit unprocessed until the next user prompt.
-
-`hasPendingImmediateInjects` is in `packages/agent/src/storage/event-log.ts:42`.
-`findLastTurnEndEventSeq` is in the same file at line 73.
+Abort, slash-command and failed-run paths retain their scheduling fallback. Only
+an actual runner-reported watermark advances the draft's known-consumption
+record; a fallback used to decide whether to schedule work does not establish
+consumption. Section 13 describes the reservation contract and its draft limits.
 
 ### Why the watermark is per-turn local
 
-The watermark is internal cursor state. The authoritative position is always
-`findLastTurnEndEventSeq` plus a scan. We never persist the watermark to disk;
-if the runner restarts mid-conversation, the next `run()` recomputes from
-`events.jsonl`.
+The runner derives its initial cursor from the current event projection and
+advances it through its tailer. The durable event history remains the source of
+truth. The draft's supplemental consumption record is process-local and does not
+prove that an earlier process consumed a retained injection after restart.
 
 ## 6. Idle-wake semantics
 
@@ -447,3 +427,56 @@ relevant decisions:
   land an event into another process's session, it must route through that
   process's RPC peer (today: `session/update` discriminants). Adding a
   `flock`-style writer is on the "do not without strong reason" list.
+
+## 13. Native completion observation (draft proposal)
+
+**Merge blocker:** this proposal does not yet cover every native finalizer.
+`JobManager.finalizeJob`, used by `ent/job/kill` for a job without a process,
+sets `job.finished` before awaiting persistence and update publication without a
+completion reservation. The observation below can therefore report
+`settled: true` during that work. Covering that existing owner and testing its
+actual entry point is required before consumers rely on native settlement. This
+limitation is independent of memory integration.
+
+`ent/agent/status` exposes `completion` for the active session. It contains
+`sessionId`, the latest durable `terminalTurnId` (when present),
+`observedStreamSeq`, and `settled`. The check requires a durable terminal turn,
+no open turn or unfinished native job, no tracked prompt-handler or
+job-finalizer reservation, no queued immediate drain, and no unread immediate
+inject. The status handler takes this synchronous snapshot after its
+asynchronous permission recovery work.
+
+The prompt handler retains ownership through its finalization and drain
+scheduling. A job finalizer reserves before `job_finished` becomes observable
+and releases after its notification is injected or suppressed by subscriptions.
+The shared idle-wake helper and prompt-exit path use the same deferred drain.
+Each drain captures its producing session and retains a reservation through
+admission or discard. Its admitted prompt owns the turn before the drain
+releases ownership. A competing prompt that already consumed the inject makes
+the drain a no-op; a changed session prevents it from entering the replacement
+session. A job finalizer captures the active session when it begins and
+suppresses notification publication if that session changes during finalization.
+This does not change routing for jobs that finish after an earlier session
+change.
+
+Reservation release emits a `completion_status` session update, including when a
+queued drain is discarded without starting a turn. This update only wakes a
+fresh status read. Consumers must match the session and terminal turn and
+require `observedStreamSeq` to cover their observed updates. They must discard a
+response if newer relevant updates arrived while it was in flight. A status read
+never emits another completion wake.
+
+The proposed contract is that native activity has quiesced at that boundary. It
+does not establish successful work, delegate collection, user delivery, or
+answer quality. Those remain separate caller contracts. Reservations and known
+inject consumption belong to this process; this observation does not durably
+certify work from an earlier process after restart.
+
+Only the producing session's runner-reported inject watermark advances known
+consumption. Abort, slash, and failure paths retain their scheduling fallback
+without treating it as consumption. A failed followup can therefore remain
+unsettled with an unread notification. Retained injects whose consumption is
+unknown after a load also prevent settlement; observation adds no automatic
+retry policy. Failed terminal notification delivery keeps its finalizer
+reservation unresolved rather than treating a write failure as deliberate
+suppression.
