@@ -107,8 +107,8 @@ export function applyEffectiveJobConfig(
  *      'context_window_exceeded' (provider rejected the prompt for being too
  *        long; the work was not performed),
  *      'refusal' (model refused to answer — content filter / safety policy),
- *      'incomplete' (kata #31 round 2 — model declared intent but did not call
- *        the tool that would do the work),
+ *      'incomplete' (an explicit incomplete outcome; the runner does not infer
+ *        it from future-tense text),
  *      'failed' (provider reported an unrecoverable error code).
  *
  * An undefined or unrecognized stopReason falls back to 'completed' — defensive

@@ -228,11 +228,9 @@ export function mapErrorToStopReason(err: unknown): RunResult['stopReason'] {
   return 'internal_error';
 }
 
-// First-person future-tense intent markers. When the model emits one of these
-// on a text-only turn following a tool round-trip, it has declared work it has
-// not actually performed (kata #31 round 2: production "I'll add a brief note"
-// pattern). Past-tense completion summaries ("Done. Updated successfully.") and
-// pure-answer text ("The answer is 42.") deliberately do NOT match.
+// A first-person promise at the end of a text-only response can signal work
+// left undone after tool use. Earlier intent can introduce a completed report,
+// so only the final substantive sentence or line participates in the reminder check.
 const FUTURE_TENSE_INTENT_PATTERN =
   /\b(?:I'll|I will|I'm going to|I am going to|let me|let's|I shall|I'll just|I'll go ahead|going to add|going to write|going to update|going to create)\b/i;
 
@@ -270,12 +268,13 @@ const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
 
 /**
  * The reminder injected at the bare-text stop-checkpoint (model returned text,
- * no tool call, after a tool round-trip). Normally it nudges the model to verify
- * its work before stopping. But if a message was injected mid-turn, that ritual
+ * no tool call, after a tool round-trip). An empty response gets one
+ * verification retry; future intent gets one only if another round remains.
+ * If a message was injected mid-turn, that ritual
  * is the wrong pull — a passively-appended inbound reads as "more context to
  * summarize" and loses to a standby/verify wrap-up. So flip it to a directive to
- * handle the new message. The reminder keeps its original value (catching a
- * premature "Done") on turns with no pending inbound.
+ * handle the new message. A completion summary without a pending inbound or
+ * declared intent can end the turn without an unrelated verification call.
  */
 export type MidTurnArrival = 'none' | 'message' | 'notification' | 'both';
 
@@ -326,8 +325,22 @@ export function bareTextStopReminder(arrival: MidTurnArrival): string {
 }
 
 function hasFutureTenseIntent(text: string): boolean {
-  if (!text) return false;
-  return FUTURE_TENSE_INTENT_PATTERN.test(text);
+  const finalTextUnit =
+    text
+      .split(/(?<=[.!?])\s+|\n+/)
+      .filter((unit) => /[\p{L}\p{N}]/u.test(unit))
+      .at(-1) ?? '';
+  // A standalone closing or a "so" ending does not promise more work. Keep
+  // other prefixes, which may condition the stop on unfinished work, and any
+  // other promise in the same sentence.
+  const intentText = finalTextUnit.replace(
+    /(?:^\s*|\bso\s+)(?:I'll|I will)\s+end the turn[.!?]*\s*$/i,
+    ''
+  );
+  // A negated action is a stated boundary, not a promise to perform it. Remove
+  // only that first-person prefix so another promise in the sentence still counts.
+  const positiveIntentText = intentText.replace(/\bnot something (?:I'll|I will)\b/gi, '');
+  return FUTURE_TENSE_INTENT_PATTERN.test(positiveIntentText);
 }
 
 /**
@@ -624,14 +637,12 @@ export class ConversationRunner {
     let streamTurnSeq = 0;
     let completedTurns = 0;
 
-    // Bare text retry: when the model returns no tool calls, retry once with
-    // tool_choice=required to force a verification tool call (catches
-    // NEVER_SUBMITTED pattern where model says "Done" instead of verifying)
+    // Retry an empty response or mid-turn arrival once with tool_choice=required.
+    // Future intent can also trigger that reminder if another round remains.
     let retriedWithToolChoice = false;
-    // Set when a context_injected event is picked up mid-turn. Flips the
-    // bare-text stop-checkpoint reminder from "verify before stopping" to
-    // "handle the new message", so a mid-turn inbound isn't crowded out by the
-    // standby/verify wrap-up.
+    // Tracks mid-turn arrivals since the last tool-result batch. Pending
+    // arrivals survive provider pauses and retries. A result is progress for
+    // reminder purposes; it does not prove the arrival was answered.
     let injectedArrival: MidTurnArrival = 'none';
     let nextRequestOptions: RequestOptions | undefined;
     let usedTemporaryContext = false;
@@ -1242,10 +1253,13 @@ export class ConversationRunner {
         }
 
         if (toolCalls.length === 0) {
-          // Retry once with tool_choice=required to force a verification tool call.
-          // This catches the NEVER_SUBMITTED pattern where the model produces "Done"
-          // text or empty responses instead of calling a verification tool.
-          if (!retriedWithToolChoice && completedTurns > 0) {
+          if (
+            !retriedWithToolChoice &&
+            completedTurns > 0 &&
+            (injectedArrival !== 'none' ||
+              !assistantText.trim() ||
+              (completedTurns < maxTurns - 1 && hasFutureTenseIntent(assistantText)))
+          ) {
             retriedWithToolChoice = true;
             // Always push an assistant turn before the user reminder, even when
             // assistantText is empty — Anthropic requires alternating roles, and
@@ -1265,15 +1279,6 @@ export class ConversationRunner {
             ];
             nextRequestOptions = { toolChoice: 'required' };
             continue;
-          }
-          // After a tool round-trip, if the model still returns only text and
-          // that text declares future-tense intent ("I'll add a note", "I will
-          // now apply the change"), the model has promised work it never
-          // performed. Surface 'incomplete' so the caller (subagent job, parent
-          // agent, scripts) can tell this apart from a clean completion summary.
-          if (completedTurns > 0 && hasFutureTenseIntent(assistantText)) {
-            stopReason = 'incomplete';
-            break;
           }
           stopReason = 'end_turn';
           break;
@@ -1380,6 +1385,7 @@ export class ConversationRunner {
             ...providerMessages,
             { role: 'user', content: '', toolResults: batchResults },
           ];
+          injectedArrival = 'none';
         }
 
         if (!shouldContinue) {
