@@ -1,6 +1,6 @@
 // ABOUTME: The single pure reducer that folds durable events into the canonical
-// ProviderMessage[] shape. One assistant carries all of a turn's tool_use blocks;
-// one user carries all of that turn's tool_result blocks (the Anthropic parallel-
+// ProviderMessage[] shape. One assistant carries a model response's tool_use blocks;
+// one user carries that response's tool_result blocks (the Anthropic parallel-
 // tool form). This is the one place event->message coalescing happens; the batch
 // rebuild, the compaction-tail build, and the runner's live tail all share it, so
 // the shape sent on turn N equals the shape rebuilt on turn N+1.
@@ -21,7 +21,7 @@ export type FoldEventInput =
 
 export type FoldState = {
   messages: ProviderMessage[];
-  // Open tool batch for the current turn: indices into messages, or null between turns.
+  // Open tool batch for the current model response: indices into messages.
   batch: { assistantIdx: number; userIdx: number | null } | null;
 };
 
