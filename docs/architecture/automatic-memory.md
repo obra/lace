@@ -70,6 +70,10 @@ for extraction. Images retain base64 bytes and PNG/JPEG/GIF/WebP media types
 when the configured catalog model declares attachment support. Other image
 coverage is explicitly omitted.
 
+Assistant message events with empty content arrays preserve model-response
+boundaries but supply no extraction original. Discovery and loading skip them
+before adding provenance headers, so they consume no extraction slot or request.
+
 For documents, discovery pins Git HEAD once, enumerates only configured paths
 and reads immutable blobs. First discovery uses the current committed tree;
 later discoveries offer changed blob versions. Uncommitted edits await the
