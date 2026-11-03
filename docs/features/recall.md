@@ -16,16 +16,26 @@ persona/session/time/track filters do not select them. A memory-handle read
 returns the current note and original source references, explicitly marking
 superseded, missing or unavailable support. It checks current role authority; an
 unconfigured session cannot use derived memory. These are model-authored
-attributed syntheses, not independently verified facts.
+attributed syntheses, not independently verified facts. When before-answer
+automatic recall is configured, Lace retrieves bounded evidence before provider
+requests. It defaults off and is independent of extraction; omit
+`initialize.memory.recall` at the next initialization to disable automatic
+insertion while preserving manual recall and retained memory. Its opaque
+`source:<digest>` handles expand admitted committed documents and full
+historical sidecars through the existing `read` action under current authority;
+arbitrary filesystem paths are rejected.
 
-Configured transcript search, read and thread also attach `current_accounts` for
-originals that supported a retained note revision. Each attachment names the
-latest stored account, with its revision, attribution and support handles. It
-may retain exact readable superseded document support, preserving its historical
-status. Missing or unreadable required support withholds the affected original
-group with an explicit reason. A current account does not confirm current facts:
-claims drawn from superseded support need current applicable evidence before use
-as present instructions.
+Configured transcript results and opaque source reads retain every directly
+linked latest summary in `current_accounts`, including corrections linked
+through an older summary revision. “Current” here identifies the stored
+revision, not confirmed present truth. Each supporting original keeps its own
+status. Readable pinned document versions may remain attached as `superseded`
+historical evidence; their claims need current applicable evidence before use as
+present instructions. Lace omits the affected original group if required support
+is missing, unavailable or changes during the read, or if the full attachment
+exceeds its budget. Automatic recall still selects only current originals, while
+keeping these status-qualified summaries attached. Historical source reads keep
+the exact requested version and its status rather than substituting newer text.
 
 ## Actions
 

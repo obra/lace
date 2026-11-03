@@ -27,3 +27,38 @@ it('rejects missing local assets without downloading or accepting unrelated mode
   const { verifyMemoryModel } = await import('../encoder');
   await expect(verifyMemoryModel('/nonexistent/lace-model')).rejects.toThrow();
 });
+
+it('gives waiting queries the next batch slot and cancels queued work', async () => {
+  const module = await import('../encoder');
+  const calls: string[][] = [];
+  let release!: () => void;
+  let started!: () => void;
+  const first = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const encoder = module.scheduledMemoryEncoder({
+    generation: 'test',
+    async encode(texts: string[]) {
+      calls.push(texts);
+      if (calls.length === 1) {
+        started();
+        await blocked;
+      }
+      return texts.map(() => [1, 0]);
+    },
+  });
+  const background = encoder.encode(['a', 'b', 'c', 'd', 'e'], 'document');
+  await first;
+  const foreground = encoder.encode(['question'], 'query');
+  const controller = new AbortController();
+  const cancelled = encoder.encode(['cancelled'], 'query', { signal: controller.signal });
+  controller.abort();
+  const rejection = cancelled.catch((error: unknown) => error);
+  release();
+  await Promise.all([background, foreground]);
+  expect(await rejection).toBeInstanceOf(Error);
+  expect(calls).toEqual([['a', 'b', 'c', 'd'], ['question'], ['e']]);
+});

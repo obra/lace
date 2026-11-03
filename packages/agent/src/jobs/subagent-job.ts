@@ -735,6 +735,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             data: {
               content: [{ type: 'text', text }],
               priority: 'immediate',
+              inputKind: 'continuation',
             },
           });
           sessionState = nextState;

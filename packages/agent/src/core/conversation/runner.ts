@@ -2,6 +2,8 @@
 // This is the core conversation engine. It handles message building, provider
 // calls, tool execution, permission handling, and event persistence.
 
+import { appendOrdinaryCue, recallConversationText } from '../../memory/recall-input';
+import { representedToolText } from '../../memory/source-text';
 import { randomUUID } from 'node:crypto';
 import { join, basename, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
@@ -581,7 +583,7 @@ export class ConversationRunner {
     const writeAndAdvance = async (event: { type: string; data: Record<string, unknown> }) => {
       await this.deps.runExclusive(() => {
         let sessionState: SessionState = readSessionState(sessionDir);
-        const { nextState } = appendDurableEvent(sessionDir, sessionState, {
+        const { nextState, written } = appendDurableEvent(sessionDir, sessionState, {
           type: event.type,
           data: event.data,
           turnId,
@@ -589,6 +591,18 @@ export class ConversationRunner {
         });
         sessionState = nextState;
         writeSessionState(sessionDir, sessionState);
+        if (event.type === 'message') {
+          const text =
+            typeof event.data.content === 'string'
+              ? event.data.content
+              : extractInjectedText(event.data.content);
+          if (text.trim()) recallTail.push({ eventSeq: written.eventSeq, text });
+        }
+        if (event.type === 'tool_use') {
+          const text = representedToolText(event.data);
+          if (text)
+            represented.push({ kind: 'event', sessionId, eventSeq: written.eventSeq, text });
+        }
       });
     };
 
@@ -635,6 +649,16 @@ export class ConversationRunner {
     let injectedArrival: MidTurnArrival = 'none';
     let nextRequestOptions: RequestOptions | undefined;
     let usedTemporaryContext = false;
+    let automaticRemovedForOverflow = false;
+    let automaticBlock: string | null = null;
+    let cue = turnEntry.latestCue;
+    let recallTail = [...turnEntry.recallTail];
+    let represented = turnEntry.retainedOriginals.map((entry) => ({
+      kind: 'event' as const,
+      sessionId,
+      eventSeq: entry.eventSeq,
+      text: entry.text,
+    }));
     // Carries forward the parsed structured object from the last provider
     // response that produced one, surfaced on the RunResult for the prompt
     // handler. Only set when this turn requested an outputFormat.
@@ -675,7 +699,28 @@ export class ConversationRunner {
         // that landed since we last looked. These come from ent/session/inject
         // RPCs fired by peers while this turn is in flight; without this
         // re-read they would not be visible until the next sessionPrompt.
-        const { injections, newWatermark } = injectTailer.readNew();
+        const { injections, originals, newWatermark } = injectTailer.readNew();
+        represented.push(
+          ...originals.map((entry) => ({
+            kind: 'event' as const,
+            sessionId,
+            eventSeq: entry.eventSeq,
+            text: entry.text,
+          }))
+        );
+        const ordinary = originals.filter((entry) => entry.inputKind === 'message');
+        if (ordinary.length) {
+          cue = undefined;
+          for (const entry of ordinary) {
+            cue = appendOrdinaryCue(cue, entry.eventSeq, entry.recall.query);
+            const text = recallConversationText(entry.recall);
+            if (text.trim()) recallTail.push({ eventSeq: entry.eventSeq, text });
+          }
+          // An arrival can be persisted before the response to the in-flight provider call.
+          // Durable order keeps this view identical on restart.
+          recallTail.sort((a, b) => a.eventSeq - b.eventSeq);
+          automaticRemovedForOverflow = false;
+        }
         for (const content of injections) {
           providerMessages = appendOrMergeUser(providerMessages, content);
         }
@@ -792,7 +837,55 @@ export class ConversationRunner {
           // nextRequestOptions (a one-shot tool_choice nudge), outputFormat
           // applies to every call this turn so the final answer stays
           // schema-constrained even after tool-use iterations.
-          const temporaryContext = this.deps.getTemporaryContext?.() ?? null;
+          let recallDiagnostics: Record<string, unknown> | undefined;
+          automaticBlock = null;
+          if (cue && this.deps.prepareAutomaticRecall && !automaticRemovedForOverflow) {
+            const callerContext = this.deps.getTemporaryContext?.() ?? null;
+            const outputAllowance =
+              provider.config.maxTokens ||
+              provider.getAvailableModels().find((model) => model.id === modelId)
+                ?.maxOutputTokens ||
+              (provider.providerName === 'openai' ? 16384 : 8192);
+            const allowance = Math.max(
+              0,
+              provider.contextWindowForModel(modelId ?? 'default') -
+                estimateProviderTokens(providerMessages) -
+                Math.ceil(
+                  Buffer.byteLength(
+                    frozenSystemPrompt +
+                      (callerContext ?? '') +
+                      JSON.stringify(
+                        toolsForProvider.map((tool) => ({
+                          name: tool.name,
+                          description: tool.description,
+                          input_schema: tool.inputSchema,
+                        }))
+                      )
+                  ) / 3
+                ) -
+                outputAllowance
+            );
+            const tail = recallTail
+              .slice(-4)
+              .map((entry) => entry.text)
+              .join('\n')
+              .slice(-800);
+            const prepared = await this.deps.prepareAutomaticRecall({
+              query: cue.text,
+              tail,
+              cueIds: cue.ids.map((seq) => `${sessionId}:${seq}`),
+              represented,
+              signal: abortController.signal,
+              maxTokens: allowance,
+            });
+            abortController.signal.throwIfAborted();
+            automaticBlock = prepared.block;
+            recallDiagnostics = prepared.diagnostics;
+          }
+          const callerContext = this.deps.getTemporaryContext?.() ?? null;
+          const temporaryContext =
+            [callerContext, automaticBlock].filter((text) => text !== null).join('\n\n') ||
+            (callerContext === '' ? '' : null);
           usedTemporaryContext ||= temporaryContext !== null;
           const requestOptions: RequestOptions = {
             ...(usedTemporaryContext ? { temporaryContext } : {}),
@@ -800,14 +893,22 @@ export class ConversationRunner {
             ...(runOutputFormat ? { outputFormat: runOutputFormat } : {}),
             correlation: createModelCallCorrelation({ sessionId, turnId }),
           };
-          response = await provider.createStreamingResponse(
-            providerMessages,
-            toolsForProvider,
-            modelId || 'unknown-model',
-            abortController.signal,
-            lastResponseId ? { previousResponseId: lastResponseId } : undefined,
-            requestOptions
-          );
+          try {
+            response = await provider.createStreamingResponse(
+              providerMessages,
+              toolsForProvider,
+              modelId || 'unknown-model',
+              abortController.signal,
+              lastResponseId ? { previousResponseId: lastResponseId } : undefined,
+              requestOptions
+            );
+          } finally {
+            if (recallDiagnostics)
+              await this.deps.onUpdate(durableTurnSeq++, {
+                type: 'session_info',
+                _meta: { automaticRecall: recallDiagnostics },
+              });
+          }
           nextRequestOptions = undefined; // Reset after use
           if (response.structuredOutput !== undefined) {
             lastStructuredOutput = response.structuredOutput;
@@ -1090,6 +1191,16 @@ export class ConversationRunner {
         // looping.
         if (
           stopReason === 'context_window_exceeded' &&
+          automaticBlock &&
+          !automaticRemovedForOverflow
+        ) {
+          automaticRemovedForOverflow = true;
+          lastResponseId = undefined;
+          completedTurns--;
+          continue;
+        }
+        if (
+          stopReason === 'context_window_exceeded' &&
           emergencyCompactions < MAX_EMERGENCY_COMPACTIONS
         ) {
           emergencyCompactions++;
@@ -1137,7 +1248,19 @@ export class ConversationRunner {
                   sessionId
                 )
               : loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+            // Replay can regroup older inputs; only an unconsumed arrival re-enables evidence.
+            if (compactedEntry.latestCue?.ids.some((eventSeq) => eventSeq > lastSeenEventSeq)) {
+              automaticRemovedForOverflow = false;
+            }
+            cue = compactedEntry.latestCue;
             providerMessages = compactedEntry.messages;
+            recallTail = [...compactedEntry.recallTail];
+            represented = compactedEntry.retainedOriginals.map((entry) => ({
+              kind: 'event' as const,
+              sessionId,
+              eventSeq: entry.eventSeq,
+              text: entry.text,
+            }));
             if (compactedEntry.systemPrompt) {
               // rerenderPersonaAfterCompaction may have written a new
               // system_prompt_set; the retry should use it.

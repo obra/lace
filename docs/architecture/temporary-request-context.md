@@ -5,6 +5,12 @@ Use this for current caller-supplied context that should stay out of
 conversation history. It is separate from memory and from durable
 `ent/session/inject` events.
 
+When [automatic recall](automatic-memory.md#before-answer-automatic-recall) is
+configured, the runner composes its bounded evidence after caller text in the
+same request-only surface. Set, peek and clear still address only the caller's
+value. Clearing caller text does not disable automatic recall; the optional
+recall configuration is applied when initializing the process.
+
 After initializing the agent and activating a session, use these three RPCs:
 
 ```json
@@ -61,10 +67,18 @@ transport retries keep their snapshot. The supported OpenAI
 streaming-verification fallback preserves the same options and materialized text
 when switching to a non-streaming call on the selected API.
 
+Automatic recall estimates its allowance before awaiting retrieval, then the
+runner reads caller text again immediately before submission. A set or clear
+during that wait affects the pending request. If a larger caller value outgrows
+the earlier allowance and the provider reports overflow, the existing single
+retry removes automatic evidence while retaining current caller text. Retrieval
+is not repeated to chase caller updates.
+
 ```text
 system instructions + tools
 required conversation history (including tool results and images)
-current temporary context, if set
+current caller temporary context, if set
+automatic recall evidence, when configured and available
 ```
 
 Canonical messages, event logs and compaction input exclude this extra text.
@@ -99,7 +113,8 @@ cache retention, eligibility or billing behavior.
 
 `AgentServerState.temporaryContext` owns the process-local value. The session
 operation handlers validate Ent schemas; the prompt handler provides a narrow
-getter to `ConversationRunner`. The runner supplies its snapshot through
+getter to `ConversationRunner`. The runner composes its snapshot with any
+independently prepared automatic evidence through
 `RequestOptions.temporaryContext`. The adapters materialize a fresh trailing
 message without modifying canonical history. The internal null option retains
 stateless Responses mode after a clear; it is not a public lifetime control.

@@ -1,5 +1,13 @@
 // ABOUTME: Message building utilities for converting durable events to provider messages
 
+import {
+  appendOrdinaryCue,
+  recallConversationText,
+  recallInputForContent,
+  type OrdinaryCue,
+} from '../memory/recall-input';
+export type { OrdinaryCue } from '../memory/recall-input';
+import { representedToolText } from '../memory/source-text';
 import type { ToolResult } from '@lace/ent-protocol';
 import type { ContentBlock, ProviderMessage, ThinkingBlock } from '../providers/base-provider';
 import { appendOrMergeUser } from './append-or-merge';
@@ -198,7 +206,12 @@ function dropOrphanedToolBlocks(messages: ProviderMessage[]): void {
  * systemPrompt is sourced exclusively from system_prompt_set events (last one wins).
  * Sessions without a system_prompt_set event return systemPrompt: ''.
  */
+export type RetainedOriginalEvent = { eventSeq: number; text: string };
+export type RecallTailEntry = { eventSeq: number; text: string };
 export type BuiltProviderMessages = {
+  retainedOriginals: RetainedOriginalEvent[];
+  recallTail: RecallTailEntry[];
+  latestCue?: OrdinaryCue;
   messages: ProviderMessage[];
   systemPrompt: string;
 };
@@ -230,10 +243,21 @@ export type ProjectionAccumulator = {
   // each context_compacted (a post-compaction rerender legitimately supersedes
   // earlier prompts). Events marked rerender:true are not counted. >1 within one era is the invariant violation worth surfacing.
   systemPromptCount: number;
+  retainedOriginals: RetainedOriginalEvent[];
+  recallTail: RecallTailEntry[];
+  latestCue?: OrdinaryCue;
+  cueOpen: boolean;
 };
 
 export function newProjectionAccumulator(): ProjectionAccumulator {
-  return { state: initialFoldState(), systemPrompt: '', systemPromptCount: 0 };
+  return {
+    state: initialFoldState(),
+    systemPrompt: '',
+    systemPromptCount: 0,
+    retainedOriginals: [],
+    recallTail: [],
+    cueOpen: false,
+  };
 }
 
 /**
@@ -251,8 +275,39 @@ export function newProjectionAccumulator(): ProjectionAccumulator {
 export function applyEventToProjection(
   acc: ProjectionAccumulator,
   type: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  eventSeq = 0
 ): void {
+  const ordinary = type === 'prompt' || type === 'context_injected';
+  const content =
+    typeof data.content === 'string'
+      ? data.content
+      : extractTextFromContentBlocks(Array.isArray(data.content) ? data.content : []);
+  if (type === 'context_compacted') {
+    const retained = Array.isArray(data.retainedEventSeqs) ? data.retainedEventSeqs : [];
+    acc.retainedOriginals = acc.retainedOriginals.filter((entry) =>
+      retained.includes(entry.eventSeq)
+    );
+    acc.recallTail = acc.recallTail.filter((entry) => retained.includes(entry.eventSeq));
+    acc.cueOpen = false;
+  } else if (eventSeq && ['prompt', 'context_injected', 'message', 'tool_use'].includes(type)) {
+    const text = type === 'tool_use' ? representedToolText(data) : content;
+    if (text.trim()) acc.retainedOriginals.push({ eventSeq, text });
+  }
+  const recall = recallInputForContent(data.recall, content);
+  const query = recall.query;
+  if ((ordinary && data.inputKind !== 'continuation') || type === 'message') {
+    const text = ordinary ? recallConversationText(recall) : content;
+    if (text.trim()) acc.recallTail.push({ eventSeq, text });
+  }
+  if (
+    ordinary &&
+    (content.trim() || (Array.isArray(data.content) && data.content.length > 0)) &&
+    data.inputKind !== 'continuation'
+  ) {
+    acc.latestCue = appendOrdinaryCue(acc.cueOpen ? acc.latestCue : undefined, eventSeq, query);
+    acc.cueOpen = true;
+  } else if (['message', 'turn_start', 'turn_end'].includes(type)) acc.cueOpen = false;
   if (type === 'system_prompt_set') {
     const eventData = data as SystemPromptSetData;
     if (typeof eventData.text === 'string') {
@@ -401,7 +456,13 @@ export function buildProviderMessagesFromParsedEvents(
   parsedEvents: ParsedSessionEvent[]
 ): BuiltProviderMessages {
   const acc = newProjectionAccumulator();
-  for (const e of parsedEvents) applyEventToProjection(acc, e.type, e.data);
+  for (const e of parsedEvents) applyEventToProjection(acc, e.type, e.data, e.eventSeq);
   finalizeProjectionWarnings(acc);
-  return { messages: acc.state.messages, systemPrompt: acc.systemPrompt };
+  return {
+    messages: acc.state.messages,
+    systemPrompt: acc.systemPrompt,
+    retainedOriginals: acc.retainedOriginals,
+    recallTail: acc.recallTail,
+    ...(acc.latestCue ? { latestCue: acc.latestCue } : {}),
+  };
 }

@@ -2,7 +2,7 @@ import { sessionMemory } from '../../memory/session';
 // ABOUTME: Prompt RPC handler - thin adapter over core/conversation/runner
 
 import { randomUUID } from 'node:crypto';
-import { AcpErrorCodes, type JsonRpcPeer } from '@lace/ent-protocol';
+import { AcpErrorCodes, type JsonRpcPeer, type RecallInput } from '@lace/ent-protocol';
 import {
   loadSession,
   readSessionState,
@@ -118,6 +118,8 @@ export function registerPromptHandler(
     maxTurns?: number;
     idempotencyKey?: unknown;
     track?: unknown;
+    inputKind?: 'message' | 'continuation';
+    recall?: RecallInput;
   }) => {
     assertInitialized(state);
     rejectHandoffSourceMetadata(params);
@@ -249,6 +251,8 @@ export function registerPromptHandler(
         type: 'prompt',
         data: {
           content: promptContent,
+          inputKind: params.inputKind ?? (promptContent.length ? 'message' : 'continuation'),
+          ...(params.recall !== undefined ? { recall: params.recall } : {}),
           ...(idempotencyKey ? { idempotencyKey } : {}),
           ...(track !== undefined ? { track } : {}),
         },
@@ -433,6 +437,7 @@ export function registerPromptHandler(
       // Build runner dependencies
       const deps: RunnerDependencies = {
         memory: sessionMemory(state, state.activeSession)?.reader,
+        prepareAutomaticRecall: sessionMemory(state, state.activeSession)?.prepareAutomaticRecall,
         getTemporaryContext: () => state.temporaryContext ?? null,
         onUpdate: emitUpdate,
         runExclusive,
@@ -642,7 +647,7 @@ export function registerPromptHandler(
   // Assign the internal prompt runner for use by queueJobNotification
   runPromptInternalRef.current = async (content: unknown[]) => {
     try {
-      await handlePrompt({ content });
+      await handlePrompt({ content, inputKind: 'continuation' });
     } catch {
       // Silently ignore errors from internally-triggered turns
     }
@@ -657,6 +662,8 @@ export function registerPromptHandler(
         maxTurns?: number;
         idempotencyKey?: unknown;
         track?: unknown;
+        inputKind?: 'message' | 'continuation';
+        recall?: RecallInput;
       }
     );
   });

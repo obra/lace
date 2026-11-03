@@ -502,3 +502,151 @@ describe('projectTurnEntry — cross-shard byte-offset incremental', () => {
     );
   });
 });
+
+it('preserves the latest ordinary cue through compaction while tracking only actually retained original identities', () => {
+  const events = [
+    ev(1, 'prompt', { content: [{ type: 'text', text: 'Where is TASK-271?' }] }),
+    ev(2, 'message', { content: 'An old reply.' }),
+    ev(3, 'context_compacted', {
+      preserved: [{ role: 'user', content: 'summary' }],
+      retainedEventSeqs: [2],
+    }),
+    ev(4, 'prompt', {
+      content: [{ type: 'text', text: 'maintenance wake' }],
+      inputKind: 'continuation',
+    }),
+    ev(5, 'context_injected', {
+      content: [{ type: 'text', text: 'What about auth.config?' }],
+      inputKind: 'message',
+    }),
+  ];
+  const full = buildProviderMessagesFromParsedEvents(events);
+  expect(full.retainedOriginals.map((entry) => entry.eventSeq)).toEqual([2, 4, 5]);
+  expect(full.latestCue).toEqual({ ids: [5], text: 'What about auth.config?' });
+  for (let split = 0; split <= events.length; split++) {
+    const before = foldTailIntoProjection(initialCachedProjection(), events.slice(0, split));
+    const incremental = foldTailIntoProjection(before, events.slice(split));
+    expect(incremental.retainedOriginals).toEqual(full.retainedOriginals);
+    expect(incremental.latestCue).toEqual(full.latestCue);
+  }
+  expect(buildProviderMessagesFromParsedEvents(events.slice(0, 4)).latestCue).toEqual({
+    ids: [1],
+    text: 'Where is TASK-271?',
+  });
+});
+
+it('advances ordinary image-only cue identity and preserves it through continuations in both projections', () => {
+  const image = {
+    type: 'image',
+    source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
+  };
+  const events = [
+    ev(1, 'prompt', { content: [{ type: 'text', text: 'bicycle topic' }] }),
+    ev(2, 'turn_start', {}),
+    ev(3, 'prompt', { content: [image], inputKind: 'message' }),
+    ev(4, 'prompt', { content: [], inputKind: 'continuation' }),
+  ];
+  const full = buildProviderMessagesFromParsedEvents(events);
+  expect(full.latestCue).toEqual({ ids: [3], text: '' });
+  expect(full.messages.at(-1)?.content).toEqual([image]);
+  for (let split = 0; split <= events.length; split++) {
+    const before = foldTailIntoProjection(initialCachedProjection(), events.slice(0, split));
+    expect(foldTailIntoProjection(before, events.slice(split)).latestCue).toEqual(full.latestCue);
+  }
+});
+
+it('coalesces a text message and image arriving at the same intake boundary into one new cue', () => {
+  const events = [
+    ev(1, 'prompt', { content: [{ type: 'text', text: 'older topic' }] }),
+    ev(2, 'turn_end', {}),
+    ev(3, 'context_injected', {
+      content: [{ type: 'text', text: 'new bicycle question' }],
+      inputKind: 'message',
+    }),
+    ev(4, 'context_injected', {
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' } },
+      ],
+      inputKind: 'message',
+    }),
+  ];
+  const full = buildProviderMessagesFromParsedEvents(events);
+  expect(full.latestCue).toEqual({ ids: [3, 4], text: 'new bicycle question' });
+  const before = foldTailIntoProjection(initialCachedProjection(), events.slice(0, 3));
+  expect(foldTailIntoProjection(before, events.slice(3)).latestCue).toEqual(full.latestCue);
+});
+
+it('uses retrieval query without replacing provider history or represented originals', () => {
+  const raw = '<messages source="slack">TASK-271 &lt;literal&gt;</messages>';
+  const events = [
+    ev(1, 'prompt', {
+      content: [{ type: 'text', text: raw }],
+      recall: { query: 'TASK-271 <literal> slack:T:C', context: 'antecedent' },
+    }),
+    ev(2, 'turn_start', {}),
+    ev(3, 'context_injected', {
+      content: [{ type: 'text', text: 'machine envelope' }],
+      recall: { query: '' },
+    }),
+  ];
+  const first = buildProviderMessagesFromParsedEvents(events.slice(0, 2));
+  expect(first.latestCue).toEqual({ ids: [1], text: 'TASK-271 <literal> slack:T:C' });
+  expect(first.messages[0].content).toBe(raw);
+  expect(first.retainedOriginals).toEqual([{ eventSeq: 1, text: raw }]);
+  const full = buildProviderMessagesFromParsedEvents(events);
+  expect(full.latestCue).toEqual({ ids: [3], text: '' });
+  for (let split = 0; split <= events.length; split++) {
+    const before = foldTailIntoProjection(initialCachedProjection(), events.slice(0, split));
+    expect(foldTailIntoProjection(before, events.slice(split)).latestCue).toEqual(full.latestCue);
+  }
+});
+
+it('projects conversational retrieval bodies independently across replay and compaction', () => {
+  const events = [
+    ev(1, 'prompt', {
+      content: [{ type: 'text', text: 'old wrapper' }],
+      recall: { query: 'old question', context: 'old antecedent' },
+    }),
+    ev(2, 'message', { content: [{ type: 'text', text: 'assistant prose with tools' }] }),
+    ev(3, 'tool_use', {
+      toolCallId: 'tool1',
+      name: 'bash',
+      input: { command: 'payload' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'tool payload' }] },
+    }),
+    ev(4, 'context_injected', {
+      content: [{ type: 'text', text: 'maintenance reminder' }],
+      inputKind: 'continuation',
+    }),
+    ev(5, 'context_compacted', {
+      preserved: [{ role: 'user', content: 'generated summary wrapper' }],
+      retainedEventSeqs: [2, 3, 4],
+    }),
+    ev(6, 'context_injected', {
+      content: [{ type: 'text', text: 'new wrapper' }],
+      recall: { query: 'What about TASK-271 <literal>?', context: 'Its prior decision was amber.' },
+    }),
+    ev(7, 'context_injected', {
+      content: [{ type: 'text', text: 'machine-only envelope' }],
+      recall: { query: '' },
+    }),
+  ];
+  const full = buildProviderMessagesFromParsedEvents(events);
+  expect(full.recallTail).toEqual([
+    { eventSeq: 2, text: 'assistant prose with tools' },
+    { eventSeq: 6, text: 'Its prior decision was amber.\nWhat about TASK-271 <literal>?' },
+  ]);
+  expect(full.latestCue).toEqual({ ids: [6, 7], text: 'What about TASK-271 <literal>?' });
+  for (let split = 0; split <= events.length; split++) {
+    const before = foldTailIntoProjection(initialCachedProjection(), events.slice(0, split));
+    expect(foldTailIntoProjection(before, events.slice(split)).recallTail).toEqual(full.recallTail);
+  }
+  expect(
+    buildProviderMessagesFromParsedEvents([
+      ...events,
+      ev(8, 'context_compacted', {
+        preserved: [{ role: 'user', content: 'another summary' }],
+      }),
+    ]).recallTail
+  ).toEqual([]);
+});

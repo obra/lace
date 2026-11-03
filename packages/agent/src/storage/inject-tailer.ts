@@ -3,6 +3,8 @@
 // terminated lines, so a concurrently-appended (cross-process) partial line is never
 // mis-parsed. Backs the injects tail-read: it reads the source of truth (the JSONL),
 // so it never lags a derived index.
+import type { RecallInput } from '@lace/ent-protocol';
+import { recallInputForContent } from '../memory/recall-input';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { listTranscriptFiles } from './transcript-paths';
@@ -107,7 +109,16 @@ function sessionShardFiles(laceDir: string, sessionId: string): string[] {
  * are <= the watermark (belt-and-suspenders).
  */
 export type InjectTailer = {
-  readNew(): { injections: string[]; newWatermark: number };
+  readNew(): {
+    injections: string[];
+    originals: Array<{
+      eventSeq: number;
+      text: string;
+      inputKind: 'message' | 'continuation';
+      recall: RecallInput;
+    }>;
+    newWatermark: number;
+  };
 };
 
 export function createInjectTailer(
@@ -119,7 +130,16 @@ export function createInjectTailer(
   let watermark = afterEventSeq;
 
   return {
-    readNew(): { injections: string[]; newWatermark: number } {
+    readNew(): {
+      injections: string[];
+      originals: Array<{
+        eventSeq: number;
+        text: string;
+        inputKind: 'message' | 'continuation';
+        recall: RecallInput;
+      }>;
+      newWatermark: number;
+    } {
       // Gather newly-appended events from every shard, then process them in
       // eventSeq order — mirroring readAllSessionEventLines' global sort so the
       // watermark advances over a strictly monotonic stream (cross-shard seqs can
@@ -144,16 +164,35 @@ export function createInjectTailer(
       parsedEvents.sort((a, b) => a.eventSeq - b.eventSeq);
 
       const injections: string[] = [];
+      const originals: Array<{
+        eventSeq: number;
+        text: string;
+        inputKind: 'message' | 'continuation';
+        recall: RecallInput;
+      }> = [];
       for (const e of parsedEvents) {
         if (e.eventSeq <= watermark) continue;
         watermark = e.eventSeq;
         if (e.type !== 'context_injected') continue;
-        const data = e.data as { content?: unknown; priority?: unknown };
+        const data = e.data as {
+          content?: unknown;
+          priority?: unknown;
+          inputKind?: unknown;
+          recall?: unknown;
+        };
         if (data.priority !== 'immediate') continue;
         const text = extractInjectedText(data.content);
         if (text.trim()) injections.push(text);
+        if (text.trim() || (Array.isArray(data.content) && data.content.length > 0)) {
+          originals.push({
+            eventSeq: e.eventSeq,
+            text,
+            inputKind: data.inputKind === 'continuation' ? 'continuation' : 'message',
+            recall: recallInputForContent(data.recall, text),
+          });
+        }
       }
-      return { injections, newWatermark: watermark };
+      return { injections, originals, newWatermark: watermark };
     },
   };
 }
