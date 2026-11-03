@@ -128,11 +128,18 @@ completed.
 
 The extraction instructions require preserving dates, attribution, distinct
 people/scopes, material transition history and uncertainty. A departure can make
-a former assignment unsafe without naming a successor. Ingestion order is not
-fact time. Retained event `recordedAt` is separate metadata for prompts,
-messages, context injections and completed tools; adding it does not change
-source hashes or authenticate the author or a claim's effective date. Existing
-strict proposal and acceptance checks remain in force.
+a former assignment unsafe without naming a successor. The latest applicable
+decision, assignment or stated preference remains the latest known state until
+evidence changes or ends it, respecting explicit end dates and scope. Missing
+later confirmation, an older record arriving later, or a superseded source
+version alone is not evidence of a change; state the latest known state without
+adding a reconfirmation caveat. Genuine conflicts or unresolved applicability
+retain uncertainty and competing accounts; latest known state does not imply
+live verification. Ingestion order is not fact time. Retained event `recordedAt`
+is separate metadata for prompts, messages, context injections and completed
+tools; adding it does not change source hashes or authenticate the author or a
+claim's effective date. Existing strict proposal and acceptance checks remain in
+force.
 
 The only proposal shape is:
 
