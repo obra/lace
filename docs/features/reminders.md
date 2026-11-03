@@ -101,12 +101,12 @@ lace-agent reminders ensure --session <sessionId> --cron '0 22 * * *' \
   id format, 50-reminder cap, next-fire in `TZ`, atomic write) and prints
   `{"status":"created","id":"..."}`.
 - It reads `reminders.json` strictly: anything other than a
-  `{"reminders": [...]}` object, or a row without a string `id`, exits 3 and
-  the file is left untouched (a lenient read would let the save replace it).
+  `{"reminders": [...]}` object, or a row without a string `id`, exits 3 and the
+  file is left untouched (a lenient read would let the save replace it).
 - Exit codes: 0 ok, 1 invalid cron, cap reached, unreadable prompt file or
-  unusable session storage, 2 session not found, 3 unreadable
-  `reminders.json`, 64 usage (missing, unknown or repeated flag, or a session id
-  that is not `sess_<uuid>`).
+  unusable session storage, 2 session not found, 3 unreadable `reminders.json`,
+  64 usage (missing, unknown or repeated flag, or a session id that is not
+  `sess_<uuid>`).
 - The session directory resolves exactly as the server's: `LACE_SESSION_DIR`,
   else `<LACE_DIR>/agent-sessions`, falling back to `XDG_STATE_HOME`,
   `~/.local/state` and the OS temp dir. Give it the same env as the server, or
@@ -118,5 +118,5 @@ schedule in memory and only picks the new row up on the session's next
 every save, so it does not drop the row in the meantime.
 
 `lace-agent` with no arguments starts the JSON-RPC server as before. The entry
-(`src/main.ts`) picks the CLI or the server before importing either, because
-the server starts as import-time side effects of `src/server-main.ts`.
+(`src/main.ts`) picks the CLI or the server before importing either, because the
+server starts as import-time side effects of `src/server-main.ts`.
