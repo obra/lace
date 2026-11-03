@@ -13,6 +13,7 @@ import { createMemoryRuntime } from '../runtime';
 import { RecallTool } from '../../tools/implementations/recall';
 import { logger } from '../../utils/logger';
 import { closeRecallIndex } from '../../storage/recall/index-db';
+import type { ProviderMessage } from '../../providers/base-provider';
 
 const sessionId = 'sess_11111111-1111-4111-8111-111111111111';
 const grant = {
@@ -211,6 +212,73 @@ describe('configured automatic memory', () => {
     });
     await runtime.wake();
   });
+
+  it('does not extract empty response boundaries while retaining neighboring text, tools and images', async () => {
+    // A boundary can be discovered before its tool finishes. Admitting the
+    // provenance header alone would schedule an otherwise empty extraction.
+    event(1, '', { data: { content: [] } });
+    const requests: ProviderMessage[][] = [];
+    const runtime = createMemoryRuntime(
+      {
+        databasePath,
+        binding,
+        extraction: { connectionId: 'fake', modelId: 'fake' },
+      },
+      {
+        supportsImages: async () => true,
+        query: async (opts) => {
+          requests.push(structuredClone(opts.messages));
+          return { text: '{"changes":[]}', stopReason: 'end_turn', toolCalls: [] };
+        },
+      }
+    );
+    runtimes.push(runtime);
+    await runtime.wake();
+    expect(requests).toEqual([]);
+
+    event(2, '', { data: { content: [{ type: 'text', text: 'Jesse chose compact rows.' }] } });
+    event(3, '', {
+      type: 'tool_use',
+      data: {
+        name: 'file_read',
+        toolCallId: 'read_preference',
+        input: { path: 'preference.txt' },
+        result: {
+          outcome: 'completed',
+          content: [{ type: 'text', text: 'The preferred spacing is compact.' }],
+        },
+      },
+    });
+    event(4, '', {
+      data: { content: [{ type: 'image', data: 'aGVsbG8=', mediaType: 'image/png' }] },
+    });
+    event(5, '', { data: { content: [] } });
+    await runtime.wake();
+
+    expect(requests).toHaveLength(1);
+    const blocks = requests[0][0].content;
+    if (typeof blocks === 'string') throw new Error('Expected extraction content blocks');
+    const body = JSON.parse(blocks[0].text!);
+    expect(body.sources.map((source: any) => source.reference.eventSeq)).toEqual([2, 3, 4]);
+    expect(body.sources[0].text).toContain('Jesse chose compact rows.');
+    expect(body.sources[1].text).toContain('The preferred spacing is compact.');
+    expect(blocks).toContainEqual({
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
+    });
+
+    const db = openMemoryDatabase(databasePath, 'instance', false);
+    try {
+      expect(db.prepare('SELECT id,status FROM memory_sources ORDER BY rowid').all()).toEqual([
+        { id: `event:${sessionId}:2`, status: 'completed' },
+        { id: `event:${sessionId}:3`, status: 'completed' },
+        { id: `event:${sessionId}:4`, status: 'completed' },
+      ]);
+    } finally {
+      db.close();
+    }
+  });
+
   it('reads full sidecars and native images as supplied originals', async () => {
     const { writeToolResultSidecar } = await import('../../storage/tool-result-store');
     const sidecar = Array.from({ length: 300 }, (_, i) => `line ${i}`).join('\n');

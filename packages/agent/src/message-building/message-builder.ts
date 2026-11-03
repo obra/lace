@@ -245,8 +245,8 @@ export function newProjectionAccumulator(): ProjectionAccumulator {
  * system-prompt last-wins + era count (with reset on compaction), the empty-
  * `prompt` drop + image-preserving extraction, the `context_injected`
  * text-merge, and the `context_compacted` reset to `preserved[]` + orphan
- * cleanup. Those special events close the open tool batch (batch = null) so a
- * following tool_use starts a fresh turn rather than coalescing across them.
+ * cleanup. An injection preserves the current response's tool batch: it is
+ * consumed live after that response's tool results, even when persisted first.
  */
 export function applyEventToProjection(
   acc: ProjectionAccumulator,
@@ -288,10 +288,7 @@ export function applyEventToProjection(
     const content = extractTextFromContentBlocks(contentArr);
     if (content.trim()) {
       const merged = appendOrMergeUser(acc.state.messages, content);
-      acc.state = { messages: merged, batch: null };
-    } else {
-      // Even an empty injection closes the open tool batch.
-      acc.state = { messages: acc.state.messages, batch: null };
+      acc.state = { messages: merged, batch: acc.state.batch };
     }
     return;
   }

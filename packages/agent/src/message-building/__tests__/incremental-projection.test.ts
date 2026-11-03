@@ -136,6 +136,27 @@ const CORPUS: ParsedSessionEvent[][] = [
     ev(3, 'prompt', { content: [{ type: 'text', text: 'after' }] }),
     ev(4, 'message', { content: [{ type: 'text', text: 'fine' }] }),
   ],
+  // 9. injections persisted during each tool, before its result is recorded.
+  [
+    ev(1, 'prompt', { content: [{ type: 'text', text: 'write two files' }] }),
+    ev(2, 'message', { content: [] }),
+    ev(3, 'context_injected', { content: [{ type: 'text', text: 'first write confirmed' }] }),
+    ev(4, 'tool_use', {
+      toolCallId: 'tc1',
+      name: 'file_write',
+      input: { path: '/work/a.txt', content: 'A' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'written A' }] },
+    }),
+    ev(5, 'context_injected', { content: [{ type: 'text', text: 'second write confirmed' }] }),
+    ev(6, 'tool_use', {
+      toolCallId: 'tc2',
+      name: 'file_write',
+      input: { path: '/work/b.txt', content: 'B' },
+      result: { outcome: 'completed', content: [{ type: 'text', text: 'written B' }] },
+    }),
+    ev(7, 'message', { content: [{ type: 'text', text: 'done' }] }),
+    ev(8, 'turn_end', { stopReason: 'end_turn' }),
+  ],
 ];
 
 function assertIncrementalEqualsFull(events: ParsedSessionEvent[]): void {

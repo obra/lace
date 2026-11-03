@@ -62,6 +62,8 @@ function eventContent(
     return blocks;
   }
   if (!['prompt', 'message', 'context_injected'].includes(event.type)) return [];
+  // Empty assistant content preserves a model-response boundary, not an original.
+  if (event.type === 'message' && Array.isArray(data?.content) && !data.content.length) return [];
   if (typeof data?.content === 'string')
     return [
       {

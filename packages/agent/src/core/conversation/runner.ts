@@ -911,19 +911,18 @@ export class ConversationRunner {
         const toolCalls = Array.isArray(response.toolCalls) ? response.toolCalls : [];
         if (response.stopReason !== 'pause_turn') {
           // Store content in array format (standard content block format).
-          // Only persist if there is actual content — an empty assistant turn would
-          // produce a {role:'assistant', content:''} when rebuilt, which creates
-          // consecutive user/user messages after the format-converter drops the
-          // empty block. Anthropic's API rejects consecutive same-role messages.
           const contentBlocks = concatenatedAssistantText
             ? [{ type: 'text', text: concatenatedAssistantText }]
             : [];
-          // Persist the turn when it has text OR thinking blocks. A tool-only
-          // turn (no text) still needs its 'message' event when thinking is
-          // present, so the rebuilt assistant message carries the thinking that
-          // must precede its tool_use blocks. A turn with neither is skipped (an
-          // empty {role:'assistant'} would create consecutive same-role messages).
-          if (contentBlocks.length > 0 || concatenatedThinkingBlocks.length > 0) {
+          // The message event also separates model responses: a tool-only
+          // response needs it so rebuilding does not merge its calls into the
+          // previous response's batch. Skip genuinely empty responses, whose
+          // empty assistant message would be dropped by provider converters.
+          if (
+            contentBlocks.length > 0 ||
+            concatenatedThinkingBlocks.length > 0 ||
+            toolCalls.length > 0
+          ) {
             await writeAndAdvance({
               type: 'message',
               data: {
