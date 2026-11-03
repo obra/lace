@@ -20,8 +20,8 @@ export type TurnEntryProjection = BuiltProviderMessages & {
 
 export function loadTurnEntryProjection(sessionDir: string, cwd: string): TurnEntryProjection {
   const events = pe.readParsedSessionEvents(sessionDir);
-  const { messages, systemPrompt } = buildProviderMessagesFromParsedEvents(events);
+  const built = buildProviderMessagesFromParsedEvents(events);
   const filesRead = deriveFilesReadFromParsedEvents(events, cwd);
   const maxFoldedSeq = events.reduce((max, e) => (e.eventSeq > max ? e.eventSeq : max), 0);
-  return { messages, systemPrompt, filesRead, maxFoldedSeq };
+  return { ...built, filesRead, maxFoldedSeq };
 }

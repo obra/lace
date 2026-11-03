@@ -238,6 +238,11 @@ export async function compact(
         strategy: 'track-based',
         messagesCompacted: earlier.length,
         preserved,
+        retainedEventSeqs: tail
+          .filter((event) =>
+            ['prompt', 'message', 'context_injected', 'tool_use'].includes(event.type)
+          )
+          .map((event) => event.eventSeq),
       },
     },
   };

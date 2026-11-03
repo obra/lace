@@ -1,4 +1,4 @@
-import { sessionMemory } from '../memory/session';
+import { sessionMemory, clearSessionMemory } from '../memory/session';
 // ABOUTME: Slash command handling for built-in commands like /compact, /mode, /help
 
 import { randomUUID } from 'node:crypto';
@@ -247,6 +247,7 @@ export async function handleSlashCommand(
         // Switch to the new session (reload to pick up the new event).
         state.activeSession = loadSession(newSessionId);
         state.temporaryContext = null;
+        clearSessionMemory(state);
 
         // Notify the client that the session has changed
         await emitUpdate(0, {

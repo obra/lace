@@ -18,6 +18,9 @@ import {
   finalizeProjectionWarnings,
   newProjectionAccumulator,
   type ProjectionAccumulator,
+  type RetainedOriginalEvent,
+  type RecallTailEntry,
+  type OrdinaryCue,
 } from './message-builder';
 import type { ParsedSessionEvent } from './parsed-events';
 import * as pe from './parsed-events';
@@ -38,6 +41,10 @@ import { loadTurnEntryProjection, type TurnEntryProjection } from './turn-entry-
  */
 export type CachedProjection = {
   foldState: FoldState;
+  retainedOriginals: RetainedOriginalEvent[];
+  recallTail: RecallTailEntry[];
+  latestCue?: OrdinaryCue;
+  cueOpen: boolean;
   systemPrompt: string;
   systemPromptCount: number;
   filesRead: Set<string>;
@@ -74,6 +81,10 @@ export function initialCachedProjection(cwd = ''): CachedProjection {
   const acc = newProjectionAccumulator();
   return {
     foldState: acc.state,
+    retainedOriginals: acc.retainedOriginals,
+    recallTail: acc.recallTail,
+    latestCue: acc.latestCue,
+    cueOpen: acc.cueOpen,
     systemPrompt: acc.systemPrompt,
     systemPromptCount: acc.systemPromptCount,
     filesRead: new Set<string>(),
@@ -99,6 +110,10 @@ export function foldTailIntoProjection(
 ): CachedProjection & { messages: ProviderMessage[] } {
   const acc: ProjectionAccumulator = {
     state: proj.foldState,
+    retainedOriginals: [...proj.retainedOriginals],
+    recallTail: [...proj.recallTail],
+    latestCue: proj.latestCue,
+    cueOpen: proj.cueOpen,
     systemPrompt: proj.systemPrompt,
     systemPromptCount: proj.systemPromptCount,
   };
@@ -107,7 +122,7 @@ export function foldTailIntoProjection(
   let headSeq = proj.headSeq;
 
   for (const e of events) {
-    applyEventToProjection(acc, e.type, e.data);
+    applyEventToProjection(acc, e.type, e.data, e.eventSeq);
     if (e.type === 'tool_use') {
       const data = e.data as {
         name?: unknown;
@@ -129,6 +144,10 @@ export function foldTailIntoProjection(
 
   const next: CachedProjection = {
     foldState: acc.state,
+    retainedOriginals: acc.retainedOriginals,
+    recallTail: acc.recallTail,
+    latestCue: acc.latestCue,
+    cueOpen: acc.cueOpen,
     systemPrompt: acc.systemPrompt,
     systemPromptCount: acc.systemPromptCount,
     filesRead,
@@ -158,11 +177,15 @@ function seedCachedProjection(
   tip: number | undefined
 ): CachedProjection {
   const acc = newProjectionAccumulator();
-  for (const e of events) applyEventToProjection(acc, e.type, e.data);
+  for (const e of events) applyEventToProjection(acc, e.type, e.data, e.eventSeq);
   finalizeProjectionWarnings(acc);
   const maxSeq = events.length > 0 ? Math.max(...events.map((e) => e.eventSeq)) : 0;
   return {
     foldState: acc.state,
+    retainedOriginals: acc.retainedOriginals,
+    recallTail: acc.recallTail,
+    latestCue: acc.latestCue,
+    cueOpen: acc.cueOpen,
     systemPrompt: full.systemPrompt,
     systemPromptCount: acc.systemPromptCount,
     filesRead: full.filesRead,
@@ -252,6 +275,9 @@ export function projectTurnEntry(
     cache.set(sessionId, folded);
     return {
       messages: folded.messages,
+      retainedOriginals: folded.retainedOriginals,
+      recallTail: folded.recallTail,
+      latestCue: folded.latestCue,
       systemPrompt: folded.systemPrompt,
       filesRead: folded.filesRead,
       maxFoldedSeq: folded.maxFoldedSeq,

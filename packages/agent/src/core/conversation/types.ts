@@ -1,4 +1,4 @@
-import type { MemoryReader } from '../../memory/types';
+import type { MemoryReader, AutomaticRecallInput } from '../../memory/types';
 // ABOUTME: Types for ConversationRunner - the extracted agentic loop
 
 import type { AIProvider, LaceStopDetails } from '@lace/agent/providers/base-provider';
@@ -67,6 +67,9 @@ export interface RunnerConfig {
  */
 export interface RunnerDependencies {
   memory?: MemoryReader;
+  prepareAutomaticRecall?: (
+    input: AutomaticRecallInput
+  ) => Promise<{ block: string | null; diagnostics?: Record<string, unknown> }>;
   /** Read current request-only text immediately before each model request. */
   getTemporaryContext?: () => string | null;
   /** Callback for emitting session updates to clients */

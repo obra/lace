@@ -1,7 +1,7 @@
 // ABOUTME: Type-safe discriminated union for durable event data
 // All event types are defined here with their specific data shapes
 
-import type { ToolResult } from '@lace/ent-protocol';
+import type { ToolResult, RecallInput } from '@lace/ent-protocol';
 import type { RuntimeExecutionBinding } from '../tools/runtime/types';
 import type {
   LaceStopReason,
@@ -18,6 +18,8 @@ export type ContentBlock =
 // Individual event data types
 export type PromptEventData = {
   type: 'prompt';
+  inputKind?: 'message' | 'continuation';
+  recall?: RecallInput;
   content: ContentBlock[];
   /**
    * Producer-defined demux key for the new track-based compaction strategy.
@@ -129,6 +131,7 @@ export type ContextCompactedEventData = {
   type: 'context_compacted';
   strategy: string;
   preserved: unknown[];
+  retainedEventSeqs?: number[];
   summary?: string;
   /**
    * Count of canonical events that were summarized into the prefix. Used by
@@ -146,6 +149,8 @@ export type ContextCompactedEventData = {
 
 export type ContextInjectedEventData = {
   type: 'context_injected';
+  inputKind?: 'message' | 'continuation';
+  recall?: RecallInput;
   content: ContentBlock[];
   priority?: string;
   /** See PromptEventData.track. */

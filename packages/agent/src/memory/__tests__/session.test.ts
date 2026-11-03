@@ -12,6 +12,11 @@ import { createAgentServerState, registerAgentRpcMethods, shutdownReminders } fr
 import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../authority';
 import { closeRecallIndex } from '../../storage/recall/index-db';
 import { defaultInitializeParams } from '../../__tests__/helpers/initialize';
+import { appendDurableEvent } from '../../storage/event-log';
+import { writeSessionState } from '../../storage/session-store';
+import { localMemoryEncoder } from '../encoder';
+import { sessionMemory } from '../session';
+import { TestAgentProvider } from '../../runtime/test-provider';
 
 const grant = {
   producerId: 'persona:lace',
@@ -73,6 +78,7 @@ describe('trusted memory initialization and session affinity', () => {
     }
     for (const peer of peers.splice(0)) peer.close();
     closeRecallIndex();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     rmSync(dir, { recursive: true, force: true });
   });
@@ -97,6 +103,76 @@ describe('trusted memory initialization and session affinity', () => {
     ).rejects.toMatchObject({ message: expect.stringContaining('Session memory authority') });
     expect(unconfigured.state.activeSession).toBeNull();
   });
+  it('resumes with automatic recall disabled without reusing evidence while keeping manual source reads', async () => {
+    const encoder = vi
+      .spyOn(localMemoryEncoder, 'encode')
+      .mockImplementation(async (texts) => texts.map(() => [1, 0]));
+    const enabled = pair();
+    await initialize(enabled.client, {
+      databasePath,
+      binding,
+      recall: { modelDirectory: '/unused-test-model' },
+    });
+    const created = (await enabled.client.request('session/new', {
+      cwd: dir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    const active = enabled.state.activeSession!;
+    const { nextState } = appendDurableEvent(active.dir, active.state, {
+      type: 'message',
+      data: { content: [{ type: 'text', text: 'My bicycle is violet.' }] },
+    });
+    active.state = nextState;
+    writeSessionState(active.dir, nextState);
+    await enabled.state.memory!.wake();
+    const prepared = await sessionMemory(enabled.state, active)!.prepareAutomaticRecall!({
+      query: 'bicycle',
+      cueIds: ['ordinary-cue'],
+      represented: [],
+      maxTokens: 2000,
+      signal: new AbortController().signal,
+    });
+    expect(prepared.groups).toHaveLength(1);
+    expect(prepared.block).toContain('violet');
+    const handle = prepared.groups[0].originals[0].handle;
+    await shutdownReminders(enabled.state);
+    await enabled.state.memory!.close();
+    const encodedBeforeRestart = encoder.mock.calls.length;
+
+    const disabled = pair();
+    await initialize(disabled.client);
+    await disabled.client.request('session/load', {
+      sessionId: created.sessionId,
+      cwd: dir,
+      mcpServers: [],
+    });
+    const resumed = sessionMemory(disabled.state, disabled.state.activeSession!)!;
+    expect(resumed.prepareAutomaticRecall).toBeUndefined();
+    expect(await resumed.reader.readOriginal(handle)).toMatchObject({
+      status: 'current',
+      text: expect.stringContaining('My bicycle is violet.'),
+    });
+    const contexts: Array<string | null | undefined> = [];
+    vi.spyOn(TestAgentProvider.prototype, 'createStreamingResponse').mockImplementation(
+      async (_messages, _tools, _model, _signal, _state, options) => {
+        contexts.push(options?.temporaryContext);
+        return {
+          content: 'Finished.',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        };
+      }
+    );
+    disabled.state.temporaryContext = 'caller-owned context';
+    await disabled.client.request('session/prompt', {
+      content: [{ type: 'text', text: 'What color is my bicycle?' }],
+      maxTurns: 1,
+    });
+    expect(contexts).toEqual(['caller-owned context']);
+    expect(encoder.mock.calls).toHaveLength(encodedBeforeRestart);
+  });
+
   it('rejects child extraction configuration before activating the server', async () => {
     const child = pair();
     await expect(

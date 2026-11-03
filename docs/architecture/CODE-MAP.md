@@ -32,7 +32,7 @@
 - [Automatic memory](automatic-memory.md): local model setup, related
   current-note vectors, bounded reconciliation and current-account transcript
   attachments, alongside retained-source discovery, background extraction,
-  atomic derived notes and existing recall integration.
+  atomic derived notes and independently configured before-answer recall.
 
 ## Common Commands
 

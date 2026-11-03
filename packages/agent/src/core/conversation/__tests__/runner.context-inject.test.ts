@@ -9,6 +9,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { MCPToolAdapter } from '@lace/agent/mcp/tool-adapter';
+import { buildProviderMessagesFromDurableEvents } from '@lace/agent/message-building/message-builder';
 import { ConversationRunner, bareTextStopReminder } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import {
@@ -215,6 +218,692 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
     else process.env.LACE_DIR = savedLaceDir;
     if (existsSync(laceDir)) rmSync(laceDir, { recursive: true, force: true });
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('coalesces clean mid-turn queries while keeping raw injected source text', async () => {
+    injectContextEvent(sessionDir, 'initial topic');
+    const captured: Array<
+      Parameters<NonNullable<RunnerDependencies['prepareAutomaticRecall']>>[0]
+    > = [];
+    const provider = new ScriptedProvider([
+      {
+        beforeReturn: () => {
+          for (const [raw, query] of [
+            ['envelope one', 'TASK-271 <literal>'],
+            ['envelope two', 'slack:T:C'],
+          ]) {
+            const state = readSessionState(sessionDir);
+            const { nextState } = appendDurableEvent(sessionDir, state, {
+              type: 'context_injected',
+              data: {
+                priority: 'immediate',
+                content: [{ type: 'text', text: raw }],
+                recall: { query, context: raw === 'envelope one' ? 'amber antecedent' : undefined },
+              },
+            });
+            writeSessionState(sessionDir, nextState);
+          }
+        },
+        response: {
+          content: 'I will inspect amber.',
+          toolCalls: [{ id: 'recall_inject_tool', name: 'bash', arguments: { command: 'check' } }],
+          stopReason: 'tool_use',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+      {
+        response: {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async (input) => {
+          captured.push(input);
+          return { block: null };
+        },
+      })
+    );
+    await runner.run({
+      content: [],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    expect(captured[1].query).toBe('TASK-271 <literal>\nslack:T:C');
+    expect(captured[1].tail).toBe(
+      'initial topic\namber antecedent\nTASK-271 <literal>\nslack:T:C\nI will inspect amber.'
+    );
+    expect(captured[2].tail).toBe(
+      'amber antecedent\nTASK-271 <literal>\nslack:T:C\nI will inspect amber.\ndone'
+    );
+    expect(captured[2].tail).not.toContain('envelope');
+    expect(captured[2].tail).not.toContain('system-reminder');
+
+    expect(captured[1].cueIds).toHaveLength(2);
+    expect(captured[1].represented).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'event', text: 'envelope one' }),
+        expect.objectContaining({ kind: 'event', text: 'envelope two' }),
+      ])
+    );
+    expect(provider.receivedMessages[1]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: expect.stringContaining('envelope one') }),
+      ])
+    );
+  });
+
+  it('keeps the query and conversational tail bounds separate from raw provider history', async () => {
+    const append = (type: string, data: Record<string, unknown>) => {
+      const state = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, state, { type, data });
+      writeSessionState(sessionDir, nextState);
+    };
+    for (const body of ['outside-last-four', 'first', 'second', 'third']) {
+      append('prompt', { content: [{ type: 'text', text: body }] });
+      append('turn_end', {});
+    }
+    const query = 'TASK-271 <literal> '.repeat(200);
+    append('prompt', {
+      content: [{ type: 'text', text: 'raw transport wrapper' }],
+      recall: { query, context: 'amber antecedent' },
+    });
+    append('context_injected', {
+      content: [{ type: 'text', text: 'maintenance wake' }],
+      inputKind: 'continuation',
+    });
+    const captured: Array<
+      Parameters<NonNullable<RunnerDependencies['prepareAutomaticRecall']>>[0]
+    > = [];
+    const provider = new ScriptedProvider([]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async (input) => {
+          captured.push(input);
+          return { block: null };
+        },
+      })
+    );
+    await runner.run({
+      content: [],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    expect(captured[0].query).toBe(query.slice(0, 2400));
+    expect(captured[0].tail).toBe(query.slice(-800));
+    expect(captured[0].tail).toHaveLength(800);
+    expect(provider.receivedMessages[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'user',
+          content: expect.stringContaining('maintenance wake'),
+        }),
+      ])
+    );
+  });
+
+  it('coalesces overlong ordinary inputs identically for live lookup and cold replay', async () => {
+    injectContextEvent(sessionDir, 'initial topic');
+    // The RPC writes turn_start before the runner begins; it separates the prior cue from arrivals.
+    const state = readSessionState(sessionDir);
+    const { nextState } = appendDurableEvent(sessionDir, state, { type: 'turn_start', data: {} });
+    writeSessionState(sessionDir, nextState);
+    const queries = ['first-prefix '.repeat(250) + 'first-ending', 'newest-body '.repeat(130)];
+    const provider = new ScriptedProvider([
+      {
+        beforeReturn: () => {
+          for (const query of queries) {
+            const state = readSessionState(sessionDir);
+            const { nextState } = appendDurableEvent(sessionDir, state, {
+              type: 'context_injected',
+              data: {
+                priority: 'immediate',
+                content: [{ type: 'text', text: 'raw envelope' }],
+                recall: { query },
+              },
+            });
+            writeSessionState(sessionDir, nextState);
+          }
+        },
+        response: {
+          content: '',
+          toolCalls: [{ id: 'long_query_tool', name: 'bash', arguments: { command: 'check' } }],
+          stopReason: 'tool_use',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+      {
+        response: {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+    ]);
+    const captured: string[] = [];
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async (input) => {
+          captured.push(input.query);
+          return { block: null };
+        },
+      })
+    );
+    await runner.run({
+      content: [],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    const expected = [queries[0].slice(0, 2400), queries[1]].join('\n').slice(-2400);
+    expect(captured[1]).toBe(expected);
+    expect(captured[1]).toBe(buildProviderMessagesFromDurableEvents(sessionDir).latestCue?.text);
+    expect(captured[1]).toHaveLength(2400);
+    expect(captured[1].endsWith(queries[1])).toBe(true);
+  });
+
+  it('waits for automatic preparation before calling the provider and composes caller context', async () => {
+    injectContextEvent(sessionDir, 'Where is TASK-271?');
+    let release!: (value: { block: string | null }) => void;
+    const prepared = new Promise<{ block: string | null }>((resolve) => {
+      release = resolve;
+    });
+    let entered!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const provider = new ScriptedProvider([
+      {
+        response: {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        getTemporaryContext: () => 'caller sticky',
+        prepareAutomaticRecall: async () => {
+          entered();
+          return prepared;
+        },
+      })
+    );
+    const running = runner.run({
+      content: [],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    await Promise.race([waiting, running]);
+    expect(provider.callCount).toBe(0);
+    release({ block: 'automatic data' });
+    await running;
+    expect(provider.receivedOptions[0]?.temporaryContext).toBe('caller sticky\n\nautomatic data');
+    expect(JSON.stringify(readDurableEvents(sessionDir, {}).events)).not.toContain(
+      'automatic data'
+    );
+  });
+
+  it.each([
+    {
+      action: 'set',
+      initial: null,
+      next: 'caller updated',
+      expected: 'caller updated\n\nautomatic data',
+      overflow: false,
+    },
+    {
+      action: 'clear',
+      initial: 'caller before',
+      next: null,
+      expected: 'automatic data',
+      overflow: false,
+    },
+    {
+      action: 'replace with larger text',
+      initial: 'caller before',
+      next: 'expanded caller context '.repeat(250),
+      expected: 'expanded caller context '.repeat(250) + '\n\nautomatic data',
+      overflow: true,
+    },
+  ])(
+    'uses caller context $action while automatic preparation is pending',
+    async ({ initial, next, expected, overflow }) => {
+      injectContextEvent(sessionDir, 'Where is TASK-271?');
+      let caller: string | null = initial;
+      let release!: () => void;
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let entered!: () => void;
+      const waiting = new Promise<void>((resolve) => {
+        entered = resolve;
+      });
+      const provider = new ScriptedProvider([
+        {
+          response: {
+            content: 'done',
+            toolCalls: [],
+            stopReason: overflow ? 'context_window_exceeded' : 'end_turn',
+            usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+          },
+        },
+        ...(overflow
+          ? [
+              {
+                response: {
+                  content: 'done',
+                  toolCalls: [],
+                  stopReason: 'end_turn' as const,
+                  usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+                },
+              },
+            ]
+          : []),
+      ]);
+      const runner = new ConversationRunner(
+        { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+        createMockDeps({
+          createProvider: async () => provider,
+          getTemporaryContext: () => caller,
+          prepareAutomaticRecall: async () => {
+            entered();
+            await blocked;
+            return { block: 'automatic data' };
+          },
+        })
+      );
+      const running = runner.run({
+        content: [],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+      await Promise.race([waiting, running]);
+      expect(provider.callCount).toBe(0);
+      caller = next;
+      release();
+      await running;
+      expect(provider.receivedOptions[0]?.temporaryContext).toBe(expected);
+      if (overflow) {
+        expect(provider.receivedOptions.map((options) => options?.temporaryContext)).toEqual([
+          expected,
+          next,
+        ]);
+        expect(
+          readDurableEvents(sessionDir, {}).events.some(
+            (event) => event.type === 'context_compacted'
+          )
+        ).toBe(false);
+      }
+    }
+  );
+
+  it('retries overflow once without automatic evidence while preserving caller text and output format', async () => {
+    injectContextEvent(sessionDir, 'Where is TASK-271?');
+    const provider = new ScriptedProvider([
+      {
+        response: {
+          content: '',
+          toolCalls: [],
+          stopReason: 'context_window_exceeded',
+          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        },
+      },
+      {
+        response: {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+    ]);
+    const outputFormat = { type: 'json_schema', schema: { type: 'object' } };
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        getTemporaryContext: () => 'caller sticky',
+        prepareAutomaticRecall: async () => ({ block: 'automatic data' }),
+      })
+    );
+    await runner.run({
+      content: [],
+      outputFormat,
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    expect(provider.receivedOptions.map((options) => options?.temporaryContext)).toEqual([
+      'caller sticky\n\nautomatic data',
+      'caller sticky',
+    ]);
+    expect(
+      provider.receivedOptions.every((options) => options?.outputFormat === outputFormat)
+    ).toBe(true);
+    expect(
+      readDurableEvents(sessionDir, {}).events.some((event) => event.type === 'context_compacted')
+    ).toBe(false);
+  });
+
+  it.each([
+    { window: 8192, output: 1024, configured: true },
+    { window: 64000, output: 32000, configured: false },
+  ])(
+    'reserves selected output allowance for automatic recall ($window/$output)',
+    async ({ window, output, configured }) => {
+      injectContextEvent(sessionDir, 'Where is TASK-271?');
+      const provider = new ScriptedProvider([
+        {
+          response: {
+            content: 'done',
+            toolCalls: [],
+            stopReason: 'end_turn',
+            usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+          },
+        },
+      ]);
+      provider.contextWindowForModel = () => window;
+      provider.getAvailableModels = () => [
+        {
+          id: 'budget-model',
+          displayName: 'Budget',
+          contextWindow: window,
+          maxOutputTokens: output,
+        },
+      ];
+      if (configured) provider.config.maxTokens = output;
+      let allowance = -1;
+      const runner = new ConversationRunner(
+        {
+          sessionDir,
+          sessionId,
+          cwd,
+          modelId: 'budget-model',
+          executionMode: 'execute',
+          approvalMode: 'approve',
+        },
+        createMockDeps({
+          createProvider: async () => provider,
+          prepareAutomaticRecall: async (input) => {
+            allowance = input.maxTokens;
+            return { block: null };
+          },
+        })
+      );
+      await runner.run({
+        content: [],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+      expect(allowance).toBeGreaterThan(0);
+      expect(allowance).toBeLessThanOrEqual(window - output);
+    }
+  );
+
+  it('budgets MCP tool schemas without serializing their live clients', async () => {
+    const client = new Client({ name: 'recall-budget-test', version: '1.0.0' });
+    const allowances: number[] = [];
+    for (const description of ['query', 'query'.repeat(601)]) {
+      injectContextEvent(sessionDir, 'Where is TASK-271?');
+      const tool = new MCPToolAdapter(
+        {
+          name: 'search',
+          description: 'Search retained evidence',
+          inputSchema: {
+            type: 'object',
+            properties: { query: { type: 'string', description } },
+            required: ['query'],
+          },
+        },
+        'knowledge',
+        client
+      );
+      const provider = new ScriptedProvider([
+        {
+          response: {
+            content: 'done',
+            toolCalls: [],
+            stopReason: 'end_turn',
+            usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+          },
+        },
+      ]);
+      provider.contextWindowForModel = () => 64000;
+      provider.config.maxTokens = 1024;
+      const deps = createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async (input) => {
+          allowances.push(input.maxTokens);
+          return { block: 'automatic data' };
+        },
+      });
+      const createToolExecutor = deps.createToolExecutor;
+      deps.createToolExecutor = async (...args) => ({
+        ...(await createToolExecutor(...args)),
+        toolsForProvider: [tool],
+      });
+      const runner = new ConversationRunner(
+        { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+        deps
+      );
+      await runner.run({
+        content: [],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+      expect(provider.callCount).toBe(1);
+      expect(provider.receivedOptions[0]?.temporaryContext).toBe('automatic data');
+    }
+    expect(allowances).toHaveLength(2);
+    expect(allowances[0] - allowances[1]).toBeGreaterThanOrEqual(1000);
+  });
+
+  it('dispatches before awaiting its recall diagnostic observer', async () => {
+    injectContextEvent(sessionDir, 'bicycle topic');
+    let release!: () => void;
+    let enter!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const provider = new ScriptedProvider([
+      {
+        response: {
+          content: 'done',
+          toolCalls: [],
+          stopReason: 'end_turn',
+          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+        },
+      },
+    ]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async () => ({
+          block: 'valid historical data',
+          diagnostics: { mode: 'hybrid' },
+        }),
+        onUpdate: async (_seq, update) => {
+          if (update.type === 'session_info') {
+            enter();
+            await blocked;
+          }
+        },
+      })
+    );
+    const running = runner.run({
+      content: [],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    await entered;
+    const dispatchedWhileObserverHeld = provider.callCount;
+    release();
+    await running;
+    expect(dispatchedWhileObserverHeld).toBe(1);
+  });
+
+  it('prepares an empty new cue for an ordinary image request without the preceding topic evidence', async () => {
+    const append = (data: Record<string, unknown>) => {
+      const state = readSessionState(sessionDir);
+      const { nextState } = appendDurableEvent(sessionDir, state, { type: 'prompt', data });
+      writeSessionState(sessionDir, nextState);
+    };
+    append({ content: [{ type: 'text', text: 'bicycle topic' }] });
+    const done: ProviderResponse = {
+      content: 'done',
+      toolCalls: [],
+      stopReason: 'end_turn',
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const provider = new ScriptedProvider([{ response: done }, { response: done }]);
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async (input) => ({
+          block: input.query ? 'prior bicycle evidence' : null,
+        }),
+      })
+    );
+    const run = () =>
+      runner.run({
+        content: [],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+    await run();
+    const image = {
+      type: 'image',
+      source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
+    };
+    append({ content: [image], inputKind: 'message' });
+    await run();
+    expect(provider.receivedOptions[0]?.temporaryContext).toBe('prior bicycle evidence');
+    expect(provider.receivedOptions[1]?.temporaryContext ?? '').not.toContain('prior bicycle');
+    expect(provider.receivedMessages[1].at(-1)?.content).toEqual([image]);
+  });
+
+  it('extends represented originals after a current-run tool result before the next injected message', async () => {
+    injectContextEvent(sessionDir, 'initial topic');
+    const tool: ProviderResponse = {
+      content: '',
+      toolCalls: [{ id: 'complete_tool', name: 'bash', arguments: { command: 'report' } }],
+      stopReason: 'tool_use',
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const done: ProviderResponse = {
+      content: 'done',
+      toolCalls: [],
+      stopReason: 'end_turn',
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const provider = new ScriptedProvider([{ response: tool }, { response: done }]);
+    const captured: Array<
+      Parameters<NonNullable<RunnerDependencies['prepareAutomaticRecall']>>[0]
+    > = [];
+    const deps = createMockDeps({
+      createProvider: async () => provider,
+      prepareAutomaticRecall: async (input) => {
+        captured.push(input);
+        return { block: null };
+      },
+    });
+    const factory = deps.createToolExecutor;
+    deps.createToolExecutor = async (...args) => {
+      const built = await factory(...args);
+      built.executor.execute = vi.fn(async () => {
+        injectContextEvent(sessionDir, 'new bicycle message');
+        return { status: 'completed', content: [{ type: 'text', text: 'bicycle violet' }] };
+      });
+      return built;
+    };
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      deps
+    );
+    await runner.run({
+      content: [],
+      abortController: new AbortController(),
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+    const written = readDurableEvents(sessionDir, {}).events.find(
+      (event) => event.type === 'tool_use' && event.data.toolCallId === 'complete_tool'
+    )!;
+    expect(
+      captured[1].represented.some(
+        (original) =>
+          original.kind === 'event' &&
+          original.eventSeq === written.eventSeq &&
+          original.text.includes('tool=bash') &&
+          original.text.includes('bicycle violet')
+      )
+    ).toBe(true);
+    expect(provider.receivedMessages[1].some((message) => message.toolResults?.length === 1)).toBe(
+      true
+    );
+  });
+
+  it('delivers recall diagnostics after dispatch even when the provider rejects', async () => {
+    injectContextEvent(sessionDir, 'bicycle topic');
+    const provider = new ScriptedProvider([]);
+    let dispatched = false;
+    provider.createStreamingResponse = async () => {
+      dispatched = true;
+      throw new Error('provider rejected');
+    };
+    const updates: string[] = [];
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async () => ({
+          block: 'historical data',
+          diagnostics: { mode: 'hybrid' },
+        }),
+        onUpdate: async (_seq, update) => {
+          if (update.type === 'session_info') expect(dispatched).toBe(true);
+          updates.push(update.type);
+        },
+      })
+    );
+    await expect(
+      runner.run({
+        content: [],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      })
+    ).rejects.toBeDefined();
+    expect(updates).toContain('session_info');
   });
 
   it('snapshots sticky temporary context each round and turn without persisting it', async () => {

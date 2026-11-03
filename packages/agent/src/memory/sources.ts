@@ -14,6 +14,7 @@ import { getLaceDir } from '../config/lace-dir';
 import { readToolResultOriginal } from '../storage/tool-result-store';
 import type { ContentBlock } from '../providers/base-provider';
 import type { MemoryNotes } from './notes';
+import { toolSourceHeader } from './source-text';
 import {
   MEMORY_LIMITS as L,
   type MemoryConfiguration,
@@ -40,7 +41,7 @@ function eventContent(
     if (data?.name === 'recall') return [];
     if (!data?.result || data.result.outcome !== 'completed') return [];
     const blocks: ContentBlock[] = [
-      { type: 'text', text: `tool=${data.name}\ninput=${JSON.stringify(data.input)}` },
+      { type: 'text', text: toolSourceHeader(data.name, data.input) },
     ];
     let spilled = false;
     for (const block of data.result.content ?? []) {

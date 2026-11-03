@@ -8,6 +8,7 @@ import {
   EntErrorCodes,
   type DurableHandoffStatus,
   type JsonRpcPeer,
+  type RecallInput,
   type ContextBreakdown,
   type ThreadTokenUsage,
 } from '@lace/ent-protocol';
@@ -237,6 +238,8 @@ export async function injectIntoActiveSession(
     priority: 'immediate' | 'normal' | 'deferred';
     idempotencyKey?: unknown;
     track?: unknown;
+    inputKind?: 'message' | 'continuation';
+    recall?: RecallInput;
   }
 ): Promise<{ durableHandoffStatus: DurableHandoffStatus } | undefined> {
   return await runExclusive(() => {
@@ -278,6 +281,8 @@ export async function injectIntoActiveSession(
       data: {
         content: Array.isArray(parsed.content) ? parsed.content : [],
         priority: parsed.priority,
+        inputKind: parsed.inputKind ?? 'message',
+        ...(parsed.recall !== undefined ? { recall: parsed.recall } : {}),
         ...(idempotencyKey ? { idempotencyKey } : {}),
         ...(track !== undefined ? { track } : {}),
       },
@@ -766,6 +771,8 @@ export function registerSessionOperationHandlers(
       priority: 'immediate' | 'normal' | 'deferred';
       idempotencyKey?: unknown;
       track?: unknown;
+      inputKind?: 'message' | 'continuation';
+      recall?: RecallInput;
     };
     const priority =
       parsed?.priority === 'immediate' ||
@@ -778,6 +785,8 @@ export function registerSessionOperationHandlers(
       priority,
       idempotencyKey: parsed?.idempotencyKey,
       track: parsed?.track,
+      inputKind: parsed?.inputKind,
+      recall: parsed?.recall,
     });
   });
 

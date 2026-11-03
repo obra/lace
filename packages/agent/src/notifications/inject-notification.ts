@@ -63,6 +63,7 @@ export function injectNotification(opts: InjectNotificationOptions): void {
     data: {
       content: [{ type: 'text', text }],
       priority: 'immediate',
+      inputKind: 'continuation',
       ...(opts.track !== undefined ? { track: opts.track } : {}),
     },
   });

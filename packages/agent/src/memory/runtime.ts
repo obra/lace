@@ -7,8 +7,12 @@ import { onDurableEventAppend } from '../storage/event-log';
 import { logger } from '../utils/logger';
 import { assertMemoryAccess, openMemoryDatabase, resolveMemoryBinding } from './authority';
 import { MemoryNotes } from './notes';
+import { MemoryPassages, originalHandle, originalReference } from './passages';
+import { automaticRecall } from './automatic';
+import { attachCurrentAccounts } from './recall-accounts';
+import { redact } from '../storage/recall/redact';
 import { MemorySources } from './sources';
-import { localMemoryEncoder, type MemoryEncoder } from './encoder';
+import { localMemoryEncoder, configureMemoryEncoderDirectory, type MemoryEncoder } from './encoder';
 import { relatedNotes } from './related';
 import { extract, type MemoryQuery } from './extraction';
 import {
@@ -21,6 +25,7 @@ import {
   type SuppliedSource,
   type Note,
   type Support,
+  type MemoryReader,
 } from './types';
 
 export function createMemoryRuntime(
@@ -29,6 +34,8 @@ export function createMemoryRuntime(
     query?: MemoryQuery;
     supportsImages?: () => Promise<boolean>;
     encoder?: MemoryEncoder;
+    semanticFloor?: number;
+    textual?: boolean;
   } = {}
 ): MemoryRuntime {
   const configuration = MemoryConfigurationSchema.parse(input);
@@ -39,6 +46,8 @@ export function createMemoryRuntime(
     if (!binding.isRoot && (configuration.extraction || configuration.documentSources))
       throw new Error('Only root may configure memory discovery');
     MemorySources.validatePaths(configuration);
+    if (configuration.recall && (!deps.encoder || deps.encoder === localMemoryEncoder))
+      configureMemoryEncoderDirectory(configuration.recall.modelDirectory);
   } catch (error) {
     db.close();
     throw error;
@@ -52,6 +61,7 @@ export function createMemoryRuntime(
         const store = new MemoryNotes(db, binding.isRoot && binding.canMutate, () => {
           assertMemoryAccess(db, binding, true);
           if (
+            configuration.extraction &&
             (
               db.prepare('SELECT attempt FROM memory_worker WHERE singleton=1').get() as {
                 attempt: string;
@@ -70,6 +80,11 @@ export function createMemoryRuntime(
     throw error;
   }
   const sources = new MemorySources(notes, configuration);
+  const passages = new MemoryPassages(
+    notes,
+    sources,
+    !!configuration.recall && binding.isRoot && binding.canMutate
+  );
   const controller = new AbortController();
   let closed = false;
   let pending = false;
@@ -254,8 +269,14 @@ export function createMemoryRuntime(
           throw new Error('Offered source changed during extraction');
       for (const change of proposal.changes)
         for (const id of change.sourceIds)
-          if (!primary.some((s) => sourceHandle(s) === id && s.sourceStatus === 'current'))
-            throw new Error('Unoffered or non-current support');
+          if (
+            !primary.some(
+              (s) =>
+                sourceHandle(s) === id &&
+                (s.sourceStatus === 'current' || s.sourceStatus === 'superseded')
+            )
+          )
+            throw new Error('Unoffered or ineligible support');
       notes.accept(
         binding,
         attempt,
@@ -299,35 +320,101 @@ export function createMemoryRuntime(
     }
     return available.length > primaries.length;
   }
-  function wake(): Promise<void> {
-    if (closed || !configuration.extraction) return Promise.resolve();
-    pending = true;
-    if (!running)
-      running = (async () => {
+  let localRunning: Promise<void> | undefined;
+  let localPending = false;
+  let vectorRunning: Promise<void> | undefined;
+  const encoder = deps.encoder ?? localMemoryEncoder;
+  function checkLocal() {
+    if (closed || controller.signal.aborted) throw new Error('Memory runtime closed');
+    assertMemoryAccess(db, binding, true);
+  }
+  function localWake(): Promise<void> {
+    if (
+      closed ||
+      !binding.isRoot ||
+      !binding.canMutate ||
+      (!configuration.recall && !configuration.extraction)
+    )
+      return Promise.resolve();
+    localPending = true;
+    if (!localRunning)
+      localRunning = (async () => {
         try {
           do {
-            pending = false;
+            localPending = false;
             await sources.discover();
-            while (!closed && (await runBatch())) {
-              /* Each batch awaits its sole provider call. */
-            }
-          } while (pending && !closed);
-        } catch (error) {
-          logger.warn('memory.worker.failed', { error: String(error) });
+            checkLocal();
+            if (configuration.recall) await passages.index(checkLocal);
+          } while (localPending && !closed);
         } finally {
-          running = undefined;
+          localRunning = undefined;
         }
       })();
-    return running;
+    return localRunning;
   }
-  const unsubscribe = configuration.extraction
+  function wake(): Promise<void> {
+    const local = localWake();
+    if (configuration.extraction && !closed) {
+      pending = true;
+      if (!running)
+        running = (async () => {
+          try {
+            do {
+              pending = false;
+              await localWake();
+              while (!closed && (await runBatch())) {
+                /* One extraction call per batch. */
+              }
+            } while (pending && !closed);
+          } catch (error) {
+            logger.warn('memory.worker.failed', { error: String(error) });
+          } finally {
+            running = undefined;
+          }
+        })();
+    }
+    return local.then(async () => {
+      if (configuration.recall && binding.isRoot && !vectorRunning) {
+        vectorRunning = (async () => {
+          await passages.vectors(encoder, checkLocal);
+          const missing = notes
+            .candidates()
+            .filter((note) => !notes.vector(note, encoder.generation));
+          for (let offset = 0; offset < missing.length; offset += 4) {
+            const batch = missing.slice(offset, offset + 4);
+            const vectors = await encoder.encode(
+              batch.map((note) => note.text),
+              'document'
+            );
+            checkLocal();
+            for (const [index, note] of batch.entries())
+              notes.cacheVector(note, encoder.generation, vectors[index]);
+          }
+        })()
+          .catch((error: unknown) => {
+            if (!closed) logger.warn('memory.index.text-only', { reason: String(error) });
+          })
+          .finally(() => {
+            vectorRunning = undefined;
+          });
+      }
+      if (configuration.recall) await vectorRunning;
+      if (configuration.extraction) await running;
+    });
+  }
+  const maintenance = binding.isRoot && (configuration.extraction || configuration.recall);
+  const unsubscribe = maintenance
     ? onDurableEventAppend(() => {
-        void wake();
+        void wake().catch((error: unknown) =>
+          logger.warn('memory.index.failed', { reason: String(error) })
+        );
       })
     : undefined;
-  const timer = configuration.extraction
+  const timer = maintenance
     ? setInterval(() => {
-        void wake();
+        void wake().catch((error: unknown) =>
+          logger.warn('memory.index.failed', { reason: String(error) })
+        );
       }, L.maintenanceMs)
     : undefined;
   timer?.unref();
@@ -335,7 +422,72 @@ export function createMemoryRuntime(
     configuration,
     reader(readBinding) {
       checkReader(readBinding);
-      return {
+      const reader: MemoryReader = {
+        async automatic(input) {
+          checkReader(readBinding);
+          if (!configuration.recall) throw new Error('Automatic recall is not configured');
+          void localWake().catch(() => {});
+          checkReader(readBinding);
+          return automaticRecall(input, {
+            notes,
+            sources,
+            passages,
+            encoder,
+            floor: deps.semanticFloor ?? 0.8279641135636632,
+            check: () => checkReader(readBinding),
+            accountsFor: reader.accountsFor,
+            indexing: () => !!localRunning,
+            textual: deps.textual,
+          });
+        },
+        async readOriginal(handle) {
+          checkReader(readBinding);
+          const source = passages.admitted().find((source) => originalHandle(source) === handle);
+          if (!source) return undefined;
+          let status = await sources.status(source);
+          checkReader(readBinding);
+          let text: string | undefined;
+          try {
+            const loaded = await sources.load(source, true);
+            checkReader(readBinding);
+            sources.validateAtAcceptance([{ ...loaded, sourceStatus: status }]);
+            text = redact(
+              loaded.content
+                .filter((block) => block.type === 'text')
+                .map((block) => block.text)
+                .join('\n')
+            );
+          } catch {
+            checkReader(readBinding);
+            status = 'unavailable';
+          }
+          const original = { handle, source: originalReference(source), status, text };
+          if (text === undefined) return original;
+          const guarded = await attachCurrentAccounts(
+            [{ ...original, event_id: handle }],
+            reader,
+            [],
+            [original.source]
+          );
+          checkReader(readBinding);
+          try {
+            sources.validateAtAcceptance([
+              { ...source, sourceStatus: status, content: [], textBytes: 0, imageBytes: 0 },
+            ]);
+          } catch {
+            checkReader(readBinding);
+            return { ...original, status: 'unavailable', text: undefined };
+          }
+          checkReader(readBinding);
+          return (
+            guarded.groups[0] ?? {
+              handle,
+              source: original.source,
+              status,
+              omitted: guarded.omitted[0]?.reason ?? 'Required current accounts unavailable',
+            }
+          );
+        },
         async accountsFor(originals, expectedHeads = []) {
           checkReader(readBinding);
           if (!notes.available()) return originals.map(() => ({ accounts: [] }));
@@ -350,7 +502,19 @@ export function createMemoryRuntime(
           for (const group of groups) {
             for (const note of group.heads) {
               if (checked.has(note.id)) continue;
-              checked.set(note.id, { note, refs: await support(note.sources) });
+              const refs = await support(note.sources);
+              checkReader(readBinding);
+              for (const ref of refs) {
+                if (ref.status !== 'superseded' || ref.reference.kind !== 'document') continue;
+                // A superseded tree entry does not establish that its pinned blob is readable.
+                try {
+                  await sources.load(ref, false);
+                } catch {
+                  ref.status = 'unavailable';
+                }
+                checkReader(readBinding);
+              }
+              checked.set(note.id, { note, refs });
               checkReader(readBinding);
             }
           }
@@ -378,12 +542,19 @@ export function createMemoryRuntime(
                 const { note, refs } = checked.get(head.id)!;
                 if (notes.note(note.id)?.revision !== note.revision)
                   throw new Error('Current account revision changed during recall');
-                if (!refs.length || refs.some((ref) => ref.status !== 'current'))
-                  throw new Error('Required current account support unavailable or non-current');
+                if (
+                  !refs.length ||
+                  refs.some(
+                    (ref) =>
+                      ref.status !== 'current' &&
+                      !(ref.status === 'superseded' && ref.reference.kind === 'document')
+                  )
+                )
+                  throw new Error('Required current account support unavailable');
                 sources.validateAtAcceptance(
                   refs.map((ref) => ({
                     ...ref,
-                    sourceStatus: 'current',
+                    sourceStatus: ref.status,
                     content: [],
                     textBytes: 0,
                     imageBytes: 0,
@@ -446,7 +617,8 @@ export function createMemoryRuntime(
           const { sources: _sources, ...head } = note;
           return { ...head, support: refs };
         },
-      };
+      } satisfies MemoryReader;
+      return reader;
     },
     bindingForRole(role, actorId) {
       return resolveMemoryBinding(db, binding, role, actorId);
