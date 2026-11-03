@@ -2,18 +2,19 @@ import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
 // NOTE ON TEST PARALLELISM
-// The tests under `src/__tests__/` (plus the three Docker integration tests) each
-// spawn a real subprocess — a child lace-agent over stdio, or a Docker container.
+// The tests under `src/__tests__/`, the three Docker integration tests and the
+// workspace-stats E2E test each spawn real subprocesses — child lace-agents,
+// containers or an exec tool.
 // Running many of them in parallel oversubscribes the CPU and makes their internal
 // request timeouts flake nondeterministically. They must run with file parallelism
 // disabled. This CANNOT be expressed here as a per-project `fileParallelism: false`:
 // vitest schedules all projects through one shared worker pool and interleaves their
 // files, so a "serial" project still runs concurrently with the parallel one. The
-// serialization is therefore done in the package.json `test` script, which runs the
-// fast unit tests in parallel first, then the subprocess-heavy tests in a second
-// `vitest run --no-file-parallelism` pass.
+// serialization is therefore done in the package.json `test` and `test:coverage`
+// scripts, which run fast unit tests in parallel first, then subprocess-heavy
+// tests in a second `vitest run --no-file-parallelism` pass.
 //
-// Those same tests must NOT inherit vitest's 5s default `testTimeout`: at the
+// The child lace-agent tests must NOT inherit vitest's 5s default `testTimeout`: at the
 // concurrency a fully parallel run produces, the child agent's cold boot alone
 // eats most of that budget, and the test dies before its own `withTimeout`
 // guards — the ones that name which call hung — can fire. They declare
