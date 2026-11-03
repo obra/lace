@@ -152,7 +152,7 @@ export class ReminderScheduler {
 
   async schedule(input: ScheduleInput): Promise<ScheduleResult> {
     return this.mutex.runExclusive(async () => {
-      const rows = this.store.list();
+      const rows = this.store.listStrict();
       if (rows.length >= MAX_ACTIVE_REMINDERS) {
         throw new Error(
           `Cannot schedule: ${rows.length} reminders are currently pending (over the ${MAX_ACTIVE_REMINDERS}-active cap). Call manage_reminders({action:"list"}) to see them and cancel ones you no longer need.`
@@ -258,8 +258,9 @@ export class ReminderScheduler {
       }
     }
 
-    // Write all recovery changes in a single atomic call.
-    if (mutated) {
+    // Write all recovery changes in a single atomic call, unless the file has rows list()
+    // couldn't read: saving would drop them.
+    if (mutated && this.storeIsReadable()) {
       try {
         this.store.save(rows);
       } catch (err) {
@@ -273,6 +274,18 @@ export class ReminderScheduler {
     this.heap = rows
       .map((r) => ({ id: r.id, nextFireAt: r.next_fire_at }))
       .sort((a, b) => a.nextFireAt - b.nextFireAt);
+  }
+
+  private storeIsReadable(): boolean {
+    try {
+      this.store.listStrict();
+      return true;
+    } catch (err) {
+      logger.error('reminders.store.unreadable_not_rewritten', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
   }
 
   private rescheduleNextTick(): void {

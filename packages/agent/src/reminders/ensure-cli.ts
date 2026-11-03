@@ -5,10 +5,11 @@
 
 import { isSessionId } from '@lace/ent-protocol';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { getSessionDir } from '../storage/session-store';
 import { assertCronAtLeast5MinInterval, getAgentTimezone } from './cron';
 import { ReminderScheduler } from './scheduler';
+import { ReminderStore } from './store';
+import type { ReminderRow } from './types';
 
 export interface CliIo {
   stdout(line: string): void;
@@ -54,35 +55,6 @@ function parseEnsureArgs(args: string[]): EnsureArgs | undefined {
   return { session, cron, promptFile, match };
 }
 
-type CronRow = { id: string; prompt: string };
-
-/**
- * Reads reminders.json strictly. ReminderStore.list() treats a malformed file as empty, and
- * saving after that would wipe every reminder the session has, so this refuses instead.
- */
-function readCronRowsStrict(file: string): CronRow[] {
-  if (!existsSync(file)) return [];
-  const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-  // lace always writes {"reminders": [...]}; any other shape is something we don't understand,
-  // and schedule() would replace it with just the new row.
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('not a {"reminders": [...]} object');
-  }
-  const reminders = (parsed as { reminders?: unknown }).reminders;
-  if (!Array.isArray(reminders)) throw new Error('"reminders" is missing or not an array');
-  const rows: CronRow[] = [];
-  for (const entry of reminders as unknown[]) {
-    const r = entry as { id?: unknown; prompt?: unknown; recurs?: { kind?: unknown } | null };
-    if (typeof r !== 'object' || r === null || typeof r.id !== 'string') {
-      throw new Error('a reminder has no string id');
-    }
-    if (r.recurs?.kind === 'cron' && typeof r.prompt === 'string') {
-      rows.push({ id: r.id, prompt: r.prompt });
-    }
-  }
-  return rows;
-}
-
 async function ensure(args: EnsureArgs, io: CliIo): Promise<number> {
   if (!isSessionId(args.session)) {
     io.stderr(`invalid session id: ${args.session}`);
@@ -100,17 +72,21 @@ async function ensure(args: EnsureArgs, io: CliIo): Promise<number> {
     return EXIT_SESSION_NOT_FOUND;
   }
 
-  const storeFile = join(sessionDir, 'reminders.json');
-  let cronRows: CronRow[];
+  let rows: ReminderRow[];
   try {
-    cronRows = readCronRowsStrict(storeFile);
+    rows = new ReminderStore(sessionDir).listStrict();
   } catch (err) {
-    io.stderr(`cannot read ${storeFile}: ${err instanceof Error ? err.message : String(err)}`);
+    io.stderr(err instanceof Error ? err.message : String(err));
     return EXIT_UNREADABLE_STORE;
   }
 
   const needle = args.match.toLowerCase();
-  const existing = cronRows.find((r) => r.prompt.toLowerCase().includes(needle));
+  const existing = rows.find(
+    (r) =>
+      r.recurs?.kind === 'cron' &&
+      typeof r.prompt === 'string' &&
+      r.prompt.toLowerCase().includes(needle)
+  );
   if (existing) {
     io.stdout(JSON.stringify({ status: 'exists', id: existing.id }));
     return 0;
