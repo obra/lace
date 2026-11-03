@@ -191,7 +191,8 @@ export class ReminderScheduler {
 
   async cancel(id: string): Promise<CancelResult> {
     return this.mutex.runExclusive(async () => {
-      const rows = this.store.list();
+      // Strict: a partly unreadable file would otherwise be saved without its unreadable rows.
+      const rows = this.store.listStrict();
       const idx = rows.findIndex((r) => r.id === id);
       if (idx < 0) return { cancelled: false, reason: 'not_found' } as CancelResult;
       const nextRows = [...rows.slice(0, idx), ...rows.slice(idx + 1)];
@@ -341,7 +342,17 @@ export class ReminderScheduler {
       // prior) or never happened (e.g. computePostFire threw).
       let prior: ReminderRow | null = null;
       try {
-        const rows = this.store.list();
+        let rows: ReminderRow[];
+        try {
+          // Strict: a partly unreadable file would otherwise be saved without its unreadable rows.
+          rows = this.store.listStrict();
+        } catch (err) {
+          // Don't fire and don't retry: restoring the heap entry would refire on the next tick
+          // forever. The row stays on disk and re-arms when the session next loads.
+          this.onError(err);
+          committed = true;
+          return;
+        }
         const idx = rows.findIndex((r) => r.id === id);
         if (idx < 0) {
           committed = true; // Nothing to do; not an error.

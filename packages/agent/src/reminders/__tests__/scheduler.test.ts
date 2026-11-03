@@ -839,17 +839,22 @@ describe('ReminderScheduler exception handling', () => {
       if (saveCalls === 1) throw new Error('disk full');
       return origSave(rows);
     }) as typeof origSave;
-    sched.store.list = (() => {
-      listCalls++;
-      // list() call order inside a single tick:
-      //   call 1: tickForTest rebuilds heap
-      //   call 2: fire() reads rows at top of try block
-      //   call 3: pre-fix finally block re-reads disk for heap restore
-      // Post-fix, the finally block uses `prior` instead of list(), so call 3
-      // never happens — and heap restore works even if list() would throw here.
-      if (listCalls === 3) throw new Error('disk failure during restore');
-      return origList();
-    }) as typeof origList;
+    // Disk reads, through either list() or listStrict(), in order inside a single tick:
+    //   read 1: tickForTest rebuilds heap (list)
+    //   read 2: fire() reads rows at top of try block (listStrict)
+    //   read 3: pre-fix finally block re-reads disk for heap restore
+    // Post-fix, the finally block uses `prior` instead of re-reading, so read 3
+    // never happens — and heap restore works even if a read would throw here.
+    const origListStrict = sched.store.listStrict.bind(sched.store);
+    const countedRead =
+      <T>(read: () => T) =>
+      (): T => {
+        listCalls++;
+        if (listCalls === 3) throw new Error('disk failure during restore');
+        return read();
+      };
+    sched.store.list = countedRead(origList) as typeof origList;
+    sched.store.listStrict = countedRead(origListStrict) as typeof origListStrict;
 
     await sched.tickForTest(2000);
 
@@ -858,7 +863,7 @@ describe('ReminderScheduler exception handling', () => {
 
     // The fix is that the finally block uses the in-scope `prior` snapshot
     // instead of calling store.list() a second time. Assert directly that
-    // list() was called exactly twice (once in tickForTest's heap rebuild,
+    // the disk was read exactly twice (once in tickForTest's heap rebuild,
     // once at the start of fire()) — a regression that re-introduced a
     // disk read in the finally block would bump this to 3+.
     expect(listCalls).toBe(2);
@@ -870,6 +875,7 @@ describe('ReminderScheduler exception handling', () => {
     // Restore patched methods and verify the row fires successfully on next tick.
     sched.store.save = origSave;
     sched.store.list = origList;
+    sched.store.listStrict = origListStrict;
     const fired: number[] = [];
     (sched as unknown as { notifier: (ctx: { firedAt: number }) => Promise<void> }).notifier =
       async (ctx: { firedAt: number }) => {

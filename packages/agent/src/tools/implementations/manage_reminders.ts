@@ -264,8 +264,12 @@ export class ManageRemindersTool extends Tool {
     }
 
     if (parsed.kind === 'cancel') {
-      const result = await reminderScheduler.cancel(parsed.id);
-      return ok(result as Record<string, unknown>);
+      try {
+        const result = await reminderScheduler.cancel(parsed.id);
+        return ok(result as Record<string, unknown>);
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e));
+      }
     }
 
     // schedule

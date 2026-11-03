@@ -64,9 +64,22 @@ describe('ReminderStore.listStrict', () => {
     const dir = sessionDir();
     writeFileSync(join(dir, 'reminders.json'), content);
 
-    expect(() => new ReminderStore(dir).listStrict()).toThrow(ReminderStoreUnreadableError);
+    let thrown: unknown;
+    try {
+      new ReminderStore(dir).listStrict();
+    } catch (err) {
+      thrown = err;
+    }
+    // Both checks: instanceof fails loudly if the class isn't exported at all.
+    expect(thrown).toBeInstanceOf(ReminderStoreUnreadableError);
+    expect(thrown).toMatchObject({ name: 'ReminderStoreUnreadableError' });
   });
 });
+
+/** One good row plus one row list() silently skips: the shape partial corruption leaves. */
+function mixedFile(good: ReminderRow): string {
+  return JSON.stringify({ reminders: [good, { ...row({ id: 'x' }), id: 42 }] });
+}
 
 describe('writers never overwrite an unreadable reminders.json', () => {
   it.each(UNREADABLE)(
@@ -78,10 +91,52 @@ describe('writers never overwrite an unreadable reminders.json', () => {
 
       await expect(
         scheduler(dir).schedule({ prompt: 'new', delaySeconds: 600, recurs: null })
-      ).rejects.toThrow(ReminderStoreUnreadableError);
+      ).rejects.toThrow(expect.objectContaining({ name: 'ReminderStoreUnreadableError' }));
       expect(readFileSync(file, 'utf8')).toBe(content);
     }
   );
+
+  it('cancel() refuses a partly unreadable file instead of dropping the bad row', async () => {
+    const dir = sessionDir();
+    const file = join(dir, 'reminders.json');
+    const content = mixedFile(row({ id: 'reminder_bbbbbbbbbbbb' }));
+    writeFileSync(file, content);
+
+    await expect(scheduler(dir).cancel('reminder_bbbbbbbbbbbb')).rejects.toThrow(
+      expect.objectContaining({ name: 'ReminderStoreUnreadableError' })
+    );
+    expect(readFileSync(file, 'utf8')).toBe(content);
+  });
+
+  it('a due reminder in a partly unreadable file reports the error, does not fire, and leaves the file', async () => {
+    const dir = sessionDir();
+    const file = join(dir, 'reminders.json');
+    const content = mixedFile(
+      row({ id: 'reminder_cccccccccccc', next_fire_at: 1000, recurs: null })
+    );
+    writeFileSync(file, content);
+    const errors: unknown[] = [];
+    const fired: unknown[] = [];
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 2000,
+      notifier: (ctx) => {
+        fired.push(ctx);
+      },
+      onError: (err) => errors.push(err),
+    });
+
+    await sched.start();
+    await sched.tickForTest(2000);
+    // Not put back on the heap, or the live timer would refire it on every tick.
+    const heap = (sched as unknown as { heap: Array<{ id: string }> }).heap;
+    await sched.stop();
+
+    expect(fired).toEqual([]);
+    expect(errors).toEqual([expect.objectContaining({ name: 'ReminderStoreUnreadableError' })]);
+    expect(heap.find((e) => e.id === 'reminder_cccccccccccc')).toBeUndefined();
+    expect(readFileSync(file, 'utf8')).toBe(content);
+  });
 
   it('boot recovery does not rewrite a file with a row it cannot read', async () => {
     const dir = sessionDir();
