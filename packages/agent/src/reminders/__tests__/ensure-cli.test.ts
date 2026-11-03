@@ -181,6 +181,53 @@ describe('lace-agent reminders ensure', () => {
     expect(readFileSync(remindersPath(), 'utf8')).toBe(content);
   });
 
+  it.each([
+    ['a top-level array', '[]'],
+    ['an object without a reminders array', '{"other": 1}'],
+    ['a reminders value that is not an array', '{"reminders": {}}'],
+  ])('refuses %s without touching it', async (_name, content) => {
+    writeFileSync(remindersPath(), content);
+
+    const { code } = await run();
+
+    expect(code).toBe(3);
+    expect(readFileSync(remindersPath(), 'utf8')).toBe(content);
+  });
+
+  it('does not count a count reminder that mentions the text', async () => {
+    writeFileSync(
+      remindersPath(),
+      JSON.stringify({
+        reminders: [
+          row({
+            id: 'reminder_999999999999',
+            prompt: 'mise-en-place, twice',
+            recurs: { kind: 'count', interval_ms: 600_000, remaining: 2 },
+          }),
+        ],
+      })
+    );
+
+    const { code, last } = await run();
+
+    expect(code).toBe(0);
+    expect(last).toMatchObject({ status: 'created' });
+  });
+
+  it('exits 64 with usage for an invalid session id, unknown flag or repeated flag', async () => {
+    const io = { stdout: () => {}, stderr: () => {} };
+    const base = ['--cron', '0 22 * * *', '--prompt-file', promptFile, '--match', 'x'];
+
+    expect(await runRemindersCli(['ensure', '--session', '../escape', ...base], io)).toBe(64);
+    expect(
+      await runRemindersCli(['ensure', '--session', SESSION, ...base, '--force', 'yes'], io)
+    ).toBe(64);
+    expect(
+      await runRemindersCli(['ensure', '--session', SESSION, ...base, '--match', 'y'], io)
+    ).toBe(64);
+    expect(existsSync(remindersPath())).toBe(false);
+  });
+
   it('exits 2 for a session that does not exist', async () => {
     rmSync(sessionDir, { recursive: true, force: true });
 

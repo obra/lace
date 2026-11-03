@@ -100,12 +100,17 @@ lace-agent reminders ensure --session <sessionId> --cron '0 22 * * *' \
   `manage_reminders`, adds the row through `ReminderScheduler.schedule()` (same
   id format, 50-reminder cap, next-fire in `TZ`, atomic write) and prints
   `{"status":"created","id":"..."}`.
-- It reads `reminders.json` strictly: a file that does not parse, or a row
-  without a string `id`, exits 3 and is left untouched.
-- Exit codes: 0 ok, 1 invalid cron, cap reached or unreadable prompt file,
-  2 session not found, 3 unreadable `reminders.json`, 64 usage.
-- The session directory resolves exactly as the server's (`LACE_DIR`,
-  `LACE_SESSION_DIR`).
+- It reads `reminders.json` strictly: anything other than a
+  `{"reminders": [...]}` object, or a row without a string `id`, exits 3 and
+  the file is left untouched (a lenient read would let the save replace it).
+- Exit codes: 0 ok, 1 invalid cron, cap reached, unreadable prompt file or
+  unusable session storage, 2 session not found, 3 unreadable
+  `reminders.json`, 64 usage (missing, unknown or repeated flag, or a session id
+  that is not `sess_<uuid>`).
+- The session directory resolves exactly as the server's: `LACE_SESSION_DIR`,
+  else `<LACE_DIR>/agent-sessions`, falling back to `XDG_STATE_HOME`,
+  `~/.local/state` and the OS temp dir. Give it the same env as the server, or
+  it can look in a different place.
 
 Run it while no lace server has that session active. A live scheduler keeps its
 schedule in memory and only picks the new row up on the session's next

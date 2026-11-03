@@ -3,6 +3,7 @@
 // ABOUTME: Writes reminders.json through lace's own scheduler; run it while no server has the
 // ABOUTME: session active (a live scheduler only picks the row up on its next reload).
 
+import { isSessionId } from '@lace/ent-protocol';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { getSessionDir } from '../storage/session-store';
@@ -32,13 +33,18 @@ const EXIT_USAGE = 64;
 
 type EnsureArgs = { session: string; cron: string; promptFile: string; match: string };
 
+const ENSURE_FLAGS = new Set(['session', 'cron', 'prompt-file', 'match']);
+
+/** Every flag known, given once, with a value; anything else is a usage error. */
 function parseEnsureArgs(args: string[]): EnsureArgs | undefined {
   const flags = new Map<string, string>();
   for (let i = 0; i < args.length; i += 2) {
     const flag = args[i];
     const value = args[i + 1];
     if (flag === undefined || !flag.startsWith('--') || value === undefined) return undefined;
-    flags.set(flag.slice(2), value);
+    const name = flag.slice(2);
+    if (!ENSURE_FLAGS.has(name) || flags.has(name)) return undefined;
+    flags.set(name, value);
   }
   const session = flags.get('session');
   const cron = flags.get('cron');
@@ -57,10 +63,13 @@ type CronRow = { id: string; prompt: string };
 function readCronRowsStrict(file: string): CronRow[] {
   if (!existsSync(file)) return [];
   const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-  if (typeof parsed !== 'object' || parsed === null) throw new Error('not a JSON object');
+  // lace always writes {"reminders": [...]}; any other shape is something we don't understand,
+  // and schedule() would replace it with just the new row.
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('not a {"reminders": [...]} object');
+  }
   const reminders = (parsed as { reminders?: unknown }).reminders;
-  if (reminders === undefined) return [];
-  if (!Array.isArray(reminders)) throw new Error('"reminders" is not an array');
+  if (!Array.isArray(reminders)) throw new Error('"reminders" is missing or not an array');
   const rows: CronRow[] = [];
   for (const entry of reminders as unknown[]) {
     const r = entry as { id?: unknown; prompt?: unknown; recurs?: { kind?: unknown } | null };
@@ -75,7 +84,17 @@ function readCronRowsStrict(file: string): CronRow[] {
 }
 
 async function ensure(args: EnsureArgs, io: CliIo): Promise<number> {
-  const sessionDir = getSessionDir(args.session);
+  if (!isSessionId(args.session)) {
+    io.stderr(`invalid session id: ${args.session}`);
+    return EXIT_USAGE;
+  }
+  let sessionDir: string;
+  try {
+    sessionDir = getSessionDir(args.session);
+  } catch (err) {
+    io.stderr(err instanceof Error ? err.message : String(err));
+    return EXIT_INVALID;
+  }
   if (!existsSync(sessionDir)) {
     io.stderr(`session not found: ${args.session}`);
     return EXIT_SESSION_NOT_FOUND;
