@@ -18,6 +18,15 @@ superseded, missing or unavailable support. It checks current role authority; an
 unconfigured session cannot use derived memory. These are model-authored
 attributed syntheses, not independently verified facts.
 
+Configured transcript search, read and thread also attach `current_accounts` for
+originals that supported a retained note revision. Each attachment names the
+latest stored account, with its revision, attribution and support handles. It
+may retain exact readable superseded document support, preserving its historical
+status. Missing or unreadable required support withholds the affected original
+group with an explicit reason. A current account does not confirm current facts:
+claims drawn from superseded support need current applicable evidence before use
+as present instructions.
+
 ## Actions
 
 `action` is required and is one of `search`, `read` or `thread`.

@@ -89,9 +89,11 @@ A separately owned `oneShotQuery` provider receives originals and up to 16
 current candidate notes. Candidate prose is reconciliation context, never
 independent factual support. When a note is offered for revision, its supporting
 originals are offered too, including immutable older document versions marked
-superseded or missing from the current tree. A proposal may support new claims
-only with current supplied originals. A source handle identifies its exact
-source version.
+superseded or missing from the current tree. Accepted support must be exactly
+offered with current or superseded status; missing, unavailable, unknown-status
+and unoffered support is rejected. A revision may cite only historical originals
+when they support its dated account. Fresh primary admission remains
+current-only. A source handle identifies its exact source version.
 
 Related-note selection searches current heads across all note ages with the
 local EmbeddingGemma 2 text encoder. Notes have disposable vectors in the same
@@ -160,11 +162,12 @@ The authority database owns current heads, immutable revision receipts,
 immutable offered-work manifests, completion/failure receipts and source
 coverage. Acceptance updates note heads, revisions, same-database FTS and
 primary completion atomically. It rechecks current grants, owner generation,
-worker attempt, offered source versions and candidate revisions. Document heads
-and retained input are verified again at acceptance. Restart can resume
-unfinished work; completed source versions are not submitted again. Removing the
-note FTS projection allows a configured writable root to rebuild it from current
-heads.
+worker attempt, offered source identities, versions and statuses, and candidate
+revisions. Document heads and retained input are verified again at acceptance.
+These checks enforce provenance and authority; they do not establish whether a
+model-authored claim applies to the present. Restart can resume unfinished work;
+completed source versions are not submitted again. Removing the note FTS
+projection allows a configured writable root to rebuild it from current heads.
 
 Shutdown fences the runtime before aborting its request, removing wake hooks and
 closing its database. A provider that ignores abort cannot write a late result
@@ -195,8 +198,11 @@ version; document handles identify committed support and are not accepted as
 `recall(read)` event handles. Automatic original/document retrieval remains
 separate. Internal byte offsets, locator paths and content hashes remain in
 validated storage rather than being repeated in attached model-visible groups.
-Attachments share a 64 KiB budget per recall result. If a required account lacks
-current readable support, changes during awaited reads, or exceeds the
+Attachments share a 64 KiB budget per recall result. A current account may cite
+readable, pinned superseded document support alongside current support or as its
+only support. The retained blob must be readable; a superseded tree entry alone
+is insufficient. Each reference keeps its actual status. If a required account
+lacks eligible readable support, changes during awaited reads, or exceeds the
 attachment bound, the entire affected original group is omitted with an explicit
 reason. Read context and thread events use the same guard as search hits.
 Current authority and source support are revalidated after asynchronous reads.
@@ -204,10 +210,14 @@ Unconfigured transcript recall is unchanged, including its public limits,
 filtering, ordering and chronology.
 
 A derived memory is model-authored synthesis with attributed support, not
-independently verified truth. No automatic prompt insertion, experimental
-identifier ranking, new manual memory tool, correction/forget protocol or source
-archive is included. Procedures continue to use skills. Sen integration and
-production enablement require their own host configuration and validation.
-Controlled behavior tests demonstrate durability and permission contracts;
-useful model extraction and source faithfulness still require a separate
-real-model sample.
+independently verified truth. A current account is the latest stored synthesis,
+not confirmation that its claims remain current. Superseded support is
+historical evidence; claims drawn from it need current applicable evidence
+before use as present instructions. Source status and ingestion order do not
+determine fact time or present applicability. No automatic prompt insertion,
+experimental identifier ranking, new manual memory tool, correction/forget
+protocol or source archive is included. Procedures continue to use skills. Sen
+integration and production enablement require their own host configuration and
+validation. Controlled behavior tests demonstrate durability and permission
+contracts; useful model extraction and source faithfulness still require a
+separate real-model sample.

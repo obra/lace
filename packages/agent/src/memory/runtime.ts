@@ -254,8 +254,14 @@ export function createMemoryRuntime(
           throw new Error('Offered source changed during extraction');
       for (const change of proposal.changes)
         for (const id of change.sourceIds)
-          if (!primary.some((s) => sourceHandle(s) === id && s.sourceStatus === 'current'))
-            throw new Error('Unoffered or non-current support');
+          if (
+            !primary.some(
+              (s) =>
+                sourceHandle(s) === id &&
+                (s.sourceStatus === 'current' || s.sourceStatus === 'superseded')
+            )
+          )
+            throw new Error('Unoffered or ineligible support');
       notes.accept(
         binding,
         attempt,
@@ -350,7 +356,19 @@ export function createMemoryRuntime(
           for (const group of groups) {
             for (const note of group.heads) {
               if (checked.has(note.id)) continue;
-              checked.set(note.id, { note, refs: await support(note.sources) });
+              const refs = await support(note.sources);
+              checkReader(readBinding);
+              for (const ref of refs) {
+                if (ref.status !== 'superseded' || ref.reference.kind !== 'document') continue;
+                // A superseded tree entry does not establish that its pinned blob is readable.
+                try {
+                  await sources.load(ref, false);
+                } catch {
+                  ref.status = 'unavailable';
+                }
+                checkReader(readBinding);
+              }
+              checked.set(note.id, { note, refs });
               checkReader(readBinding);
             }
           }
@@ -378,12 +396,19 @@ export function createMemoryRuntime(
                 const { note, refs } = checked.get(head.id)!;
                 if (notes.note(note.id)?.revision !== note.revision)
                   throw new Error('Current account revision changed during recall');
-                if (!refs.length || refs.some((ref) => ref.status !== 'current'))
-                  throw new Error('Required current account support unavailable or non-current');
+                if (
+                  !refs.length ||
+                  refs.some(
+                    (ref) =>
+                      ref.status !== 'current' &&
+                      !(ref.status === 'superseded' && ref.reference.kind === 'document')
+                  )
+                )
+                  throw new Error('Required current account support unavailable');
                 sources.validateAtAcceptance(
                   refs.map((ref) => ({
                     ...ref,
-                    sourceStatus: 'current',
+                    sourceStatus: ref.status,
                     content: [],
                     textBytes: 0,
                     imageBytes: 0,
