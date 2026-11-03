@@ -1,4 +1,4 @@
-import { sessionMemory } from '../../memory/session';
+import { sessionMemory, clearSessionMemory } from '../../memory/session';
 // ABOUTME: Session lifecycle RPC handlers for creating, loading, and managing sessions
 
 import { randomUUID } from 'node:crypto';
@@ -447,6 +447,7 @@ async function activateStoredSession(
 
   state.activeSession = loadedWithMcpServers;
   state.temporaryContext = null;
+  clearSessionMemory(state);
   rehydrateServerConfigFromSession(state, state.activeSession.state);
 
   // MCP servers before schedulers: the reminder scheduler fires anything overdue
@@ -914,6 +915,7 @@ export function registerSessionHandlers(
 
     state.activeSession = loadSession(sessionId);
     state.temporaryContext = null;
+    clearSessionMemory(state);
     await ensureSchedulers();
     await reconcileMcpServersForActiveSession(state);
 
@@ -1198,6 +1200,7 @@ export function registerSessionHandlers(
     state.activeTurn = null;
     state.activeSession = null;
     state.temporaryContext = null;
+    clearSessionMemory(state);
 
     return {};
   });

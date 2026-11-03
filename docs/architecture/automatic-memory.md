@@ -11,6 +11,7 @@ memory: {
   databasePath: '/service/state/memory.sqlite',
   binding, // HostMemoryBinding issued by the current boot owner
   extraction: { connectionId: 'balanced', modelId: 'configured-model' },
+  recall: { modelDirectory: '/service/state/models/embeddinggemma-2-ONNX' },
   documentSources: {
     gitRoot: '/service/instance',
     paths: ['journal', 'knowledge'],
@@ -28,8 +29,9 @@ and an explicit list must be nonempty. Omitting this field preserves admission
 of all regular files beneath the literal roots. This selects originals during
 discovery; it does not introduce glob syntax or change snapshotting. The root
 must be a real repository root. Child Lace processes run on the host too; their
-fresh initialization includes only the database path and a newly derived
-non-root binding. It omits extraction and document settings.
+fresh initialization includes the database path, optional recall asset directory
+and a newly derived non-root binding. It omits extraction and document settings;
+children read the shared projections without maintaining them.
 
 Derived notes are ordinary instance-wide memory: reads require current
 `canRead`, acceptance requires current `canMutate`. Writable document collection
@@ -42,8 +44,10 @@ An unconfigured process cannot resume a session that already has this affinity.
 
 ## Originals and discovery
 
-One worker belongs to the server lifetime. Startup, a local durable append and a
-30-second maintenance tick coalesce into its wake loop. At most one extraction
+Local discovery/indexing and one extraction worker belong to the server
+lifetime. Startup, a local durable append and a 30-second maintenance tick
+coalesce their work. Local discovery and passage indexing remain available while
+extraction is disabled or waiting for its provider. At most one extraction
 request is active. Maintenance observes writes from child processes and
 committed Git changes after the final foreground turn. Extraction does not run
 as a foreground turn and has no elapsed-time failure deadline.
@@ -112,11 +116,12 @@ tokenizer files and `onnx/model_quantized.onnx` plus its data file. Setup
 downloads only the pinned revision and verifies exact sizes and SHA-256 hashes.
 Runtime verifies local assets and loads one lazy process-wide text model, with
 vision and audio disabled, 2 intra-op / 1 inter-op CPU threads, serialized
-batches of four, and the projected normalized 768-dimensional
-`sentence_embedding`. The 512-token encoder window preserves BOS/content/EOS;
-the extractor still receives complete admitted originals. This bounded window
-and the 16-candidate union cannot ensure complete contradiction coverage.
-Missing-model initialization is not retried on every worker wake.
+batches of four, with waiting foreground queries taking the next batch slot, and
+the projected normalized 768-dimensional `sentence_embedding`. The 512-token
+encoder window preserves BOS/content/EOS; the extractor still receives complete
+admitted originals. This bounded window and the 16-candidate union cannot ensure
+complete contradiction coverage. Missing-model initialization is not retried on
+every worker wake.
 
 Each admitted fresh original gets related-note reconciliation before further
 fresh originals consume support capacity. A batch splits when needed. Candidate
@@ -201,30 +206,197 @@ each event group. Links are not followed recursively.
 An attachment includes note ID/revision/prose, producer attribution and usable
 support handles. Event handles are `<sessionId>:<eventSeq>` for ordinary
 `recall(read)` expansion; pinned document handles retain the exact document
-version; document handles identify committed support and are not accepted as
-`recall(read)` event handles. Automatic original/document retrieval remains
-separate. Internal byte offsets, locator paths and content hashes remain in
-validated storage rather than being repeated in attached model-visible groups.
-Attachments share a 64 KiB budget per recall result. A current account may cite
-readable, pinned superseded document support alongside current support or as its
-only support. The retained blob must be readable; a superseded tree entry alone
-is insufficient. Each reference keeps its actual status. If a required account
-lacks eligible readable support, changes during awaited reads, or exceeds the
-attachment bound, the entire affected original group is omitted with an explicit
-reason. Read context and thread events use the same guard as search hits.
-Current authority and source support are revalidated after asynchronous reads.
-Unconfigured transcript recall is unchanged, including its public limits,
-filtering, ordering and chronology.
+version; opaque `source:<digest>` handles identify exact admitted document
+versions and expanded sidecar-backed originals through `recall(read)`. Arbitrary
+paths cannot be used as handles. Historical source reads retain
+current/superseded/missing/unavailable status and never substitute new bytes.
+Internal byte offsets, locator paths and content hashes remain in validated
+storage rather than being repeated in attached model-visible groups. Attachments
+share a 64 KiB budget per recall result. Current accounts are the latest stored
+summary revisions, not confirmed current facts. Readable pinned superseded
+document support remains attached with its actual status as historical evidence;
+its claims need current applicable evidence before use as present instructions.
+If a required account lacks current or readable superseded document support,
+changes during awaited reads, or exceeds the attachment bound, the entire
+affected original group is omitted with an explicit reason. Read context and
+thread events use the same guard as search hits. Current authority and source
+support are revalidated after asynchronous reads. Unconfigured transcript recall
+is unchanged, including its public limits, filtering, ordering and chronology.
+
+Each revision retains its own original-source references. For a transcript,
+these include the session ID and exact event sequence number, plus a file
+locator. Combine the session and sequence as `<sessionId>:<eventSeq>` for
+`recall({ action: 'read', event_id, context: 5, full: true })` to inspect the
+source event and nearby conversation. This identifies an event, not an annotated
+sentence within it. A foreground agent or a delegated reader can use the same
+reference with its existing access. Document support instead pins the committed
+path, commit and blob. A reference neither grants access nor guarantees that the
+retained source is still available.
 
 A derived memory is model-authored synthesis with attributed support, not
-independently verified truth. A current account is the latest stored synthesis,
-not confirmation that its claims remain current. Superseded support is
-historical evidence; claims drawn from it need current applicable evidence
-before use as present instructions. Source status and ingestion order do not
-determine fact time or present applicability. No automatic prompt insertion,
-experimental identifier ranking, new manual memory tool, correction/forget
+independently verified truth. No new manual memory tool, correction/forget
 protocol or source archive is included. Procedures continue to use skills. Sen
 integration and production enablement require their own host configuration and
 validation. Controlled behavior tests demonstrate durability and permission
 contracts; useful model extraction and source faithfulness still require a
 separate real-model sample.
+
+## Before-answer automatic recall
+
+The independent optional `recall: { modelDirectory }` configuration enables
+retrieval before provider requests. It defaults off: omit `recall` to disable
+automatic retrieval and insertion. Extraction is independently configured;
+omitting `extraction` does not disable recall, and omitting `recall` does not
+disable extraction, manual recall or retained memory. Host configuration is
+applied at initialization; restart/reinitialize with `recall` omitted and resume
+the session to disable it. Selections belong to the runtime and session rather
+than persisted temporary context, so disabled resumes do not reinstall prior
+automatic evidence. No live-toggle API is provided. It does not require an
+extraction connection. Configure document discovery on the root for committed
+originals even when extraction is disabled. Missing or invalid pinned assets
+produce an explicit text-only outcome; runtime never downloads weights. One
+process rejects conflicting configured model directories.
+
+Foreground requests trigger coalesced local maintenance without waiting for
+corpus catch-up; available index coverage remains explicit. The memory database
+holds disposable source-versioned passages, their redacted coordinates and
+encoder-generation vectors. Passages use a conservative 384-byte UTF-8 bound
+within the 512-token encoder input. Existing transcript and note FTS nominate
+covered text; the additional original FTS covers committed documents and
+retained text absent from transcript FTS, including full sidecars. Exact cosine
+scans yield between SQLite pages and cover every indexed age. Background
+publication checks current source/revision and host authority after awaits.
+
+A bounded query prioritizes incoming ordinary input and adds only a short
+user/assistant conversational tail. Literal text alternatives are safely quoted
+OR terms with stopwords removed. Complete quoted and code-shaped identifiers
+from the incoming question grant one boolean preference; multiple matches do not
+add boosts, and unmatched identifiers impose no constraint. Semantic evidence
+must meet the fixed generation-specific floor, 0.8279641135636632. This
+development-calibrated relevance threshold is not a probability or a guarantee
+of useful answers. Textual nominations independently require an FTS match and
+literal term overlap or a complete identifier match. Cosine scores still order
+both methods' candidates. Text-only fallback remains observable, including empty
+results.
+
+Candidate selection excludes cue events and passages actually present in
+required history. An event represented only by a digest does not exclude its
+full sidecar. Compaction records retained event identities; its watermark does
+not establish presence. The boolean complete-identifier preference applies
+before each method admits up to 24 distinct valid groups, with cosine ordering
+inside each tier and refill after invalid or duplicate nominations. Group merges
+preserve that preference. Packing first attempts the first original and every
+required current account from each ranked group, admitting at most six groups.
+It then uses remaining room for ranked sibling passages of admitted groups,
+keeping a fitting prefix for each group's originals. Bridging sources coalesce
+overlapping account groups without repeating note IDs while retaining distinct
+historical originals that fit. Only current originals are selected; their latest
+linked accounts can retain readable superseded document support with explicit
+status. An original and all directly linked current accounts stay together.
+Reused selections are revalidated and repacked for each request; changed
+evidence drops the affected group. The displayed redacted framing and JSON data
+count against 2,000 estimated tokens and the remaining request allowance. The
+runner estimates room for history, system and then-current caller text, public
+tool names, descriptions and input schemas, and the selected output allowance
+before packing evidence. Caller text is read again before submission; an update
+during retrieval can change the remaining headroom. Larger caller text is kept,
+with the existing automatic-evidence overflow retry available if needed. When
+that allowance shrinks, packing prioritizes group coverage before sibling
+expansion and keeps every required current account. A completed unit that cannot
+fit is omitted, without trimming its sentences or current accounts. The full
+validated selection remains available for a later larger request.
+
+Prompt and inject requests can carry retrieval-only
+`recall: { query: string; context?: string }` alongside provider content. The
+query is the current message body; context carries catch-up message bodies.
+Explicitly empty queries remain empty. Without this object, ordinary content
+text supplies the query. These bodies are persisted on the input event without
+replacing provider content, represented originals, or their source identities.
+The incoming query remains bounded to 2,400 characters.
+
+The conversational retrieval tail is projected separately from provider history.
+Each ordinary input contributes catch-up bodies before its current query;
+completed assistant prose also contributes, including prose accompanying tool
+calls. Internal continuations, tool payloads, compaction summaries and generated
+operational reminders do not enter this view. The last four entries are joined
+and bounded to 800 characters. Durable event order is shared by live injections,
+cold rebuilds and incremental replay; compaction keeps only entries whose source
+event identities it retains. The latest ordinary cue survives separately.
+
+Prompt/inject `inputKind` defaults to `message`; internal drains, notifications
+and maintenance use `continuation`. New ordinary messages refresh a
+session-owned selection before the next provider request, while tool/maintenance
+continuations reuse it. Midturn arrivals at one intake boundary form one lookup.
+The latest ordinary cue survives compaction independently of recalled contents
+and is reconstructed from retained events on a cold resume. Session changes
+clear selection. Cancellation stops waiting, prevents a provider call and fences
+late installation.
+
+Automatic evidence is rendered as untrusted historical quotations after required
+history/tool results, alongside separately owned caller temporary text.
+Presentation validates each retrieved passage against the unchanged redacted
+source text used by search, then completes both ends to enclosing sentence
+boundaries within recognized message bodies, journal bodies or a plain source.
+Sentence boundaries use the built-in English sentence segmenter; unusual prose
+is not guaranteed a linguistic interpretation. The presented offsets and text
+remain exact slices of that same source version. Metadata-only selections do not
+acquire unrelated body text. Overlapping or touching completed ranges from the
+same immutable source and required-account binding coalesce, including
+original-only evidence. Ranges within a source appear in ascending source order;
+separated ranges stay separate rather than quoting omitted text. Every message
+retains its own attribution, including selections crossing message boundaries.
+Indexing and retrieval priority remain seed-derived: a contextual identifier
+introduced by sentence completion does not promote the source.
+
+Sen's finite message envelopes become historical message records with quoted
+bodies, source/channel or room, conversation, sender and message reference where
+recorded. Transport `current`/`catch_up` wrappers, reply hints and external
+harness reminders are omitted. Source-authored words, including instructions and
+literal markup, remain safely escaped quotations. Each message keeps its own
+attribution. Original post time comes from producer `sent_at` or fixture `at`,
+with its field identified; missing, invalid or conflicting times remain
+explicit. Transcript `recorded_at` is separate ingestion time and never
+substitutes for post time. Unknown source formats remain generic escaped
+historical excerpts.
+
+Documents under the repository's `user/journal/` or `journal/` paths become
+journal quotations. Their full retained entry supplies the title and entry time
+from the finite journal frontmatter, even for a later body passage. Titles are
+source labels, not inferred authorship. Missing, invalid or conflicting date and
+epoch-millisecond timestamp fields remain explicit. Other documents keep their
+source path without being labeled journals.
+
+Every record includes an executable native `recall` read call. Message records
+use `recall({action:"read", event_id, context:5, full:true})` for retained
+historical surrounding context: this bounded event window is not a complete
+thread. Journal and other document records use
+`recall({action:"read", event_id:"source:…"})` for the complete immutable
+retained source version. The renderer retains required current accounts,
+revisions and support statuses. Redaction applies before packing, and all
+displayed metadata, escaping, calls, accounts and framing count against the same
+2,000-token maximum. This presentation overhead can change how many ranked
+complete presentation units fit, while selected quotations retain exact source
+offsets and text. It is background for the existing request, not a new human
+message or task. Supplied original excerpts are records already available and
+can support a sufficient answer directly. The framing reserves source expansion
+for a concrete missing fact, ambiguity, contradiction or freshness need;
+repeated background alone creates no new reply, tool or journal obligation.
+Automatic evidence is never persisted or extracted as a new original. Caller
+set/peek/clear remain sticky and independent. On provider context overflow, the
+runner retries once with automatic evidence removed before existing compaction,
+preserving caller text, output format and other normal request options. A
+cleared tail remains explicit after temporary context has been used.
+`session_info._meta.automaticRecall` and logs contain only mode/reason,
+coverage, identities, counts, duration and packed size.
+
+An ordinary image-only input advances the cue identity and clears prior
+automatic evidence without inventing a textual image query. Complete tool
+calls/results use the same redacted source text as passage indexing for history
+exclusion; digest-only results continue to leave full sidecar text eligible.
+Both failed text surfaces with working semantics report `semantic-only`; one
+working text surface remains partial `hybrid`. This mode survives continuation
+reuse. The optional `textual` dependency used by offline tests/harnesses
+disables textual nomination and identifier preference together; it is internal
+and has no Ent, initialize or environment setting. Diagnostic observers run
+after provider dispatch, so they do not delay dispatch after the final evidence
+fence.

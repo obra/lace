@@ -2,7 +2,7 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { getLaceDir } from '../config/lace-dir';
 
 export const MEMORY_MODEL = {
@@ -62,10 +62,18 @@ export const MEMORY_MODEL = {
 export const ENCODER_GENERATION = `embeddinggemma-2:${MEMORY_MODEL.revision}:q8:projected768:bos-eos512:query-search-result:document-none:v1`;
 export type MemoryEncoder = {
   generation: string;
-  encode(texts: string[], kind: 'query' | 'document'): Promise<number[][]>;
+  encode(
+    texts: string[],
+    kind: 'query' | 'document',
+    options?: { signal?: AbortSignal }
+  ): Promise<number[][]>;
 };
-export function memoryModelDirectory(): string {
-  return process.env.LACE_MEMORY_MODEL_DIR || join(getLaceDir(), 'models', 'embeddinggemma-2-ONNX');
+export function memoryModelDirectory(fallback?: string): string {
+  return (
+    process.env.LACE_MEMORY_MODEL_DIR ||
+    fallback ||
+    join(getLaceDir(), 'models', 'embeddinggemma-2-ONNX')
+  );
 }
 export async function verifyMemoryModel(directory: string): Promise<void> {
   for (const asset of MEMORY_MODEL.assets) {
@@ -119,8 +127,7 @@ export function normalizedEmbeddings(
     return vector.map((value) => value / norm);
   });
 }
-async function openLocalEncoder() {
-  const directory = memoryModelDirectory();
+async function openLocalEncoder(directory: string) {
   await verifyMemoryModel(directory);
   const { env, AutoConfig, AutoTokenizer, AutoModel, Tensor } = await import(
     '@huggingface/transformers'
@@ -171,17 +178,60 @@ async function openLocalEncoder() {
     return vectors;
   };
 }
+export function scheduledMemoryEncoder(base: MemoryEncoder): MemoryEncoder {
+  const foreground: Array<() => Promise<void>> = [];
+  const background: Array<() => Promise<void>> = [];
+  let running = false;
+  async function drain() {
+    if (running) return;
+    running = true;
+    try {
+      while (foreground.length || background.length)
+        await (foreground.shift() ?? background.shift())!();
+    } finally {
+      running = false;
+    }
+  }
+  return {
+    generation: base.generation,
+    async encode(texts, kind, options) {
+      const vectors: number[][] = [];
+      for (let offset = 0; offset < texts.length; offset += 4) {
+        options?.signal?.throwIfAborted();
+        const batch = texts.slice(offset, offset + 4);
+        const encoded = await new Promise<number[][]>((resolveBatch, rejectBatch) => {
+          (kind === 'query' ? foreground : background).push(async () => {
+            try {
+              options?.signal?.throwIfAborted();
+              const result = await base.encode(batch, kind, options);
+              options?.signal?.throwIfAborted();
+              resolveBatch(result);
+            } catch (error) {
+              rejectBatch(error);
+            }
+          });
+          void drain();
+        });
+        vectors.push(...encoded);
+      }
+      return vectors;
+    },
+  };
+}
 let encoder: ReturnType<typeof openLocalEncoder> | undefined;
-let queue: Promise<unknown> = Promise.resolve();
-export const localMemoryEncoder: MemoryEncoder = {
+let configuredDirectory: string | undefined;
+export function configureMemoryEncoderDirectory(directory: string): void {
+  const absolute = resolve(directory);
+  if (configuredDirectory && configuredDirectory !== absolute)
+    throw new Error('Conflicting local memory model directories');
+  configuredDirectory = absolute;
+}
+export const localMemoryEncoder: MemoryEncoder = scheduledMemoryEncoder({
   generation: ENCODER_GENERATION,
-  encode(texts, kind) {
+  async encode(texts, kind) {
+    configuredDirectory ??= resolve(memoryModelDirectory());
     // A failed lazy initialization stays failed; maintenance cannot loop model loads.
-    const run = queue.then(async () => {
-      encoder ??= openLocalEncoder();
-      return (await encoder)(texts, kind);
-    });
-    queue = run.catch(() => {});
-    return run;
+    encoder ??= openLocalEncoder(configuredDirectory);
+    return (await encoder)(texts, kind);
   },
-};
+});

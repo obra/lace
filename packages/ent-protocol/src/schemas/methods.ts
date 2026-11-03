@@ -544,9 +544,17 @@ export const SessionSetConfigOptionResponseSchema = z
   })
   .strict();
 
+/** Retrieval-only message bodies; provider content and source attribution remain separate. */
+export const RecallInputSchema = z
+  .object({ query: z.string(), context: z.string().optional() })
+  .strict();
+export type RecallInput = z.infer<typeof RecallInputSchema>;
+
 const SessionPromptParamsSchema = z
   .object({
     content: z.array(ContentBlockSchema),
+    inputKind: z.enum(['message', 'continuation']).optional(),
+    recall: RecallInputSchema.optional(),
     maxTurns: z.number().optional(),
     idempotencyKey: NonEmptyStringSchema.optional(),
     track: NonEmptyStringSchema.optional(),
@@ -998,6 +1006,8 @@ export const EntSessionCheckpointResponseSchema = z
 const EntSessionInjectParamsSchema = z
   .object({
     content: z.array(ContentBlockSchema),
+    inputKind: z.enum(['message', 'continuation']).optional(),
+    recall: RecallInputSchema.optional(),
     priority: z.enum(['immediate', 'normal', 'deferred']),
     idempotencyKey: NonEmptyStringSchema.optional(),
     track: NonEmptyStringSchema.optional(),

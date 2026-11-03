@@ -180,3 +180,26 @@ describe('Ent protocol session context schemas', () => {
     ).not.toThrow();
   });
 });
+
+describe('retrieval-only recall input', () => {
+  it.each([{ query: 'TASK-271 <literal> slack:T:C', context: 'Earlier question' }, { query: '' }])(
+    'preserves recall on prompt and inject, including empty queries',
+    (recall) => {
+      for (const [schema, method, extra] of [
+        [SessionPromptRequestSchema, 'session/prompt', {}],
+        [EntSessionInjectRequestSchema, 'ent/session/inject', { priority: 'immediate' }],
+      ] as const) {
+        const result = schema.parse({
+          ...baseRequest,
+          method,
+          params: {
+            content: [{ type: 'text', text: 'wrapped provider content' }],
+            recall,
+            ...extra,
+          },
+        });
+        expect(result.params).toMatchObject({ recall });
+      }
+    }
+  );
+});

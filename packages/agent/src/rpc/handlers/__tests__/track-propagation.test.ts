@@ -72,6 +72,31 @@ describe('track field propagation', () => {
     rmSync(workDir, { recursive: true, force: true });
   });
 
+  it.each(['session/prompt', 'ent/session/inject'])(
+    'persists retrieval input beside unchanged content through %s',
+    async (method) => {
+      vi.spyOn(ConversationRunner.prototype, 'run').mockResolvedValue({
+        turnId: 'turn_fake',
+        stopReason: 'end_turn',
+        content: [],
+        usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 },
+      });
+      const content = [{ type: 'text', text: '<messages source="slack">raw body</messages>' }];
+      const recall = { query: '', context: 'TASK-271 <literal> slack:T:C' };
+      await client.request(method, {
+        content,
+        recall,
+        inputKind: 'continuation',
+        ...(method === 'ent/session/inject' ? { priority: 'normal' } : {}),
+      });
+      const type = method === 'session/prompt' ? 'prompt' : 'context_injected';
+      const event = readDurableEvents(sessionDir, { types: [type] }).events.find(
+        (e) => e.type === type
+      )!;
+      expect(event.data).toMatchObject({ content, recall, inputKind: 'continuation' });
+    }
+  );
+
   describe('session/prompt', () => {
     it('writes track onto the prompt event when passed in params', async () => {
       // Make the runner finish immediately so the RPC call resolves.

@@ -460,6 +460,105 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     expect(retryText.split(marker)).toHaveLength(2);
   });
 
+  it.each(['message', 'continuation'] as const)(
+    'refreshes recall after compaction only for a new ordinary %s input',
+    async (inputKind) => {
+      const query = 'What changed for TASK-271 <literal>?';
+      const raw = '<messages>ordinary arrival during overflow</messages>';
+      const provider = new ScriptedProvider(
+        [CONTEXT_EXCEEDED, CONTEXT_EXCEEDED, CLEAN_TURN],
+        (callIndex) => {
+          // The first overflow removes automatic context; the second starts compaction.
+          if (callIndex !== 1) return;
+          const state = readSessionState(sessionDir);
+          const { nextState } = appendDurableEvent(sessionDir, state, {
+            type: 'context_injected',
+            data: {
+              content: [{ type: 'text', text: raw }],
+              priority: 'immediate',
+              inputKind,
+              recall: { query, context: 'The previous decision was amber.' },
+            },
+          });
+          writeSessionState(sessionDir, nextState);
+        }
+      );
+      const captured: Array<
+        Parameters<NonNullable<RunnerDependencies['prepareAutomaticRecall']>>[0]
+      > = [];
+      await run(provider, {
+        prepareAutomaticRecall: async (input) => {
+          captured.push(input);
+          return { block: `evidence for ${input.query}` };
+        },
+      }).promise;
+      expect(provider.callCount).toBe(3);
+      expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(1);
+      const retryText = messagesAsText(provider.sentMessages[2]);
+      expect(retryText.split(raw)).toHaveLength(2);
+      expect(provider.sentTemporaryContexts[1] ?? '').toBe('');
+      if (inputKind === 'message') {
+        expect(captured).toHaveLength(2);
+        expect(captured[1].query).toBe(query);
+        expect(captured[1].tail).toContain('The previous decision was amber.\n' + query);
+        expect(provider.sentTemporaryContexts[2]).toBe(`evidence for ${query}`);
+      } else {
+        expect(captured).toHaveLength(1);
+        expect(provider.sentTemporaryContexts[2] ?? '').toBe('');
+      }
+    }
+  );
+
+  it('keeps removed recall suppressed when compaction regroups already consumed tool-only intakes', async () => {
+    const queries = ['first ordinary intake', 'second ordinary intake'];
+    const toolResponse = (id: string): ProviderResponse => ({
+      content: '',
+      toolCalls: [{ id, name: 'test_tool', arguments: {} }],
+      stopReason: 'tool_use',
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    });
+    const provider = new ScriptedProvider(
+      [
+        toolResponse('first_tool'),
+        toolResponse('second_tool'),
+        CONTEXT_EXCEEDED,
+        CONTEXT_EXCEEDED,
+        CLEAN_TURN,
+      ],
+      (callIndex) => {
+        if (callIndex > 1) return;
+        const state = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, state, {
+          type: 'context_injected',
+          data: {
+            content: [{ type: 'text', text: `raw envelope ${callIndex}` }],
+            priority: 'immediate',
+            inputKind: 'message',
+            recall: { query: queries[callIndex] },
+          },
+        });
+        writeSessionState(sessionDir, nextState);
+      }
+    );
+    const captured: string[] = [];
+    const createTools = createMockDeps(provider).createToolExecutor;
+    await run(provider, {
+      createToolExecutor: async (...args) => {
+        const built = await createTools(...args);
+        built.executor.getTool = vi.fn().mockReturnValue({ name: 'test_tool' });
+        return built;
+      },
+      prepareAutomaticRecall: async (input) => {
+        captured.push(input.query);
+        return { block: `evidence for ${input.query}` };
+      },
+    }).promise;
+    expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(1);
+    expect(captured).toEqual(['seed prompt 10', ...queries]);
+    expect(provider.sentTemporaryContexts[2]).toBe('evidence for second ordinary intake');
+    expect(provider.sentTemporaryContexts.slice(3).every((text) => !text)).toBe(true);
+  });
+
   it('does not glue pre-compaction partial generation onto the recovered answer', async () => {
     // pause_turn accumulates text across iterations for a single durable
     // 'message' event. If the emergency retry does not clear that accumulator,

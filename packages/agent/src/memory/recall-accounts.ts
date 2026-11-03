@@ -1,23 +1,26 @@
 // ABOUTME: Every surfaced transcript group keeps its directly linked current accounts or is omitted whole.
-import type { MemoryReader, CurrentAccount } from './types';
+import type { MemoryReader, CurrentAccount, OriginalReference } from './types';
 import { redact } from '../storage/recall/redact';
 
 export async function attachCurrentAccounts<T extends { event_id: string }>(
   groups: T[],
   reader?: MemoryReader,
-  expectedHeads: Array<{ id: string; revision: number }> = []
+  expectedHeads: Array<{ id: string; revision: number }> = [],
+  originalReferences?: OriginalReference[]
 ) {
   if (!reader) return { groups, omitted: [] };
-  const originals = groups.map((group) => {
-    const split = group.event_id.lastIndexOf(':');
-    return {
-      kind: 'event' as const,
-      sessionId: group.event_id.slice(0, split),
-      eventSeq: Number(group.event_id.slice(split + 1)),
-    };
-  });
+  const originals =
+    originalReferences ??
+    groups.map((group) => {
+      const split = group.event_id.lastIndexOf(':');
+      return {
+        kind: 'event' as const,
+        sessionId: group.event_id.slice(0, split),
+        eventSeq: Number(group.event_id.slice(split + 1)),
+      };
+    });
   const results = await reader.accountsFor(originals, expectedHeads);
-  const kept: Array<T & { current_accounts?: unknown }> = [];
+  const kept: Array<T & { current_accounts?: CurrentAccount[] }> = [];
   const omitted: Array<{ event_id: string; reason: string }> = [];
   let remaining = 64 * 1024;
   for (const [index, group] of groups.entries()) {

@@ -13,7 +13,7 @@ import { createMemoryRuntime } from '../runtime';
 import type { MemoryEncoder } from '../encoder';
 import { MemoryNotes } from '../notes';
 import { MemorySources } from '../sources';
-import { sourceHandle, type Source } from '../types';
+import { originalHandle, type Source } from '../types';
 import { RecallTool } from '../../tools/implementations/recall';
 import { logger } from '../../utils/logger';
 import { closeRecallIndex } from '../../storage/recall/index-db';
@@ -616,8 +616,8 @@ describe('configured automatic memory', () => {
         attribution: 'persona:root',
         support: [
           { handle: `${sessionId}:2`, status: 'current' },
-          { handle: sourceHandle(historical), status: 'superseded' },
-          { handle: sourceHandle(signs), status: 'current' },
+          { handle: originalHandle(historical), status: 'superseded' },
+          { handle: originalHandle(signs), status: 'current' },
         ],
       };
       expect(await reader.accountsFor([target])).toEqual([{ accounts: [expectedAccount] }]);
@@ -754,10 +754,10 @@ describe('configured automatic memory', () => {
                   text: revisedText,
                   attribution: 'persona:root',
                   support: historicalOnly
-                    ? [{ handle: sourceHandle(oldSource), status: 'superseded' }]
+                    ? [{ handle: originalHandle(oldSource), status: 'superseded' }]
                     : [
-                        { handle: sourceHandle(freshSource), status: 'current' },
-                        { handle: sourceHandle(oldSource), status: 'superseded' },
+                        { handle: originalHandle(freshSource), status: 'current' },
+                        { handle: originalHandle(oldSource), status: 'superseded' },
                       ],
                 },
               ],

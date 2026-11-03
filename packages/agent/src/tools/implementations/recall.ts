@@ -325,6 +325,12 @@ export class RecallTool extends Tool {
     // must pass through redact() — see spec §Redaction. The raw input may
     // itself contain a leaked secret (the model just hallucinated an
     // event_id that includes one) and we must not echo it back unfiltered.
+    if (args.event_id.startsWith('source:')) {
+      if (!memoryContext.memory)
+        return this.createResult({ error: 'Original source unavailable for this session.' });
+      const original = await memoryContext.memory.readOriginal(args.event_id);
+      return this.createResult(original ?? { error: 'Original source not found.' });
+    }
     if (args.event_id.startsWith('memory:')) {
       if (!memoryContext.memory)
         return this.createResult({ error: 'Derived memory is unavailable for this session.' });
