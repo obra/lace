@@ -10,6 +10,10 @@ import { appendDurableEvent } from '../../storage/event-log';
 import { getSessionDir, writeSessionMeta } from '../../storage/session-store';
 import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../authority';
 import { createMemoryRuntime } from '../runtime';
+import type { MemoryEncoder } from '../encoder';
+import { MemoryNotes } from '../notes';
+import { MemorySources } from '../sources';
+import { sourceHandle, type Source } from '../types';
 import { RecallTool } from '../../tools/implementations/recall';
 import { logger } from '../../utils/logger';
 import { closeRecallIndex } from '../../storage/recall/index-db';
@@ -60,15 +64,15 @@ describe('configured automatic memory', () => {
       { flag: 'a' }
     );
   }
-  function open(query: any) {
+  function open(query: any, encoder?: MemoryEncoder, paths = ['knowledge.md']) {
     const runtime = createMemoryRuntime(
       {
         databasePath,
         binding,
         extraction: { connectionId: 'fake', modelId: 'fake' },
-        documentSources: { gitRoot: join(dir, 'git'), paths: ['knowledge.md'] },
+        documentSources: { gitRoot: join(dir, 'git'), paths },
       },
-      { query, supportsImages: async () => true }
+      { query, supportsImages: async () => true, encoder }
     );
     runtimes.push(runtime);
     return runtime;
@@ -554,6 +558,313 @@ describe('configured automatic memory', () => {
     expect(revised?.support).toHaveLength(1);
     expect(revised?.support[0].status).toBe('current');
   });
+  it.each(['event', 'document'] as const)(
+    'keeps a current %s linked to its corrected account with readable historical support',
+    async (kind) => {
+      writeFileSync(join(dir, 'git/signs.md'), 'Leave incomplete forms at the desk.');
+      git('add', 'signs.md');
+      commit('Distribute packet A.');
+      event(1, 'Alice owns routing.');
+      let batch = 0;
+      const runtime = open(
+        (request: any) => {
+          const body = JSON.parse(request.messages[0].content[0].text);
+          batch++;
+          const changes =
+            batch === 1
+              ? [{ text: 'Alice owns routing.', sourceIds: body.sources.map((s: any) => s.id) }]
+              : batch === 2
+                ? [
+                    {
+                      text: 'Bea owns routing after Alice left. The handbook supplied packet A.',
+                      sourceIds: body.sources
+                        .filter((s: any) => s.reference.eventSeq !== 1)
+                        .map((s: any) => s.id),
+                      target: { noteId: body.candidates[0].id, revision: 1 },
+                    },
+                  ]
+                : [];
+          return { text: JSON.stringify({ changes }), stopReason: 'end_turn', toolCalls: [] };
+        },
+        {
+          generation: 'linked-history-test',
+          async encode(texts) {
+            return texts.map(() => [1, 0]);
+          },
+        },
+        ['knowledge.md', 'signs.md']
+      );
+      await runtime.wake();
+      const reader = runtime.reader(binding);
+      const initial = (await reader.search('routing', 1))[0];
+      event(2, 'Bea now owns routing because Alice left.');
+      await runtime.wake();
+      const note = await reader.read(initial.event_id.slice(7));
+      expect(note?.revision).toBe(2);
+      const historical = note!.support.find((ref) => ref.id === 'document:knowledge.md')!;
+      const signs = note!.support.find((ref) => ref.id === 'document:signs.md')!;
+      commit('Distribute packet B.');
+      await runtime.wake();
+      const target =
+        kind === 'event'
+          ? { kind: 'event' as const, sessionId, eventSeq: 2 }
+          : { kind: 'document' as const, id: signs.id, version: signs.version };
+      const expectedAccount = {
+        id: note!.id,
+        revision: 2,
+        text: note!.text,
+        attribution: 'persona:root',
+        support: [
+          { handle: `${sessionId}:2`, status: 'current' },
+          { handle: sourceHandle(historical), status: 'superseded' },
+          { handle: sourceHandle(signs), status: 'current' },
+        ],
+      };
+      expect(await reader.accountsFor([target])).toEqual([{ accounts: [expectedAccount] }]);
+      expect(await reader.accountsFor([{ kind: 'event', sessionId, eventSeq: 1 }])).toEqual([
+        { accounts: [expectedAccount] },
+      ]);
+      expect((await reader.read(note!.id))?.support).toEqual([
+        expect.objectContaining({
+          reference: expect.objectContaining({ eventSeq: 2 }),
+          status: 'current',
+        }),
+        { ...historical, status: 'superseded' },
+        { ...signs, status: 'current' },
+      ]);
+      expect(git('cat-file', 'blob', historical.version)).toBe('Distribute packet A.');
+
+      // The historical tree entry alone cannot prove its retained bytes remain readable.
+      rmSync(
+        join(dir, 'git/.git/objects', historical.version.slice(0, 2), historical.version.slice(2))
+      );
+      expect(await reader.accountsFor([target])).toEqual([{ reason: expect.any(String) }]);
+    }
+  );
+
+  describe('historical citation eligibility', () => {
+    const oldText = 'On June 4 Mara owned Cedar dispatch.';
+    const oldNote = 'Mara owned Cedar dispatch as of June 4.';
+    const freshText = 'Effective June 9 Niko took Cedar dispatch from Mara.';
+    const encoder: MemoryEncoder = {
+      generation: 'historical-support-test',
+      async encode(texts) {
+        return texts.map(() => [1, 0]);
+      },
+    };
+    function documentSource(): Source {
+      const blob = git('rev-parse', 'HEAD:knowledge.md');
+      return {
+        id: 'document:knowledge.md',
+        version: blob,
+        reference: {
+          kind: 'document',
+          gitRoot: fs.realpathSync(join(dir, 'git')),
+          path: 'knowledge.md',
+          commit: git('rev-parse', 'HEAD'),
+          blob,
+        },
+      };
+    }
+
+    it.each([false, true])(
+      'revises an offered note with exact historical support (historical only: %s)',
+      async (historicalOnly) => {
+        commit(oldText);
+        const oldSource = documentSource();
+        const revisedText = historicalOnly
+          ? 'Mara held Cedar dispatch on June 4; this account does not establish its present owner.'
+          : 'Niko owns Cedar dispatch effective June 9, following Mara, who held it on June 4.';
+        const batches: any[] = [];
+        const runtime = open((request: any) => {
+          const body = JSON.parse(request.messages[0].content[0].text);
+          batches.push(body);
+          const historical = body.sources.find((source: any) => source.text === oldText);
+          const fresh = body.sources.find((source: any) => source.text === freshText);
+          return {
+            text: JSON.stringify({
+              changes: [
+                batches.length === 1
+                  ? { text: oldNote, sourceIds: [historical.id] }
+                  : {
+                      text: revisedText,
+                      sourceIds: historicalOnly ? [historical.id] : [fresh.id, historical.id],
+                      target: {
+                        noteId: body.candidates[0]?.id,
+                        revision: body.candidates[0]?.revision,
+                      },
+                    },
+              ],
+            }),
+            stopReason: 'end_turn',
+            toolCalls: [],
+          };
+        }, encoder);
+        await runtime.wake();
+        const db = openMemoryDatabase(databasePath, 'instance', false);
+        try {
+          const notes = new MemoryNotes(db, false);
+          const original = notes.candidates()[0];
+          const receipt = db.prepare('SELECT * FROM memory_revisions').get();
+          commit(freshText);
+          const freshSource = documentSource();
+          await runtime.wake();
+          expect(batches).toHaveLength(2);
+          expect(batches[1].sources.map((source: any) => source.sourceStatus)).toEqual([
+            'current',
+            'superseded',
+          ]);
+          expect(notes.note(original.id)).toEqual({
+            id: original.id,
+            revision: 2,
+            text: revisedText,
+            producer: 'persona:root',
+            sources: historicalOnly ? [oldSource] : [freshSource, oldSource],
+          });
+          expect(db.prepare('SELECT * FROM memory_revisions WHERE revision=1').get()).toEqual(
+            receipt
+          );
+          const revision = db
+            .prepare('SELECT sources FROM memory_revisions WHERE revision=2')
+            .get() as { sources: string };
+          expect(JSON.parse(revision.sources)).toEqual(
+            historicalOnly ? [oldSource] : [freshSource, oldSource]
+          );
+          const reader = runtime.reader(binding);
+          expect(await reader.read(original.id)).toMatchObject({
+            revision: 2,
+            text: revisedText,
+            support: historicalOnly
+              ? [{ ...oldSource, status: 'superseded' }]
+              : [
+                  { ...freshSource, status: 'current' },
+                  { ...oldSource, status: 'superseded' },
+                ],
+          });
+          expect(
+            await reader.accountsFor([
+              { kind: 'document', id: oldSource.id, version: oldSource.version },
+            ])
+          ).toEqual([
+            {
+              accounts: [
+                {
+                  id: original.id,
+                  revision: 2,
+                  text: revisedText,
+                  attribution: 'persona:root',
+                  support: historicalOnly
+                    ? [{ handle: sourceHandle(oldSource), status: 'superseded' }]
+                    : [
+                        { handle: sourceHandle(freshSource), status: 'current' },
+                        { handle: sourceHandle(oldSource), status: 'superseded' },
+                      ],
+                },
+              ],
+            },
+          ]);
+          expect(db.prepare('SELECT outcome FROM memory_receipts').all()).toEqual([
+            { outcome: 'completed' },
+            { outcome: 'completed' },
+          ]);
+        } finally {
+          db.close();
+        }
+      }
+    );
+
+    it.each(['missing', 'unavailable', 'unknown', 'unoffered'])(
+      'rejects an entire mixed proposal when historical support is %s',
+      async (status) => {
+        commit(oldText);
+        const oldSource = documentSource();
+        const batches: any[] = [];
+        const runtime = open((request: any) => {
+          const body = JSON.parse(request.messages[0].content[0].text);
+          batches.push(body);
+          return {
+            text: JSON.stringify({
+              changes:
+                batches.length === 1
+                  ? [{ text: oldNote, sourceIds: [body.sources[0].id] }]
+                  : [
+                      { text: 'Cedar dispatch review happened.', sourceIds: [body.sources[0].id] },
+                      {
+                        text: 'Mara held Cedar dispatch on June 4.',
+                        sourceIds: [
+                          status === 'unoffered'
+                            ? 'document:knowledge.md@unoffered-version'
+                            : `${oldSource.id}@${oldSource.version}`,
+                        ],
+                      },
+                    ],
+            }),
+            stopReason: 'end_turn',
+            toolCalls: [],
+          };
+        }, encoder);
+        await runtime.wake();
+        let restoreStatus: (() => void) | undefined;
+        const db = openMemoryDatabase(databasePath, 'instance', false);
+        try {
+          const before = db.prepare('SELECT * FROM memory_notes').all();
+          if (status === 'missing') {
+            git('rm', 'knowledge.md');
+            git(
+              '-c',
+              'user.name=Memory Test',
+              '-c',
+              'user.email=test@example.invalid',
+              'commit',
+              '-m',
+              'remove historical document'
+            );
+            expect(git('cat-file', 'blob', oldSource.version)).toBe(oldText);
+          } else {
+            commit(freshText);
+            if (status === 'unknown' || status === 'unavailable') {
+              const sourceStatus = MemorySources.prototype.status;
+              const statusSpy = vi
+                .spyOn(MemorySources.prototype, 'status')
+                .mockImplementation(function (this: MemorySources, source) {
+                  return source.version === oldSource.version
+                    ? Promise.resolve(status)
+                    : sourceStatus.call(this, source);
+                });
+              restoreStatus = () => statusSpy.mockRestore();
+            }
+          }
+          event(1, 'Cedar dispatch review happened.');
+          await runtime.wake();
+          expect(batches).toHaveLength(2);
+          if (status === 'missing' || status === 'unknown')
+            expect(batches[1].sources).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({ version: oldSource.version, sourceStatus: status }),
+              ])
+            );
+          expect(db.prepare('SELECT * FROM memory_notes').all()).toEqual(before);
+          expect(db.prepare('SELECT count(*) AS count FROM memory_revisions').get()).toEqual({
+            count: 1,
+          });
+          expect(
+            db.prepare("SELECT id FROM memory_fts WHERE memory_fts MATCH 'review'").all()
+          ).toEqual([]);
+          expect(db.prepare('SELECT outcome FROM memory_receipts').all()).toEqual([
+            { outcome: 'completed' },
+            { outcome: 'failed' },
+          ]);
+          expect(
+            db.prepare("SELECT status FROM memory_sources WHERE id LIKE 'event:%'").get()
+          ).toEqual({ status: 'failed' });
+        } finally {
+          restoreStatus?.();
+          db.close();
+        }
+      }
+    );
+  });
+
   it('does not overwrite a newer accepted note revision with a held proposal', async () => {
     let first = true;
     let started!: () => void;
