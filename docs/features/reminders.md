@@ -82,3 +82,41 @@ in-memory min-heap.
 Each row stores its `id`, `created_at`, `next_fire_at`, `prompt`, `recurs`,
 `fired_at`, and `fire_count`. The `recurs` field drives both the next-fire
 computation and the notification body at fire time.
+
+## Host CLI: `lace-agent reminders ensure`
+
+A host process (for example sen-core's boot-time init) can add a standing cron
+reminder to a session without going through the agent:
+
+```sh
+lace-agent reminders ensure --session <sessionId> --cron '0 22 * * *' \
+  --prompt-file <path> --match <text>
+```
+
+- If one of the session's **cron** reminders already mentions `<text>`
+  (case-insensitive), it prints `{"status":"exists","id":"..."}` and writes
+  nothing. One-shot and count reminders never match.
+- Otherwise it validates the cron with the same 5-minute floor as
+  `manage_reminders`, adds the row through `ReminderScheduler.schedule()` (same
+  id format, 50-reminder cap, next-fire in `TZ`, atomic write) and prints
+  `{"status":"created","id":"..."}`.
+- It reads `reminders.json` strictly: anything other than a
+  `{"reminders": [...]}` object, or a row without a string `id`, exits 3 and the
+  file is left untouched (a lenient read would let the save replace it).
+- Exit codes: 0 ok, 1 invalid cron, cap reached, unreadable prompt file or
+  unusable session storage, 2 session not found, 3 unreadable `reminders.json`,
+  64 usage (missing, unknown or repeated flag, or a session id that is not
+  `sess_<uuid>`).
+- The session directory resolves exactly as the server's: `LACE_SESSION_DIR`,
+  else `<LACE_DIR>/agent-sessions`, falling back to `XDG_STATE_HOME`,
+  `~/.local/state` and the OS temp dir. Give it the same env as the server, or
+  it can look in a different place.
+
+Run it while no lace server has that session active. A live scheduler keeps its
+schedule in memory and only picks the new row up on the session's next
+`session/resume`, `session/load` or process start. It re-reads the file before
+every save, so it does not drop the row in the meantime.
+
+`lace-agent` with no arguments starts the JSON-RPC server as before. The entry
+(`src/main.ts`) picks the CLI or the server before importing either, because the
+server starts as import-time side effects of `src/server-main.ts`.
