@@ -36,13 +36,18 @@ The incremental fold and the full rebuild apply the **same** per-event handler,
 so an incremental fold is byte-identical to a full rebuild over the same events.
 
 Each completed model response with text, thinking, or tool calls persists a
-`message` event before its `tool_use` events. For a response containing only tool
-calls, the message has empty content but still closes the preceding response's
-tool batch. The fold keeps calls from the same response together and places
-their results before the next response's calls, including after session resume.
-Genuinely empty responses are not persisted. Provider `pause_turn` continuations
-still defer the message until the logical response completes. Older logs missing
-these boundaries cannot recover them during rebuild.
+`message` event before its `tool_use` events. For a response containing only
+tool calls, the message has empty content but still closes the preceding
+response's tool batch. The fold keeps calls from the same response together and
+places their results before the next response's calls, including after session
+resume. An immediate context injection may be persisted during tool execution,
+before the combined `tool_use` event records the call and result. Such an
+injection keeps the response's batch open. Rebuild attaches the calls to that
+response's assistant message and places their results before the injected text,
+matching the live runner, which consumes the injection after the complete tool
+batch. Genuinely empty responses are not persisted. Provider `pause_turn`
+continuations still defer the message until the logical response completes.
+Older logs missing these boundaries cannot recover them during rebuild.
 
 ## The projection is the persisted prefix only
 

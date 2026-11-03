@@ -76,8 +76,16 @@ export function foldEvent(state: FoldState, event: FoldEventInput): FoldState {
         id
       );
       if (batch.userIdx === null) {
-        messages.push({ role: 'user', content: '', toolResults: [result] });
-        batch = { assistantIdx: batch.assistantIdx, userIdx: messages.length - 1 };
+        const userIdx = batch.assistantIdx + 1;
+        const injected = messages[userIdx];
+        if (injected?.role === 'user') {
+          // An injection can be persisted inside tool execution before its
+          // result. Keep the result before that text, as on the live request.
+          messages[userIdx] = { ...injected, toolResults: [result] };
+        } else {
+          messages.push({ role: 'user', content: '', toolResults: [result] });
+        }
+        batch = { assistantIdx: batch.assistantIdx, userIdx };
       } else {
         const u = messages[batch.userIdx]!;
         messages[batch.userIdx] = { ...u, toolResults: [...(u.toolResults ?? []), result] };
@@ -86,7 +94,6 @@ export function foldEvent(state: FoldState, event: FoldEventInput): FoldState {
     return { messages, batch };
   }
 
-  // Any non-tool_use event closes the batch.
   if (event.type === 'message') {
     const content = asContent(event.data.content);
     const thinkingBlocks =
@@ -94,12 +101,14 @@ export function foldEvent(state: FoldState, event: FoldEventInput): FoldState {
         ? (event.data.thinkingBlocks as ThinkingBlock[])
         : undefined;
     messages.push({ role: 'assistant', content, ...(thinkingBlocks ? { thinkingBlocks } : {}) });
-    return { messages, batch: null };
+    // The response boundary anchors its calls even when an injection is
+    // persisted before the first call's result.
+    return { messages, batch: { assistantIdx: messages.length - 1, userIdx: null } };
   }
 
   if (event.type === 'prompt' || event.type === 'context_injected') {
     messages.push({ role: 'user', content: asContent(event.data.content) });
-    return { messages, batch: null };
+    return { messages, batch: event.type === 'context_injected' ? state.batch : null };
   }
 
   return { messages, batch: state.batch };

@@ -11,6 +11,7 @@ import { createAgentServerState, registerAgentRpcMethods } from '../server';
 import type { AgentServerState } from '../server-types';
 import type { ProviderMessage, ProviderResponse } from '../providers/base-provider';
 import { TestAgentProvider } from '../runtime/test-provider';
+import { FileWriteTool } from '../tools/implementations/file_write';
 import { defaultInitializeParams } from './helpers/initialize';
 
 function createPairedPeers(state: AgentServerState) {
@@ -34,7 +35,19 @@ function toolHistory(messages: ProviderMessage[]) {
     .map(({ role, toolCalls, toolResults }) => ({ role, toolCalls, toolResults }));
 }
 
-describe('session/resume tool-round chronology', () => {
+function messageHistory(messages: ProviderMessage[]) {
+  return messages.map((message) => ({
+    ...message,
+    content:
+      typeof message.content === 'string'
+        ? message.content
+        : message.content
+            .map((block) => (block.type === 'text' ? block.text : JSON.stringify(block)))
+            .join('\n'),
+  }));
+}
+
+describe.each([null, 'left.txt', 'right.txt'])('session/resume order (%s)', (injectAfter) => {
   let originalLaceDir: string | undefined;
   let originalTestProvider: string | undefined;
   let laceDir: string;
@@ -78,7 +91,7 @@ describe('session/resume tool-round chronology', () => {
     return agent;
   }
 
-  it('keeps a parallel pair and a later dependent tool call in separate response batches', async () => {
+  it('keeps a parallel pair and a dependent call ordered across inside-tool injections', async () => {
     // Dropping textless message events must fail this test: after resume the
     // dependent read would move ahead of the writes' results into their batch.
     const requests: ProviderMessage[][] = [];
@@ -123,6 +136,29 @@ describe('session/resume tool-round chronology', () => {
       cwd: workDir,
       mcpServers: [],
     })) as { sessionId: string };
+    const notification = '<notification kind="reminder">The write is confirmed.</notification>';
+    if (injectAfter) {
+      const execute = FileWriteTool.prototype.execute;
+      vi.spyOn(FileWriteTool.prototype, 'execute').mockImplementation(async function (
+        this: FileWriteTool,
+        args,
+        context
+      ) {
+        const result = await execute.call(this, args, context);
+        if ((args as { path: string }).path === injectAfter) {
+          expect(result.status).toBe('completed');
+          expect(readFileSync(join(workDir, injectAfter), 'utf8')).toBe(
+            injectAfter === 'left.txt' ? 'left\n' : 'right\n'
+          );
+          await first.peers.client.request('ent/session/inject', {
+            content: [{ type: 'text', text: notification }],
+            priority: 'immediate',
+            inputKind: 'continuation',
+          });
+        }
+        return result;
+      });
+    }
     await first.peers.client.request('session/prompt', {
       content: [{ type: 'text', text: 'Write both files, then read the left file.' }],
     });
@@ -139,7 +175,11 @@ describe('session/resume tool-round chronology', () => {
       'user',
     ]);
     expect(live[1]!.toolCalls).toEqual([
-      { id: 'write_left', name: 'file_write', arguments: { path: 'left.txt', content: 'left\n' } },
+      {
+        id: 'write_left',
+        name: 'file_write',
+        arguments: { path: 'left.txt', content: 'left\n' },
+      },
       {
         id: 'write_right',
         name: 'file_write',
@@ -150,6 +190,7 @@ describe('session/resume tool-round chronology', () => {
       ['write_left', 'completed'],
       ['write_right', 'completed'],
     ]);
+    expect(live[2]!.content).toBe(injectAfter ? notification : '');
     expect(live[3]!.toolCalls).toEqual([
       { id: 'read_left', name: 'file_read', arguments: { path: 'left.txt' } },
     ]);
@@ -183,6 +224,7 @@ describe('session/resume tool-round chronology', () => {
     expect(requests).toHaveLength(4);
     const afterResume = requests[3]!;
     expect(toolHistory(afterResume)).toEqual(toolHistory(live));
+    expect(messageHistory(afterResume.slice(0, live.length))).toEqual(messageHistory(live));
     expect(afterResume.map((message) => message.role)).toEqual([
       'user',
       'assistant',
