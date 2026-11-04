@@ -194,11 +194,15 @@ mounts subject to the check.
 ## Cancelling projected shell commands
 
 Bare `sh`, `bash` and `dash` commands with `-c` or `-lc` receive a unique
-command sentinel. Cancellation discovers their process groups inside the
-container and sends TERM, then KILL to those same groups after a two-second
-grace period. Completion waits for this cleanup and reports lookup or signal
-failures. Closing the Docker client alone does not terminate its container
-processes. The image must provide `pgrep` and `ps`; missing tools are errors.
+command sentinel on an outer shell that survives explicit `exec` and final
+command replacement. Cancellation keeps the exec client alive while discovering
+their process groups inside the container and sends TERM, then KILL to those
+same groups after a two-second grace period. Completion waits for this cleanup
+and reports lookup or signal failures. Startup discovery waits at most five
+seconds for a target or natural client completion; an unresolved launch is an
+error, not successful cleanup. Closing the Docker client alone does not
+terminate its container processes. The image must provide `pgrep` and `ps`;
+missing tools are errors.
 
 Ordinary completion leaves intentionally backgrounded work alone. Non-shell
 commands, shells that already supply positional arguments, and descendants that

@@ -1,5 +1,6 @@
 import { posix, resolve as resolveHostPath } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 import { logger } from '../../utils/logger';
 import type {
   ContainerHandle,
@@ -305,7 +306,10 @@ function tagShellCommandForKill(command: string[]): { command: string[]; killSen
   if (bin !== 'sh' && bin !== 'bash' && bin !== 'dash') return { command };
   if (!/^-(l?c|cl?)$/.test(command[1] ?? '')) return { command };
   const killSentinel = `lace-exec-${randomUUID()}`;
-  return { command: [...command, killSentinel], killSentinel };
+  // Keep the tagged outer shell alive even if the user's final command is
+  // exec-optimized or explicitly uses exec. Both shells share its process group.
+  const body = `(\n${command[2]}\n)\nstatus=$?\nexit "$status"`;
+  return { command: [command[0]!, command[1]!, body, killSentinel], killSentinel };
 }
 
 class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
@@ -405,18 +409,29 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       containerHandle.stdin.end();
     }
 
+    let exited = false;
+    const wait = containerHandle.wait().finally(() => {
+      exited = true;
+    });
+    void wait.catch(() => {});
     let cleanup: Promise<void> | undefined;
-    const killInContainerTree = (): void => {
-      if (!tagged.killSentinel || cleanup) return;
-      cleanup = this.killContainerProcessGroup(tagged.killSentinel);
+    const killInContainerTree = (signal?: NodeJS.Signals): void => {
+      if (!tagged.killSentinel) {
+        containerHandle.kill(signal);
+        return;
+      }
+      if (cleanup) return;
+      // Keep the client alive until discovery/cleanup settles. A client closed
+      // before Docker finishes launching is not evidence that no process ran.
+      cleanup = this.killContainerProcessGroup(tagged.killSentinel, () => exited).finally(() =>
+        containerHandle.kill(signal)
+      );
       // The event handler cannot await; completion below owns the rejection.
       void cleanup.catch(() => {});
     };
-
     if (opts.signal?.aborted) {
       killInContainerTree();
-      containerHandle.kill();
-      await Promise.all([containerHandle.wait(), cleanup]);
+      await Promise.all([wait, cleanup]);
       opts.signal.throwIfAborted();
     }
 
@@ -424,14 +439,13 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
     const abortHandler = () => {
       aborted = true;
       killInContainerTree();
-      containerHandle.kill();
     };
     opts.signal?.addEventListener('abort', abortHandler, { once: true });
 
     const completion = (async () => {
       let result;
       try {
-        result = await containerHandle.wait();
+        result = await wait;
       } finally {
         try {
           await cleanup;
@@ -448,8 +462,7 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
       stdout: containerHandle.stdout,
       stderr: containerHandle.stderr,
       kill: (signal?: NodeJS.Signals) => {
-        killInContainerTree();
-        containerHandle.kill(signal);
+        killInContainerTree(signal);
       },
       completion,
     };
@@ -461,7 +474,10 @@ class ProjectedContainerProcessRunner implements RuntimeProcessRunner {
    * The bracket pattern excludes this cleanup command from its own lookup.
    * Completion reports lookup/signalling failures rather than claiming cleanup.
    */
-  private async killContainerProcessGroup(sentinel: string): Promise<void> {
+  private async killContainerProcessGroup(
+    sentinel: string,
+    hasExited: () => boolean
+  ): Promise<void> {
     const pattern = `[${sentinel[0]}]${sentinel.slice(1)}`;
     const script = `
 command -v pgrep >/dev/null && command -v ps >/dev/null || exit 1
@@ -478,7 +494,7 @@ for p in $pids; do
   [ "$group" -gt 1 ] && [ "$group" != "$$" ] || exit 1
   case " $groups " in *" $group "*) ;; *) groups="$groups $group" ;; esac
 done
-[ -n "$groups" ] || exit 0
+[ -n "$groups" ] || exit 3
 for group in $groups; do
   kill -TERM "-$group" 2>/dev/null || { kill -0 "-$group" 2>/dev/null && exit 1; }
 done
@@ -489,16 +505,25 @@ done
 exit 0
 `;
     try {
-      const handle = await this.containerManager.execStream(
-        this.descriptor.spec.name,
-        this.optionsFor(['sh', '-c', script])
-      );
-      handle.stdin.end();
-      handle.stdout.resume();
-      handle.stderr.resume();
-      const result = await handle.wait();
-      if (result.exitCode !== 0) {
-        throw new Error(`Container process-group cleanup failed (exit ${result.exitCode})`);
+      const discoveryDeadline = Date.now() + 5000;
+      while (true) {
+        const handle = await this.containerManager.execStream(
+          this.descriptor.spec.name,
+          this.optionsFor(['sh', '-c', script])
+        );
+        handle.stdin.end();
+        handle.stdout.resume();
+        handle.stderr.resume();
+        const result = await handle.wait();
+        if (result.exitCode === 0) return;
+        if (result.exitCode !== 3) {
+          throw new Error(`Container process-group cleanup failed (exit ${result.exitCode})`);
+        }
+        if (hasExited()) return;
+        if (Date.now() >= discoveryDeadline) {
+          throw new Error('Container process-group cleanup could not confirm process startup');
+        }
+        await delay(100);
       }
     } catch (error) {
       logger.warn('projected-container.tree-kill.failed', {
