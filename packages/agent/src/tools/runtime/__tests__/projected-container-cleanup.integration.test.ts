@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -26,7 +26,22 @@ describe.skipIf(!enabled)('projected container process cleanup', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'lace-cleanup-'));
     name = `cleanup-${randomUUID()}`;
-    manager = new ContainerManager(new DockerContainerRuntime(), name);
+    const dockerWrapper = join(directory, 'docker.sh');
+    await writeFile(
+      dockerWrapper,
+      `#!/bin/sh
+      tagged=0
+      for arg in "$@"; do case "$arg" in lace-exec-*) tagged=1 ;; esac; done
+      if [ -e '${directory}/delay-start' ] && [ "$tagged" = 1 ]; then
+        trap '' TERM
+        printf '%s' "$$" > '${directory}/launch.pid'
+        sleep 0.4
+      fi
+      exec docker "$@"
+    `
+    );
+    await chmod(dockerWrapper, 0o755);
+    manager = new ContainerManager(new DockerContainerRuntime(dockerWrapper), name);
     runtime = new ProjectedContainerToolRuntime({
       id: name,
       containerManager: manager,
@@ -132,6 +147,42 @@ describe.skipIf(!enabled)('projected container process cleanup', () => {
     expect(await alive(pid)).toBe(false);
   }, 10000);
 
+  it.each(['exec ', ''])(
+    'Bash cancellation survives %scommand replacement',
+    async (prefix) => {
+      const handle = await runtime.process.start([
+        '/bin/bash',
+        '-c',
+        `${prefix}node /fixture/child.cjs bash ignore-term`,
+      ]);
+      const pid = await childPid('bash');
+      handle.kill();
+      await handle.completion;
+      expect(await alive(pid)).toBe(false);
+    },
+    10000
+  );
+
+  it('cancels during real Docker startup before the target is visible', async () => {
+    await writeFile(join(directory, 'delay-start'), 'gate');
+    const controller = new AbortController();
+    const handle = await runtime.process.start(
+      ['/bin/bash', '-c', 'exec node /fixture/child.cjs startup ignore-term'],
+      {
+        signal: controller.signal,
+      }
+    );
+    const outcome = handle.completion.catch((error: unknown) => error);
+    await childPid('launch');
+    controller.abort();
+    expect(await outcome).toHaveProperty('name', 'AbortError');
+    expect(await alive(await childPid('startup'))).toBe(false);
+    await expect(readFile(join(directory, 'startup.marker'))).rejects.toHaveProperty(
+      'code',
+      'ENOENT'
+    );
+  }, 15000);
+
   it('rejects a pre-aborted start without launching the command', async () => {
     const controller = new AbortController();
     controller.abort();
@@ -163,6 +214,11 @@ describe.skipIf(!enabled)('projected container process cleanup', () => {
     handle.kill();
     expect(await outcome).toBeInstanceOf(Error);
   }, 10000);
+
+  it('preserves Bash output and exit status through the cancellation wrapper', async () => {
+    const result = await runtime.process.exec(['/bin/bash', '-c', 'printf payload; exit 7']);
+    expect(result).toEqual({ stdout: 'payload', stderr: '', exitCode: 7 });
+  });
 
   it('leaves intentionally backgrounded work alive after normal completion', async () => {
     const started = Date.now();
