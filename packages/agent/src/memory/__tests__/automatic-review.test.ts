@@ -8,6 +8,8 @@ import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../a
 import { createMemoryRuntime } from '../runtime';
 import { MemoryNotes } from '../notes';
 import { MemorySources } from '../sources';
+import { MemoryPassages, originalReference } from '../passages';
+import { automaticRecall } from '../automatic';
 import {
   originalHandle,
   sourceHandle,
@@ -18,7 +20,7 @@ import {
 } from '../types';
 import { sessionMemory } from '../session';
 import { RecallTool } from '../../tools/implementations/recall';
-import { closeRecallIndex } from '../../storage/recall/index-db';
+import { closeRecallIndex, getRecallIndex } from '../../storage/recall/index-db';
 import { loadTurnEntryProjection } from '../../message-building/turn-entry-projection';
 const sessionId = 'sess_11111111-1111-4111-8111-111111111111';
 const grant = {
@@ -150,6 +152,147 @@ afterEach(async () => {
   closeRecallIndex();
   vi.unstubAllEnvs();
   rmSync(dir, { recursive: true, force: true });
+});
+
+async function projectedOriginals(count: number) {
+  event('The bicycle queue is violet.');
+  event('The bicycle route is green.');
+  for (let index = 2; index < count; index++) event(`Unrelated harbor record ${index}.`);
+  const originals = new MemorySources(notes, configuration);
+  await originals.discover();
+  const passages = new MemoryPassages(notes, originals, true);
+  await passages.index(() => {});
+  const selected = (await passages.all('fixture', () => {})).slice(0, 2);
+  const selection: AutomaticRecallInput['selection'] = {
+    mode: 'text-only',
+    groups: selected.map((passage) => ({
+      originals: [
+        {
+          handle: passage.handle,
+          source: originalReference(passage.source),
+          start: passage.start,
+          end: passage.end,
+          text: passage.text,
+        },
+      ],
+      accounts: [],
+    })),
+  };
+  return { originals, passages, selection };
+}
+
+it.each([8, 16])(
+  'bounds source-list reconstruction while revalidating fixed evidence among %i originals',
+  async (count) => {
+    const { originals, passages, selection } = await projectedOriginals(count);
+    const admitted = vi.spyOn(passages, 'admitted');
+    const validate = vi.spyOn(originals, 'validateAtAcceptance');
+    const result = await automaticRecall(input('bicycle', { selection }), {
+      notes,
+      sources: originals,
+      passages,
+      encoder: {
+        generation: 'fixture',
+        async encode() {
+          throw new Error('Reused selection must not encode a query');
+        },
+      },
+      floor: 0.7,
+      check: () => {},
+      accountsFor: async () => [{ accounts: [] }],
+      indexing: () => true,
+    });
+    expect(result.groups.map((group) => group.originals[0].source)).toEqual([
+      { kind: 'event', sessionId, eventSeq: 1 },
+      { kind: 'event', sessionId, eventSeq: 2 },
+    ]);
+    expect(result.groups.map((group) => group.originals[0].text)).toEqual([
+      expect.stringContaining('The bicycle queue is violet.'),
+      expect.stringContaining('The bicycle route is green.'),
+    ]);
+    expect(
+      validate.mock.calls.flatMap(([expected]) => expected.map((source) => source.id))
+    ).toEqual([
+      `event:${sessionId}:1`,
+      `event:${sessionId}:2`,
+      `event:${sessionId}:1`,
+      `event:${sessionId}:2`,
+    ]);
+    expect(
+      admitted.mock.calls.length,
+      'full source-list reads per preparation'
+    ).toBeLessThanOrEqual(3);
+  }
+);
+
+it.each([8, 16])(
+  'joins matching events to %i admitted originals with linear identity reads',
+  async (count) => {
+    const { passages } = await projectedOriginals(count);
+    const admitted = passages.admitted.bind(passages);
+    const expected = admitted().map(sourceHandle);
+    for (let index = 1; index <= count; index++)
+      getRecallIndex()
+        .prepare('INSERT INTO events(event_id,content) VALUES(?,?)')
+        .run(`${sessionId}:${index}`, 'needle');
+    getRecallIndex()
+      .prepare('INSERT INTO events(event_id,content) VALUES(?,?)')
+      .run(`${sessionId}:999`, 'needle');
+    let identities = 0;
+    vi.spyOn(passages, 'admitted').mockImplementation(() =>
+      admitted().map((source) => {
+        const id = source.id;
+        return {
+          ...source,
+          get id() {
+            identities++;
+            return id;
+          },
+        };
+      })
+    );
+    expect([...passages.textMatches('needle')].sort()).toEqual(expected.sort());
+    expect(identities, 'source identity reads for all matching events').toBeLessThanOrEqual(
+      count * 3
+    );
+  }
+);
+
+it('keeps every admitted version of a matching event and deduplicates repeated FTS hits', async () => {
+  const { passages } = await projectedOriginals(8);
+  const first = passages.admitted()[0];
+  notes.discover({ ...first, version: 'retained-version' });
+  const insert = getRecallIndex().prepare('INSERT INTO events(event_id,content) VALUES(?,?)');
+  insert.run(`${sessionId}:1`, 'needle');
+  insert.run(`${sessionId}:1`, 'needle');
+  expect([...passages.textMatches('needle')].sort()).toEqual(
+    [sourceHandle(first), `${first.id}@retained-version`].sort()
+  );
+});
+
+it('omits a selected original withdrawn during an awaited account read', async () => {
+  const { originals, passages, selection } = await projectedOriginals(8);
+  const result = await automaticRecall(input('bicycle', { selection }), {
+    notes,
+    sources: originals,
+    passages,
+    encoder: {
+      generation: 'fixture',
+      async encode() {
+        return [];
+      },
+    },
+    floor: 0.7,
+    check: () => {},
+    accountsFor: async () => {
+      db.prepare('DELETE FROM memory_sources WHERE id=?').run(`event:${sessionId}:1`);
+      return [{ accounts: [] }];
+    },
+    indexing: () => true,
+  });
+  expect(result.groups.map((group) => group.originals[0].source)).toEqual([
+    { kind: 'event', sessionId, eventSeq: 2 },
+  ]);
 });
 
 it('expands an old opaque original with its revised account, or omits the whole unsupported original', async () => {

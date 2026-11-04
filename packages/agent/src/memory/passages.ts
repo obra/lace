@@ -214,10 +214,15 @@ export class MemoryPassages {
     const events = getRecallIndex()
       .prepare('SELECT event_id FROM events WHERE events MATCH ? ORDER BY rank')
       .all(query) as Array<{ event_id: string }>;
-    const allowed = this.admitted();
+    const allowed = new Map<string, string[]>();
+    for (const source of this.admitted()) {
+      const id = source.id;
+      const handles = allowed.get(id) ?? [];
+      handles.push(sourceHandle(source));
+      allowed.set(id, handles);
+    }
     for (const event of events)
-      for (const source of allowed)
-        if (source.id === `event:${event.event_id}`) ids.add(sourceHandle(source));
+      for (const handle of allowed.get(`event:${event.event_id}`) ?? []) ids.add(handle);
     for (const row of this.notes.db
       .prepare(
         'SELECT id,version FROM memory_original_fts WHERE memory_original_fts MATCH ? ORDER BY rank'

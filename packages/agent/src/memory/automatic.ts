@@ -127,15 +127,16 @@ export async function automaticRecall(
   fence();
   const all = await passages.all(encoder.generation, fence);
   fence();
+  const admitted = passages.admitted();
+  const sourcesByHandle = new Map(admitted.map((source) => [originalHandle(source), source]));
+  const projected = new Set(all.map((row) => sourceHandle(row.source)));
   const coverage = {
-    sources: passages.admitted().length,
+    sources: admitted.length,
     passages: all.length,
     vectors: all.filter((row) => row.vector).length,
     partial:
       !!deps.indexing?.() ||
-      passages
-        .admitted()
-        .some((source) => !all.some((row) => sourceHandle(row.source) === sourceHandle(source))) ||
+      admitted.some((source) => !projected.has(sourceHandle(source))) ||
       all.some((row) => !row.vector),
   };
   let mode: AutomaticRecallResult['mode'] =
@@ -318,9 +319,7 @@ export async function automaticRecall(
     const originals: OriginalEvidence[] = [];
     let valid = true;
     for (const original of group.originals) {
-      const source = passages
-        .admitted()
-        .find((source) => originalHandle(source) === original.handle);
+      const source = sourcesByHandle.get(original.handle);
       if (!source) {
         valid = false;
         break;
@@ -446,6 +445,9 @@ export async function automaticRecall(
     seen.set(key, target);
   }
   // Awaited reads above may have invalidated an earlier group; final checks do not await.
+  const currentSources = new Map(
+    passages.admitted().map((source) => [originalHandle(source), source])
+  );
   const current = groups.filter((group) => {
     try {
       const required = [
@@ -480,9 +482,7 @@ export async function automaticRecall(
         );
       }
       for (const original of group.originals) {
-        const source = passages
-          .admitted()
-          .find((source) => originalHandle(source) === original.handle);
+        const source = currentSources.get(original.handle);
         if (!source) return false;
         sources.validateAtAcceptance([
           { ...source, sourceStatus: 'current', content: [], textBytes: 0, imageBytes: 0 },
