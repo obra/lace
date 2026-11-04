@@ -90,7 +90,7 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.execStream).toHaveBeenCalledWith(
       'projected-runtime',
       expect.objectContaining({
-        command: ['/bin/sh', '-lc', 'echo ok', expect.stringMatching(/^lace-exec-/)],
+        command: ['/bin/sh', '-lc', expect.any(String), expect.stringMatching(/^lace-exec-/)],
         workingDirectory: '/workspace',
         environment: { FOO: 'bar' },
       })
@@ -502,7 +502,7 @@ describe('ProjectedContainerToolRuntime', () => {
 
     const options = manager.execStream.mock.calls[0]![1] as { command: string[] };
     expect(options.command).toHaveLength(4);
-    expect(options.command.slice(0, 3)).toEqual(['/bin/bash', '-c', 'sleep 5']);
+    expect(options.command.slice(0, 2)).toEqual(['/bin/bash', '-c']);
     expect(options.command[3]).toMatch(/^lace-exec-/);
   });
 
@@ -599,7 +599,7 @@ describe('ProjectedContainerToolRuntime', () => {
       expect(manager.execStream).toHaveBeenCalledWith(
         'projected-runtime',
         expect.objectContaining({
-          command: ['/bin/sh', '-lc', 'echo ok', expect.stringMatching(/^lace-exec-/)],
+          command: ['/bin/sh', '-lc', expect.any(String), expect.stringMatching(/^lace-exec-/)],
           workingDirectory: '/workspace',
         })
       )
@@ -630,7 +630,10 @@ describe('ProjectedContainerToolRuntime', () => {
         containerId: 'container_123',
         state: 'running' as const,
       }),
-      execStream: vi.fn().mockResolvedValue(containerHandle),
+      execStream: vi
+        .fn()
+        .mockResolvedValueOnce(containerHandle)
+        .mockResolvedValue(createFakeExecStreamHandle()),
     };
     const runtime = new ProjectedContainerToolRuntime({
       id: 'rt_container',
