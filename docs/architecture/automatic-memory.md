@@ -267,6 +267,12 @@ retained text absent from transcript FTS, including full sidecars. Exact cosine
 scans yield between SQLite pages and cover every indexed age. Background
 publication checks current source/revision and host authority after awaits.
 
+Each preparation uses request-local source lookups rather than rebuilding the
+full source list for each candidate. Transcript FTS hits join to admitted source
+versions by identity. After awaited source/account reads, a fresh admission
+snapshot and the existing source/revision checks fence the final evidence; these
+lookups do not persist across preparations.
+
 A bounded query prioritizes incoming ordinary input and adds only a short
 user/assistant conversational tail. Literal text alternatives are safely quoted
 OR terms with stopwords removed. Complete quoted and code-shaped identifiers
