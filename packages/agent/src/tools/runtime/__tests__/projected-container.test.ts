@@ -630,7 +630,10 @@ describe('ProjectedContainerToolRuntime', () => {
         containerId: 'container_123',
         state: 'running' as const,
       }),
-      execStream: vi.fn().mockResolvedValue(containerHandle),
+      execStream: vi
+        .fn()
+        .mockResolvedValueOnce(containerHandle)
+        .mockResolvedValue(createFakeExecStreamHandle()),
     };
     const runtime = new ProjectedContainerToolRuntime({
       id: 'rt_container',
