@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { parseManageRemindersInput, ManageRemindersTool } from '../manage_reminders';
 import { ReminderScheduler, ReminderStore } from '@lace/agent/reminders';
 import type { ReminderRow } from '@lace/agent/reminders';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ToolContext } from '@lace/agent/tools/types';
@@ -197,6 +197,41 @@ describe('ManageRemindersTool execution', () => {
     };
     expect(body.cancelled).toBe(true);
     await sched.stop();
+  });
+
+  it('cancel on an unreadable reminders.json returns a tool error and leaves the file', async () => {
+    const dir = tempSessionDir();
+    const file = join(dir, 'reminders.json');
+    const content = JSON.stringify({
+      reminders: [
+        {
+          id: 'reminder_dddddddddddd',
+          created_at: 0,
+          next_fire_at: 1,
+          prompt: 'p',
+          recurs: null,
+          fired_at: null,
+          fire_count: 0,
+        },
+        { id: 42 },
+      ],
+    });
+    writeFileSync(file, content);
+    const sched = new ReminderScheduler({
+      sessionDir: dir,
+      now: () => 0,
+      notifier: async () => {},
+    });
+    const tool = new ManageRemindersTool();
+
+    const result = await tool.execute(
+      { action: 'cancel', id: 'reminder_dddddddddddd' },
+      ctxWithScheduler(sched)
+    );
+
+    expect(result.status).toBe('failed');
+    expect((result.content?.[0] as { text: string }).text).toContain('cannot read');
+    expect(readFileSync(file, 'utf8')).toBe(content);
   });
 
   it('list returns rows in next_fire_at order with wire-shape recurs', async () => {

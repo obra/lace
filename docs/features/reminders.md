@@ -83,6 +83,21 @@ Each row stores its `id`, `created_at`, `next_fire_at`, `prompt`, `recurs`,
 `fired_at`, and `fire_count`. The `recurs` field drives both the next-fire
 computation and the notification body at fire time.
 
+A file that isn't a `{"reminders": [...]}` snapshot of rows with string ids is
+never overwritten. `list` and the boot heap read it leniently (skipping what
+they can't read) and log `reminders.store.corrupt_snapshot`. Every write reads
+it strictly (`ReminderStore.listStrict()`):
+
+- `schedule` and `cancel` fail with `ReminderStoreUnreadableError`, which the
+  agent sees as a tool error.
+- A due reminder reports the error through the scheduler's `onError`, does not
+  fire, and comes off the in-memory schedule; its row stays on disk and re-arms
+  when the session next loads.
+- Boot recovery skips its save and logs
+  `reminders.store.unreadable_not_rewritten`.
+
+Fix or move the file aside to recover; lace never repairs it by replacing it.
+
 ## Host CLI: `lace-agent reminders ensure`
 
 A host process (for example sen-core's boot-time init) can add a standing cron
