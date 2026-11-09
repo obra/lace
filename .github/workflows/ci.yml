@@ -33,6 +33,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
+        env:
+          # CPU execution uses bundled binaries; this job needs no CUDA providers.
+          ONNXRUNTIME_NODE_INSTALL: skip
         run: npm ci
 
       - name: Install system dependencies
