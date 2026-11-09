@@ -17,13 +17,14 @@ returns the current note and original source references, explicitly marking
 superseded, missing or unavailable support. It checks current role authority; an
 unconfigured session cannot use derived memory. These are model-authored
 attributed syntheses, not independently verified facts. When before-answer
-automatic recall is configured, Lace retrieves bounded evidence before provider
-requests. It defaults off and is independent of extraction; omit
-`initialize.memory.recall` at the next initialization to disable automatic
-insertion while preserving manual recall and retained memory. Its opaque
-`source:<digest>` handles expand admitted committed documents and full
-historical sidecars through the existing `read` action under current authority;
-arbitrary filesystem paths are rejected.
+automatic recall is configured, the main agent retrieves bounded evidence before
+provider requests. Delegates can use the explicit `recall` tool under their
+current permissions. Automatic recall defaults off and is independent of
+extraction. Omit `initialize.memory.recall` at the next initialization to
+disable automatic insertion while preserving manual recall and retained memory.
+Its opaque `source:<digest>` handles expand admitted committed documents and
+full historical sidecars through the existing `read` action under current
+authority; arbitrary filesystem paths are rejected.
 
 Configured transcript results and opaque source reads retain every directly
 linked latest summary in `current_accounts`, including corrections linked

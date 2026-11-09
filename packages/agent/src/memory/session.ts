@@ -84,10 +84,10 @@ export function sessionMemory(
 export function childMemoryConfiguration(state: AgentServerState, role: string, actorId: string) {
   const runtime = state.memory;
   if (!runtime) return undefined;
+  // Delegates read shared memory on demand. The main agent prepares automatic recall.
   return {
     databasePath: runtime.configuration.databasePath,
     binding: runtime.bindingForRole(role, actorId),
-    ...(runtime.configuration.recall ? { recall: runtime.configuration.recall } : {}),
   };
 }
 

@@ -28,10 +28,11 @@ sibling generated caches. Each suffix is a dot followed by letters or digits,
 and an explicit list must be nonempty. Omitting this field preserves admission
 of all regular files beneath the literal roots. This selects originals during
 discovery; it does not introduce glob syntax or change snapshotting. The root
-must be a real repository root. Child Lace processes run on the host too; their
-fresh initialization includes the database path, optional recall asset directory
-and a newly derived non-root binding. It omits extraction and document settings;
-children read the shared projections without maintaining them.
+must be a real repository root. Child Lace processes also run on the host. Each
+new, resumed or nested delegate receives the shared database path and a newly
+derived non-root binding. The main agent owns extraction, document discovery and
+automatic recall. Delegates can search and read the shared projections through
+the explicit `recall` tool under their current role grants and tool permissions.
 
 Derived notes are ordinary instance-wide memory: reads require current
 `canRead`, acceptance requires current `canMutate`. Writable document collection
@@ -252,19 +253,19 @@ separate real-model sample.
 
 ## Before-answer automatic recall
 
-The independent optional `recall: { modelDirectory }` configuration enables
-retrieval before provider requests. It defaults off: omit `recall` to disable
-automatic retrieval and insertion. Extraction is independently configured;
-omitting `extraction` does not disable recall, and omitting `recall` does not
-disable extraction, manual recall or retained memory. Host configuration is
-applied at initialization; restart/reinitialize with `recall` omitted and resume
-the session to disable it. Selections belong to the runtime and session rather
-than persisted temporary context, so disabled resumes do not reinstall prior
-automatic evidence. No live-toggle API is provided. It does not require an
-extraction connection. Configure document discovery on the root for committed
-originals even when extraction is disabled. Missing or invalid pinned assets
-produce an explicit text-only outcome; runtime never downloads weights. One
-process rejects conflicting configured model directories.
+The independent optional `recall: { modelDirectory }` configuration enables the
+main agent to retrieve evidence before provider requests. It defaults off. Omit
+`recall` to disable automatic retrieval and insertion. Extraction is
+independently configured. Omitting `extraction` leaves recall available, and
+omitting `recall` preserves extraction, explicit recall and retained memory.
+Host configuration is applied at initialization; restart/reinitialize with
+`recall` omitted and resume the session to disable it. Selections belong to the
+runtime and session rather than persisted temporary context, so disabled resumes
+do not reinstall prior automatic evidence. No live-toggle API is provided. It
+does not require an extraction connection. Configure document discovery on the
+root for committed originals even when extraction is disabled. Missing or
+invalid pinned assets produce an explicit text-only outcome; runtime never
+downloads weights. One process rejects conflicting configured model directories.
 
 Foreground requests trigger coalesced local maintenance without waiting for
 corpus catch-up; available index coverage remains explicit. The memory database
