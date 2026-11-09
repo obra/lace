@@ -54,6 +54,8 @@ jobs:
 
       - name: Run agent tests with coverage
         run: npm run test:coverage
+        env:
+          LACE_CONTAINER_CLEANUP_TESTS: "1"
 
       - name: Run CLI tests
         run: npm run test --workspace=packages/cli

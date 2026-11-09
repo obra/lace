@@ -212,5 +212,5 @@ Ordinary completion leaves intentionally backgrounded work alone. Non-shell
 commands, shells that already supply positional arguments, and descendants that
 deliberately create a separate session are outside this group cleanup contract.
 The real Docker regression is enabled with `LACE_CONTAINER_CLEANUP_TESTS=1` on
-disposable Linux infrastructure; it checks actual process liveness and isolation
-from unrelated work.
+disposable Linux infrastructure, and CI sets it for the agent test step; it
+checks actual process liveness and isolation from unrelated work.
