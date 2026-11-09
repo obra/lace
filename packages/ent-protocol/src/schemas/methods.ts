@@ -1089,6 +1089,59 @@ export const EntSessionTemporaryContextPeekResponseSchema = z
 export const EntSessionTemporaryContextClearResponseSchema =
   EntSessionTemporaryContextSetResponseSchema;
 
+// Memory-only per-session overlay of env vars for tool calls (PRI-3672) — e.g.
+// a placeholder credential the credential broker just minted. Like
+// temporary_context above, never a durable event and never persisted into
+// session state/config.
+export const EnvOverlaySetParamsSchema = z
+  .object({
+    vars: z
+      .record(z.string(), z.string())
+      .refine((vars) => Object.keys(vars).length > 0, { message: 'vars must not be empty' }),
+    // Epoch milliseconds. Omit for an entry that lives until explicitly
+    // cleared or the process restarts.
+    expiresAt: z.number().int().positive().optional(),
+  })
+  .strict();
+export const EnvOverlayClearParamsSchema = z
+  .object({
+    // Omit to clear the whole overlay.
+    keys: z.array(z.string()).optional(),
+  })
+  .strict();
+export const EnvOverlaySetResultSchema = z.object({}).strict();
+export const EnvOverlayClearResultSchema = z.object({}).strict();
+export const EntSessionEnvOverlaySetRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/env_overlay/set'),
+    params: EnvOverlaySetParamsSchema,
+  })
+  .strict();
+export const EntSessionEnvOverlayClearRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/env_overlay/clear'),
+    params: EnvOverlayClearParamsSchema.optional(),
+  })
+  .strict();
+export const EntSessionEnvOverlaySetResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EnvOverlaySetResultSchema,
+  })
+  .strict();
+export const EntSessionEnvOverlayClearResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EnvOverlayClearResultSchema,
+  })
+  .strict();
+
 const EntSessionEventsParamsSchema = z
   .object({
     afterEventSeq: z.number().optional(),
@@ -2517,6 +2570,8 @@ export const EntProtocolRequestSchema = z.union([
   EntSessionTemporaryContextSetRequestSchema,
   EntSessionTemporaryContextPeekRequestSchema,
   EntSessionTemporaryContextClearRequestSchema,
+  EntSessionEnvOverlaySetRequestSchema,
+  EntSessionEnvOverlayClearRequestSchema,
   EntSessionEventsRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,

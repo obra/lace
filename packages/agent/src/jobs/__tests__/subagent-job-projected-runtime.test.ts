@@ -112,12 +112,14 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
   let onRequestSpy: ReturnType<typeof vi.spyOn>;
   let sessionUpdateHandler: ((params: unknown) => unknown | Promise<unknown>) | undefined;
   const sessionNewRequests: Array<Record<string, unknown>> = [];
+  const envOverlaySetRequests: Array<Record<string, unknown>> = [];
   const spawnRequests: unknown[] = [];
   const previousLaceSessionDir = process.env.LACE_SESSION_DIR;
   const previousLaceDir = process.env.LACE_DIR;
 
   beforeEach(() => {
     sessionNewRequests.length = 0;
+    envOverlaySetRequests.length = 0;
     spawnRequests.length = 0;
     sessionUpdateHandler = undefined;
     laceDir = mkdtempSync(join(tmpdir(), 'projected-subagent-'));
@@ -174,6 +176,10 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
         }
         if (method === 'ent/session/configure') return undefined;
         if (method === 'session/set_config_option') return undefined;
+        if (method === 'ent/session/env_overlay/set') {
+          envOverlaySetRequests.push(params as Record<string, unknown>);
+          return {};
+        }
         if (method === 'session/prompt') {
           // After prompt resolves, runSubagentJobProcess proceeds to the
           // finally block. Signal graceful exit so SIGTERM teardown returns
@@ -312,6 +318,114 @@ describe('runSubagentJobProcess — host-projected runtimeBinding', () => {
     // Sanity: finalizeJob was invoked exactly once and the job completed.
     expect(finalizeJob).toHaveBeenCalledOnce();
     expect(job.status).toBe('completed');
+  });
+
+  it("forwards the parent's live credential env overlay to the child before session/prompt (PRI-3672 condition 3)", async () => {
+    const jobId = 'job_env_overlay_forward_test';
+    const outputPath = join(parentSessionDir, 'jobs', `${jobId}.log`);
+
+    const runtimeBinding: RuntimeExecutionBinding = {
+      schemaVersion: 1,
+      identity: { runtimeId: 'rt_projected_subagent_overlay' },
+      toolRuntime: {
+        type: 'container',
+        cwd: '/work',
+        spec: {
+          name: 'sess_parent-shell',
+          image: 'node:24-bookworm',
+          workingDirectory: '/work',
+          mounts: [],
+        },
+      },
+    };
+
+    let resolveCompletion: () => void = () => undefined;
+    const completion = new Promise<void>((r) => {
+      resolveCompletion = r;
+    });
+
+    const job: JobState = {
+      jobId,
+      type: 'delegate',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+      outputPath,
+      finished: false,
+      completion,
+      resolveCompletion,
+      persona: 'shell',
+      subagentContent: [{ type: 'text', text: 'noop' }],
+      runtimeBinding,
+    };
+
+    const finalizeJob = vi.fn(async (j: JobState) => {
+      j.finished = true;
+      j.resolveCompletion();
+    });
+
+    const containerMounts: Readonly<Record<string, MountRegistryEntry>> = {};
+    const now = Date.now();
+    const state = {
+      activeSession: {
+        meta: { sessionId: parentSessionId, workDir: parentWorkDir },
+        dir: parentSessionDir,
+        state: { nextEventSeq: 1, nextStreamSeq: 1, config: {} },
+      },
+      config: {},
+      jobManager: {
+        getJob: vi.fn(),
+        addJob: vi.fn(),
+        getStreamingMode: () => 'full' as const,
+      },
+      containerManager: null as unknown as ContainerManager,
+      containerMounts,
+      personaRegistry: {
+        getUserPersonasPaths: () => [],
+        getMcpBaseDir: () => undefined,
+        getIncludeFallbacks: () => undefined,
+      },
+      environmentRegistry: { getEnvironmentsPaths: () => [] },
+      // Set via ent/session/env_overlay/set on the parent, in-memory only —
+      // this is what must be forwarded to the freshly-spawned child.
+      envOverlay: {
+        MINTED_CRED: { value: 'test-placeholder-xyz' },
+        EXPIRING_CRED: { value: 'test-placeholder-abc', expiresAt: now + 60_000 },
+      },
+    };
+
+    const topLevelPeer = {
+      notify: vi.fn(),
+    } as unknown as JsonRpcPeer;
+
+    runSubagentJobProcess(job, {
+      getState: () => state as never,
+      runExclusive: async <T>(work: () => Promise<T> | T) => work(),
+      emitSessionUpdate: vi.fn(),
+      requestPermissionFromClient: vi.fn(),
+      finalizeJob,
+      runPromptInternalRef: { current: null },
+      topLevelPeer,
+    });
+
+    await completion;
+
+    // One batch per distinct expiry (none vs. the shared one here), each
+    // forwarded as its own env_overlay/set call, and BEFORE session/prompt
+    // (the child's first tool call can't happen before that).
+    expect(envOverlaySetRequests.length).toBeGreaterThanOrEqual(2);
+    expect(envOverlaySetRequests).toContainEqual({ vars: { MINTED_CRED: 'test-placeholder-xyz' } });
+    expect(envOverlaySetRequests).toContainEqual({
+      vars: { EXPIRING_CRED: 'test-placeholder-abc' },
+      expiresAt: now + 60_000,
+    });
+
+    const requestMethods = requestSpy.mock.calls.map((call) => call[0] as string);
+    const lastEnvOverlayIdx = requestMethods.lastIndexOf('ent/session/env_overlay/set');
+    const promptIdx = requestMethods.indexOf('session/prompt');
+    expect(lastEnvOverlayIdx).toBeGreaterThanOrEqual(0);
+    expect(promptIdx).toBeGreaterThan(lastEnvOverlayIdx);
+
+    expect(finalizeJob).toHaveBeenCalledOnce();
   });
 
   it('does not mint container execution metadata for native persona delegates', async () => {
