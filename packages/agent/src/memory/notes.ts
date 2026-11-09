@@ -12,6 +12,33 @@ const noteOf = <T extends NoteRow>(row: T): Omit<T, 'sources'> & Note => ({
   ...row,
   sources: JSON.parse(row.sources) as Source[],
 });
+
+function projectRevisionLinks(noteId: string, sources: string): string {
+  return `INSERT OR IGNORE INTO memory_revision_links
+    SELECT CASE WHEN kind='event' THEN 'event' ELSE 'document' END,
+      json_extract(value, CASE WHEN kind='event' THEN '$.reference.sessionId' ELSE '$.id' END),
+      json_extract(value, CASE WHEN kind='event' THEN '$.reference.eventSeq' ELSE '$.version' END),
+      note_id
+    FROM (SELECT ${noteId} AS note_id,value,json_extract(value,'$.reference.kind') AS kind FROM ${sources})`;
+}
+
+function initializeRevisionLinks(db: Database): void {
+  db.transaction(() => {
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='memory_revision_links'").get()) return;
+    // Publish the lookup and its write-through trigger together with the complete backfill.
+    db.exec(`
+      CREATE TABLE memory_revision_links (
+        kind TEXT NOT NULL, source_key TEXT NOT NULL, source_version TEXT NOT NULL, note_id TEXT NOT NULL,
+        PRIMARY KEY(kind,source_key,source_version,note_id)
+      ) WITHOUT ROWID;
+      CREATE TRIGGER IF NOT EXISTS memory_revision_links_insert AFTER INSERT ON memory_revisions BEGIN
+        ${projectRevisionLinks('NEW.note_id', 'json_each(NEW.sources)')};
+      END;
+      ${projectRevisionLinks('r.note_id', 'memory_revisions AS r, json_each(r.sources)')};
+    `);
+  }).immediate();
+}
+
 export class MemoryNotes {
   constructor(
     readonly db: Database,
@@ -46,6 +73,7 @@ export class MemoryNotes {
       CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(id UNINDEXED, content, tokenize='porter unicode61');
     `);
     if (rebuild) db.exec('INSERT INTO memory_fts(id,content) SELECT id,text FROM memory_notes');
+    initializeRevisionLinks(db);
   }
   write<T>(work: () => T): T {
     const run = () => {
@@ -135,19 +163,13 @@ export class MemoryNotes {
   linked(source: OriginalReference, limit: number): Note[] {
     const rows = this.db
       .prepare(
-        `SELECT DISTINCT note_id AS id FROM memory_revisions, json_each(memory_revisions.sources) AS source
-      WHERE (? = 'event' AND json_extract(source.value,'$.reference.kind')='event'
-        AND json_extract(source.value,'$.reference.sessionId')=? AND json_extract(source.value,'$.reference.eventSeq')=?)
-      OR (? = 'document' AND json_extract(source.value,'$.id')=? AND json_extract(source.value,'$.version')=?)
-      LIMIT ?`
+        `SELECT note_id AS id FROM memory_revision_links
+         WHERE kind=? AND source_key=? AND source_version=? ORDER BY note_id LIMIT ?`
       )
       .all(
         source.kind,
-        source.kind === 'event' ? source.sessionId : null,
-        source.kind === 'event' ? source.eventSeq : null,
-        source.kind,
-        source.kind === 'document' ? source.id : null,
-        source.kind === 'document' ? source.version : null,
+        source.kind === 'event' ? source.sessionId : source.id,
+        source.kind === 'event' ? String(source.eventSeq) : source.version,
         limit + 1
       ) as { id: string }[];
     if (rows.length > limit) throw new Error('Current account attachment budget');

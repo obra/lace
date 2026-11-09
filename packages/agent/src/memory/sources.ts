@@ -92,7 +92,54 @@ function eventContent(
     }),
   ] as ContentBlock[];
 }
-function* retainedLines(file: string): Generator<string> {
+function oversizedEvent(prefix: Buffer, requested: number) {
+  // appendDurableEvent serializes the assigned identity first. Unknown envelopes stay unavailable.
+  const seq = Number(/^\{"eventSeq":([1-9]\d{0,15}),/.exec(prefix.toString('utf8'))?.[1]);
+  const unavailable = () => new Error('Oversize retained event input');
+  if (!Number.isSafeInteger(seq) || seq === requested) throw unavailable();
+
+  // Check later top-level strings for an overriding key, without decoding the payload.
+  const keyBytes = 2 + 'eventSeq'.length * 6;
+  let depth = 0;
+  let quoted = false;
+  let escaped = false;
+  let seen = false;
+  let keyExpected = false;
+  let token: number[] | undefined;
+  return {
+    scan(part: Buffer) {
+      for (const byte of part) {
+        if (quoted) {
+          if (token && token.length < keyBytes) token.push(byte);
+          else token = undefined;
+          if (escaped) escaped = false;
+          else if (byte === 92)
+            escaped = true; // backslash
+          else if (byte === 34) {
+            quoted = false;
+            if (token && JSON.parse(Buffer.from(token).toString('utf8')) === 'eventSeq') {
+              if (seen) throw unavailable();
+              seen = true;
+            }
+          }
+        } else if (byte === 34) {
+          quoted = true;
+          token = depth === 1 && keyExpected ? [byte] : undefined;
+          keyExpected = false;
+        } else if (byte === 123 || byte === 91) {
+          // { or [
+          if (++depth === 1) keyExpected = true;
+        } else if (byte === 125 || byte === 93)
+          depth--; // } or ]
+        else if (depth === 1 && byte === 44) keyExpected = true; // comma between root fields
+      }
+    },
+    complete() {
+      if (!seen || depth !== 0 || quoted) throw unavailable();
+    },
+  };
+}
+function* retainedLines(file: string, requested: number): Generator<string> {
   let fd: number;
   try {
     fd = openSync(file, 'r');
@@ -104,6 +151,7 @@ function* retainedLines(file: string): Generator<string> {
     const buffer = Buffer.allocUnsafe(Math.min(L.discoveryBytes, size));
     let parts: Buffer[] = [];
     let bytes = 0;
+    let oversized: ReturnType<typeof oversizedEvent> | undefined;
     for (let offset = 0; offset < size; ) {
       const count = readSync(fd, buffer, 0, Math.min(buffer.length, size - offset), offset);
       if (!count) break;
@@ -112,21 +160,27 @@ function* retainedLines(file: string): Generator<string> {
       for (let start = 0; start < count; ) {
         const newline = chunk.indexOf(10, start);
         const part = chunk.subarray(start, newline < 0 ? count : newline);
-        bytes += part.length;
-        // Refuse the fallback if an oversized line could precede another copy of the event.
-        if (bytes > EVENT_BYTES) throw new Error('Oversize retained event input');
+        if (!oversized && (bytes += part.length) > EVENT_BYTES) {
+          oversized = oversizedEvent(Buffer.concat([...parts, part], 64), requested);
+          for (const fragment of parts) oversized.scan(fragment);
+          parts = [];
+        }
+        oversized?.scan(part);
         if (newline < 0) {
-          parts.push(Buffer.from(part));
+          if (!oversized) parts.push(Buffer.from(part));
           break;
         }
-        if (bytes)
+        if (oversized) oversized.complete();
+        else if (bytes)
           yield (parts.length ? Buffer.concat([...parts, part], bytes) : part).toString('utf8');
+        oversized = undefined;
         parts = [];
         bytes = 0;
         start = newline + 1;
       }
     }
-    if (bytes) yield Buffer.concat(parts, bytes).toString('utf8');
+    if (oversized) oversized.complete();
+    else if (bytes) yield Buffer.concat(parts, bytes).toString('utf8');
   } finally {
     closeSync(fd);
   }
@@ -137,7 +191,7 @@ function retainedLine(ref: Extract<SourceReference, { kind: 'event' }>): string 
   } catch {
     // Equal event sequences retain file and line order in the full session reader.
     for (const file of sessionShardFiles(getSessionDir(ref.sessionId)))
-      for (const line of retainedLines(file)) {
+      for (const line of retainedLines(file, ref.eventSeq)) {
         try {
           if ((JSON.parse(line) as { eventSeq: number }).eventSeq === ref.eventSeq) return line;
         } catch {

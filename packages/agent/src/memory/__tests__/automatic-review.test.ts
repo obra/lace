@@ -31,6 +31,7 @@ import {
 import { sessionMemory } from '../session';
 import { RecallTool } from '../../tools/implementations/recall';
 import { closeRecallIndex, getRecallIndex } from '../../storage/recall/index-db';
+import { appendDurableEvent } from '../../storage/event-log';
 import { loadTurnEntryProjection } from '../../message-building/turn-entry-projection';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -218,6 +219,40 @@ it('recovers a moved original in authoritative file order without reading whole 
   );
 });
 
+it('continues past a known unrelated oversized event and guards an oversized first copy', async () => {
+  const { originals } = await projectedOriginals(3);
+  const first = sources()[0];
+  if (first.reference.kind !== 'event') throw new Error('Expected event fixture');
+  const legacy = file();
+  const original = readFileSync(legacy, 'utf8').split('\n')[0];
+  const shard = join(dir, 'transcripts', 'root', '2026-10-30', `${sessionId}.jsonl`);
+  mkdirSync(join(shard, '..'), { recursive: true });
+  writeFileSync(shard, `${original}\n`);
+  const relocated = { ...first, reference: { ...first.reference, file: `${legacy}.old` } };
+  const { written } = appendDurableEvent(
+    join(legacy, '..'),
+    { nextEventSeq: 4, nextStreamSeq: 1 },
+    {
+      type: 'message',
+      data: {
+        eventSeq: 1,
+        content: `escaped "eventSeq":1 inside a string ${'x'.repeat(8 * 1024 * 1024)}`,
+      },
+    }
+  );
+  expect(written.eventSeq).toBe(4);
+  const large = JSON.stringify(written);
+  writeFileSync(legacy, `${large}\n`);
+  expect((await originals.load(relocated, true)).recordedAt).toBe('2026-10-30T00:00:00Z');
+
+  writeFileSync(legacy, `${large.replace('{"eventSeq":4,', '{"eventSeq":1,')}\n`);
+  await expect(originals.load(relocated, true)).rejects.toThrow('Oversize retained event input');
+
+  // JSON.parse would use the final top-level eventSeq, including escaped key spellings.
+  writeFileSync(legacy, `${large.slice(0, -1)},"event\\u0053eq":1}\n`);
+  await expect(originals.load(relocated, true)).rejects.toThrow('Oversize retained event input');
+});
+
 it('reuses selected originals without decoding an unrelated stored vector', async () => {
   vector = (text) => (text.includes('bicycle') ? [1, 0] : [0, 1]);
   event('bicycle finish is violet.');
@@ -233,6 +268,76 @@ it('reuses selected originals without decoding an unrelated stored vector', asyn
   expect(reused.selected).toEqual(first.selected);
   expect(reused.coverage).toMatchObject({ sources: 2, passages: 2, vectors: 2 });
   expect(queries).toBe(1);
+});
+
+it('backfills historical links for children and reuses selected accounts without reading unrelated revisions', async () => {
+  event('bicycle finish was violet.');
+  event('bicycle finish is now amber.');
+  event('harbor winds are moderate.');
+  event('The latest finish is bronze.');
+  vector = (text, kind) => (kind === 'query' || text.includes('bicycle') ? [1, 0] : [0, 1]);
+  const root = start(false);
+  await root.wake();
+  const [first, correction, harbor, bronze] = sources();
+  const former = accept('The bicycle finish was violet.', [first]);
+  const current = accept('The bicycle finish is now amber.', [correction], former);
+  let unrelated = accept('Unrelated harbor account 0.', [harbor]);
+  for (let i = 1; i < 16; i++)
+    unrelated = accept(`Unrelated harbor account ${i}.`, [harbor], unrelated);
+  const allRevisions = () =>
+    db.prepare('SELECT * FROM memory_revisions ORDER BY note_id,revision').all();
+  const originalRevisions = allRevisions();
+
+  db.exec(
+    'DROP TRIGGER IF EXISTS memory_revision_links_insert; DROP TABLE IF EXISTS memory_revision_links'
+  );
+  const child = start(false, true);
+  const projection = () =>
+    db.prepare("SELECT 1 FROM sqlite_master WHERE name='memory_revision_links'").get();
+  expect(projection()).toBeUndefined();
+  const previous = db
+    .prepare('SELECT sources FROM memory_revisions WHERE note_id=? AND revision=1')
+    .get(unrelated.id) as { sources: string };
+  const replaceUnrelated = db.prepare(
+    'UPDATE memory_revisions SET sources=? WHERE note_id=? AND revision=1'
+  );
+  replaceUnrelated.run('unreadable', unrelated.id);
+  expect(() => start(false)).toThrow('malformed JSON');
+  expect(projection()).toBeUndefined();
+  const childAccounts = child.reader(child.configuration.binding);
+  expect(await childAccounts.accountsFor([originalReference(first)])).toMatchObject([
+    { reason: expect.any(String) },
+  ]);
+  replaceUnrelated.run(previous.sources, unrelated.id);
+  start(false);
+  expect(allRevisions()).toEqual(originalRevisions);
+  const initial = await recall(child, 'bicycle');
+  expect(initial.selected).toHaveLength(1);
+  expect(initial.selected[0].originals.map((original) => original.handle)).toEqual([
+    originalHandle(first),
+    originalHandle(correction),
+  ]);
+  expect(initial.selected[0].accounts).toMatchObject([
+    { id: current.id, revision: 2, text: current.text },
+  ]);
+
+  // Fault injection after backfill exposes any scan of an unrelated revision's source JSON.
+  replaceUnrelated.run('unreadable', unrelated.id);
+  const reused = await recall(child, 'bicycle', {
+    selection: { ...initial, groups: initial.selected },
+  });
+  expect(reused.selected).toEqual(initial.selected);
+
+  const latest = accept('The bicycle finish is now bronze.', [bronze], current);
+  const refreshed = await recall(child, 'bicycle', {
+    selection: { ...initial, groups: initial.selected },
+  });
+  expect(refreshed.selected[0].accounts).toMatchObject([
+    { id: latest.id, revision: 3, text: latest.text },
+  ]);
+  expect(await childAccounts.accountsFor([originalReference(bronze)])).toMatchObject([
+    { accounts: [{ id: latest.id, revision: 3 }] },
+  ]);
 });
 
 it('maintains missing vectors without reconstructing already covered source and note rows', async () => {
