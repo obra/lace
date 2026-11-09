@@ -1,6 +1,15 @@
 // ABOUTME: Real-store regressions for reviewed automatic recall grouping, authority and topic boundaries.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import * as fs from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  readdirSync,
+  statSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -10,6 +19,7 @@ import { MemoryNotes } from '../notes';
 import { MemorySources } from '../sources';
 import { MemoryPassages, originalReference } from '../passages';
 import { automaticRecall } from '../automatic';
+import { RecallScratch } from '../recall-scratch';
 import {
   originalHandle,
   sourceHandle,
@@ -22,6 +32,12 @@ import { sessionMemory } from '../session';
 import { RecallTool } from '../../tools/implementations/recall';
 import { closeRecallIndex, getRecallIndex } from '../../storage/recall/index-db';
 import { loadTurnEntryProjection } from '../../message-building/turn-entry-projection';
+
+vi.mock('node:fs', async (importOriginal) => {
+  const fs = await importOriginal<typeof import('node:fs')>();
+  return { ...fs, readFileSync: vi.fn(fs.readFileSync), unlinkSync: vi.fn(fs.unlinkSync) };
+});
+
 const sessionId = 'sess_11111111-1111-4111-8111-111111111111';
 const grant = {
   producerId: 'root',
@@ -162,13 +178,13 @@ async function projectedOriginals(count: number) {
   await originals.discover();
   const passages = new MemoryPassages(notes, originals, true);
   await passages.index(() => {});
-  const selected = (await passages.all('fixture', () => {})).slice(0, 2);
+  const selected = (await passages.pages(undefined, () => {}).next()).value!.slice(0, 2);
   const selection: AutomaticRecallInput['selection'] = {
     mode: 'text-only',
     groups: selected.map((passage) => ({
       originals: [
         {
-          handle: passage.handle,
+          handle: originalHandle(passage.source),
           source: originalReference(passage.source),
           start: passage.start,
           end: passage.end,
@@ -181,11 +197,186 @@ async function projectedOriginals(count: number) {
   return { originals, passages, selection };
 }
 
+it('recovers a moved original in authoritative file order without reading whole shards', async () => {
+  const { originals } = await projectedOriginals(3);
+  const first = sources()[0];
+  if (first.reference.kind !== 'event') throw new Error('Expected event fixture');
+  const legacy = file();
+  const original = readFileSync(legacy, 'utf8').split('\n')[0];
+  const filler = JSON.stringify({ eventSeq: 4, data: { content: 'é'.repeat(140_000) } });
+  const shard = join(dir, 'transcripts', 'root', '2026-10-30', `${sessionId}.jsonl`);
+  mkdirSync(join(shard, '..'), { recursive: true });
+  writeFileSync(shard, `${original}\n`);
+  const relocated = { ...first, reference: { ...first.reference, file: `${legacy}.old` } };
+  writeFileSync(legacy, `${filler}\n${original}`);
+  const readWholeFile = vi.mocked(fs.readFileSync).mockClear();
+  expect((await originals.load(relocated, true)).recordedAt).toBe('2026-10-30T00:00:00Z');
+  expect(readWholeFile.mock.calls.some(([path]) => path === legacy || path === shard)).toBe(false);
+  writeFileSync(legacy, `${original.replace('violet', 'orange')}\n${filler}`);
+  await expect(originals.load(relocated, true)).rejects.toThrow(
+    'Source event unavailable or replaced'
+  );
+});
+
+it('reuses selected originals without decoding an unrelated stored vector', async () => {
+  vector = (text) => (text.includes('bicycle') ? [1, 0] : [0, 1]);
+  event('bicycle finish is violet.');
+  event('harbor winds are moderate.');
+  const runtime = start(false);
+  await runtime.wake();
+  const first = await recall(runtime, 'bicycle');
+  expect(first.selected).toHaveLength(1);
+  db.prepare('UPDATE memory_passages SET vector=? WHERE id=?').run('broken JSON', sources()[1].id);
+  const reused = await recall(runtime, 'bicycle', {
+    selection: { ...first, groups: first.selected },
+  });
+  expect(reused.selected).toEqual(first.selected);
+  expect(reused.coverage).toMatchObject({ sources: 2, passages: 2, vectors: 2 });
+  expect(queries).toBe(1);
+});
+
+it('maintains missing vectors without reconstructing already covered source and note rows', async () => {
+  event('bicycle finish is violet.');
+  event('harbor winds are moderate.');
+  const runtime = start();
+  await runtime.wake();
+  const [first, second] = sources();
+  const missing = accept('The bicycle is violet.', [first]);
+  const covered = accept('The harbor winds are moderate.', [second]);
+  notes.cacheVector(covered, 'review-controlled', [1, 0]);
+  db.prepare('UPDATE memory_sources SET reference=? WHERE id=?').run('unreadable', second.id);
+  db.prepare('UPDATE memory_vectors SET vector=? WHERE note_id=?').run('unreadable', covered.id);
+  db.prepare('UPDATE memory_passages SET generation=NULL,vector=NULL WHERE id=?').run(first.id);
+  await runtime.wake();
+  expect(db.prepare('SELECT generation FROM memory_passages WHERE id=?').get(first.id)).toEqual({
+    generation: 'review-controlled',
+  });
+  expect(notes.vector(missing, 'review-controlled')).toEqual([1, 0]);
+});
+
+it('refills beyond multiple sorted runs of higher-scoring rejected originals', async () => {
+  const stale = 'bicycle stale.';
+  const count = 1025;
+  for (let i = 0; i < count; i++) event(stale);
+  event('bicycle violet.');
+  event('bicycle green.');
+  event('bicycle no vector.');
+  vector = (text, kind) => (kind === 'query' || text.includes(stale) ? [1, 0] : [0.8, 0.6]);
+  const runtime = start();
+  await runtime.wake();
+  db.prepare('UPDATE memory_passages SET generation=NULL,vector=NULL WHERE id=?').run(
+    sources().at(-1)!.id
+  );
+  writeFileSync(file(), readFileSync(file(), 'utf8').replaceAll(stale, 'bicycle gone!.'));
+  const result = await recall(runtime, 'bicycle');
+  expect(result.mode).toBe('hybrid');
+  expect(result.coverage).toMatchObject({
+    sources: count + 3,
+    passages: count + 3,
+    vectors: count + 2,
+    partial: true,
+  });
+  expect(
+    result.selected.flatMap((group) => group.originals.map((original) => original.text))
+  ).toEqual([
+    expect.stringContaining('bicycle violet.'),
+    expect.stringContaining('bicycle green.'),
+    expect.stringContaining('bicycle no vector.'),
+  ]);
+});
+
+it.each(['completed', 'cancelled', 'failed'] as const)(
+  'uses a private on-disk ranking store and removes it when validation is %s',
+  async (outcome) => {
+    const { originals, passages } = await projectedOriginals(3);
+    const controller = new AbortController();
+    const files = () => readdirSync(dir).filter((name) => name.startsWith('recall-scratch-'));
+    let allocated = false;
+    const { unlinkSync } = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const removed = vi.mocked(fs.unlinkSync).mockImplementation((file) => {
+      if (String(file).endsWith('/ranking.sqlite')) {
+        expect(statSync(join(String(file), '..')).mode & 0o777).toBe(0o700);
+        expect(statSync(file).blocks).toBeGreaterThan(0);
+        expect(statSync(file).dev).toBe(statSync(configuration.databasePath).dev);
+        allocated = true;
+      }
+      unlinkSync(file);
+    });
+    let inspected = false;
+    const closed = vi.spyOn(RecallScratch.prototype, 'close');
+    const result = automaticRecall(input('bicycle', { signal: controller.signal }), {
+      notes,
+      sources: originals,
+      passages,
+      encoder: {
+        generation: 'fixture',
+        async encode() {
+          return [[1, 0]];
+        },
+      },
+      floor: 0.7,
+      check: () => {},
+      accountsFor: async () => {
+        expect(allocated).toBe(true);
+        expect(files()).toEqual([]);
+        inspected = true;
+        if (outcome === 'cancelled') {
+          controller.abort(new Error('fixture cancelled'));
+          expect(closed).toHaveBeenCalledTimes(1);
+          expect(() => closed.mock.instances[0].alias('unused')).toThrow();
+        }
+        if (outcome === 'failed') throw new Error('fixture failed');
+        return [{ accounts: [] }];
+      },
+    });
+    try {
+      if (outcome === 'completed')
+        await expect(result).resolves.toMatchObject({ mode: 'text-only' });
+      else await expect(result).rejects.toThrow(`fixture ${outcome}`);
+      expect(inspected).toBe(true);
+      expect(files()).toEqual([]);
+      expect(closed).toHaveBeenCalledTimes(1);
+      expect(() => closed.mock.instances[0].alias('unused')).toThrow();
+    } finally {
+      removed.mockReset();
+      closed.mockRestore();
+    }
+  }
+);
+
+it('omits a group whose required accounts cannot fit before reading their support', async () => {
+  event('bicycle first original.');
+  event('bicycle fallback original.');
+  event('Current support for the first original.');
+  vector = (text, kind) =>
+    kind === 'query' || text.includes('bicycle first original')
+      ? [1, 0]
+      : text.includes('bicycle')
+        ? [0.8, 0.6]
+        : [0, 1];
+  const runtime = start();
+  await runtime.wake();
+  const [first, fallback, support] = sources();
+  for (let index = 0; index < 110; index++) accept(`Required account ${index}.`, [first, support]);
+  const status = vi.spyOn(MemorySources.prototype, 'status');
+  try {
+    const result = await recall(runtime, 'bicycle');
+    expect(
+      result.selected.flatMap((group) => group.originals.map((original) => original.handle))
+    ).toEqual([originalHandle(fallback)]);
+    expect(status.mock.calls.some(([source]) => source.id === support.id)).toBe(false);
+  } finally {
+    status.mockRestore();
+  }
+  const manual = await runtime.reader(configuration.binding).readOriginal(originalHandle(first));
+  expect(manual?.current_accounts).toHaveLength(110);
+});
+
 it.each([8, 16])(
   'bounds source-list reconstruction while revalidating fixed evidence among %i originals',
   async (count) => {
     const { originals, passages, selection } = await projectedOriginals(count);
-    const admitted = vi.spyOn(passages, 'admitted');
+    const sourceForOriginal = vi.spyOn(passages, 'sourceForOriginal');
     const validate = vi.spyOn(originals, 'validateAtAcceptance');
     const result = await automaticRecall(input('bicycle', { selection }), {
       notes,
@@ -218,56 +409,49 @@ it.each([8, 16])(
       `event:${sessionId}:1`,
       `event:${sessionId}:2`,
     ]);
-    expect(
-      admitted.mock.calls.length,
-      'full source-list reads per preparation'
-    ).toBeLessThanOrEqual(3);
-  }
-);
-
-it.each([8, 16])(
-  'joins matching events to %i admitted originals with linear identity reads',
-  async (count) => {
-    const { passages } = await projectedOriginals(count);
-    const admitted = passages.admitted.bind(passages);
-    const expected = admitted().map(sourceHandle);
-    for (let index = 1; index <= count; index++)
-      getRecallIndex()
-        .prepare('INSERT INTO events(event_id,content) VALUES(?,?)')
-        .run(`${sessionId}:${index}`, 'needle');
-    getRecallIndex()
-      .prepare('INSERT INTO events(event_id,content) VALUES(?,?)')
-      .run(`${sessionId}:999`, 'needle');
-    let identities = 0;
-    vi.spyOn(passages, 'admitted').mockImplementation(() =>
-      admitted().map((source) => {
-        const id = source.id;
-        return {
-          ...source,
-          get id() {
-            identities++;
-            return id;
-          },
-        };
-      })
-    );
-    expect([...passages.textMatches('needle')].sort()).toEqual(expected.sort());
-    expect(identities, 'source identity reads for all matching events').toBeLessThanOrEqual(
-      count * 3
+    expect(sourceForOriginal.mock.calls.map(([original]) => original.source)).toEqual(
+      [1, 2, 1, 2].map((eventSeq) => ({ kind: 'event', sessionId, eventSeq }))
     );
   }
 );
 
-it('keeps every admitted version of a matching event and deduplicates repeated FTS hits', async () => {
-  const { passages } = await projectedOriginals(8);
-  const first = passages.admitted()[0];
-  notes.discover({ ...first, version: 'retained-version' });
+it('joins event FTS to admitted versions across match pages and deduplicates repeated hits', async () => {
+  const { originals, passages } = await projectedOriginals(8);
+  const first = sources()[0];
+  const stale = { ...first, version: 'retained-version' };
+  notes.discover(stale);
+  db.prepare(
+    `INSERT INTO memory_passages(id,version,start,end,text)
+    SELECT id,?,start,end,text FROM memory_passages WHERE id=?`
+  ).run(stale.version, stale.id);
+  db.exec('DELETE FROM memory_original_fts');
   const insert = getRecallIndex().prepare('INSERT INTO events(event_id,content) VALUES(?,?)');
-  insert.run(`${sessionId}:1`, 'needle');
-  insert.run(`${sessionId}:1`, 'needle');
-  expect([...passages.textMatches('needle')].sort()).toEqual(
-    [sourceHandle(first), `${first.id}@retained-version`].sort()
-  );
+  for (let eventSeq = 1000; eventSeq < 1257; eventSeq++)
+    insert.run(`${sessionId}:${eventSeq}`, 'bicycle');
+  insert.run(`${sessionId}:1`, 'bicycle');
+  insert.run(`${sessionId}:1`, 'bicycle');
+  const status = vi.spyOn(originals, 'status');
+  const result = await automaticRecall(input('bicycle'), {
+    notes,
+    sources: originals,
+    passages,
+    floor: 0.7,
+    check: () => {},
+    encoder: {
+      generation: 'fixture',
+      async encode() {
+        return [[1, 0]];
+      },
+    },
+    accountsFor: async () => [{ accounts: [] }],
+  });
+  expect(status.mock.calls.map(([source]) => source.version)).toEqual([
+    first.version,
+    stale.version,
+  ]);
+  expect(
+    result.selected.flatMap((group) => group.originals.map((original) => original.handle))
+  ).toEqual([originalHandle(first)]);
 });
 
 it('omits a selected original withdrawn during an awaited account read', async () => {

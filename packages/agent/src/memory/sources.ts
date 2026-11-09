@@ -1,6 +1,6 @@
 // ABOUTME: Incremental retained-event discovery and immutable committed-document reads.
 import { open, readdir, stat, realpath } from 'node:fs/promises';
-import { realpathSync, statSync, openSync, readSync, closeSync } from 'node:fs';
+import { realpathSync, statSync, fstatSync, openSync, readSync, closeSync } from 'node:fs';
 import { join, basename, isAbsolute, relative, resolve } from 'node:path';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { isSessionId } from '@lace/ent-protocol';
 import { agentSessionsDir, getSessionDir } from '../storage/session-store';
-import { readAllSessionEventLines } from '../storage/event-log';
+import { sessionShardFiles } from '../storage/event-log';
 import { transcriptsRoot } from '../storage/transcript-paths';
 import { getLaceDir } from '../config/lace-dir';
 import { readToolResultOriginal } from '../storage/tool-result-store';
@@ -92,17 +92,58 @@ function eventContent(
     }),
   ] as ContentBlock[];
 }
+function* retainedLines(file: string): Generator<string> {
+  let fd: number;
+  try {
+    fd = openSync(file, 'r');
+  } catch {
+    return;
+  }
+  try {
+    const size = fstatSync(fd).size;
+    const buffer = Buffer.allocUnsafe(Math.min(L.discoveryBytes, size));
+    let parts: Buffer[] = [];
+    let bytes = 0;
+    for (let offset = 0; offset < size; ) {
+      const count = readSync(fd, buffer, 0, Math.min(buffer.length, size - offset), offset);
+      if (!count) break;
+      offset += count;
+      const chunk = buffer.subarray(0, count);
+      for (let start = 0; start < count; ) {
+        const newline = chunk.indexOf(10, start);
+        const part = chunk.subarray(start, newline < 0 ? count : newline);
+        bytes += part.length;
+        // Refuse the fallback if an oversized line could precede another copy of the event.
+        if (bytes > EVENT_BYTES) throw new Error('Oversize retained event input');
+        if (newline < 0) {
+          parts.push(Buffer.from(part));
+          break;
+        }
+        if (bytes)
+          yield (parts.length ? Buffer.concat([...parts, part], bytes) : part).toString('utf8');
+        parts = [];
+        bytes = 0;
+        start = newline + 1;
+      }
+    }
+    if (bytes) yield Buffer.concat(parts, bytes).toString('utf8');
+  } finally {
+    closeSync(fd);
+  }
+}
 function retainedLine(ref: Extract<SourceReference, { kind: 'event' }>): string {
   try {
     return locatedLine(ref);
   } catch {
-    for (const line of readAllSessionEventLines(getSessionDir(ref.sessionId))) {
-      try {
-        if ((JSON.parse(line) as { eventSeq: number }).eventSeq === ref.eventSeq) return line;
-      } catch {
-        /* Skip partial lines. */
+    // Equal event sequences retain file and line order in the full session reader.
+    for (const file of sessionShardFiles(getSessionDir(ref.sessionId)))
+      for (const line of retainedLines(file)) {
+        try {
+          if ((JSON.parse(line) as { eventSeq: number }).eventSeq === ref.eventSeq) return line;
+        } catch {
+          /* Skip partial lines. */
+        }
       }
-    }
     throw new Error('Missing retained event input');
   }
 }
@@ -290,20 +331,19 @@ export class MemorySources {
   }
   async load(source: Source, images: boolean): Promise<SuppliedSource> {
     const ref = source.reference;
-    const content: ContentBlock[] =
-      ref.kind === 'document'
-        ? [{ type: 'text', text: await git(ref.gitRoot, ['cat-file', 'blob', ref.blob]) }]
-        : eventContent(retainedLine(ref), ref);
-    if (
-      !content.length ||
-      (ref.kind === 'event' && hash(JSON.stringify(content)) !== source.version)
-    )
+    if (ref.kind === 'document')
+      return supplied(
+        source,
+        [{ type: 'text', text: await git(ref.gitRoot, ['cat-file', 'blob', ref.blob]) }],
+        images
+      );
+    const line = retainedLine(ref);
+    const content = eventContent(line, ref);
+    if (!content.length || hash(JSON.stringify(content)) !== source.version)
       throw new Error('Source event unavailable or replaced');
     const input = supplied(source, content, images);
-    if (ref.kind === 'event') {
-      const event = JSON.parse(retainedLine(ref)) as { timestamp?: unknown };
-      if (typeof event.timestamp === 'string') input.recordedAt = event.timestamp;
-    }
+    const event = JSON.parse(line) as { timestamp?: unknown };
+    if (typeof event.timestamp === 'string') input.recordedAt = event.timestamp;
     return input;
   }
   async status(source: Source): Promise<string> {

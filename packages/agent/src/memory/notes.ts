@@ -7,6 +7,11 @@ import { sourceHandle, type Note, type Source, type OriginalReference } from './
 import type { Proposal } from './extraction';
 
 type SourceRow = { id: string; version: string; reference: string; status: string };
+type NoteRow = Omit<Note, 'sources'> & { sources: string };
+const noteOf = <T extends NoteRow>(row: T): Omit<T, 'sources'> & Note => ({
+  ...row,
+  sources: JSON.parse(row.sources) as Source[],
+});
 export class MemoryNotes {
   constructor(
     readonly db: Database,
@@ -88,9 +93,22 @@ export class MemoryNotes {
   }
   note(id: string): Note | undefined {
     const row = this.db.prepare('SELECT * FROM memory_notes WHERE id=?').get(id) as
-      | (Omit<Note, 'sources'> & { sources: string })
+      | NoteRow
       | undefined;
-    return row ? { ...row, sources: JSON.parse(row.sources) as Source[] } : undefined;
+    return row && noteOf(row);
+  }
+  page(after: number, limit: number, missingGeneration?: string): Array<Note & { rowid: number }> {
+    const generation = missingGeneration ?? null;
+    const rows = this.db
+      .prepare(
+        `
+      SELECT n.rowid,n.* FROM memory_notes AS n WHERE n.rowid > ? AND (? IS NULL OR NOT EXISTS (
+        SELECT 1 FROM memory_vectors AS v WHERE v.note_id=n.id AND v.revision=n.revision AND v.generation=?
+      )) ORDER BY n.rowid LIMIT ?
+    `
+      )
+      .all(after, generation, generation, limit) as Array<NoteRow & { rowid: number }>;
+    return rows.map(noteOf);
   }
   candidates(): Note[] {
     return (
@@ -114,13 +132,14 @@ export class MemoryNotes {
         .run(note.id, note.revision, generation, JSON.stringify(vector));
     });
   }
-  linked(source: OriginalReference): Note[] {
+  linked(source: OriginalReference, limit: number): Note[] {
     const rows = this.db
       .prepare(
         `SELECT DISTINCT note_id AS id FROM memory_revisions, json_each(memory_revisions.sources) AS source
       WHERE (? = 'event' AND json_extract(source.value,'$.reference.kind')='event'
         AND json_extract(source.value,'$.reference.sessionId')=? AND json_extract(source.value,'$.reference.eventSeq')=?)
-      OR (? = 'document' AND json_extract(source.value,'$.id')=? AND json_extract(source.value,'$.version')=?)`
+      OR (? = 'document' AND json_extract(source.value,'$.id')=? AND json_extract(source.value,'$.version')=?)
+      LIMIT ?`
       )
       .all(
         source.kind,
@@ -128,8 +147,10 @@ export class MemoryNotes {
         source.kind === 'event' ? source.eventSeq : null,
         source.kind,
         source.kind === 'document' ? source.id : null,
-        source.kind === 'document' ? source.version : null
+        source.kind === 'document' ? source.version : null,
+        limit + 1
       ) as { id: string }[];
+    if (rows.length > limit) throw new Error('Current account attachment budget');
     return rows.map(({ id }) => {
       const note = this.note(id);
       if (!note) throw new Error('Linked current account missing');

@@ -2,6 +2,21 @@
 import type { MemoryReader, CurrentAccount, OriginalReference } from './types';
 import { redact } from '../storage/recall/redact';
 
+export const CURRENT_ACCOUNT_ATTACHMENT_BYTES = 64 * 1024;
+const emptyAccount: CurrentAccount = {
+  id: '',
+  revision: 0,
+  text: '',
+  attribution: '',
+  support: [],
+};
+const minimumAccountBytes = JSON.stringify(emptyAccount).length;
+
+export function maxRequiredAccounts(attachmentBytes: number): number {
+  // Even redacted accounts need these JSON fields. Extra accounts make the whole group impossible to fit.
+  return Math.floor(attachmentBytes / minimumAccountBytes);
+}
+
 export async function attachCurrentAccounts<T extends { event_id: string }>(
   groups: T[],
   reader?: MemoryReader,
@@ -22,7 +37,7 @@ export async function attachCurrentAccounts<T extends { event_id: string }>(
   const results = await reader.accountsFor(originals, expectedHeads);
   const kept: Array<T & { current_accounts?: CurrentAccount[] }> = [];
   const omitted: Array<{ event_id: string; reason: string }> = [];
-  let remaining = 64 * 1024;
+  let remaining = CURRENT_ACCOUNT_ATTACHMENT_BYTES;
   for (const [index, group] of groups.entries()) {
     const result = results[index];
     if (!result || 'reason' in result) {

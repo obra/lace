@@ -53,9 +53,12 @@ committed Git changes after the final foreground turn. Extraction does not run
 as a foreground turn and has no elapsed-time failure deadline.
 
 The worker enumerates the existing transcript layouts, reads newly appended
-complete lines in bounded pages and yields between pages. Durable file cursors
-avoid rereading unchanged transcripts at every wake. Event/session identities
-and source-content versions provide coverage; recall index row IDs do not. The
+complete lines in bounded pages and yields between pages. A moved retained-event
+locator falls back to bounded line reads in the same shard order, then checks
+the original content version. If an oversized line prevents identifying the
+authoritative copy, the original is unavailable. Durable file cursors avoid
+rereading unchanged transcripts at every wake. Event/session identities and
+source-content versions provide coverage; recall index row IDs do not. The
 recall index and journal remain independently rebuildable discovery caches, and
 their write failures do not suppress retained-file discovery.
 
@@ -263,15 +266,29 @@ holds disposable source-versioned passages, their redacted coordinates and
 encoder-generation vectors. Passages use a conservative 384-byte UTF-8 bound
 within the 512-token encoder input. Existing transcript and note FTS nominate
 covered text; the additional original FTS covers committed documents and
-retained text absent from transcript FTS, including full sidecars. Exact cosine
-scans yield between SQLite pages and cover every indexed age. Background
-publication checks current source/revision and host authority after awaits.
+retained text absent from transcript FTS, including full sidecars. Root
+maintenance reads missing projections and vectors in pages and checks the keyed
+source or revision and host authority after awaited work before publication.
 
-Each preparation uses request-local source lookups rather than rebuilding the
-full source list for each candidate. Transcript FTS hits join to admitted source
-versions by identity. After awaited source/account reads, a fresh admission
-snapshot and the existing source/revision checks fence the final evidence; these
-lookups do not persist across preparations.
+Fresh recall reads coverage with SQLite aggregates and decodes vectors one
+passage page at a time. It ranks exact cosine scores across every indexed age,
+so scoring time still grows with the corpus. FTS matches, sorted runs of compact
+candidates and group aliases use request-private SQLite scratch space on the
+memory database's state volume. The host needs that volume on disk with room for
+the scratch data. On POSIX hosts, Lace unlinks the scratch file before writing
+request data and holds it open only for that preparation. The scratch connection
+has a bounded page cache and closes on completion, cancellation or failure.
+Bounded fan-in merges preserve JavaScript locale ordering and stable ties.
+Validation consumes candidates in order, with no fixed cutoff before checking
+originals and their required current accounts.
+
+Transcript FTS hits join to admitted source versions by event identity.
+Validation uses keyed admission reads and keeps only a bounded cache of source
+text and account results. Groups that cannot fit all their required accounts are
+omitted whole. After awaited source/account reads, Lace rechecks each selected
+original's admission, retained bytes, current account revisions and support
+before packing. Reuse reads aggregate coverage and revalidates the selected
+handles without encoding a query or searching the corpus again.
 
 A bounded query prioritizes incoming ordinary input and adds only a short
 user/assistant conversational tail. Literal text alternatives are safely quoted
