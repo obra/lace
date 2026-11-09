@@ -106,7 +106,8 @@ export type MemoryReader = {
   readOriginal(handle: string): Promise<OriginalRead | undefined>;
   accountsFor(
     originals: OriginalReference[],
-    expectedHeads?: Array<{ id: string; revision: number }>
+    expectedHeads?: Array<{ id: string; revision: number }>,
+    attachmentBytes?: number
   ): Promise<Array<{ accounts: CurrentAccount[] } | { reason: string }>>;
   search(
     query: string,

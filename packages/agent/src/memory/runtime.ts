@@ -6,10 +6,14 @@ import { ProviderRegistry } from '../providers/registry';
 import { onDurableEventAppend } from '../storage/event-log';
 import { logger } from '../utils/logger';
 import { assertMemoryAccess, openMemoryDatabase, resolveMemoryBinding } from './authority';
-import { MemoryNotes } from './notes';
-import { MemoryPassages, originalHandle, originalReference } from './passages';
+import { MemoryNotes, initializeRevisionLinks } from './notes';
+import { MemoryPassages, originalReference } from './passages';
 import { automaticRecall } from './automatic';
-import { attachCurrentAccounts } from './recall-accounts';
+import {
+  attachCurrentAccounts,
+  CURRENT_ACCOUNT_ATTACHMENT_BYTES,
+  maxRequiredAccounts,
+} from './recall-accounts';
 import { redact } from '../storage/recall/redact';
 import { MemorySources } from './sources';
 import { localMemoryEncoder, configureMemoryEncoderDirectory, type MemoryEncoder } from './encoder';
@@ -70,6 +74,7 @@ export function createMemoryRuntime(
           )
             throw new Error('Extraction attempt replaced');
         });
+        if (binding.isRoot && !binding.canMutate && store.available()) initializeRevisionLinks(db);
         if (configuration.extraction)
           db.prepare('INSERT OR REPLACE INTO memory_worker VALUES(1,?)').run(attempt);
         return store;
@@ -377,11 +382,12 @@ export function createMemoryRuntime(
       if (configuration.recall && binding.isRoot && !vectorRunning) {
         vectorRunning = (async () => {
           await passages.vectors(encoder, checkLocal);
-          const missing = notes
-            .candidates()
-            .filter((note) => !notes.vector(note, encoder.generation));
-          for (let offset = 0; offset < missing.length; offset += 4) {
-            const batch = missing.slice(offset, offset + 4);
+          let after = 0;
+          while (true) {
+            checkLocal();
+            const batch = notes.page(after, 4, encoder.generation);
+            if (!batch.length) break;
+            after = batch.at(-1)!.rowid;
             const vectors = await encoder.encode(
               batch.map((note) => note.text),
               'document'
@@ -442,7 +448,7 @@ export function createMemoryRuntime(
         },
         async readOriginal(handle) {
           checkReader(readBinding);
-          const source = passages.admitted().find((source) => originalHandle(source) === handle);
+          const source = passages.sourceForHandle(handle);
           if (!source) return undefined;
           let status = await sources.status(source);
           checkReader(readBinding);
@@ -488,12 +494,17 @@ export function createMemoryRuntime(
             }
           );
         },
-        async accountsFor(originals, expectedHeads = []) {
+        async accountsFor(
+          originals,
+          expectedHeads = [],
+          attachmentBytes = CURRENT_ACCOUNT_ATTACHMENT_BYTES
+        ) {
           checkReader(readBinding);
           if (!notes.available()) return originals.map(() => ({ accounts: [] }));
+          const limit = maxRequiredAccounts(attachmentBytes);
           const groups = originals.map((original) => {
             try {
-              return { original, heads: notes.linked(original) };
+              return { original, heads: notes.linked(original, limit) };
             } catch (error) {
               return { original, heads: [], reason: String(error) };
             }
@@ -527,7 +538,7 @@ export function createMemoryRuntime(
           return groups.map((group) => {
             try {
               if (group.reason) throw new Error(group.reason);
-              const current = notes.linked(group.original);
+              const current = notes.linked(group.original, limit);
               if (
                 current.length !== group.heads.length ||
                 current.some(

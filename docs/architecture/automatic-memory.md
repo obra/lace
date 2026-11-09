@@ -53,11 +53,16 @@ committed Git changes after the final foreground turn. Extraction does not run
 as a foreground turn and has no elapsed-time failure deadline.
 
 The worker enumerates the existing transcript layouts, reads newly appended
-complete lines in bounded pages and yields between pages. Durable file cursors
-avoid rereading unchanged transcripts at every wake. Event/session identities
-and source-content versions provide coverage; recall index row IDs do not. The
-recall index and journal remain independently rebuildable discovery caches, and
-their write failures do not suppress retained-file discovery.
+complete lines in bounded pages and yields between pages. A moved retained-event
+locator falls back to bounded line reads in the same shard order, then checks
+the original content version. The fallback skips an oversized canonical record
+only when its sequence identifies a different event and no later top-level key
+overrides that identity. An oversized record that could be the first copy makes
+the requested original unavailable. Durable file cursors avoid rereading
+unchanged transcripts at every wake. Event/session identities and source-content
+versions provide coverage; recall index row IDs do not. The recall index and
+journal remain independently rebuildable discovery caches, and their write
+failures do not suppress retained-file discovery.
 
 Primary event input covers prompts, assistant messages, context injections and
 completed tool results. It excludes compaction summaries and `recall` tool
@@ -172,14 +177,15 @@ never empty success; terminal failures are not retried on each maintenance tick.
 
 The authority database owns current heads, immutable revision receipts,
 immutable offered-work manifests, completion/failure receipts and source
-coverage. Acceptance updates note heads, revisions, same-database FTS and
-primary completion atomically. It rechecks current grants, owner generation,
-worker attempt, offered source identities, versions and statuses, and candidate
-revisions. Document heads and retained input are verified again at acceptance.
-These checks enforce provenance and authority; they do not establish whether a
-model-authored claim applies to the present. Restart can resume unfinished work;
-completed source versions are not submitted again. Removing the note FTS
-projection allows a configured writable root to rebuild it from current heads.
+coverage. Acceptance updates note heads, revisions, same-database FTS, indexed
+original-to-note links and primary completion atomically. It rechecks current
+grants, owner generation, worker attempt, offered source identities, versions
+and statuses, and candidate revisions. Document heads and retained input are
+verified again at acceptance. These checks enforce provenance and authority;
+they do not establish whether a model-authored claim applies to the present.
+Restart can resume unfinished work; completed source versions are not submitted
+again. Removing the note FTS projection allows a configured writable root to
+rebuild it from current heads.
 
 Shutdown fences the runtime before aborting its request, removing wake hooks and
 closing its database. A provider that ignores abort cannot write a late result
@@ -197,11 +203,14 @@ transcript events. `read` on a memory handle reads the current note head
 directly and returns its supporting references with current, superseded, missing
 or unavailable status. It never silently substitutes a new original version. All
 three transcript actions attach compact `current_accounts` to any original that
-directly supported a retained note revision. The lookup joins those existing
-revision source references to current heads: event session/sequence identities
-must match exactly, and document identities include the exact source version.
-Shared originals keep every linked current head, deduplicated by note ID within
-each event group. Links are not followed recursively.
+directly supported a retained note revision. A derived SQLite lookup indexes
+those references by exact event session and sequence or document ID and version.
+It keeps links from every revision and resolves the linked note IDs to their
+current heads in note-ID order. A verified root builds the lookup from immutable
+revisions in one transaction when it initializes an existing database, including
+when its grant is read-only. Readers can use it after that commit. Shared
+originals keep every linked current head, deduplicated by note ID within each
+event group. Links are not followed recursively.
 
 An attachment includes note ID/revision/prose, producer attribution and usable
 support handles. Event handles are `<sessionId>:<eventSeq>` for ordinary
@@ -263,15 +272,30 @@ holds disposable source-versioned passages, their redacted coordinates and
 encoder-generation vectors. Passages use a conservative 384-byte UTF-8 bound
 within the 512-token encoder input. Existing transcript and note FTS nominate
 covered text; the additional original FTS covers committed documents and
-retained text absent from transcript FTS, including full sidecars. Exact cosine
-scans yield between SQLite pages and cover every indexed age. Background
-publication checks current source/revision and host authority after awaits.
+retained text absent from transcript FTS, including full sidecars. Root
+maintenance reads missing projections and vectors in pages and checks the keyed
+source or revision and host authority after awaited work before publication.
 
-Each preparation uses request-local source lookups rather than rebuilding the
-full source list for each candidate. Transcript FTS hits join to admitted source
-versions by identity. After awaited source/account reads, a fresh admission
-snapshot and the existing source/revision checks fence the final evidence; these
-lookups do not persist across preparations.
+Fresh recall reads coverage with SQLite aggregates and decodes vectors one
+passage page at a time. It ranks exact cosine scores across every indexed age,
+so scoring time still grows with the corpus. FTS matches, sorted runs of compact
+candidates and group aliases use request-private SQLite scratch space on the
+memory database's state volume. The host needs that volume on disk with room for
+the scratch data. On POSIX hosts, Lace unlinks the scratch file before writing
+request data and holds it open only for that preparation. The scratch connection
+has a bounded page cache and closes on completion, cancellation or failure.
+Bounded fan-in merges preserve JavaScript locale ordering and stable ties.
+Validation consumes candidates in order, with no fixed cutoff before checking
+originals and their required current accounts.
+
+Transcript FTS hits join to admitted source versions by event identity.
+Validation uses keyed admission reads and keeps only a bounded cache of source
+text and account results. Groups that cannot fit all their required accounts are
+omitted whole. After awaited source/account reads, Lace rechecks each selected
+original's admission, retained bytes, current account revisions and support
+before packing. Reuse reads aggregate coverage and revalidates the selected
+handles and their indexed account links without encoding a query or searching
+the corpus again.
 
 A bounded query prioritizes incoming ordinary input and adds only a short
 user/assistant conversational tail. Literal text alternatives are safely quoted

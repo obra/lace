@@ -71,11 +71,13 @@ connection **inside their acceptance transaction**. A successful check is not
 reusable authority across a later policy replacement or owner claim.
 
 The automatic runtime initializes its small source-reference, work, note and FTS
-tables on this database under current root mutation authority. Delegates only
-read existing note state. Ordinary derived notes require note mutation
-permission; they do not select a writable document collection. Acceptance checks
-permissions inside its immediate transaction. Session admission and prompting
-enforce the persisted instance affinity and reject missing, mismatched or stale
-authority. See [automatic memory](automatic-memory.md) for source coverage,
-shutdown and limitations. Deliberate manual writing, correction/forget protocols
-and Sen production adoption remain separate work.
+tables on this database under current root mutation authority. A verified
+read-only root can initialize the derived revision-link lookup in an existing
+notes store. Delegates only read existing note state. Ordinary derived notes
+require note mutation permission; they do not select a writable document
+collection. Acceptance checks permissions inside its immediate transaction.
+Session admission and prompting enforce the persisted instance affinity and
+reject missing, mismatched or stale authority. See
+[automatic memory](automatic-memory.md) for source coverage, shutdown and
+limitations. Deliberate manual writing, correction/forget protocols and Sen
+production adoption remain separate work.
