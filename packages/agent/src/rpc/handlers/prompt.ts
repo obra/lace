@@ -30,6 +30,7 @@ import { createProviderForTurn, getModelPricing } from '@lace/agent/conversation
 import { ConversationRunner } from '@lace/agent/core/conversation/runner';
 import type { RunnerConfig, RunnerDependencies } from '@lace/agent/core/conversation/types';
 import { getEffectiveConfig } from '@lace/agent/core/session';
+import { liveEnvOverlay } from '@lace/agent/core/env-overlay';
 import { SkillRegistry, getSkillDirectories } from '@lace/agent/skills';
 import { composeSkillDirs } from '@lace/agent/skills/compose-skill-dirs';
 import { getAgentSkillsDir } from '@lace/agent/skills/agent-skills-dir';
@@ -439,6 +440,7 @@ export function registerPromptHandler(
         memory: sessionMemory(state, state.activeSession)?.reader,
         prepareAutomaticRecall: sessionMemory(state, state.activeSession)?.prepareAutomaticRecall,
         getTemporaryContext: () => state.temporaryContext ?? null,
+        getEnvOverlay: () => liveEnvOverlay(state),
         onUpdate: emitUpdate,
         runExclusive,
         rerenderPersonaAfterCompaction: async () => {

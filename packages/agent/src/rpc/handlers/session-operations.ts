@@ -5,6 +5,8 @@ import {
   AcpErrorCodes,
   TemporaryContextSetParamsSchema,
   TemporaryContextEmptyParamsSchema,
+  EnvOverlaySetParamsSchema,
+  EnvOverlayClearParamsSchema,
   EntErrorCodes,
   type DurableHandoffStatus,
   type JsonRpcPeer,
@@ -28,6 +30,7 @@ import { deriveCheckpointFilesFromDurableEvents } from '../../storage/files-from
 import type { ContentBlock } from '../../providers/base-provider';
 import { estimateTokens } from '@lace/agent/utils/token-estimation';
 import type { AgentServerState, CreateToolExecutorFn } from '../../server-types';
+import { isDangerousEnvVarName } from '../../core/env-overlay';
 import { createIdleWake } from '../../notifications/idle-wake';
 import { type IdleWakeHooks, wakeIfIdle } from '../../notifications/inject-notification';
 import { rerenderPersonaForSession } from './session';
@@ -360,6 +363,50 @@ export function registerSessionOperationHandlers(
       throwInvalidParams('params must be an empty object');
     }
     state.temporaryContext = null;
+    return {};
+  });
+
+  // Memory-only credential env overlay (PRI-3672 part 1). See
+  // core/env-overlay.ts for the read-side (liveEnvOverlay) that the runner
+  // consults at every tool call. Nothing here is written to session
+  // state/config or a durable event — the whole point is that the value
+  // never touches disk.
+  peer.onRequest('ent/session/env_overlay/set', (params: unknown) => {
+    assertActiveSession(state);
+    const parsed = EnvOverlaySetParamsSchema.safeParse(params);
+    if (!parsed.success) throwInvalidParams(parsed.error.message);
+    const { vars, expiresAt } = parsed.data;
+
+    // Refuse the whole call (not just the offending keys) if any requested
+    // name would hijack process/runtime behavior rather than deliver a
+    // credential to application code — sen-core's credential broker lets the
+    // *agent* choose this name (request_credential verb=migrate's `env`
+    // param) and only validates its shape, not its safety. See
+    // core/env-overlay.ts's DANGEROUS_ENV_VAR_NAMES doc comment.
+    const dangerous = Object.keys(vars).filter(isDangerousEnvVarName);
+    if (dangerous.length > 0) {
+      throwInvalidParams(
+        `env_overlay/set refuses names that control process/runtime behavior rather than deliver a credential: ${dangerous.sort().join(', ')}`
+      );
+    }
+
+    state.envOverlay ??= {};
+    for (const [key, value] of Object.entries(vars)) {
+      state.envOverlay[key] = expiresAt === undefined ? { value } : { value, expiresAt };
+    }
+    return {};
+  });
+  peer.onRequest('ent/session/env_overlay/clear', (params: unknown) => {
+    assertActiveSession(state);
+    const parsed = EnvOverlayClearParamsSchema.safeParse(params === undefined ? {} : params);
+    if (!parsed.success) throwInvalidParams(parsed.error.message);
+    if (!state.envOverlay) return {};
+    const { keys } = parsed.data;
+    if (keys === undefined) {
+      state.envOverlay = {};
+    } else {
+      for (const key of keys) delete state.envOverlay[key];
+    }
     return {};
   });
 

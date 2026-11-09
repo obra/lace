@@ -2408,7 +2408,24 @@ export class ConversationRunner {
     }
 
     // Default: execute through tool executor
-    const runtime = this.createRuntime(runtimeBinding, envOverlay);
+    //
+    // Re-read the credential env overlay fresh for THIS tool call (PRI-3672)
+    // rather than reusing the per-run `envOverlay` closed over above the
+    // tool-call loop: a credential minted mid-turn (ent/session/env_overlay/set)
+    // must reach the very next tool call, not just tool calls in a later
+    // prompt turn. Dynamic entries win on key collision with the static,
+    // per-run environment. Threaded into both env paths a tool call can take:
+    // createRuntime's `env` (the container/host runtime's own default spawn
+    // env) and `processEnv` on the ToolContext (what bash.ts/ripgrep_search.ts
+    // actually pass to runtime.process.start — the path that reaches a
+    // container's `docker exec -e`, which does NOT inherit process.env).
+    const dynamicEnvOverlay = this.deps.getEnvOverlay?.();
+    const effectiveEnvOverlay =
+      dynamicEnvOverlay && Object.keys(dynamicEnvOverlay).length > 0
+        ? { ...envOverlay, ...dynamicEnvOverlay }
+        : envOverlay;
+
+    const runtime = this.createRuntime(runtimeBinding, effectiveEnvOverlay);
     const markRuntimeFileRead = (path: RuntimePath): void => {
       runtimeFileAccessTracker.markRead(path, runtime.paths.canonicalKey(path));
       const hostPath = path.hostPath ?? (runtime.kind === 'host' ? path.runtimePath : undefined);
@@ -2424,7 +2441,7 @@ export class ConversationRunner {
         runtime,
         runtimeBinding,
         toolTempRoot: join(this.config.sessionDir, 'tool-temp'),
-        processEnv: envOverlay,
+        processEnv: effectiveEnvOverlay,
         hasRuntimeFileBeenRead: (path) =>
           runtimeFileAccessTracker.hasRead(path, runtime.paths.canonicalKey(path)),
         markFileRead: markRuntimeFileRead,
