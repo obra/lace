@@ -90,7 +90,7 @@ describe('ProjectedContainerToolRuntime', () => {
     expect(manager.execStream).toHaveBeenCalledWith(
       'projected-runtime',
       expect.objectContaining({
-        command: ['/bin/sh', '-lc', 'echo ok', expect.stringMatching(/^lace-exec-/)],
+        command: ['/bin/sh', '-lc', expect.any(String), expect.stringMatching(/^lace-exec-/)],
         workingDirectory: '/workspace',
         environment: { FOO: 'bar' },
       })
@@ -502,7 +502,7 @@ describe('ProjectedContainerToolRuntime', () => {
 
     const options = manager.execStream.mock.calls[0]![1] as { command: string[] };
     expect(options.command).toHaveLength(4);
-    expect(options.command.slice(0, 3)).toEqual(['/bin/bash', '-c', 'sleep 5']);
+    expect(options.command.slice(0, 2)).toEqual(['/bin/bash', '-c']);
     expect(options.command[3]).toMatch(/^lace-exec-/);
   });
 
@@ -599,7 +599,7 @@ describe('ProjectedContainerToolRuntime', () => {
       expect(manager.execStream).toHaveBeenCalledWith(
         'projected-runtime',
         expect.objectContaining({
-          command: ['/bin/sh', '-lc', 'echo ok', expect.stringMatching(/^lace-exec-/)],
+          command: ['/bin/sh', '-lc', expect.any(String), expect.stringMatching(/^lace-exec-/)],
           workingDirectory: '/workspace',
         })
       )
@@ -630,7 +630,10 @@ describe('ProjectedContainerToolRuntime', () => {
         containerId: 'container_123',
         state: 'running' as const,
       }),
-      execStream: vi.fn().mockResolvedValue(containerHandle),
+      execStream: vi
+        .fn()
+        .mockResolvedValueOnce(containerHandle)
+        .mockResolvedValue(createFakeExecStreamHandle()),
     };
     const runtime = new ProjectedContainerToolRuntime({
       id: 'rt_container',
@@ -647,6 +650,65 @@ describe('ProjectedContainerToolRuntime', () => {
 
     await expect(handle.completion).rejects.toMatchObject({ name: 'AbortError' });
     expect(containerHandle.kill).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles completion with a cleanup error when the cleanup exec never finishes', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveWait!: (result: { exitCode: number }) => void;
+      const wait = new Promise<{ exitCode: number }>((resolve) => {
+        resolveWait = resolve;
+      });
+      const containerHandle = {
+        ...createFakeExecStreamHandle(),
+        stdout: Readable.from([]),
+        stderr: Readable.from([]),
+        wait: vi.fn().mockReturnValue(wait),
+        kill: vi.fn(() => resolveWait({ exitCode: 143 })),
+      };
+      const hungCleanupHandle = {
+        ...createFakeExecStreamHandle(),
+        wait: vi.fn().mockReturnValue(new Promise<{ exitCode: number }>(() => {})),
+      };
+      const manager = {
+        materialize: vi.fn().mockResolvedValue({
+          spec: descriptor().spec,
+          containerId: 'container_123',
+          state: 'running' as const,
+        }),
+        execStream: vi
+          .fn()
+          .mockResolvedValueOnce(containerHandle)
+          .mockResolvedValue(hungCleanupHandle),
+      };
+      const runtime = new ProjectedContainerToolRuntime({
+        id: 'rt_container',
+        containerManager: manager,
+        descriptor: descriptor(),
+      });
+
+      const handle = await runtime.process.start(['/bin/sh', '-c', 'sleep 60'], {
+        cwd: runtime.cwd,
+      });
+      const outcome = handle.completion.catch((error: unknown) => error);
+      handle.kill();
+
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(hungCleanupHandle.kill).not.toHaveBeenCalled();
+      expect(containerHandle.kill).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(hungCleanupHandle.kill).toHaveBeenCalledTimes(1);
+      expect(containerHandle.kill).toHaveBeenCalledTimes(1);
+      expect(manager.execStream).toHaveBeenCalledTimes(2);
+      const error = await outcome;
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(
+        'Container process-group cleanup timed out after 10000ms'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // Container execStream always wires a piped stdin. A default ('ignore')

@@ -1,6 +1,7 @@
 // ABOUTME: Tests for shell job state access pattern
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { appendFileSync } from 'node:fs';
 import { createRunShellJobProcess } from '../shell-job';
 import type { JobState } from '../../server-types';
 import type { LoadedSession } from '../../storage/session-store';
@@ -271,6 +272,80 @@ describe('createRunShellJobProcess', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: process.platform !== 'win32',
       signal: undefined,
+    });
+  });
+
+  describe('when the process completion rejects', () => {
+    const startJob = async (jobId: string) => {
+      const mutableState = {
+        activeSession: {
+          dir: '/tmp/test-session',
+          meta: {
+            sessionId: 'sess_rejected',
+            workDir: '/tmp',
+            projectId: 'test-project',
+            rootDir: '/tmp',
+            personaId: 'default',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        } as LoadedSession,
+        config: { approvalMode: 'dangerouslySkipPermissions' as const },
+        jobStreaming: 'none' as const,
+      };
+      const mockFinalizeJob = vi.fn().mockResolvedValue(undefined);
+      const runShellJobProcess = createRunShellJobProcess({
+        getState: () => mutableState,
+        runExclusive: vi.fn().mockImplementation(<T>(fn: () => T) => fn()),
+        emitSessionUpdate: vi.fn().mockResolvedValue(undefined),
+        requestPermissionFromClient: vi.fn().mockResolvedValue({ decision: 'allow' }),
+        finalizeJob: mockFinalizeJob,
+      });
+      const job: JobState = {
+        jobId,
+        type: 'bash',
+        status: 'running',
+        command: 'sleep 60',
+        startedAt: new Date().toISOString(),
+        outputPath: '/tmp/test-output',
+        finished: false,
+        completion: Promise.resolve(),
+        resolveCompletion: vi.fn(),
+      };
+
+      runShellJobProcess(job);
+      await vi.waitFor(() => expect(job.proc).toBeDefined());
+      return { job, mockFinalizeJob };
+    };
+
+    it('keeps a cancelled job cancelled and records the error in its output', async () => {
+      const { job, mockFinalizeJob } = await startJob('job_cancelled_cleanup_failed');
+
+      // killJob marks the job cancelled before signalling the process.
+      job.status = 'cancelled';
+      mockProc.emit('error', new Error('Container process-group cleanup failed (exit 1)'));
+
+      await vi.waitFor(() => expect(mockFinalizeJob).toHaveBeenCalledWith(job, { exitCode: 1 }));
+      expect(job.status).toBe('cancelled');
+      expect(appendFileSync).toHaveBeenCalledWith(
+        '/tmp/test-output',
+        '[BASH ERROR]\nMessage: Container process-group cleanup failed (exit 1)\n',
+        { encoding: 'utf8' }
+      );
+    });
+
+    it('marks a job that was not cancelled as failed', async () => {
+      const { job, mockFinalizeJob } = await startJob('job_running_rejected');
+
+      mockProc.emit('error', new Error('spawn failed'));
+
+      await vi.waitFor(() => expect(mockFinalizeJob).toHaveBeenCalledWith(job, { exitCode: 1 }));
+      expect(job.status).toBe('failed');
+      expect(appendFileSync).toHaveBeenCalledWith(
+        '/tmp/test-output',
+        '[BASH ERROR]\nMessage: spawn failed\n',
+        { encoding: 'utf8' }
+      );
     });
   });
 });

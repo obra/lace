@@ -291,7 +291,9 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
           void (async () => {
             const message = error instanceof Error ? error.message : String(error);
             await appendOutput(`[BASH ERROR]\nMessage: ${message}\n`);
-            job.status = 'failed';
+            if (job.status !== 'cancelled') {
+              job.status = 'failed';
+            }
             await context.finalizeJob(job, { exitCode: 1 });
           })();
         }
