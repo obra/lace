@@ -200,9 +200,10 @@ their process groups inside the container and sends TERM, then KILL to those
 same groups after a two-second grace period. Completion waits for this cleanup
 and reports lookup or signal failures. Startup discovery waits at most five
 seconds for a target or natural client completion; an unresolved launch is an
-error, not successful cleanup. Closing the Docker client alone does not
-terminate its container processes. The image must provide `pgrep` and `ps`;
-missing tools are errors.
+error, not successful cleanup. Each cleanup exec is bounded at ten seconds; one
+that does not return is killed and reported as a cleanup failure, so completion
+still settles. Closing the Docker client alone does not terminate its container
+processes. The image must provide `pgrep` and `ps`; missing tools are errors.
 
 Ordinary completion leaves intentionally backgrounded work alone. Non-shell
 commands, shells that already supply positional arguments, and descendants that

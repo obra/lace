@@ -47,6 +47,9 @@ const CONTAINER_AUTHORITY_FIELDS = [
   'gatewayRoute',
 ] as const;
 
+// The cleanup script itself sleeps two seconds between TERM and KILL.
+const CONTAINER_CLEANUP_EXEC_TIMEOUT_MS = 10_000;
+
 interface ProjectedContainerSecretContext {
   runtimeId: string;
   sessionId?: string;
@@ -514,7 +517,7 @@ exit 0
         handle.stdin.end();
         handle.stdout.resume();
         handle.stderr.resume();
-        const result = await handle.wait();
+        const result = await this.waitForCleanupExec(handle);
         if (result.exitCode === 0) return;
         if (result.exitCode !== 3) {
           throw new Error(`Container process-group cleanup failed (exit ${result.exitCode})`);
@@ -531,6 +534,29 @@ exit 0
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    }
+  }
+
+  /**
+   * A cleanup exec that never returns (e.g. a stuck Docker daemon) must not
+   * keep the cancelled command's completion pending forever.
+   */
+  private async waitForCleanupExec(handle: ExecStreamHandle): Promise<{ exitCode: number }> {
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        handle.kill('SIGKILL');
+        reject(
+          new Error(
+            `Container process-group cleanup timed out after ${CONTAINER_CLEANUP_EXEC_TIMEOUT_MS}ms`
+          )
+        );
+      }, CONTAINER_CLEANUP_EXEC_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([handle.wait(), timedOut]);
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
