@@ -6,7 +6,7 @@ import { ProviderRegistry } from '../providers/registry';
 import { onDurableEventAppend } from '../storage/event-log';
 import { logger } from '../utils/logger';
 import { assertMemoryAccess, openMemoryDatabase, resolveMemoryBinding } from './authority';
-import { MemoryNotes } from './notes';
+import { MemoryNotes, initializeRevisionLinks } from './notes';
 import { MemoryPassages, originalReference } from './passages';
 import { automaticRecall } from './automatic';
 import {
@@ -74,6 +74,7 @@ export function createMemoryRuntime(
           )
             throw new Error('Extraction attempt replaced');
         });
+        if (binding.isRoot && !binding.canMutate && store.available()) initializeRevisionLinks(db);
         if (configuration.extraction)
           db.prepare('INSERT OR REPLACE INTO memory_worker VALUES(1,?)').run(attempt);
         return store;

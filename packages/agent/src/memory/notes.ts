@@ -22,7 +22,8 @@ function projectRevisionLinks(noteId: string, sources: string): string {
     FROM (SELECT ${noteId} AS note_id,value,json_extract(value,'$.reference.kind') AS kind FROM ${sources})`;
 }
 
-function initializeRevisionLinks(db: Database): void {
+/** Initialize a derived index after the caller has verified root ownership of an existing store. */
+export function initializeRevisionLinks(db: Database): void {
   db.transaction(() => {
     if (db.prepare("SELECT 1 FROM sqlite_master WHERE name='memory_revision_links'").get()) return;
     // Publish the lookup and its write-through trigger together with the complete backfill.

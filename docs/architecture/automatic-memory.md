@@ -206,11 +206,11 @@ three transcript actions attach compact `current_accounts` to any original that
 directly supported a retained note revision. A derived SQLite lookup indexes
 those references by exact event session and sequence or document ID and version.
 It keeps links from every revision and resolves the linked note IDs to their
-current heads in note-ID order. A writable root builds the lookup from immutable
-revisions in one transaction when it initializes an existing database. Readers
-can use it after that commit. Shared originals keep every linked current head,
-deduplicated by note ID within each event group. Links are not followed
-recursively.
+current heads in note-ID order. A verified root builds the lookup from immutable
+revisions in one transaction when it initializes an existing database, including
+when its grant is read-only. Readers can use it after that commit. Shared
+originals keep every linked current head, deduplicated by note ID within each
+event group. Links are not followed recursively.
 
 An attachment includes note ID/revision/prose, producer attribution and usable
 support handles. Event handles are `<sessionId>:<eventSeq>` for ordinary

@@ -340,6 +340,60 @@ it('backfills historical links for children and reuses selected accounts without
   ]);
 });
 
+it('upgrades linked-account reads for a read-only root with existing memory', async () => {
+  event('The bicycle finish was violet.');
+  event('The bicycle finish is now amber.');
+  const writable = start(false);
+  await writable.wake();
+  const [original, correction] = sources();
+  const former = accept('The bicycle finish was violet.', [original]);
+  const current = accept('The bicycle finish is now amber.', [correction], former);
+  await writable.close();
+
+  db.exec('DROP TRIGGER memory_revision_links_insert; DROP TABLE memory_revision_links');
+  const readOnly = { ...configuration.binding, canMutate: false };
+  configureMemoryRoles(db, readOnly, { root: { ...grant, canMutate: false } });
+  configuration = { ...configuration, binding: readOnly };
+  const retained = () => ({
+    sources: db.prepare('SELECT * FROM memory_sources ORDER BY rowid').all(),
+    revisions: db.prepare('SELECT * FROM memory_revisions ORDER BY rowid').all(),
+    notes: db.prepare('SELECT * FROM memory_notes ORDER BY rowid').all(),
+  });
+  const before = retained();
+  const runtime = start(false);
+  const account = { id: current.id, revision: 2, text: current.text };
+  const manual = await new RecallTool().execute(
+    { action: 'read', event_id: originalHandle(original) },
+    { signal: new AbortController().signal, memory: runtime.reader(readOnly) }
+  );
+  expect.soft(JSON.parse(manual.content[0].text!)).toMatchObject({
+    text: expect.stringContaining('The bicycle finish was violet.'),
+    current_accounts: [account],
+  });
+  const automatic = await recall(runtime, 'bicycle');
+  expect.soft(automatic.groups).toMatchObject([
+    {
+      originals: [{ handle: originalHandle(original) }, { handle: originalHandle(correction) }],
+      accounts: [account],
+    },
+  ]);
+  expect(() =>
+    notes.accept(
+      readOnly,
+      'fixture',
+      'denied',
+      [original],
+      [],
+      {
+        changes: [{ text: 'An unpermitted new note.', sourceIds: [sourceHandle(original)] }],
+      },
+      () => {},
+      [original]
+    )
+  ).toThrow('Memory access denied');
+  expect(retained()).toEqual(before);
+});
+
 it('maintains missing vectors without reconstructing already covered source and note rows', async () => {
   event('bicycle finish is violet.');
   event('harbor winds are moderate.');
