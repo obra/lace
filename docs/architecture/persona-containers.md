@@ -205,6 +205,9 @@ that does not return is killed and reported as a cleanup failure, so completion
 still settles. Closing the Docker client alone does not terminate its container
 processes. The image must provide `pgrep` and `ps`; missing tools are errors.
 
+A background shell job cancelled through job control stays `cancelled` when its
+cleanup fails; the cleanup error is appended to the job output.
+
 Ordinary completion leaves intentionally backgrounded work alone. Non-shell
 commands, shells that already supply positional arguments, and descendants that
 deliberately create a separate session are outside this group cleanup contract.
