@@ -515,6 +515,15 @@ at the persona's `compaction.breakpoints`
 compaction and asks the model to end its turn); or via the `ent/session/compact`
 RPC / the `/compact` command.
 
+Breakpoints are measured against the last model call in the turn that reported
+usage. A `notify` breakpoint fires, and the fired-breakpoint state resets, only
+after a turn that ended cleanly (`end_turn`, `stop_sequence`, `max_turns`). A
+`compact` breakpoint also fires after a turn that failed, such as a provider
+error or a tool error, so a session that keeps failing once it is large still
+compacts. It does not fire after a turn that was cancelled, denied permission,
+or stopped by its budget: hosts may wake the agent after a compaction, which
+would undo the stop.
+
 Return `{ noop: true }` when there is nothing to compact — do **not** return a
 `compactionEvent` with an empty `preserved`. `ContextCompactedEventData` (from
 `@lace/agent/storage/event-types`) requires `strategy: string` and
