@@ -1,5 +1,6 @@
 // ABOUTME: Real-store regressions for reviewed automatic recall grouping, authority and topic boundaries.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
 import * as fs from 'node:fs';
 import {
   mkdtempSync,
@@ -412,6 +413,88 @@ it('maintains missing vectors without reconstructing already covered source and 
     generation: 'review-controlled',
   });
   expect(notes.vector(missing, 'review-controlled')).toEqual([1, 0]);
+});
+
+it('counts coverage without reading the passage table', async () => {
+  const { passages } = await projectedOriginals(3);
+  const rootPage = db
+    .prepare("SELECT rootpage FROM sqlite_schema WHERE name='memory_passages'")
+    .pluck()
+    .get();
+  expect(rootPage).toEqual(expect.any(Number));
+  const prepare = vi.spyOn(db, 'prepare');
+  let sql: string;
+  try {
+    passages.coverage('fixture');
+    sql = prepare.mock.lastCall![0];
+  } finally {
+    prepare.mockRestore();
+  }
+  const program = db.prepare(`EXPLAIN ${sql}`).all('fixture') as Array<{
+    opcode: string;
+    p1: number;
+    p2: number;
+  }>;
+  const cursors = new Set(
+    program.filter((op) => op.opcode === 'OpenRead' && op.p2 === rootPage).map((op) => op.p1)
+  );
+  expect(
+    program.filter(
+      (op) =>
+        cursors.has(op.p1) &&
+        /^(Column|Rowid|Count|Rewind|Last|Next|Prev|Seek|NotExists)/.test(op.opcode)
+    )
+  ).toEqual([]);
+});
+
+it('counts only admitted passages and current vectors, including without the optional index', async () => {
+  const originals = new MemorySources(notes, configuration);
+  const passages = new MemoryPassages(notes, originals, true);
+  const generation = 'fixture';
+  expect(passages.coverage(generation)).toEqual({
+    sources: 0,
+    passages: 0,
+    vectors: 0,
+    partial: false,
+  });
+
+  event('First original.');
+  event('Second original.');
+  await originals.discover();
+  await passages.index(() => {});
+  db.prepare('UPDATE memory_passages SET generation=?, vector=?').run(generation, '[1,0]');
+  expect(passages.coverage(generation)).toEqual({
+    sources: 2,
+    passages: 2,
+    vectors: 2,
+    partial: false,
+  });
+  event('Discovered but unprojected.');
+  await originals.discover();
+  expect(passages.coverage(generation)).toEqual({
+    sources: 3,
+    passages: 2,
+    vectors: 2,
+    partial: true,
+  });
+
+  const [first, second] = sources();
+  const insert = db.prepare('INSERT INTO memory_passages VALUES(?,?,?,?,?,?,?)');
+  insert.run(first.id, first.version, 100, 101, 'x', generation, null);
+  insert.run(first.id, first.version, 101, 102, 'x', null, null);
+  insert.run(first.id, 'orphan-version', 0, 1, 'x', generation, '[1,0]');
+  db.prepare('UPDATE memory_passages SET generation=? WHERE id=?').run('older', second.id);
+  const expected = { sources: 3, passages: 4, vectors: 1, partial: true };
+  expect(passages.coverage(generation)).toEqual(expected);
+  db.exec('DROP INDEX IF EXISTS memory_passages_coverage');
+  const readOnly = new Database(db.name, { readonly: true, fileMustExist: true });
+  try {
+    expect(
+      new MemoryPassages(new MemoryNotes(readOnly, false), originals, false).coverage(generation)
+    ).toEqual(expected);
+  } finally {
+    readOnly.close();
+  }
 });
 
 it.each([
