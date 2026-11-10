@@ -96,12 +96,16 @@ docker run --rm -it --init --name "$LAB_CONTAINER" --platform linux/amd64 \
   --workdir /work "$LAB_IMAGE"
 ```
 
-For the Qdrant arm, start the server from that shell and retain its log in the
-private case directory.
+For the Qdrant arm, start the server from that shell with the qualification
+limits of one search, optimization, and indexing thread each. Retain its log in
+the private case directory.
 
 ```sh
 (cd /qdrant && QDRANT__SERVICE__HOST=127.0.0.1 \
-  QDRANT__TELEMETRY_DISABLED=true exec ./qdrant) \
+  QDRANT__TELEMETRY_DISABLED=true \
+  QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=1 \
+  QDRANT__STORAGE__OPTIMIZERS__MAX_OPTIMIZATION_THREADS=1 \
+  QDRANT__STORAGE__HNSW_INDEX__MAX_INDEXING_THREADS=1 exec ./qdrant) \
   > /var/sen/instance/qdrant.log 2>&1 &
 qdrant_pid=$!
 ```
