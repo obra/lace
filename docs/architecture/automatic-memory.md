@@ -292,6 +292,11 @@ Bounded fan-in merges preserve JavaScript locale ordering and stable ties.
 Validation consumes candidates in order, with no fixed cutoff before checking
 originals and their required current accounts.
 
+The passage and current-vector counts can use metadata indexes, avoiding a scan
+of vector-bearing rows. The writable root creates the partial vector index once
+when initializing a store that lacks it. A read-only store can still compute
+exact coverage without it.
+
 Transcript FTS hits join to admitted source versions by event identity.
 Validation uses keyed admission reads and keeps only a bounded cache of source
 text and account results. Groups that cannot fit all their required accounts are

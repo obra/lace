@@ -72,6 +72,8 @@ export class MemoryPassages {
         id TEXT NOT NULL, version TEXT NOT NULL, start INTEGER NOT NULL, end INTEGER NOT NULL,
         text TEXT NOT NULL, generation TEXT, vector TEXT, PRIMARY KEY(id,version,start)
       );
+      CREATE INDEX IF NOT EXISTS memory_passages_coverage
+        ON memory_passages(generation,id,version) WHERE vector IS NOT NULL;
       CREATE TABLE IF NOT EXISTS memory_projected (id TEXT NOT NULL, version TEXT NOT NULL, PRIMARY KEY(id,version));
       CREATE VIRTUAL TABLE IF NOT EXISTS memory_original_fts USING fts5(id UNINDEXED, version UNINDEXED, content, tokenize='porter unicode61');
     `)
@@ -234,9 +236,12 @@ export class MemoryPassages {
           SELECT 1 FROM memory_passages AS p WHERE p.id=s.id AND p.version=s.version
         )),0) AS unprojected FROM memory_sources AS s
       ), (
-        SELECT count(*) AS passages, count(CASE WHEN p.generation=? AND p.vector IS NOT NULL
-          THEN 1 END) AS vectors FROM memory_passages AS p
+        SELECT count(*) AS passages FROM memory_passages AS p
           JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
+      ), (
+        SELECT count(*) AS vectors FROM memory_passages AS p
+          JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
+          WHERE p.generation=? AND p.vector IS NOT NULL
       )
     `
       )
