@@ -253,15 +253,16 @@ The existing `wake()` starts publication immediately, independently of discovery
 and encoding, and joins that work. Once both initial publication and local
 projection/vector work settle, request a fresh drain for the queued changes,
 including when encoding fails after some successful writes. Waiting for the
-initial run prevents coalescing from swallowing the final drain. Coalesce all
-publication under its own lifetime promise, use the existing maintenance tick
-and append events, and report failures without blocking core startup or losing
-the queue. Closing aborts pending search work before closing SQLite; combine the
-turn and runtime abort signals for queries. Unavailable search setup, including
-an unreadable key file, logs an error and uses text-only recall while preserving
-explicit tools. A configured reader without a publisher reports unverified
-publication coverage as partial. Query preparation itself never runs or waits
-for publication.
+initial run prevents coalescing from swallowing the final drain. Do not delay
+that drain for a pending extraction provider; after extraction settles, drain
+again only if it left queued publication. Coalesce all publication under its own
+lifetime promise, use the existing maintenance tick and append events, and
+report failures without blocking core startup or losing the queue. Closing
+aborts pending search work before closing SQLite; combine the turn and runtime
+abort signals for queries. Unavailable search setup, including an unreadable key
+file, logs an error and uses text-only recall while preserving explicit tools. A
+configured reader without a publisher reports unverified publication coverage as
+partial. Query preparation itself never runs or waits for publication.
 
 ### Sen service and deployment
 

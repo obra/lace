@@ -338,6 +338,45 @@ namespace replacement. Search failure leaves core and text-only recall usable.
       lint and formatting serially. Self-review and commit owned files; two
       independent reviews follow. Root adds the real merged Lace pin later.
 
+### Task 8: Reuse the populated native evaluator
+
+**Files:** Promote the existing private `recall-native-evaluation.ts` and
+`recall-native-resources.ts` scenario helpers into the same paths under
+`packages/agent/tests/scenarios/`, with their existing small deterministic
+provider batching and streamed-stderr test-helper changes. Add focused tests for
+the publication barrier. Keep private manifests, sources, weights and results
+outside the repository.
+
+**Contract:** Reuse the established root-plus-two-native-workers scenario. Add
+an optional search endpoint to its case schema and initialization. For a search
+case, record and await initial durable publication separately before the first
+query. During the worker overlap, the maintenance marker must reach the remote
+index as well as SQLite before releasing worker reads. The barrier observes the
+matching generation/incarnation, completed seed and empty durable queue; root
+exit, publication failure and cancellation terminate the wait. No arbitrary
+provider deadline or new product requirement. The default case remains the
+exhaustive baseline. This scenario measures operations, not answer quality.
+
+- [ ] Reuse the existing harness and its reviewed provider/stderr changes;
+      extend only search configuration, publication readiness observations and
+      bounded failure handling. Test real SQLite barrier transitions and
+      cancellation. Preserve prior runs and record the new harness identity.
+- [ ] Root builds the tiny development image and runs an exhaustive baseline and
+      the new candidate serially under the same Debian 13 base, two CPUs, six
+      GiB and no swap. The candidate includes Qdrant in that same cgroup; the
+      baseline leaves it stopped. Each gets a separate copy of the frozen
+      populated SQLite, originals and Git objects. Record initial publication,
+      fresh/reused recall stages, native page offsets, worker/maintenance
+      overlap, combined memory peak and OOM counters.
+- [ ] Compare full selected evidence as well as timing. Add a separately labeled
+      matched delivered-answer regression using the retained native Sen
+      evaluator and stopped state; same model, settings and extraction-off state
+      on both sides. Preserve failure and partial-source status. One regression
+      pair cannot establish general answer-quality improvement.
+- [ ] Obtain two independent reviews of the changed harness and experimental
+      conclusions before delivery. A discovered failure is diagnosed and fixed
+      before a new bounded run; no repeated or overlapping relaunches.
+
 ### Subsequent delivery stages
 
 The agreed sequence is incremental publication and query integration in Lace;
