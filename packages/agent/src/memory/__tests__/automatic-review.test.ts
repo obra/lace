@@ -706,6 +706,24 @@ it('uses below-floor scores for FTS candidates and marks a missing indexed score
   ]);
 });
 
+it('ranks text by literal overlap while the available engine has no passage vectors', async () => {
+  event('The bicycle is violet.');
+  event('The bicycle route is green.');
+  const originals = new MemorySources(notes, configuration);
+  await originals.discover();
+  await new MemoryPassages(notes, originals, true).index(() => {});
+  const engine = { query: vi.fn(async () => []), scores: vi.fn(async () => []) };
+  const result = await recall(start(true, 'root', engine), 'bicycle route');
+  expect(result.coverage).toMatchObject({ passages: 2, vectors: 0, partial: true });
+  expect(result.selected.map((group) => group.originals[0].text)).toEqual([
+    'The bicycle route is green.',
+    'The bicycle is violet.',
+  ]);
+  expect(result.mode).toBe('text-only');
+  expect(queries).toBe(0);
+  expect(engine.query).not.toHaveBeenCalled();
+});
+
 it('discards a completed semantic page and reranks retained text after a later engine failure', async () => {
   await projectedOriginals(3);
   const [textual, , semantic] = indexedPassages();

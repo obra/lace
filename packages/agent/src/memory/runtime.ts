@@ -508,7 +508,6 @@ export function createMemoryRuntime(
           if (!configuration.recall) throw new Error('Automatic recall is not configured');
           activeAutomaticReads++;
           try {
-            void localWake().catch(() => {});
             const signal = AbortSignal.any([input.signal, controller.signal]);
             return await automaticRecall(
               { ...input, signal },

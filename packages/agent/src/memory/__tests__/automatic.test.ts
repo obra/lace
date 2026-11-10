@@ -533,6 +533,7 @@ it('returns available evidence with partial coverage without waiting for held lo
     await blocked;
     await discover.call(this);
   });
+  const maintenance = runtime.wake();
   try {
     const result = await request('cycling');
     expect(result.groups).toHaveLength(1);
@@ -540,7 +541,7 @@ it('returns available evidence with partial coverage without waiting for held lo
   } finally {
     release();
     spy.mockRestore();
-    await runtime.wake();
+    await maintenance;
   }
 });
 

@@ -225,7 +225,9 @@ async function rankPassages(
       `Semantic retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`
     );
   };
-  if (search) {
+  if (search && coverage.passages && !coverage.vectors) {
+    reasons.push('Semantic retrieval unavailable: Original vectors not indexed');
+  } else if (search) {
     try {
       [query] = await encoder.encode(
         [`${input.query.slice(0, 2400)}\n${input.tail?.slice(-800) ?? ''}`],

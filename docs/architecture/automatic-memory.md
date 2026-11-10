@@ -276,35 +276,38 @@ service, the root reports text-only recall and explicit memory tools remain
 available. Child sessions retain scoped explicit readers and have no automatic
 recall preparation.
 
-Foreground requests trigger coalesced local maintenance without waiting for
-corpus catch-up. A running document embedding batch may finish, and maintenance
-waits for active automatic recall to finish before starting another passage or
-note embedding batch. Discovery and projection can continue. Available index
-coverage remains explicit. The memory database holds disposable source-versioned
-passages, their redacted coordinates and encoder-generation vectors. Passages
-use a conservative 384-byte UTF-8 bound within the 512-token encoder input.
-Existing transcript and note FTS nominate covered text; the additional original
-FTS covers committed documents and retained text absent from transcript FTS,
-including full sidecars. Root maintenance reads missing projections and vectors
-in pages and checks the keyed source or revision and host authority after
-awaited work before publication. A writable root drains a durable SQLite
-identity queue into its owned Qdrant collection, independently of model loading
-and local discovery. Existing vectors seed in bounded pages with a checkpoint
-bound to the collection incarnation. The wake drains newly queued changes after
-local projection and vector maintenance settle. A Qdrant outage leaves work
-durable. Query preparation never creates or waits for a collection. To restore
-an older SQLite backup, provision a fresh owned derived collection and reseed.
+Root initialization, durable event appends and the maintenance timer trigger
+coalesced local maintenance. Foreground recall uses the available index coverage
+without waiting for corpus catch-up. A running document embedding batch may
+finish, and maintenance waits for active automatic recall to finish before
+starting another passage or note embedding batch. Discovery and projection can
+continue. Available index coverage remains explicit. The memory database holds
+disposable source-versioned passages, their redacted coordinates and
+encoder-generation vectors. Passages use a conservative 384-byte UTF-8 bound
+within the 512-token encoder input. Existing transcript and note FTS nominate
+covered text; the additional original FTS covers committed documents and
+retained text absent from transcript FTS, including full sidecars. Root
+maintenance reads missing projections and vectors in pages and checks the keyed
+source or revision and host authority after awaited work before publication. A
+writable root drains a durable SQLite identity queue into its owned Qdrant
+collection, independently of model loading and local discovery. Existing vectors
+seed in bounded pages with a checkpoint bound to the collection incarnation. The
+wake drains newly queued changes after local projection and vector maintenance
+settle. A Qdrant outage leaves work durable. Query preparation never creates or
+waits for a collection. To restore an older SQLite backup, provision a fresh
+owned derived collection and reseed.
 
 Fresh recall reads coverage with SQLite aggregates and asks Qdrant for exact Dot
 scores in bounded pages through the semantic floor. It resolves passage and note
 identities against current SQLite metadata, and requests scores for remaining
 FTS candidates by point ID. Missing engine scores leave text candidates
-eligible. An engine failure discards partial semantic ranks and reranks the
-retained text matches. Neither path decodes stored vector JSON. Qdrant exact
-search can still scan the corpus internally, and deeper offset pages can repeat
-that work. Publication in flight, queued work, and overlap between publication
-and preparation make coverage partial. Native pagination does not provide a
-snapshot across requests.
+eligible. If projected passages have no vectors in the active generation, recall
+ranks text by literal overlap. An engine failure discards partial semantic ranks
+and reranks the retained text matches. Neither path decodes stored vector JSON.
+Qdrant exact search can still scan the corpus internally, and deeper offset
+pages can repeat that work. Publication in flight, queued work, and overlap
+between publication and preparation make coverage partial. Native pagination
+does not provide a snapshot across requests.
 
 FTS matches, nominated identities, sorted runs, and group aliases use
 request-private SQLite scratch space on the memory database's state volume. The

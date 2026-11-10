@@ -228,6 +228,35 @@ it('cancels an in-flight HTTP search when the runtime closes', async () => {
   expect(server.methods.filter((method) => method === 'POST points/query')).toHaveLength(1);
 });
 
+it('reports complete coverage once a writable root has settled local and remote publication', async () => {
+  event('bicycle stored');
+  await projectStoredVector();
+  server = await engine((response) => {
+    const points = [...server!.points].map(([id, identity]) => ({
+      id,
+      score: 1,
+      payload: { ...identity, generation },
+    }));
+    response.end(JSON.stringify({ status: 'ok', result: { points } }));
+  });
+  const worker = start(
+    {
+      generation,
+      async encode(texts) {
+        return texts.map(() => embedding);
+      },
+    },
+    { url: server.url }
+  );
+  await worker.wake();
+  expect(server.points.size).toBe(1);
+
+  const result = await recall(worker);
+  expect(result.mode).toBe('hybrid');
+  expect(result.coverage).toEqual({ sources: 1, passages: 1, vectors: 1, partial: false });
+  expect(result.block).toContain('"partial":false');
+});
+
 it('cancels a held publication on close and leaves its SQLite acknowledgment pending', async () => {
   event('bicycle stored');
   await projectStoredVector();
