@@ -74,10 +74,8 @@ logger.configure('debug', agentLogPath, true);
 
 // Pipe stdin into a PassThrough tee. A PassThrough buffers while nothing
 // consumes it and only flows once a `data` listener (or pipe) attaches.
-// We intentionally DO NOT attach any consumer here — the protocol-log `data`
-// listener is attached inside boot() AFTER the plugin-load await, so frames
-// that arrive during the (possibly slow) import buffer in the tee and are
-// delivered in order once the peer wires. This resolves the existing H15 race.
+// Attach consumers only after startup work, so frames that arrive during
+// plugin loading or index catch-up are delivered in order once the peer wires.
 const stdinTee = new PassThrough();
 process.stdin.pipe(stdinTee);
 const readable = stdinTee;
@@ -183,8 +181,16 @@ async function boot(): Promise<void> {
   // the reaper is a no-op — skip it. Best-effort; runs its own try/catch.
   await runStartupReaper(manager?.isPlaneRuntime ? null : manager);
 
-  // Safe to attach the stdin consumer NOW — frames that arrived during the plugin
-  // await were buffered in the tee and will be delivered in order once the peer wires.
+  // Catch up the FTS index before serving requests. This synchronous work can
+  // stall network I/O if buffered initialization starts memory publication first.
+  // JSONL is the source of truth, so a backfill failure must not prevent startup.
+  try {
+    const stats = backfillIndex(getRecallIndex(), laceDir);
+    logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
+  } catch (err) {
+    logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   readable.on('data', (chunk) => {
     const lines = chunk
       .toString()
@@ -202,19 +208,6 @@ async function boot(): Promise<void> {
   state.peer = peer;
   // manager is set above, so the network-lifecycle observer will be installed.
   registerAgentRpcMethods(peer, state);
-
-  // Catch the FTS index up to anything that landed in JSONL before write-through
-  // indexing shipped, or while the process was down. Deferred to the next event
-  // loop tick so the JSON-RPC peer above is fully wired up before we touch the
-  // FTS index. Failures must never break startup; the JSONL files are source of truth.
-  setImmediate(() => {
-    try {
-      const stats = backfillIndex(getRecallIndex(), laceDir);
-      logger.info(`recall: backfill scanned=${stats.scanned} inserted=${stats.inserted}`);
-    } catch (err) {
-      logger.error(`recall: backfill failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  });
 }
 
 void boot();

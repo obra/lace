@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { writeFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { EntErrorCodes } from '@lace/ent-protocol';
+import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../memory/authority';
 import {
   AGENT_BOOT_TIMEOUT_MS,
   createE2EContext,
@@ -16,6 +17,97 @@ describe('lace-agent process (E2E over stdio)', { timeout: E2E_TEST_TIMEOUT_MS }
 
   beforeEach(() => ctx.setup());
   afterEach(() => ctx.teardown());
+
+  it('backfills transcripts before buffered initialization starts memory publication', async () => {
+    const sessionId = 'sess_11111111-1111-4111-8111-111111111111';
+    const sessions = join(ctx.laceDir, 'agent-sessions');
+    mkdirSync(join(sessions, sessionId), { recursive: true });
+    writeFileSync(
+      join(sessions, sessionId, 'events.jsonl'),
+      JSON.stringify({
+        eventSeq: 1,
+        timestamp: new Date(0).toISOString(),
+        type: 'prompt',
+        data: { content: [{ type: 'text', text: 'bootfixture' }] },
+      }) + '\n'
+    );
+    const databasePath = join(ctx.laceDir, 'memory.sqlite');
+    const grant = {
+      producerId: 'root',
+      canRead: true,
+      canMutate: true,
+      collections: [],
+      writableCollections: [],
+    };
+    const binding = {
+      ...grant,
+      instanceId: 'instance',
+      ownerGeneration: claimMemoryOwner('instance', databasePath, 'root'),
+      actorId: 'root',
+      role: 'root',
+      isRoot: true,
+    };
+    const db = openMemoryDatabase(databasePath, binding.instanceId, false);
+    try {
+      configureMemoryRoles(db, binding, { root: grant });
+    } finally {
+      db.close();
+    }
+
+    const plugin = join(ctx.workDir, 'startup-probe.mjs');
+    const observation = join(ctx.workDir, 'publication-observation.json');
+    const indexModule = new URL('../../dist/storage/recall/index-db.js', import.meta.url);
+    // Send the first RPC while plugin import still holds boot. Observe the real FTS
+    // contents at the moment initialize starts the first publication request.
+    writeFileSync(
+      plugin,
+      `
+import { once } from 'node:events';
+import { writeFileSync } from 'node:fs';
+import { getRecallIndex } from ${JSON.stringify(indexModule.href)};
+const input = once(process.stdin, 'data');
+process.stdout.write('{"jsonrpc":"2.0","method":"fixture/input-ready"}\\n');
+await input;
+export const meta = { name: 'startup-probe', namespace: 'startup-probe', version: '0.0.0' };
+export function register() {
+  const fetch = globalThis.fetch;
+  globalThis.fetch = (url, options) => {
+    if (!String(url).startsWith('http://127.0.0.1:1/collections/')) return fetch(url, options);
+    const row = getRecallIndex().prepare('SELECT event_id FROM events WHERE events MATCH ?').get('bootfixture');
+    writeFileSync(${JSON.stringify(observation)}, JSON.stringify(row?.event_id ?? null));
+    return Promise.resolve(new Response(null, { status: 503 }));
+  };
+}
+`
+    );
+    const agent = spawnAgentProcess({
+      laceDir: ctx.laceDir,
+      env: {
+        LACE_PLUGINS: plugin,
+        LACE_SESSION_DIR: sessions,
+        LACE_CONTAINER_RUNTIME: 'plane',
+        LACE_DOCKER_BIN: '/dev/null',
+      },
+    });
+    ctx.agent = agent;
+    const ready = new Promise<void>((resolve) => {
+      agent.peer.onRequest('fixture/input-ready', async () => resolve());
+    });
+    await withTimeout(ready, AGENT_BOOT_TIMEOUT_MS, 'startup probe waiting for input');
+    await withTimeout(
+      agent.peer.request('initialize', {
+        ...defaultInitializeParams(),
+        memory: {
+          databasePath,
+          binding,
+          recall: { modelDirectory: ctx.workDir, search: { url: 'http://127.0.0.1:1' } },
+        },
+      }),
+      AGENT_BOOT_TIMEOUT_MS,
+      'initialize buffered during plugin import'
+    );
+    expect(JSON.parse(readFileSync(observation, 'utf8'))).toBe(`${sessionId}:1`);
+  });
 
   it('rejects initialize without required clientInfo/capabilities', async () => {
     ctx.agent = spawnAgentProcess({ laceDir: ctx.laceDir });

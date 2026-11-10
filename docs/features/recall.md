@@ -88,9 +88,9 @@ Expands one event with the events around it. `event_id` is required, in the form
 The target event, and every surrounding non-tool-call event (user, assistant,
 notification and system), is capped at 10,000 characters. Surrounding tool-call
 events are capped at 500 characters, or 10,000 when `full` is `true`. Each
-result also includes the event's original journal line, redacted, best-effort —
-absent when the journal row is missing, for example while an older session is
-still being backfilled.
+result includes the event's original journal line, redacted, when available.
+Lace runs best-effort transcript index catch-up before accepting requests. The
+journal line is absent if its row is still missing after catch-up.
 
 ### `thread`
 
