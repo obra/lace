@@ -51,7 +51,7 @@ it('pages FTS identities and clears failed semantic ranking while preserving mat
     };
     scratch.addRun([semantic]);
     scratch.addAlias('keep', 7);
-    scratch.clearRanking();
+    await scratch.clearRanking(() => {});
     expect(scratch.nominate(passage)).toBe(true);
     const textual = { ...semantic, text: 'text only', score: 0, semantic: false, textual: true };
     scratch.addRun([textual]);
@@ -64,6 +64,53 @@ it('pages FTS identities and clears failed semantic ranking while preserving mat
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it.each(['ranking', 'nominations'] as const)(
+  'fences cancellation between %s reset pages',
+  async (table) => {
+    const directory = mkdtempSync(join(tmpdir(), 'recall-runs-'));
+    const scratch = new RecallScratch(join(directory, 'memory.sqlite'));
+    try {
+      const count = RECALL_PAGE_SIZE * 2 + 1;
+      const identity = (i: number) =>
+        ({ kind: 'note', noteId: `note-${String(i).padStart(3, '0')}`, revision: 1 }) as const;
+      if (table === 'ranking') {
+        const rows: RankedPassage[] = Array.from({ length: count }, (_, ordinal) => ({
+          id: 'doc',
+          version: 'v1',
+          start: ordinal,
+          end: ordinal + 1,
+          text: 'passage',
+          exact: false,
+          score: 1,
+          semantic: true,
+          textual: false,
+          ordinal,
+        }));
+        for (let i = 0; i < rows.length; i += RECALL_PAGE_SIZE)
+          scratch.addRun(rows.slice(i, i + RECALL_PAGE_SIZE));
+      } else {
+        for (let i = 0; i < count; i++) scratch.nominate(identity(i));
+      }
+      const controller = new AbortController();
+      setImmediate(() => controller.abort());
+      const clearing = scratch.clearRanking(() => controller.signal.throwIfAborted());
+      await expect(clearing).rejects.toMatchObject({ name: 'AbortError' });
+      if (table === 'ranking') {
+        expect([...(await scratch.ordered(() => {}))]).toHaveLength(count - RECALL_PAGE_SIZE);
+      } else {
+        expect(scratch.nominate(identity(0))).toBe(true);
+        expect(scratch.nominate(identity(RECALL_PAGE_SIZE))).toBe(false);
+      }
+      await scratch.clearRanking(() => {});
+      expect([...(await scratch.ordered(() => {}))]).toEqual([]);
+      expect(scratch.nominate(identity(RECALL_PAGE_SIZE))).toBe(true);
+    } finally {
+      scratch.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+);
 
 it('merges runs larger than the page cache after unlink while preserving locale order and ties', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'recall-runs-'));

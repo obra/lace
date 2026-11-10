@@ -143,8 +143,22 @@ export class RecallScratch {
     return this.insertNomination.run(JSON.stringify(key)).changes === 1;
   }
 
-  clearRanking(): void {
-    this.db.exec('DELETE FROM candidates; DELETE FROM nominations;');
+  async clearRanking(check: () => void): Promise<void> {
+    check();
+    const removeNominationPage = this.db.prepare(`
+      DELETE FROM nominations WHERE identity IN (
+        SELECT identity FROM nominations ORDER BY identity LIMIT ${RECALL_PAGE_SIZE}
+      )
+    `);
+    for (const removePage of [
+      () => this.removeRunPage.run(0, this.nextRun),
+      () => removeNominationPage.run(),
+    ]) {
+      while (removePage().changes > 0) {
+        await yieldTurn();
+        check();
+      }
+    }
     this.nextRun = 0;
   }
 
