@@ -292,6 +292,11 @@ Bounded fan-in merges preserve JavaScript locale ordering and stable ties.
 Validation consumes candidates in order, with no fixed cutoff before checking
 originals and their required current accounts.
 
+The `memory.recall.stages` debug event reports wall-clock times and aggregate
+row or candidate counts for successful preparations. Run merging is reported
+separately from validation, which consumes the final lazy merge. Reused
+preparations report coverage and validation only.
+
 The passage and current-vector counts can use metadata indexes, avoiding a scan
 of vector-bearing rows. The writable root creates the partial vector index once
 when initializing a store that lacks it. A read-only store can still compute
