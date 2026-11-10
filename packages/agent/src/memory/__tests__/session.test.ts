@@ -15,8 +15,9 @@ import { defaultInitializeParams } from '../../__tests__/helpers/initialize';
 import { appendDurableEvent } from '../../storage/event-log';
 import { writeSessionState } from '../../storage/session-store';
 import { localMemoryEncoder } from '../encoder';
-import { sessionMemory } from '../session';
+import { childMemoryConfiguration, sessionMemory } from '../session';
 import { TestAgentProvider } from '../../runtime/test-provider';
+import { RecallTool } from '../../tools/implementations/recall';
 
 const grant = {
   producerId: 'persona:lace',
@@ -50,6 +51,23 @@ describe('trusted memory initialization and session affinity', () => {
     return client.request('initialize', {
       ...defaultInitializeParams(),
       ...(memory ? { memory } : {}),
+    });
+  }
+  async function rememberBicycle(root: ReturnType<typeof pair>) {
+    const active = root.state.activeSession!;
+    const { nextState } = appendDurableEvent(active.dir, active.state, {
+      type: 'message',
+      data: { content: [{ type: 'text', text: 'My bicycle is violet.' }] },
+    });
+    active.state = nextState;
+    writeSessionState(active.dir, nextState);
+    await root.state.memory!.wake();
+    return sessionMemory(root.state, active)!.prepareAutomaticRecall!({
+      query: 'bicycle',
+      cueIds: ['ordinary-cue'],
+      represented: [],
+      maxTokens: 2000,
+      signal: new AbortController().signal,
     });
   }
   beforeEach(() => {
@@ -117,21 +135,7 @@ describe('trusted memory initialization and session affinity', () => {
       cwd: dir,
       mcpServers: [],
     })) as { sessionId: string };
-    const active = enabled.state.activeSession!;
-    const { nextState } = appendDurableEvent(active.dir, active.state, {
-      type: 'message',
-      data: { content: [{ type: 'text', text: 'My bicycle is violet.' }] },
-    });
-    active.state = nextState;
-    writeSessionState(active.dir, nextState);
-    await enabled.state.memory!.wake();
-    const prepared = await sessionMemory(enabled.state, active)!.prepareAutomaticRecall!({
-      query: 'bicycle',
-      cueIds: ['ordinary-cue'],
-      represented: [],
-      maxTokens: 2000,
-      signal: new AbortController().signal,
-    });
+    const prepared = await rememberBicycle(enabled);
     expect(prepared.groups).toHaveLength(1);
     expect(prepared.block).toContain('violet');
     const handle = prepared.groups[0].originals[0].handle;
@@ -173,6 +177,81 @@ describe('trusted memory initialization and session affinity', () => {
     expect(encoder.mock.calls).toHaveLength(encodedBeforeRestart);
   });
 
+  it('keeps automatic recall off for new, nested and resumed delegates with shared explicit access', async () => {
+    const encoder = vi
+      .spyOn(localMemoryEncoder, 'encode')
+      .mockImplementation(async (texts) => texts.map(() => [1, 0]));
+    const root = pair();
+    await initialize(root.client, {
+      databasePath,
+      binding,
+      recall: { modelDirectory: '/unused-test-model' },
+    });
+    const { sessionId: rootId } = (await root.client.request('session/new', {
+      cwd: dir,
+      mcpServers: [],
+    })) as { sessionId: string };
+    const prepared = await rememberBicycle(root);
+    expect(prepared.groups).toHaveLength(1);
+    const handle = prepared.groups[0].originals[0].handle;
+    encoder.mockClear();
+
+    const child = pair();
+    await initialize(
+      child.client,
+      childMemoryConfiguration(root.state, 'lace', 'child-job') ?? null
+    );
+    const { sessionId: childId } = (await child.client.request('session/new', {
+      cwd: dir,
+      parent: { sessionId: rootId, jobId: 'child-job' },
+    })) as { sessionId: string };
+    const childAccess = sessionMemory(child.state, child.state.activeSession!)!;
+    const tool = new RecallTool();
+    const context = { memory: childAccess.reader, signal: new AbortController().signal };
+    const search = (await tool.execute({ action: 'search', query: 'bicycle' }, context)).content[0];
+    expect(search.type === 'text' && JSON.parse(search.text)).toMatchObject({
+      hits: [{ session_id: rootId, preview: 'My bicycle is violet.' }],
+    });
+    const original = (await tool.execute({ action: 'read', event_id: handle }, context)).content[0];
+    expect(original.type === 'text' && JSON.parse(original.text)).toMatchObject({
+      status: 'current',
+      text: expect.stringContaining('My bicycle is violet.'),
+    });
+    await child.client.request('session/prompt', {
+      content: [{ type: 'text', text: 'What color is the bicycle?' }],
+      maxTurns: 1,
+    });
+
+    const nested = pair();
+    await initialize(
+      nested.client,
+      childMemoryConfiguration(child.state, 'lace', 'nested-job') ?? null
+    );
+    await nested.client.request('session/new', {
+      cwd: dir,
+      parent: { sessionId: childId, jobId: 'nested-job' },
+    });
+    const nestedAccess = sessionMemory(nested.state, nested.state.activeSession!)!;
+
+    await shutdownReminders(child.state);
+    await child.state.memory!.close();
+    const resumed = pair();
+    await initialize(resumed.client, childMemoryConfiguration(root.state, 'lace', childId) ?? null);
+    await resumed.client.request('session/resume', {
+      sessionId: childId,
+      cwd: dir,
+      mcpServers: [],
+    });
+    const resumedAccess = sessionMemory(resumed.state, resumed.state.activeSession!)!;
+
+    expect({
+      fresh: childAccess.prepareAutomaticRecall,
+      nested: nestedAccess.prepareAutomaticRecall,
+      resumed: resumedAccess.prepareAutomaticRecall,
+      encodedQueries: encoder.mock.calls.filter(([, kind]) => kind === 'query').length,
+    }).toEqual({ fresh: undefined, nested: undefined, resumed: undefined, encodedQueries: 0 });
+  });
+
   it('rejects child extraction configuration before activating the server', async () => {
     const child = pair();
     await expect(
@@ -187,7 +266,6 @@ describe('trusted memory initialization and session affinity', () => {
   it('checks current owner before session/new and forwards fresh restricted child configuration', async () => {
     const root = pair();
     await initialize(root.client);
-    const { childMemoryConfiguration } = await import('../session');
     const child = childMemoryConfiguration(root.state, 'lace', 'child-actor');
     expect(child).toMatchObject({
       databasePath,
