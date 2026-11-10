@@ -295,7 +295,9 @@ originals and their required current accounts.
 The `memory.recall.stages` debug event reports wall-clock times and aggregate
 row or candidate counts for successful preparations. Run merging is reported
 separately from validation, which consumes the final lazy merge. Reused
-preparations report coverage and validation only.
+preparations report coverage and validation only. The
+`memory.recall.passage_scan` debug event splits a completed passage scan into
+SQLite reads, decoding, caller processing, and cooperative yield waits.
 
 The passage and current-vector counts can use metadata indexes, avoiding a scan
 of vector-bearing rows. The writable root creates the partial vector index once

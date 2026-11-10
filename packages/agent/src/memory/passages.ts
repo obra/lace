@@ -1,6 +1,7 @@
 // ABOUTME: Disposable, source-versioned passages with all-age scans and missing-original FTS.
 import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { getRecallIndex } from '../storage/recall/index-db';
+import { logger } from '../utils/logger';
 import { sourceText } from './source-text';
 import type { MemoryNotes } from './notes';
 import type { MemorySources } from './sources';
@@ -261,15 +262,28 @@ export class MemoryPassages {
       FROM memory_passages AS p JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
       WHERE p.rowid>? ORDER BY p.rowid LIMIT 128
     `);
+    const scan = { pages: 0, rows: 0, sqliteMs: 0, decodeMs: 0, callerMs: 0, yieldMs: 0 };
     let after = 0;
     while (true) {
       check();
+      let started = performance.now();
       const rows = page.all(generation ?? null, after) as PassageRow[];
-      if (!rows.length) return;
+      scan.sqliteMs += performance.now() - started;
+      if (!rows.length) break;
+      scan.pages++;
+      scan.rows += rows.length;
       after = rows.at(-1)!.rowid;
-      yield rows.map(passageOf);
+      started = performance.now();
+      const passages = rows.map(passageOf);
+      scan.decodeMs += performance.now() - started;
+      started = performance.now();
+      yield passages;
+      scan.callerMs += performance.now() - started;
+      started = performance.now();
       await yieldTurn();
+      scan.yieldMs += performance.now() - started;
     }
+    logger.debug('memory.recall.passage_scan', scan);
   }
   first(support: Source[]): Passage | undefined {
     if (!this.available()) return undefined;
