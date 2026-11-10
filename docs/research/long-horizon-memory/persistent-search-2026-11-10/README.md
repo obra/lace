@@ -1,9 +1,9 @@
 # Persistent search qualification
 
-The populated trial supports proceeding with Qdrant **exact search** for the
-first integration. It does not support shipping the tested approximate-search
-setting. This is engine qualification, not a delivered-answer or deployment
-result.
+The populated trial supports Qdrant **exact search** for this integration. It
+does not support shipping the tested approximate-search setting. The subsequent
+native integration and retained-answer regression are recorded below. Deployment
+remains pending.
 
 ## Method
 
@@ -87,3 +87,93 @@ bind mount emitted a FUSE safety error before import; the trial moved to a Linux
 volume. The first preparation refused an orphan SQLite sidecar; a separate
 sealed file-only copy succeeded. The original SQLite file still matched its
 saved hash. Neither failure was overwritten or silently retried.
+
+## Populated Lace integration
+
+The integrated candidate at `aea2c3b696aa5459978d3b0ff485a1dd9f923371` completed
+the existing root-plus-two-native-workers scenario. Its comparison used Lace
+`d0834134e1e24fd60bc50f8bcaf053332b9e5303`, the same frozen SQLite snapshot, and
+identical manifests for 1,362 retained files. Both ran the same evaluator and
+immutable Debian 13/Node 22 lab image under 2 CPUs, 6 GiB and no swap. The
+candidate's Qdrant server was in the same container and resource accounting as
+Lace and its workers. This remains an emulated Linux operational test with a
+deterministic provider, not an answer-quality result.
+
+| Measurement                                    | Exhaustive baseline | Persistent search candidate    |
+| ---------------------------------------------- | ------------------- | ------------------------------ |
+| Initial publication barrier                    | Not applicable      | 200.1 seconds                  |
+| First fresh recall preparation                 | 24.72 seconds       | 7.61 seconds after publication |
+| Second fresh recall preparation                | 21.42 seconds       | 18.15 seconds                  |
+| Four reused preparations, total                | 4.55 seconds        | 6.28 seconds                   |
+| Second root turn and workers through idle      | 37.70 seconds       | 41.57 seconds                  |
+| Combined cgroup memory peak                    | 4.73 GiB            | 5.70 GiB                       |
+| OOM or memory-limit events                     | Zero                | Zero                           |
+| Workers completing while maintenance published | 2 of 2              | 2 of 2                         |
+
+All six root calls selected byte-identical evidence bodies, including ordering,
+excerpts, source ranges and read-context instructions. The first four complete
+temporary-context payloads also matched. The two notification payloads differed
+only in a coverage source count, 37,378 versus 37,379. Every worker provider
+call had no automatic-recall context. Both arms reported partial hybrid
+coverage; neither fell back to text. This corpus had no derived note accounts.
+
+The candidate's peak occurred with the root and both worker processes alive,
+after initial publication, leaving about 305 MiB below the combined limit. The
+nearest sampled peak consisted mainly of filesystem cache. The measurement does
+not attribute the peak to a specific component or demonstrate improved capacity.
+All four reused preparations were slower. These results support faster fresh
+preparation for the two measured cues, not a general latency or memory
+improvement.
+
+Both fresh queries used one native page at offset zero. The second native
+semantic query took about 25 ms, but scoring text-nominated candidates required
+157 batches and about 4.67 seconds. Other text retrieval, candidate validation
+and packing work remained. This run does not establish behavior at deep native
+offsets or years-of-history scale. Initial publication is recorded separately;
+the first end-to-end response including that work took longer than the baseline.
+
+The first integrated attempt failed before any query when a synchronous startup
+FTS backfill blocked the request loop and the server returned HTTP 408. The
+preserved failure led to a small ordering repair: finish that existing backfill
+before admitting RPC work. A deterministic real-process regression failed on the
+old ordering and passed on the repair; two independent Sol reviews accepted it.
+No timeout or retry policy changed. The fresh repaired attempt completed, and
+the server subsequently stopped cleanly with zero restarts or OOMs. The failed
+attempt and its volume remain separate from the successful run.
+
+Two independent Sol reviewers checked the populated comparison and its limits.
+Private receipts are retained under `qdrant-native.qLUEDL`. Full checks,
+dependency-ordered merges and Reeve-only deployment remain pending. The existing
+Reeve deployment was healthy in a read-only check; this candidate has not been
+deployed.
+
+## Retained delivered-answer regression
+
+One retained changed-responsibility question was run through the existing native
+Sen evaluator with the same stopped state, current Sen build, DeepSeek 4.1 Flash
+background model and normal runtime settings. Recall was enabled and extraction
+disabled in both arms. The seed's six successful and six failed extraction
+sources remained intact, with all 19 passage vectors and six current-note
+vectors available. The persistent arm used a fresh isolated server and awaited
+publication. Original seed hashes matched before and after both runs.
+
+Both delivered answers correctly named the current owner and included the
+unfinished work; neither attributed current responsibility to a previous owner.
+Both sent their answer before any explicit source search. Their first automatic
+recall selected the same four originals, including the decisive handoff, and the
+same note. All recall rounds reported hybrid mode, with no text fallback. Two
+independent, unblinded Sol reviews graded the outward deliveries against the
+frozen required and forbidden claims and inspected the actual transcripts.
+
+Both sessions performed checks after sending their answer. The exhaustive arm
+read conversation history and searched its journal; the persistent arm reopened
+the exact handoff record. Both also wrote private journal observations. Neither
+sent a second answer, and both ended normally without pending jobs or dead
+letters. These observed post-answer calls are not evidence of a retrieval
+failure or an answer-quality advantage. Interviews of private copies remain
+pending.
+
+This is one known regression case, not fresh held-out evidence or a new
+comparison against main. It establishes the observed answer and recall behavior
+for that case, not general quality improvement. Private receipts are under
+`rs-answer.fln6z6`; the original completed cells are preserved.
