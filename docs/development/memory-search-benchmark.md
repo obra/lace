@@ -67,6 +67,53 @@ collection for the read-only restart check. The check reads that sentinel and
 looks up the old revision and deletion-control IDs directly to confirm their
 absence.
 
+## Measure Lace and Qdrant under one resource limit
+
+The development image runs the Lace evaluator and Qdrant in the same Linux
+cgroup. It uses the qualified Qdrant 1.20.0 image and the same amd64 Node
+22.23.4 binary as the historical Linux evaluator. The final base is Debian 13.
+The historical Node-only evaluator used Debian 12 (Bookworm). Run both arms in
+this image for a comparison that holds the base OS constant.
+
+From the repo root, check the Docker inventories and choose fresh names for
+`LAB_IMAGE`, `LAB_CONTAINER`, and `LAB_VOLUME`. Set `LAB_CODE` to an absolute
+path to the evaluator checkout with Linux amd64 dependencies and build output,
+`LAB_CASE` to a fresh writable copy of the case, and `MODEL_DIR` to the local
+encoder directory. Mount any frozen baseline inputs read-only as well. The build
+context contains only the image definition.
+
+```sh
+docker ps -a
+docker compose ls -a
+docker build --platform linux/amd64 -t "$LAB_IMAGE" scripts/memory-search-lab
+docker volume create "$LAB_VOLUME"
+docker run --rm -it --init --name "$LAB_CONTAINER" --platform linux/amd64 \
+  --network none --cpus 2 --memory 6g --memory-swap 6g \
+  --mount "type=bind,src=$LAB_CODE,dst=/work,readonly" \
+  --mount "type=bind,src=$LAB_CASE,dst=/var/sen/instance" \
+  --mount "type=bind,src=$MODEL_DIR,dst=/model,readonly" \
+  --mount "type=volume,src=$LAB_VOLUME,dst=/qdrant/storage" \
+  --workdir /work "$LAB_IMAGE"
+```
+
+For the Qdrant arm, start the server from that shell and retain its log in the
+private case directory.
+
+```sh
+(cd /qdrant && QDRANT__SERVICE__HOST=127.0.0.1 \
+  QDRANT__TELEMETRY_DISABLED=true exec ./qdrant) \
+  > /var/sen/instance/qdrant.log 2>&1 &
+qdrant_pid=$!
+```
+
+Confirm `http://127.0.0.1:6333/readyz` returns success, then run the evaluator
+in the same shell against that loopback URL. Use a fresh container per arm and
+leave Qdrant stopped for the exhaustive baseline. Record Lace's publication
+readiness separately from Qdrant startup. On cgroup v2, save
+`/sys/fs/cgroup/memory.peak`, `memory.events`, and `cpu.stat` before exiting.
+Stop the server with `kill -TERM "$qdrant_pid"` and `wait "$qdrant_pid"`. Reuse
+the owned Linux volume when measuring a restart, and remove it after the run.
+
 ## Read the results
 
 Keep `prepared.json`, `point-mapping.jsonl`, and every `events.jsonl` private.
