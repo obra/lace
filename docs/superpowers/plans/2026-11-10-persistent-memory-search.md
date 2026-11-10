@@ -144,22 +144,65 @@ identities/scores. No query creates a collection. No class method silently
 retries a failed operation. The publisher, not this client, will own SQLite
 state.
 
-- [ ] Use deterministic UUIDs over kind, identity and generation; preserve the
+- [x] Use deterministic UUIDs over kind, identity and generation; preserve the
       passage identity definition used in qualification. Notes include revision.
-- [ ] Use the measured Float32/Dot and storage/index configuration. Validate
+- [x] Use the measured Float32/Dot and storage/index configuration. Validate
       existing owner/generation/format metadata and relevant collection
       settings; preserve foreign collections. Collection recreation gets a new
       incarnation.
-- [ ] Permit literal loopback HTTP(S) URLs only, refuse redirects, read an
+- [x] Permit literal loopback HTTP(S) URLs only, refuse redirects, read an
       optional private key without logging it, and propagate cancellation. Keep
       HTTP failure diagnostics bounded and free of the configured key.
-- [ ] Test with a real local HTTP fixture: first create/reopen, foreign identity
+- [x] Test with a real local HTTP fixture: first create/reopen, foreign identity
       refusal, exact query and validated response, completed versus ambiguous
       writes, deletion, cancellation, and error redaction. Exercise structured
       requests/effects rather than rendered shell strings.
-- [ ] Run the focused test file and relevant typecheck/lint/format checks with
+- [x] Run the focused test file and relevant typecheck/lint/format checks with
       saved logs. Self-review and commit only owned files. Two independent
       reviews follow before publication wiring.
+
+### Task 4: Add durable incremental publication
+
+**Files:** Create `packages/agent/src/memory/search-publication.ts` and
+`packages/agent/src/memory/__tests__/search-publication.test.ts`. Do not wire
+runtime or change retrieval in this task. Reuse Task 3's client; extend its
+ensure method with a required beforeCreate guard and update its focused test.
+
+**Contract:** `MemorySearchPublication(notes, index, binding, generation)`
+initializes only after verifying root mutation authority in the SQLite
+transaction. `run(signal)` serializes the existing publisher lifetime, ensures
+the collection, binds its incarnation, seeds metadata and drains bounded pages.
+`partial()` reports unverified incarnation, unfinished seed or pending work. No
+timers, embeddings, source rewriting, new storage format or automatic retry.
+
+- [ ] Create one state row for generation/incarnation, passage/note cursors and
+      seed completion; create a pending table with autoincrement sequence and
+      unique serialized point identity. Use real SQLite triggers to enqueue
+      current writers atomically. Explicitly capture the old identity before
+      `INSERT OR REPLACE`; refresh sequence on every same-identity enqueue.
+- [ ] Seed already-stored matching-generation passages and current note vectors
+      in pages of 128. Save cursor and enqueued page in one transaction. Drain
+      pending pages between seed pages, so no all-corpus memory map or queue
+      construction is needed. An unchanged completed state never reseeds.
+- [ ] Resolve current authoritative vectors for a pending page only. Missing,
+      invalidated or wrong-generation entries delete that point. Complete both
+      upsert and delete operations before removing only the acknowledged
+      sequence numbers. Fence ownership/cancellation before every outbound
+      mutation and within local acknowledgment. Pass a beforeCreate guard to
+      ensure so ownership is checked after the awaited collection lookup;
+      upsert/delete pages are at most 128 points and need no multi-batch gap.
+- [ ] Clear in-process readiness before ensure; after a new incarnation reset
+      seed progress in the same transaction that binds it. Failures retain work
+      and partial status. Current-DB restart resumes; restored-DB deployment
+      will recreate the derived collection as specified in the restore rule.
+- [ ] Test real SQLite plus the real HTTP client at a controlled local server:
+      initial seed/reopen, write after seed, revision invalidation, actual
+      REPLACE clearing/changing a passage, same-identity change during a held
+      write, remote success before a lost acknowledgment, abort/owner rotation,
+      and collection recreation. Inspect effects and preserved pending work.
+- [ ] Run focused tests and relevant typecheck/lint/format checks, save
+      receipts, self-review and commit owned files. Obtain two independent code
+      reviews.
 
 ### Subsequent delivery stages
 

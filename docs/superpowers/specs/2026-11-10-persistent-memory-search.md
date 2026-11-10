@@ -119,8 +119,48 @@ rechecking root ownership, so a concurrent replacement remains pending. A failed
 or interrupted request leaves the work durable. Existing revisions and originals
 are never rewritten by search publication.
 
+Use two SQLite tables: one state row holding generation, collection incarnation,
+passage/note seed cursors and completion, and a pending table with an
+autoincrement sequence and unique serialized identity. Triggers enqueue vector
+insertion/replacement/update/deletion and invalidate the previous note revision
+when its current note is replaced. Account for the existing `INSERT OR REPLACE`
+writers explicitly; do not rely on SQLite replacement firing delete triggers.
+Installing the tables and triggers is one authorized SQLite transaction. Capture
+the old passage identity before replacement by its SQLite key
+`(id,version,start)`, even if the new row has no vector or a different end.
+Every enqueue of the same identity receives a fresh sequence, so an older
+in-flight acknowledgment cannot consume it.
+
+Seed metadata in pages of 128 and checkpoint the page in the same transaction
+that enqueues it. Interleave seeding with draining pending pages. Resolve
+vectors only for the pending page; passage lookup joins the admitted source
+version, and note lookup requires the current note revision and encoder
+generation. Use separate upsert/delete requests for a page and acknowledge it
+only after both succeed. Cancellation or ownership loss preserves unacknowledged
+entries. Check root write authority before each remote mutation and inside the
+local acknowledgment transaction. Because ensure awaits a read before creating a
+missing collection, it accepts a required `beforeCreate` callback and invokes
+that guard immediately before creation. Publisher upsert/delete pages never
+exceed one client write batch. After a completed seed and empty queue, the
+publisher performs no seed/corpus scan. Existing discovery and embedding
+maintenance are separate. This state is a derived-index work queue, not another
+memory archive.
+
 Use the existing root maintenance lifetime, with no child publisher or new
-polling service. Coverage remains explicitly partial during seed/catch-up.
+polling service. Only a root with mutation authority initializes or runs it.
+Start seed/drain independently of embedding: existing vectors and queued
+invalidations must progress even when model loading fails or embedding pauses
+for a foreground request. Coverage remains explicitly partial during
+seed/catch-up or an unverified incarnation. Invalidate in-process readiness
+before ensuring the collection, then bind the returned incarnation and seed
+state atomically before declaring it ready. A known missing collection also
+invalidates the client's cached validation.
+
+Operational restore rule: restoring an older SQLite snapshot also requires a
+fresh owned derived collection/volume and reseeding. A normal process reopen of
+the current SQLite database resumes the existing collection. Do not invent a
+reconciliation protocol for restoring only one half of that pair.
+
 Concrete nomination and text-candidate integration follow this foundation; no
 claim of full hybrid equivalence follows from the vector benchmark alone.
 
