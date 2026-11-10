@@ -40,23 +40,32 @@ existing normalized dot-product scoring without extra normalization or
 quantization. Use cold vector storage, a cached HNSW graph, m=16,
 ef_construct=100, one indexing thread and one optimizer job. New points remain
 searchable before optimization: do not enable indexed_only or
-prevent_unoptimized. Upserts/deletes use wait=true. No public network listener.
+prevent_unoptimized. Upserts/deletes use wait=true and only a completed result
+counts as publication. Read the API key from a private file, disable outbound
+usage telemetry, and expose no public network listener.
 
-Compare exhaustive JavaScript reference results, native exact search and HNSW
-search with hnsw_ef=128 for 100 candidates. Treat score differences within 1e-5
-as numerical ties when assessing ordering; report raw disagreements too. These
-candidate measurements do not establish answer quality or preserve the existing
-semantic/text/identifier union by themselves. The runtime phase must retain
-those routes and validate selected evidence and delivered answers.
+Compare exhaustive JavaScript reference results, native exact search and
+HNSW-enabled search with hnsw_ef=128 for 100 candidates. Save collection state
+and details_level=4 telemetry around queries to establish whether HNSW ran; the
+planner can choose exact scans. Label execution order because an exact query
+warms disk pages for a following approximate query. Treat score differences
+within 1e-5 as numerical ties; report raw disagreements too. Independently
+rescore returned boundary IDs from SQLite; an engine score cannot certify an
+unknown ID as a tie. These measurements do not establish answer quality or
+preserve the semantic/text/identifier union by themselves. The runtime phase
+must retain those routes and validate selected evidence and delivered answers.
 
 Record import and indexing separately from first/warm query times. Exercise
-bounded upserts, a revised sentinel, deletion, interrupted publication replay
-and restart with persisted storage. Preserve every result and error. Reuse the
-existing native-worker evaluator for final concurrency and full-preparation
-measurements, after the runtime integration exists. The first server trial is
-limited to 2 CPUs/4 GiB and runs alone; later whole-stack measurements retain
-the existing 2 CPU/6 GiB lab envelope. No claim of production speed follows from
-an emulated or differently resourced run.
+bounded upserts, a new revision ID, deletion, idempotent replay and restart with
+persisted storage. A fresh container must read the live sentinel and confirm the
+deleted IDs absent before any writes. This tests engine recovery, not the future
+Lace publication cursor. Use a private standalone SQLite backup in DELETE
+journal mode, reject WAL/SHM siblings and hash around prepare/import. Preserve
+every result and error. Reuse the existing native-worker evaluator for final
+concurrency and full-preparation measurements, after the runtime integration
+exists. The first server trial is limited to 2 CPUs/4 GiB and runs alone; later
+whole-stack measurements retain the existing 2 CPU/6 GiB lab envelope. No claim
+of production speed follows from an emulated or differently resourced run.
 
 ## Runtime follow-through
 

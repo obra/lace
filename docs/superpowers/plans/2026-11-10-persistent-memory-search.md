@@ -92,6 +92,15 @@ built-in fetch; no product API or runtime wiring yet.
 - [ ] Run the focused tests, typecheck/lint the touched code as applicable,
       inspect logs, format, self-review and commit only owned files.
 
+Review refinements for Task 1: Qdrant commands accept `--api-key-file` without
+logging it. The snapshot is a sealed standalone backup without WAL/SHM siblings,
+hashed before/after reads. Query accepts the snapshot for independent boundary
+score checks. Save details_level=4 telemetry and collection state; label
+HNSW-enabled until counters demonstrate graph search. Waited writes require
+`status=completed`. Mutation verification is separately read-only after
+container recreation: new revision ID present, old/deleted IDs absent by exact
+lookup. Root owns cgroup peak/events/CPU and swap receipts.
+
 ### Task 2: Execute and review the populated fit test
 
 **Files:** Private artifacts under the existing incident evidence directory;
