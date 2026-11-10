@@ -53,6 +53,40 @@ describe('memory permission schemas', () => {
   });
 });
 
+it('accepts optional trusted memory search configuration without accepting a raw API key', () => {
+  const memory = { databasePath: '/instance/memory.sqlite', binding };
+  const recall = {
+    modelDirectory: '/instance/model',
+    search: { url: 'http://127.0.0.1:6333', apiKeyFile: '/instance/qdrant.key' },
+  };
+  const request = InitializeRequestSchema.parse({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '1.0',
+      clientInfo: { name: 'host', version: '1' },
+      capabilities: {},
+      memory: { ...memory, recall },
+    },
+  });
+  expect(request.params.memory?.recall).toEqual(recall);
+  expect(
+    MemoryConfigurationSchema.safeParse({
+      ...memory,
+      recall: { ...recall, search: { ...recall.search, apiKey: 'secret' } },
+    }).success
+  ).toBe(false);
+  expect(
+    MemoryConfigurationSchema.safeParse({ ...memory, recall: { ...recall, search: { url: '' } } })
+      .success
+  ).toBe(false);
+  expect(
+    MemoryConfigurationSchema.parse({ ...memory, recall: { modelDirectory: '/instance/model' } })
+      .recall
+  ).toEqual({ modelDirectory: '/instance/model' });
+});
+
 describe('memory document extension selection', () => {
   const memory = {
     databasePath: '/instance/memory.sqlite',

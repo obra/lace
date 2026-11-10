@@ -461,7 +461,16 @@ export const MemoryConfigurationSchema = z
   .object({
     databasePath: NonEmptyStringSchema,
     binding: MemoryBindingSchema,
-    recall: z.object({ modelDirectory: NonEmptyStringSchema }).strict().optional(),
+    recall: z
+      .object({
+        modelDirectory: NonEmptyStringSchema,
+        search: z
+          .object({ url: NonEmptyStringSchema, apiKeyFile: NonEmptyStringSchema.optional() })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
     extraction: z
       .object({ connectionId: NonEmptyStringSchema, modelId: NonEmptyStringSchema })
       .strict()

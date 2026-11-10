@@ -11,7 +11,10 @@ memory: {
   databasePath: '/service/state/memory.sqlite',
   binding, // HostMemoryBinding issued by the current boot owner
   extraction: { connectionId: 'balanced', modelId: 'configured-model' },
-  recall: { modelDirectory: '/service/state/models/embeddinggemma-2-ONNX' },
+  recall: {
+    modelDirectory: '/service/state/models/embeddinggemma-2-ONNX',
+    search: { url: 'http://127.0.0.1:6333', apiKeyFile: '/service/state/qdrant.key' },
+  },
   documentSources: {
     gitRoot: '/service/instance',
     paths: ['journal', 'knowledge'],
@@ -253,19 +256,25 @@ separate real-model sample.
 
 ## Before-answer automatic recall
 
-The independent optional `recall: { modelDirectory }` configuration enables the
-main agent to retrieve evidence before provider requests. It defaults off. Omit
-`recall` to disable automatic retrieval and insertion. Extraction is
-independently configured. Omitting `extraction` leaves recall available, and
-omitting `recall` preserves extraction, explicit recall and retained memory.
-Host configuration is applied at initialization; restart/reinitialize with
-`recall` omitted and resume the session to disable it. Selections belong to the
-runtime and session rather than persisted temporary context, so disabled resumes
-do not reinstall prior automatic evidence. No live-toggle API is provided. It
-does not require an extraction connection. Configure document discovery on the
-root for committed originals even when extraction is disabled. Missing or
-invalid pinned assets produce an explicit text-only outcome; runtime never
-downloads weights. One process rejects conflicting configured model directories.
+The independent optional `recall: { modelDirectory, search? }` configuration
+enables the root agent to retrieve evidence before provider requests. It
+defaults off. Omit `recall` to disable automatic retrieval and insertion.
+Extraction is independently configured. Omitting `extraction` leaves recall
+available, and omitting `recall` preserves extraction, explicit recall and
+retained memory. Host configuration is applied at initialization;
+restart/reinitialize with `recall` omitted and resume the session to disable it.
+Selections belong to the runtime and session rather than persisted temporary
+context, so disabled resumes do not reinstall prior automatic evidence. No
+live-toggle API is provided. It does not require an extraction connection.
+Configure document discovery on the root for committed originals even when
+extraction is disabled. Missing or invalid pinned assets produce an explicit
+text-only outcome; runtime never downloads weights. One process rejects
+conflicting configured model directories. Trusted host configuration may supply
+a loopback Qdrant URL and an optional API key file. The endpoint, model
+directory, and key file stay in host configuration. Without a usable search
+service, the root reports text-only recall and explicit memory tools remain
+available. Child sessions retain scoped explicit readers and have no automatic
+recall preparation.
 
 Foreground requests trigger coalesced local maintenance without waiting for
 corpus catch-up. A running document embedding batch may finish, and maintenance
@@ -278,26 +287,40 @@ Existing transcript and note FTS nominate covered text; the additional original
 FTS covers committed documents and retained text absent from transcript FTS,
 including full sidecars. Root maintenance reads missing projections and vectors
 in pages and checks the keyed source or revision and host authority after
-awaited work before publication.
+awaited work before publication. A writable root drains a durable SQLite
+identity queue into its owned Qdrant collection, independently of model loading
+and local discovery. Existing vectors seed in bounded pages with a checkpoint
+bound to the collection incarnation. The wake drains newly queued changes after
+local projection and vector maintenance settle. A Qdrant outage leaves work
+durable. Query preparation never creates or waits for a collection. To restore
+an older SQLite backup, provision a fresh owned derived collection and reseed.
 
-Fresh recall reads coverage with SQLite aggregates and decodes vectors one
-passage page at a time. It ranks exact cosine scores across every indexed age,
-so scoring time still grows with the corpus. FTS matches, sorted runs of compact
-candidates and group aliases use request-private SQLite scratch space on the
-memory database's state volume. The host needs that volume on disk with room for
-the scratch data. On POSIX hosts, Lace unlinks the scratch file before writing
-request data and holds it open only for that preparation. The scratch connection
-has a bounded page cache and closes on completion, cancellation or failure.
-Bounded fan-in merges preserve JavaScript locale ordering and stable ties.
-Validation consumes candidates in order, with no fixed cutoff before checking
-originals and their required current accounts.
+Fresh recall reads coverage with SQLite aggregates and asks Qdrant for exact Dot
+scores in bounded pages through the semantic floor. It resolves passage and note
+identities against current SQLite metadata, and requests scores for remaining
+FTS candidates by point ID. Missing engine scores leave text candidates
+eligible. An engine failure discards partial semantic ranks and reranks the
+retained text matches. Neither path decodes stored vector JSON. Qdrant exact
+search can still scan the corpus internally, and deeper offset pages can repeat
+that work. Publication in flight, queued work, and overlap between publication
+and preparation make coverage partial. Native pagination does not provide a
+snapshot across requests.
+
+FTS matches, nominated identities, sorted runs, and group aliases use
+request-private SQLite scratch space on the memory database's state volume. The
+host needs room for that scratch data. On POSIX hosts, Lace unlinks the file
+before writing request data and holds it open only for that preparation. The
+connection has a bounded page cache and closes on completion, cancellation, or
+failure. Bounded fan-in merges preserve JavaScript locale ordering and SQLite
+nomination order for equal native scores. Validation consumes candidates in
+order, with no fixed cutoff before checking originals and their required current
+accounts.
 
 The `memory.recall.stages` debug event reports wall-clock times and aggregate
-row or candidate counts for successful preparations. Run merging is reported
-separately from validation, which consumes the final lazy merge. Reused
-preparations report coverage and validation only. The
-`memory.recall.passage_scan` debug event splits a completed passage scan into
-SQLite reads, decoding, caller processing, and cooperative yield waits.
+row or candidate counts for successful preparations. Native query time, page
+count, largest offset, and explicit score batches are recorded separately. Run
+merging is reported separately from validation, which consumes the final lazy
+merge. Reused preparations report coverage and validation only.
 
 The passage and current-vector counts can use metadata indexes, avoiding a scan
 of vector-bearing rows. The writable root creates the partial vector index once
@@ -321,7 +344,7 @@ add boosts, and unmatched identifiers impose no constraint. Semantic evidence
 must meet the fixed generation-specific floor, 0.8279641135636632. This
 development-calibrated relevance threshold is not a probability or a guarantee
 of useful answers. Textual nominations independently require an FTS match and
-literal term overlap or a complete identifier match. Cosine scores still order
+literal term overlap or a complete identifier match. Native Dot scores order
 both methods' candidates. Text-only fallback remains observable, including empty
 results.
 

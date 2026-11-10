@@ -13,9 +13,10 @@ import { getRecallIndex } from '../storage/recall/index-db';
 import { logger } from '../utils/logger';
 import type { MemoryNotes } from './notes';
 import type { MemorySources } from './sources';
-import type { MemoryPassages, Passage } from './passages';
+import type { MemoryPassages, Passage, PassageCandidate } from './passages';
 import { originalHandle, originalReference } from './passages';
 import type { MemoryEncoder } from './encoder';
+import type { MemorySearchIdentity, MemorySearchIndex } from './search-index';
 import {
   RecallScratch,
   RECALL_PAGE_SIZE,
@@ -120,10 +121,13 @@ type RecallDependencies = {
   sources: MemorySources;
   passages: MemoryPassages;
   encoder: MemoryEncoder;
+  search?: Pick<MemorySearchIndex, 'query' | 'scores'>;
+  searchUnavailable?: string;
   floor: number;
   check: () => void;
   accountsFor: MemoryReader['accountsFor'];
   indexing?: () => boolean;
+  publication?: () => { epoch: number; partial: boolean };
   textual?: boolean;
 };
 type RecallCoverage = AutomaticRecallResult['coverage'];
@@ -141,8 +145,38 @@ type RecallStages = {
   fts?: Partial<Record<MatchSurface, { durationMs: number; rows: number }>>;
   passages?: { durationMs: number; rows: number; candidates: number };
   notes?: { durationMs: number; rows: number; candidates: number };
+  native?: {
+    pages: number;
+    largestOffset: number;
+    queryMs: number;
+    scoreBatches: number;
+    scoreMs: number;
+  };
   mergeRunsMs?: number;
 };
+
+type Candidate = {
+  identity: MemorySearchIdentity;
+  passage: Passage;
+  actualText: string;
+  indexed: boolean;
+  ftsMatch: boolean;
+  ordinal: number;
+};
+
+class SemanticSearchError extends Error {
+  constructor(readonly failure: unknown) {
+    super('Memory search request failed');
+  }
+}
+
+function identityKey(identity: MemorySearchIdentity) {
+  return JSON.stringify(
+    identity.kind === 'passage'
+      ? [identity.kind, identity.sourceId, identity.version, identity.start, identity.end]
+      : [identity.kind, identity.noteId, identity.revision]
+  );
+}
 
 async function copyTextMatches(
   scratch: RecallScratch,
@@ -179,26 +213,36 @@ async function rankPassages(
   fence: () => void,
   stages: RecallStages
 ): Promise<RecallRanking> {
-  const { notes, passages, encoder } = deps;
-  let mode: AutomaticRecallResult['mode'] = 'hybrid';
-  let reason: string | undefined;
+  const { notes, passages, encoder, search } = deps;
+  const reasons: string[] = [];
   let query: number[] | undefined;
   let started = performance.now();
-  try {
-    [query] = await encoder.encode(
-      [`${input.query.slice(0, 2400)}\n${input.tail?.slice(-800) ?? ''}`],
-      'query',
-      { signal: input.signal }
-    );
-    fence();
-    if (coverage.passages && !coverage.vectors) throw new Error('Original vectors not indexed');
-  } catch (error) {
+  const semanticFailure = (error: unknown) => {
     fence();
     query = undefined;
-    mode = 'text-only';
-    reason = `Semantic retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`;
-  } finally {
-    stages.encodeMs = performance.now() - started;
+    coverage.partial = true;
+    reasons.unshift(
+      `Semantic retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`
+    );
+  };
+  if (search) {
+    try {
+      [query] = await encoder.encode(
+        [`${input.query.slice(0, 2400)}\n${input.tail?.slice(-800) ?? ''}`],
+        'query',
+        { signal: input.signal }
+      );
+      fence();
+      if (!query) throw new Error('Missing query vector');
+    } catch (error) {
+      semanticFailure(error);
+    } finally {
+      stages.encodeMs = performance.now() - started;
+    }
+  } else {
+    reasons.push(
+      `Semantic retrieval unavailable: ${deps.searchUnavailable ?? 'Search index not configured'}`
+    );
   }
   const fts = literalQuery(input.query);
   let originalMatches = false;
@@ -206,7 +250,7 @@ async function rankPassages(
   const textFailure = (error: unknown) => {
     fence();
     coverage.partial = true;
-    reason = `${reason ? `${reason}; ` : ''}Text retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`;
+    reasons.push(`Text retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`);
   };
   if (deps.textual !== false) {
     const ftsStages: NonNullable<RecallStages['fts']> = {};
@@ -250,7 +294,6 @@ async function rankPassages(
     }
   }
   const textAvailable = originalMatches || noteMatches;
-  if (!textAvailable) mode = query ? 'semantic-only' : 'unavailable';
   const identifiers = textAvailable ? queryIdentifiers(input.query).map(termPattern) : [];
   const terms = literalTerms(input.query).map((term) => termPattern(term.toLowerCase()));
   const cueIds = new Set(input.cueIds);
@@ -258,96 +301,237 @@ async function rankPassages(
     key: JSON.stringify(originalReferenceKey(source)),
     text: source.text,
   }));
-  let ordinal = 0;
-  function nominate(
-    passage: Passage,
-    actualText: string,
-    vector: number[] | undefined,
-    ftsMatch: boolean
-  ): RankedPassage[] {
+  const stats = {
+    passage: (stages.passages = { durationMs: 0, rows: 0, candidates: 0 }),
+    note: (stages.notes = { durationMs: 0, rows: 0, candidates: 0 }),
+  };
+  const native = { pages: 0, largestOffset: 0, queryMs: 0, scoreBatches: 0, scoreMs: 0 };
+
+  function passageCandidate(passage: PassageCandidate): Candidate {
+    const { source, start, end, text, rowid, generation, hasVector } = passage;
+    return {
+      identity: { kind: 'passage', sourceId: source.id, version: source.version, start, end },
+      passage,
+      actualText: text,
+      indexed: hasVector && generation === encoder.generation,
+      ftsMatch:
+        originalMatches &&
+        (scratch.hasMatch('original', source.id, source.version) ||
+          scratch.hasMatch('event', source.id)),
+      // Match exhaustive scan ties: passage rowids precede all note rowids.
+      ordinal: rowid - Number.MAX_SAFE_INTEGER,
+    };
+  }
+
+  function resolveNote(noteId: string, revision?: number): Candidate | undefined {
+    const stat = stats.note;
+    const begin = performance.now();
+    stat.rows++;
+    try {
+      const note = notes.candidate(noteId, encoder.generation);
+      if (!note || (revision !== undefined && note.revision !== revision)) return undefined;
+      const passage = passages.first(note.sources);
+      if (!passage) return undefined;
+      return {
+        identity: { kind: 'note', noteId, revision: note.revision },
+        passage,
+        actualText: note.text,
+        indexed: note.hasVector,
+        ftsMatch: noteMatches && scratch.hasMatch('note', note.id),
+        ordinal: note.rowid,
+      };
+    } finally {
+      stat.durationMs += performance.now() - begin;
+    }
+  }
+
+  function resolve(identity: MemorySearchIdentity): Candidate | undefined {
+    if (identity.kind === 'note') return resolveNote(identity.noteId, identity.revision);
+    const begin = performance.now();
+    stats.passage.rows++;
+    const passage = passages.candidate(identity);
+    const candidate = passage && passageCandidate(passage);
+    stats.passage.durationMs += performance.now() - begin;
+    return candidate;
+  }
+
+  function rank(
+    { passage, actualText, ftsMatch, ordinal }: Candidate,
+    score?: number
+  ): RankedPassage | undefined {
     const { source, start, end, text } = passage;
-    if (cueIds.has(source.id.replace(/^event:/, ''))) return [];
+    if (cueIds.has(source.id.replace(/^event:/, ''))) return;
     const key = JSON.stringify(originalReferenceKey(originalReference(source)));
-    if (represented.some((entry) => entry.key === key && entry.text.includes(text))) return [];
+    if (represented.some((entry) => entry.key === key && entry.text.includes(text))) return;
     // An exact hit in this text is already evidence that the identifier occurs in a nomination.
     const exact = identifiers.some((id) => id.test(actualText) || id.test(text));
-    const score =
-      query && vector ? vector.reduce((sum, value, i) => sum + value * query![i], 0) : -1;
     const lower = ftsMatch ? actualText.toLowerCase() : '';
     const overlap = ftsMatch ? terms.filter((term) => term.test(lower)).length : 0;
     const textual = ftsMatch && (overlap > 0 || exact);
-    const semantic = !!query && !!vector && score >= deps.floor;
-    if (!semantic && !textual) return [];
-    return [
-      {
-        id: source.id,
-        version: source.version,
-        start,
-        end,
-        text,
-        exact,
-        score: query ? score : overlap / 1000,
-        semantic,
-        textual,
-        ordinal: ordinal++,
-      },
-    ];
-  }
-  started = performance.now();
-  let passageRows = 0;
-  for await (const page of passages.pages(query ? encoder.generation : undefined, fence)) {
-    fence();
-    passageRows += page.length;
-    scratch.addRun(
-      page.flatMap((passage) =>
-        nominate(
-          passage,
-          passage.text,
-          passage.vector,
-          originalMatches &&
-            (scratch.hasMatch('original', passage.source.id, passage.source.version) ||
-              scratch.hasMatch('event', passage.source.id))
-        )
-      )
-    );
-  }
-  stages.passages = {
-    durationMs: performance.now() - started,
-    rows: passageRows,
-    candidates: ordinal,
-  };
-  if (notes.available() && coverage.passages) {
-    started = performance.now();
-    let noteRows = 0;
-    const passageCandidates = ordinal;
-    let after = 0;
-    while (true) {
-      fence();
-      const page = notes.page(after, RECALL_PAGE_SIZE);
-      if (!page.length) break;
-      noteRows += page.length;
-      after = page.at(-1)!.rowid;
-      scratch.addRun(
-        page.flatMap((note) => {
-          const passage = passages.first(note.sources);
-          return passage
-            ? nominate(
-                passage,
-                note.text,
-                query ? notes.vector(note, encoder.generation) : undefined,
-                noteMatches && scratch.hasMatch('note', note.id)
-              )
-            : [];
-        })
-      );
-      await yieldTurn();
-    }
-    stages.notes = {
-      durationMs: performance.now() - started,
-      rows: noteRows,
-      candidates: ordinal - passageCandidates,
+    const semantic = score !== undefined && score >= deps.floor;
+    if (!semantic && !textual) return;
+    return {
+      id: source.id,
+      version: source.version,
+      start,
+      end,
+      text,
+      exact,
+      score: query ? (score ?? -1) : overlap / 1000,
+      semantic,
+      textual,
+      ordinal,
     };
   }
+
+  async function rankSemantic(index: NonNullable<typeof search>, vector: number[]) {
+    for (let offset = 0; ; ) {
+      fence();
+      const begin = performance.now();
+      native.pages++;
+      native.largestOffset = offset;
+      let hits;
+      try {
+        hits = await index.query(vector, RECALL_PAGE_SIZE, input.signal, {
+          offset,
+          minScore: deps.floor,
+        });
+      } catch (error) {
+        throw new SemanticSearchError(error);
+      } finally {
+        native.queryMs += performance.now() - begin;
+      }
+      fence();
+      const page: RankedPassage[] = [];
+      for (const { identity, score } of hits) {
+        const candidate = resolve(identity);
+        if (!candidate?.indexed) {
+          coverage.partial = true;
+          continue;
+        }
+        const ranked = rank(candidate, score);
+        if (!ranked || !scratch.nominate(identity)) continue;
+        stats[identity.kind].candidates++;
+        page.push(ranked);
+      }
+      scratch.addRun(page);
+      offset += hits.length;
+      if (hits.length < RECALL_PAGE_SIZE) return;
+      await yieldTurn();
+    }
+  }
+
+  async function rankText() {
+    fence();
+    let pending: Candidate[] = [];
+    function queue(candidate: Candidate | undefined) {
+      if (candidate && rank(candidate) && scratch.nominate(candidate.identity))
+        pending.push(candidate);
+    }
+    async function flush() {
+      const wanted =
+        query && search
+          ? pending.filter(({ indexed }) => indexed).map(({ identity }) => identity)
+          : [];
+      const scores = new Map<string, number>();
+      if (query && search && wanted.length) {
+        const begin = performance.now();
+        native.scoreBatches++;
+        try {
+          for (const hit of await search.scores(query, wanted, input.signal))
+            scores.set(identityKey(hit.identity), hit.score);
+        } catch (error) {
+          throw new SemanticSearchError(error);
+        } finally {
+          native.scoreMs += performance.now() - begin;
+        }
+        fence();
+      }
+      const page: RankedPassage[] = [];
+      for (const previous of pending) {
+        const candidate = wanted.length ? resolve(previous.identity) : previous;
+        if (!candidate) continue;
+        const score = candidate.indexed ? scores.get(identityKey(candidate.identity)) : undefined;
+        if (query && candidate.indexed && score === undefined) coverage.partial = true;
+        const ranked = rank(candidate, score);
+        if (!ranked) continue;
+        stats[candidate.identity.kind].candidates++;
+        page.push(ranked);
+      }
+      scratch.addRun(page);
+      pending = [];
+    }
+    if (originalMatches) {
+      for (const surface of ['event', 'original'] as const) {
+        for (const matches of scratch.matchPages(surface)) {
+          for (const { id, version } of matches) {
+            let after = 0;
+            for (;;) {
+              fence();
+              const begin = performance.now();
+              const rows = passages.sourcePage(
+                id,
+                surface === 'event' ? undefined : version,
+                after
+              );
+              stats.passage.rows += rows.length;
+              stats.passage.durationMs += performance.now() - begin;
+              for (const row of rows) {
+                queue(passageCandidate(row));
+                if (pending.length === RECALL_PAGE_SIZE) {
+                  await flush();
+                  fence();
+                }
+              }
+              if (rows.length < RECALL_PAGE_SIZE) break;
+              after = rows[rows.length - 1].rowid;
+              await yieldTurn();
+            }
+          }
+          await yieldTurn();
+          fence();
+        }
+      }
+    }
+    if (noteMatches && coverage.passages) {
+      for (const matches of scratch.matchPages('note')) {
+        for (const { id } of matches) {
+          queue(resolveNote(id));
+          if (pending.length === RECALL_PAGE_SIZE) {
+            await flush();
+            fence();
+          }
+        }
+        await yieldTurn();
+        fence();
+      }
+    }
+    if (pending.length) await flush();
+  }
+
+  if (search && query) {
+    stages.native = native;
+    try {
+      await rankSemantic(search, query);
+      await rankText();
+    } catch (error) {
+      if (!(error instanceof SemanticSearchError)) throw error;
+      semanticFailure(error.failure);
+      await scratch.clearRanking(fence);
+      await rankText();
+    }
+  } else {
+    await rankText();
+  }
+  fence();
+  const mode = query
+    ? textAvailable
+      ? 'hybrid'
+      : 'semantic-only'
+    : textAvailable
+      ? 'text-only'
+      : 'unavailable';
+  const reason = reasons.length ? reasons.join('; ') : undefined;
   started = performance.now();
   const ranked = await scratch.ordered(fence);
   stages.mergeRunsMs = performance.now() - started;
@@ -369,7 +553,13 @@ export async function automaticRecall(
     reused: !!input.selection,
     coverageMs: performance.now() - started,
   };
-  coverage.partial ||= !!deps.indexing?.();
+  const publication = deps.publication?.();
+  coverage.partial ||= !!deps.indexing?.() || !!publication?.partial;
+  const refreshCoverage = () => {
+    const current = deps.publication?.();
+    coverage.partial ||=
+      !!deps.indexing?.() || !!current?.partial || current?.epoch !== publication?.epoch;
+  };
   if (!input.query.trim())
     return packEvidence(
       { mode: 'unavailable', reason: 'No textual cue', coverage, groups: [] },
@@ -388,7 +578,8 @@ export async function automaticRecall(
       },
       undefined,
       fence,
-      stages
+      stages,
+      refreshCoverage
     );
   started = performance.now();
   const scratch = new RecallScratch(deps.notes.db.name);
@@ -402,7 +593,16 @@ export async function automaticRecall(
   input.signal.addEventListener('abort', close, { once: true });
   try {
     const ranking = await rankPassages(input, deps, coverage, scratch, fence, stages);
-    return await validateEvidence(input, deps, coverage, ranking, scratch, fence, stages);
+    return await validateEvidence(
+      input,
+      deps,
+      coverage,
+      ranking,
+      scratch,
+      fence,
+      stages,
+      refreshCoverage
+    );
   } finally {
     input.signal.removeEventListener('abort', close);
     close();
@@ -416,7 +616,8 @@ async function validateEvidence(
   { mode, reason, identifiers, ranked }: RecallRanking,
   scratch: RecallScratch | undefined,
   fence: () => void,
-  stages: RecallStages
+  stages: RecallStages,
+  refreshCoverage: () => void
 ): Promise<AutomaticRecallResult> {
   const started = performance.now();
   fence();
@@ -676,6 +877,7 @@ async function validateEvidence(
       );
     });
   fence();
+  refreshCoverage();
   const result = packEvidence(
     { mode, reason, coverage, groups: current.map(([, group]) => group) },
     input.maxTokens

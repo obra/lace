@@ -17,6 +17,8 @@ import {
 import { redact } from '../storage/recall/redact';
 import { MemorySources } from './sources';
 import { localMemoryEncoder, configureMemoryEncoderDirectory, type MemoryEncoder } from './encoder';
+import { MemorySearchIndex } from './search-index';
+import { MemorySearchPublication } from './search-publication';
 import { relatedNotes } from './related';
 import { extract, type MemoryQuery } from './extraction';
 import {
@@ -38,6 +40,7 @@ export function createMemoryRuntime(
     query?: MemoryQuery;
     supportsImages?: () => Promise<boolean>;
     encoder?: MemoryEncoder;
+    search?: Pick<MemorySearchIndex, 'query' | 'scores'>;
     semanticFloor?: number;
     textual?: boolean;
   } = {}
@@ -90,10 +93,29 @@ export function createMemoryRuntime(
     sources,
     !!configuration.recall && binding.isRoot && binding.canMutate
   );
+  const encoder = deps.encoder ?? localMemoryEncoder;
+  let search = deps.search;
+  let searchUnavailable: string | undefined;
+  let publisher: MemorySearchPublication | undefined;
+  if (!search && binding.isRoot && configuration.recall?.search) {
+    try {
+      const index = new MemorySearchIndex(configuration.recall.search, {
+        instanceId: binding.instanceId,
+        generation: encoder.generation,
+      });
+      if (binding.canMutate)
+        publisher = new MemorySearchPublication(notes, index, binding, encoder.generation);
+      search = index;
+    } catch (error) {
+      searchUnavailable = 'Search index setup failed';
+      logger.warn('memory.search.setup.failed', { reason: String(error).slice(0, 512) });
+    }
+  }
   const controller = new AbortController();
   let closed = false;
   let pending = false;
   let running: Promise<void> | undefined;
+  let acceptedChanges = 0;
   const supportsImages =
     deps.supportsImages ??
     (async () => {
@@ -302,6 +324,7 @@ export function createMemoryRuntime(
         },
         primaries
       );
+      if (proposal.changes.length) acceptedChanges++;
     } catch (error) {
       if (!closed) {
         const detail = error instanceof Error ? error.message : String(error);
@@ -328,9 +351,10 @@ export function createMemoryRuntime(
   let localRunning: Promise<void> | undefined;
   let localPending = false;
   let vectorRunning: Promise<void> | undefined;
+  let publishing: Promise<void> | undefined;
+  let publicationEpoch = 0;
   let activeAutomaticReads = 0;
   let resumeMaintenance: (() => void) | undefined;
-  const encoder = deps.encoder ?? localMemoryEncoder;
   function checkLocal() {
     if (closed || controller.signal.aborted) throw new Error('Memory runtime closed');
     assertMemoryAccess(db, binding, true);
@@ -371,7 +395,27 @@ export function createMemoryRuntime(
       })();
     return localRunning;
   }
+  function publish(): Promise<void> {
+    if (closed || !publisher) return Promise.resolve();
+    if (!publishing) {
+      publicationEpoch++;
+      publishing = publisher
+        .run(controller.signal)
+        .catch((error: unknown) => {
+          if (!closed)
+            logger.warn('memory.search.publication.failed', {
+              reason: String(error).slice(0, 512),
+            });
+        })
+        .finally(() => {
+          publicationEpoch++;
+          publishing = undefined;
+        });
+    }
+    return publishing;
+  }
   function wake(): Promise<void> {
+    const initialPublication = publish();
     const local = localWake();
     if (configuration.extraction && !closed) {
       pending = true;
@@ -392,8 +436,14 @@ export function createMemoryRuntime(
           }
         })();
     }
-    return local.then(async () => {
-      if (configuration.recall && binding.isRoot && !vectorRunning) {
+    const localWork = local.then(async () => {
+      if (
+        !closed &&
+        configuration.recall &&
+        binding.isRoot &&
+        binding.canMutate &&
+        !vectorRunning
+      ) {
         vectorRunning = (async () => {
           await passages.vectors(maintenanceEncoder, checkLocal);
           let after = 0;
@@ -416,7 +466,18 @@ export function createMemoryRuntime(
           });
       }
       if (configuration.recall) await vectorRunning;
-      if (configuration.extraction) await running;
+    });
+    return Promise.allSettled([initialPublication, localWork]).then(async ([, localResult]) => {
+      // The initial drain must settle before requesting the tail, or it would coalesce it.
+      const extraction = running;
+      const changesBeforeTail = acceptedChanges;
+      await publish();
+      if (extraction) {
+        await extraction;
+        if (!closed && acceptedChanges !== changesBeforeTail && publisher?.partial())
+          await publish();
+      }
+      if (localResult.status === 'rejected') throw localResult.reason;
     });
   }
   const maintenance = binding.isRoot && (configuration.extraction || configuration.recall);
@@ -442,21 +503,35 @@ export function createMemoryRuntime(
       const reader: MemoryReader = {
         async automatic(input) {
           checkReader(readBinding);
+          if (!binding.isRoot || !readBinding.isRoot)
+            throw new Error('Automatic recall is root-only');
           if (!configuration.recall) throw new Error('Automatic recall is not configured');
           activeAutomaticReads++;
           try {
             void localWake().catch(() => {});
-            return await automaticRecall(input, {
-              notes,
-              sources,
-              passages,
-              encoder,
-              floor: deps.semanticFloor ?? 0.8279641135636632,
-              check: () => checkReader(readBinding),
-              accountsFor: reader.accountsFor,
-              indexing: () => !!localRunning,
-              textual: deps.textual,
-            });
+            const signal = AbortSignal.any([input.signal, controller.signal]);
+            return await automaticRecall(
+              { ...input, signal },
+              {
+                notes,
+                sources,
+                passages,
+                encoder,
+                search,
+                searchUnavailable,
+                floor: deps.semanticFloor ?? 0.8279641135636632,
+                check: () => checkReader(readBinding),
+                accountsFor: reader.accountsFor,
+                indexing: () => !!localRunning,
+                publication: configuration.recall.search
+                  ? () => ({
+                      epoch: publicationEpoch,
+                      partial: !!publishing || (publisher?.partial() ?? true),
+                    })
+                  : undefined,
+                textual: deps.textual,
+              }
+            );
           } finally {
             if (--activeAutomaticReads === 0) resumeMaintenance?.();
           }
