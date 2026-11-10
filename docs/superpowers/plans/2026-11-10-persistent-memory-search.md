@@ -62,15 +62,15 @@ IDs/scores privately. Commands `prepare`, `import`, `query` and `mutations`
 operate on saved outputs; the root owns Docker lifecycle. Qdrant calls use
 built-in fetch; no product API or runtime wiring yet.
 
-- [ ] Write behavioral tests for stable point identity (source
+- [x] Write behavioral tests for stable point identity (source
       ID/version/start/end/generation), finite 768-dimensional input validation,
       streamed bounded top-100 exact reference, tie-aware comparison, and
       refusal to replace existing output or a mismatched/nonempty target
       collection. Use a tiny temporary SQLite DB and a real local HTTP test
       server where useful; assert effects and structured contracts, not rendered
       large strings.
-- [ ] Run that test file once and preserve the failing output.
-- [ ] Implement the CLI and helper. Read SQLite with readonly/fileMustExist, set
+- [x] Run that test file once and preserve the failing output.
+- [x] Implement the CLI and helper. Read SQLite with readonly/fileMustExist, set
       query_only, iterate bounded row batches from the same
       passages/source-version join as `MemoryPassages.pages`, and include only
       the selected encoder generation. Parse corpus vectors only during
@@ -78,18 +78,18 @@ built-in fetch; no product API or runtime wiring yet.
       deterministic UUID-shaped IDs derived from the complete passage identity;
       preserve an ID mapping privately. Keep top-100 references per query
       without retaining the corpus. No private text in routine stdout.
-- [ ] Implement Qdrant collection creation and sequential bounded upsert batches
+- [x] Implement Qdrant collection creation and sequential bounded upsert batches
       with wait=true; metadata includes source identity/version/generation.
       Refuse foreign collection reuse. Query exact then HNSW on saved query
       vectors and save raw IDs/scores/times; report ties and overlap without
       declaring answer-quality success. Mutations use dedicated sentinel points
       with known vectors and exercise visible upsert/revision/delete/idempotent
       replay without changing imported corpus points.
-- [ ] Keep commands restartable through explicit saved artifacts and fail on
+- [x] Keep commands restartable through explicit saved artifacts and fail on
       errors rather than relaunching. Save each command's outputs under a fresh
       run subdirectory, never overwrite previous results. Include concise usage
       and measurement limitations.
-- [ ] Run the focused tests, typecheck/lint the touched code as applicable,
+- [x] Run the focused tests, typecheck/lint the touched code as applicable,
       inspect logs, format, self-review and commit only owned files.
 
 Review refinements for Task 1: Qdrant commands accept `--api-key-file` without
@@ -111,21 +111,55 @@ committed.
 Produces engine fit evidence, exact/ANN comparisons and recovery receipts for
 the next implementation stage.
 
-- [ ] Pin the server image digest, freeze query panel and inputs, verify host
+- [x] Pin the server image digest, freeze query panel and inputs, verify host
       capacity and create one uniquely named isolated resource set. Keep port
       private and record it.
-- [ ] Prepare and import once, recording preparation/import/indexing times and
+- [x] Prepare and import once, recording preparation/import/indexing times and
       resource peaks separately. Do not duplicate an active import.
-- [ ] Run first/repeated exact and HNSW queries, then mutation/replay and
+- [x] Run first/repeated exact and HNSW queries, then mutation/replay and
       owned-server restart checks. Preserve all outputs, database identity and
       input hashes. A service restart is not an OS-page-cache cold test; label
       it accurately.
-- [ ] Obtain two independent Sol reviews of the code and interpretation. Resolve
+- [x] Obtain two independent Sol reviews of the code and interpretation. Resolve
       reachable findings with minimal changes and targeted verification.
-- [ ] Record the measured decision. If the engine is suitable, the coordinator
+- [x] Record the measured decision. If the engine is suitable, the coordinator
       writes the concrete runtime-integration task interfaces using these
       results and proceeds under Jesse's existing authorization. Do not invent
       production APIs before this evidence exists.
+
+### Task 3: Add the internal persistent-search client
+
+**Files:** Create `packages/agent/src/memory/search-index.ts` and
+`packages/agent/src/memory/__tests__/search-index.test.ts`. Update the existing
+memory architecture reference only when runtime wiring lands; this client is not
+yet active. Do not edit the benchmark or introduce a backend framework.
+
+**Contract:** `MemorySearchIndex` receives `{url, apiKeyFile?}` and
+`{instanceId, generation}`. Export typed passage and note identities, points and
+hits. `ensure(signal)` validates or creates the owned collection and returns its
+incarnation. `upsert(points, signal)` and `remove(identities, signal)` send
+bounded waited writes, accepting only completed results.
+`query(vector, limit, signal)` uses exact Dot search and returns
+identities/scores. No query creates a collection. No class method silently
+retries a failed operation. The publisher, not this client, will own SQLite
+state.
+
+- [ ] Use deterministic UUIDs over kind, identity and generation; preserve the
+      passage identity definition used in qualification. Notes include revision.
+- [ ] Use the measured Float32/Dot and storage/index configuration. Validate
+      existing owner/generation/format metadata and relevant collection
+      settings; preserve foreign collections. Collection recreation gets a new
+      incarnation.
+- [ ] Permit literal loopback HTTP(S) URLs only, refuse redirects, read an
+      optional private key without logging it, and propagate cancellation. Keep
+      HTTP failure diagnostics bounded and free of the configured key.
+- [ ] Test with a real local HTTP fixture: first create/reopen, foreign identity
+      refusal, exact query and validated response, completed versus ambiguous
+      writes, deletion, cancellation, and error redaction. Exercise structured
+      requests/effects rather than rendered shell strings.
+- [ ] Run the focused test file and relevant typecheck/lint/format checks with
+      saved logs. Self-review and commit only owned files. Two independent
+      reviews follow before publication wiring.
 
 ### Subsequent delivery stages
 

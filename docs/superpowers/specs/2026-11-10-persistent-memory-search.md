@@ -69,6 +69,61 @@ of production speed follows from an emulated or differently resourced run.
 
 ## Runtime follow-through
 
+The populated qualification supports native exact queries for initial
+integration. HNSW at ef=128 did not preserve the nearest candidates. See the
+[aggregate results](../../research/long-horizon-memory/persistent-search-2026-11-10/README.md).
+Do not change the collection settings during the first integration; retain the
+measured configuration and issue `exact: true`. This is not a claim of sublinear
+scaling.
+
+### Engine boundary
+
+Use one internal `MemorySearchIndex`, backed by Qdrant's HTTP API. It is not a
+public search-backend framework. Its constructor takes a loopback URL, an
+optional private API-key file, the SQLite instance ID and encoder generation.
+The host supplies these values; model input and persisted session configuration
+do not. Read the key once and never log it. Sen can share the existing proxy
+network namespace and bind the engine to loopback without publishing a host
+port.
+
+The collection name is deterministically scoped to instance and generation.
+Collection metadata must match both, a fixed projection format, and a random
+incarnation created with that collection. An existing mismatched collection is
+an error, never an overwrite. A missing collection may be created by the
+publisher, not implicitly by a query. Returning its incarnation lets durable
+publication notice a lost/recreated derived index and reseed existing vectors.
+
+Passage identity includes source ID, source version, start and end. Note
+identity includes note ID and revision. Deterministic UUIDs additionally include
+the encoder generation. Payloads contain only these identities, not memory prose
+or authority claims. The client supports ensure, bounded upsert, removal and
+exact query. Successful writes require `wait=true` and a `completed` result.
+Queries return bounded identities/scores, without vectors. Validate dimensions,
+finite scores, unique returned IDs and identity/generation agreement. Use caller
+cancellation; transport errors propagate to existing text-only fallback.
+
+### Durable publication
+
+SQLite gains only disposable publication metadata and a pending-change table.
+Initialize them after root authority admission. Record vector changes in the
+same SQLite transaction as the existing vector write. Seed already-stored
+passage and current-note vectors in bounded pages, with durable progress tied to
+the collection incarnation. Reopening the same collection resumes progress;
+recreation requires a fresh seed. Neither operation re-embeds existing vectors.
+
+Pending work identifies the passage or note revision; publication resolves its
+current SQLite state before sending a bounded batch. A vanished or invalidated
+entry removes that point. Stable IDs make repeating a completed remote update
+safe. Clear only the exact pending sequence acknowledged by the server, after
+rechecking root ownership, so a concurrent replacement remains pending. A failed
+or interrupted request leaves the work durable. Existing revisions and originals
+are never rewritten by search publication.
+
+Use the existing root maintenance lifetime, with no child publisher or new
+polling service. Coverage remains explicitly partial during seed/catch-up.
+Concrete nomination and text-candidate integration follow this foundation; no
+claim of full hybrid equivalence follows from the vector benchmark alone.
+
 After the fit results pass two independent reviews, replace vector nomination
 with engine candidate retrieval. Keep existing text/identifier recall and source
 validation. Candidate retrieval must account for candidates rejected by
