@@ -144,6 +144,7 @@ it('queries an existing collection with exact Dot search and validates returned 
     await expect(reader.query(vector, 1, signal())).rejects.toThrow(/404/);
     expect(server.requests.map(({ method }) => method)).toEqual(['GET']);
     await new MemorySearchIndex({ url: server.url }, owner).ensure(signal());
+    const [path, config] = [...server.collections.entries()][0];
     server.requests.length = 0;
     expect(await reader.query(vector, 1, signal())).toEqual([{ identity: passage, score: 0.75 }]);
     expect(await reader.query(vector, 1, signal())).toHaveLength(1);
@@ -175,8 +176,18 @@ it('queries an existing collection with exact Dot search and validates returned 
     ];
     await expect(reader.query(vector, 1, signal())).rejects.toThrow(/limit/i);
     server.collections.clear();
+    server.requests.length = 0;
     await expect(reader.query(vector, 1, signal())).rejects.toThrow(/404/);
     expect(server.collections.size).toBe(0);
+    expect(server.requests.map(({ method }) => method)).toEqual(['POST']);
+
+    server.collections.set(path, {
+      ...config,
+      metadata: { ...(config.metadata as object), instanceId: 'foreign' },
+    });
+    points = [match];
+    await expect(reader.query(vector, 1, signal())).rejects.toThrow(/collection identity/i);
+    expect(server.requests.map(({ method }) => method)).toEqual(['POST', 'GET']);
   } finally {
     server.close();
   }

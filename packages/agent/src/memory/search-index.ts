@@ -326,10 +326,13 @@ export class MemorySearchIndex {
           : '';
       throw new Error(`Qdrant memory search ${method} request failed${cause}`);
     }
-    if (response.status === 404 && allowMissing) {
-      await response.body?.cancel();
-      signal.throwIfAborted();
-      return undefined;
+    if (response.status === 404) {
+      this.validation = 'unchecked';
+      if (allowMissing) {
+        await response.body?.cancel();
+        signal.throwIfAborted();
+        return undefined;
+      }
     }
     if (!response.ok) {
       let detail: string | undefined;
