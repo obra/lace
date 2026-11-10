@@ -543,6 +543,11 @@ export function registerPromptHandler(
         ...(result.usage.lastCallInputContextTokens !== undefined
           ? { lastCallInputContextTokens: result.usage.lastCallInputContextTokens }
           : {}),
+        // The window the runner measured pressure against, so an embedder can
+        // compact at a fraction of it and agree with lace's own breakpoints.
+        ...(result.usage.contextWindow !== undefined
+          ? { contextWindow: result.usage.contextWindow }
+          : {}),
         ...(result.usage.costUsd !== undefined ? { costUsd: result.usage.costUsd } : {}),
       };
 
