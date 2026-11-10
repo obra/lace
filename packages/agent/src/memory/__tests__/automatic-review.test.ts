@@ -13,6 +13,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { setImmediate as yieldTurn } from 'node:timers/promises';
 import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../authority';
 import { createMemoryRuntime } from '../runtime';
 import { MemoryNotes } from '../notes';
@@ -412,6 +413,99 @@ it('maintains missing vectors without reconstructing already covered source and 
   });
   expect(notes.vector(missing, 'review-controlled')).toEqual([1, 0]);
 });
+
+it.each([
+  { next: 'passage', outcome: 'success' },
+  { next: 'note', outcome: 'cancel' },
+  { next: 'passage', outcome: 'close' },
+] as const)(
+  'defers the next $next embedding batch until automatic recall $outcome',
+  async ({ next, outcome }) => {
+    const generation = 'review-controlled';
+    await projectedOriginals(next === 'passage' ? 6 : 5);
+    db.prepare('UPDATE memory_passages SET generation=?,vector=? WHERE rowid=1').run(
+      generation,
+      '[1,0]'
+    );
+    const note =
+      next === 'note' ? accept('The bicycle queue is violet.', [sources()[0]]) : undefined;
+    let startBatch!: () => void;
+    let finishBatch!: () => void;
+    let startValidation!: () => void;
+    let finishValidation!: () => void;
+    const batchStarted = new Promise<void>((resolve) => (startBatch = resolve));
+    const batchFinished = new Promise<void>((resolve) => (finishBatch = resolve));
+    const validationStarted = new Promise<void>((resolve) => (startValidation = resolve));
+    const validationFinished = new Promise<void>((resolve) => (finishValidation = resolve));
+    const documentBatches: string[][] = [];
+    const runtime = createMemoryRuntime(configuration, {
+      encoder: {
+        generation,
+        async encode(texts, kind) {
+          if (kind === 'document' && documentBatches.push(texts) === 1) {
+            startBatch();
+            await batchFinished;
+          }
+          return texts.map(() => [1, 0]);
+        },
+      },
+    });
+    runtimes.push(runtime);
+    const reader = runtime.reader(configuration.binding);
+    const accountsFor = reader.accountsFor;
+    reader.accountsFor = async (...args) => {
+      startValidation();
+      await validationFinished;
+      return accountsFor(...args);
+    };
+    const maintenance = runtime.wake();
+    const controller = new AbortController();
+    await batchStarted;
+    const foreground = reader.automatic(input('bicycle', { signal: controller.signal }));
+    const settled = foreground.catch((error: unknown) => error);
+    try {
+      await validationStarted;
+      finishBatch();
+      // The first batch publishes, then passage maintenance yields before its next batch.
+      await yieldTurn();
+      await yieldTurn();
+      expect(documentBatches).toHaveLength(1);
+      expect(
+        db
+          .prepare('SELECT count(*) AS count FROM memory_passages WHERE generation=?')
+          .get(generation)
+      ).toEqual({ count: 5 });
+      if (outcome === 'close') {
+        await runtime.close();
+        await maintenance;
+        expect(documentBatches).toHaveLength(1);
+      } else if (outcome === 'cancel') {
+        controller.abort(new Error('fixture cancelled'));
+      }
+      finishValidation();
+      if (outcome === 'success')
+        await expect(foreground).resolves.toMatchObject({ mode: 'hybrid' });
+      else
+        await expect(foreground).rejects.toThrow(
+          outcome === 'close' ? 'Memory runtime closed' : 'fixture cancelled'
+        );
+      await maintenance;
+      if (outcome !== 'close') {
+        expect(documentBatches).toHaveLength(2);
+        if (note) expect(notes.vector(note, generation)).toEqual([1, 0]);
+        else
+          expect(db.prepare('SELECT generation FROM memory_passages WHERE rowid=6').get()).toEqual({
+            generation,
+          });
+      }
+    } finally {
+      finishBatch();
+      finishValidation();
+      await settled;
+      await maintenance;
+    }
+  }
+);
 
 it('refills beyond multiple sorted runs of higher-scoring rejected originals', async () => {
   const stale = 'bicycle stale.';

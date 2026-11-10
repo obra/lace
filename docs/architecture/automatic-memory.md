@@ -268,14 +268,17 @@ invalid pinned assets produce an explicit text-only outcome; runtime never
 downloads weights. One process rejects conflicting configured model directories.
 
 Foreground requests trigger coalesced local maintenance without waiting for
-corpus catch-up; available index coverage remains explicit. The memory database
-holds disposable source-versioned passages, their redacted coordinates and
-encoder-generation vectors. Passages use a conservative 384-byte UTF-8 bound
-within the 512-token encoder input. Existing transcript and note FTS nominate
-covered text; the additional original FTS covers committed documents and
-retained text absent from transcript FTS, including full sidecars. Root
-maintenance reads missing projections and vectors in pages and checks the keyed
-source or revision and host authority after awaited work before publication.
+corpus catch-up. A running document embedding batch may finish, and maintenance
+waits for active automatic recall to finish before starting another passage or
+note embedding batch. Discovery and projection can continue. Available index
+coverage remains explicit. The memory database holds disposable source-versioned
+passages, their redacted coordinates and encoder-generation vectors. Passages
+use a conservative 384-byte UTF-8 bound within the 512-token encoder input.
+Existing transcript and note FTS nominate covered text; the additional original
+FTS covers committed documents and retained text absent from transcript FTS,
+including full sidecars. Root maintenance reads missing projections and vectors
+in pages and checks the keyed source or revision and host authority after
+awaited work before publication.
 
 Fresh recall reads coverage with SQLite aggregates and decodes vectors one
 passage page at a time. It ranks exact cosine scores across every indexed age,
