@@ -182,6 +182,14 @@ the existing cancellation/error rules. Pages contain at most 1,024 hits;
 publication remains at 128 points per write. These are internal search methods,
 not a general filter language or backend framework.
 
+Qdrant's Dot threshold is strict. The client sends the largest Float32 threshold
+strictly below the caller's inclusive floor and restores returned scores to
+Float32 before local comparison. This avoids excluding the first qualifying
+score when the configured floor rounds upward. The page limit bounds the
+response, not native work: Qdrant internally retrieves the prefix through offset
+plus limit. Record page count/largest offset and whole-process resources in the
+populated measurement.
+
 Read semantic hits in pages through the existing floor, without a fixed total
 candidate cutoff. Resolve each identity by SQLite key, checking passage end,
 stored generation/vector presence and current note revision. Then enumerate
@@ -191,6 +199,10 @@ nominated by the semantic route. The request-private scratch database dedupes
 point identities and retains the existing exact/score/source ordering. A note's
 vector and prose still nominate its earliest supporting passage; that is a
 distinct candidate from the passage's own vector.
+
+After an awaited explicit-score call, re-resolve the complete candidate identity
+before using its score or prose. A revised note or changed passage cannot keep
+its previous nomination merely because its supporting original is still valid.
 
 Keep the existing validation and packing pass over the complete admitted union,
 including refill after invalid or already represented evidence. An engine error
@@ -219,6 +231,9 @@ flags before dedupe. A missing engine score for a locally indexed text candidate
 keeps that candidate at the existing missing-vector score of -1 and marks
 coverage partial.
 
+Fold the final coverage observation into the result before evidence is rendered,
+so model-visible coverage and diagnostics agree.
+
 ### Lace configuration and lifetime
 
 Add optional trusted `recall.search: {url, apiKeyFile?}` to `initialize.memory`.
@@ -235,14 +250,18 @@ unit fixtures, matching only the concrete client's public methods; do not add a
 public pluggable-backend API. Automatic retrieval needs only query and scoring.
 
 The existing `wake()` starts publication immediately, independently of discovery
-and encoding, and joins that work. Once local projection/vector work finishes,
-publish its queued changes as well, including when encoding fails after some
-successful writes. Coalesce all publication under its own lifetime promise, use
-the existing maintenance tick and append events, and report failures without
-blocking core startup or losing the queue. Closing aborts pending search work
-before closing SQLite. A configured reader without a publisher reports
-unverified publication coverage as partial. Query preparation itself never runs
-or waits for publication.
+and encoding, and joins that work. Once both initial publication and local
+projection/vector work settle, request a fresh drain for the queued changes,
+including when encoding fails after some successful writes. Waiting for the
+initial run prevents coalescing from swallowing the final drain. Coalesce all
+publication under its own lifetime promise, use the existing maintenance tick
+and append events, and report failures without blocking core startup or losing
+the queue. Closing aborts pending search work before closing SQLite; combine the
+turn and runtime abort signals for queries. Unavailable search setup, including
+an unreadable key file, logs an error and uses text-only recall while preserving
+explicit tools. A configured reader without a publisher reports unverified
+publication coverage as partial. Query preparation itself never runs or waits
+for publication.
 
 After the fit results pass two independent reviews, replace vector nomination
 with engine candidate retrieval. Keep existing text/identifier recall and source

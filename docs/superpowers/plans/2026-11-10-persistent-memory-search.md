@@ -27,8 +27,9 @@ existing local Gemma encoder.
   or multi-backend framework.
 - One heavy test at a time. Record test output and inspect it before further
   action.
-- Start with Float32/Dot, m=16, ef_construct=100, hnsw_ef=128, 100 candidates,
-  one optimizer job/indexing thread; cold vectors/cached graph.
+- Qualification starts with Float32/Dot, m=16, ef_construct=100, hnsw_ef=128,
+  100 candidates, one optimizer job/indexing thread; cold vectors/cached graph.
+  The measured runtime decision uses exact search and bounded pagination.
 - Two independent reviews of implementation and experiment conclusions.
 - Jesse's execution approval covers the described staged implementation; no
   routine reapproval between stages.
@@ -261,7 +262,8 @@ existing internal runtime dependencies; this is not a product backend API.
       flags before dedupe, retain the exact-identifier rule, and preserve
       passage rowid order with note rowids after passages for otherwise equal
       ranks. Advance native offset by raw returned count. No fixed total
-      candidate cap.
+      candidate cap. Re-resolve complete identities after each awaited
+      explicit-score batch.
 - [ ] Missing engine points stay eligible for textual admission, score -1 and
       partial coverage when a local matching-generation vector exists. Any
       actual semantic error clears partial ranking and nominated identities,
@@ -274,10 +276,14 @@ existing internal runtime dependencies; this is not a product backend API.
       work after vector/projection work settles. Failure keeps pending work and
       logs a bounded diagnostic. Closing aborts publication/search before SQLite
       closes. Non-root and read-only bindings never publish or create indexes.
+      Wait for initial publication and local work to settle before the final
+      drain. Combine turn/runtime query abort signals; failed client setup
+      leaves explicit tools and text-only recall available.
 - [ ] Track publication start/settlement with one in-process epoch. Recall
       compares the epoch and pending status before/after the whole operation;
       publication overlap makes coverage partial without retries or waiting.
-      Keep child automatic recall disabled and explicit tools unchanged.
+      Keep child automatic recall disabled and explicit tools unchanged. Sample
+      final coverage before rendering the model-visible block.
 - [ ] Retain the meaningful existing automatic-recall regression suite using a
       small deterministic search fixture. Add cases for a semantic-only
       paraphrase, below-floor text ordering, identifier priority, note identity,
