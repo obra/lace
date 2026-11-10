@@ -161,8 +161,52 @@ fresh owned derived collection/volume and reseeding. A normal process reopen of
 the current SQLite database resumes the existing collection. Do not invent a
 reconciliation protocol for restoring only one half of that pair.
 
-Concrete nomination and text-candidate integration follow this foundation; no
-claim of full hybrid equivalence follows from the vector benchmark alone.
+Returning to a previously used encoder generation also requires a fresh derived
+collection and reseeding. An inactive generation's collection does not receive
+the active generation's deletions. This pilot keeps the encoder generation
+fixed; no multi-generation reconciliation is needed.
+
+### Query integration
+
+Keep the existing semantic floor, literal-term admission, exact-identifier
+priority, source validation, grouping and packing. Qdrant calculates vector
+scores; SQLite supplies candidate text and authoritative current identities.
+Neither normal retrieval nor its error fallback decodes the corpus vectors.
+
+Extend the internal client with bounded exact-query pagination and scoring of an
+explicit bounded set of point identities. The first uses Qdrant's offset and
+score threshold. The second uses its point-ID filter, without a score threshold,
+so text-admitted candidates below the semantic floor retain their vector-based
+order. Both return only identities and scores, validate their results, and use
+the existing cancellation/error rules. Pages contain at most 1,024 hits;
+publication remains at 128 points per write. These are internal search methods,
+not a general filter language or backend framework.
+
+Read semantic hits in pages through the existing floor, without a fixed total
+candidate cutoff. Resolve each identity by SQLite key, checking passage end,
+stored generation/vector presence and current note revision. Then enumerate
+passages belonging to the existing FTS-hit source identities and the FTS-hit
+current notes, in bounded pages. Score only text candidates not already
+nominated by the semantic route. The request-private scratch database dedupes
+point identities and retains the existing exact/score/source ordering. A note's
+vector and prose still nominate its earliest supporting passage; that is a
+distinct candidate from the passage's own vector.
+
+Keep the existing validation and packing pass over the complete admitted union,
+including refill after invalid or already represented evidence. An engine error
+at any stage discards the in-progress semantic ranking and reranks text hits
+using the existing text-only rule, with an explicit fallback reason. It never
+mixes a half-failed semantic ranking into a text-only result or launches a local
+vector scan. No query creates, rebuilds or waits for the publisher. Seed and
+pending publication make coverage partial; newly unindexed text remains usable.
+
+The engine's Float32 scores may reorder numerical ties; the qualification
+records that boundary. Pagination is not a cross-request index snapshot. SQLite
+identity and source checks remain authoritative under concurrent updates, as
+they do today. Test nomination/selection against a frozen exhaustive reference
+and measure the complete path before claiming a speed improvement. The retained
+FTS materialization and request-private ranking may still cost time; this change
+does not claim to eliminate every corpus-dependent operation.
 
 After the fit results pass two independent reviews, replace vector nomination
 with engine candidate retrieval. Keep existing text/identifier recall and source

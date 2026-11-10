@@ -175,34 +175,67 @@ the collection, binds its incarnation, seeds metadata and drains bounded pages.
 `partial()` reports unverified incarnation, unfinished seed or pending work. No
 timers, embeddings, source rewriting, new storage format or automatic retry.
 
-- [ ] Create one state row for generation/incarnation, passage/note cursors and
+- [x] Create one state row for generation/incarnation, passage/note cursors and
       seed completion; create a pending table with autoincrement sequence and
       unique serialized point identity. Use real SQLite triggers to enqueue
       current writers atomically. Explicitly capture the old identity before
       `INSERT OR REPLACE`; refresh sequence on every same-identity enqueue.
-- [ ] Seed already-stored matching-generation passages and current note vectors
+- [x] Seed already-stored matching-generation passages and current note vectors
       in pages of 128. Save cursor and enqueued page in one transaction. Drain
       pending pages between seed pages, so no all-corpus memory map or queue
       construction is needed. An unchanged completed state never reseeds.
-- [ ] Resolve current authoritative vectors for a pending page only. Missing,
+- [x] Resolve current authoritative vectors for a pending page only. Missing,
       invalidated or wrong-generation entries delete that point. Complete both
       upsert and delete operations before removing only the acknowledged
       sequence numbers. Fence ownership/cancellation before every outbound
       mutation and within local acknowledgment. Pass a beforeCreate guard to
       ensure so ownership is checked after the awaited collection lookup;
       upsert/delete pages are at most 128 points and need no multi-batch gap.
-- [ ] Clear in-process readiness before ensure; after a new incarnation reset
+- [x] Clear in-process readiness before ensure; after a new incarnation reset
       seed progress in the same transaction that binds it. Failures retain work
       and partial status. Current-DB restart resumes; restored-DB deployment
       will recreate the derived collection as specified in the restore rule.
-- [ ] Test real SQLite plus the real HTTP client at a controlled local server:
+- [x] Test real SQLite plus the real HTTP client at a controlled local server:
       initial seed/reopen, write after seed, revision invalidation, actual
       REPLACE clearing/changing a passage, same-identity change during a held
       write, remote success before a lost acknowledgment, abort/owner rotation,
       and collection recreation. Inspect effects and preserved pending work.
-- [ ] Run focused tests and relevant typecheck/lint/format checks, save
+- [x] Run focused tests and relevant typecheck/lint/format checks, save
       receipts, self-review and commit owned files. Obtain two independent code
       reviews.
+
+### Task 5: Add bounded candidate lookup and score operations
+
+**Files:** `packages/agent/src/memory/search-index.ts`, `passages.ts`,
+`recall-scratch.ts` and their focused tests. Do not change automatic nomination,
+runtime wiring, protocol configuration or Sen in this task.
+
+**Contract:** Extend `query(vector, limit, signal, options?)` with internal
+`{offset?, minScore?}` options. Add `scores(vector, identities, signal)` for at
+most 1,024 explicit identities using an exact point-ID-filtered query, with no
+floor. Neither method returns vectors or creates a collection. Add passage
+point/source-prefix lookups that never select the JSON vector column. Return the
+passage rowid, generation and vector-presence metadata needed to reject stale
+engine hits and preserve nomination order. Source-prefix reads are paged by
+rowid with an optional version (event FTS matches all admitted versions).
+
+- [ ] Validate offset, finite threshold, and bounded page/identity limits.
+      Validate each scored result belongs to the requested identity set, reject
+      unexpected/duplicate IDs, and preserve existing collection/error checks.
+- [ ] Add real SQLite passage-key lookup and source-prefix paging. Check the
+      complete passage identity including end; join admitted sources. Exercise
+      replacement, missing sources, generation changes and bounded pages without
+      decoding vector content. Current note lookup and note-vector existence can
+      use the existing note key; no new storage or index is required here.
+- [ ] Extend request-private scratch with bounded iteration of existing FTS
+      match identities, a dedupe set of nominated point identities, and a way to
+      clear ranking/dedupe after a semantic failure while retaining text
+      matches. Keep aliases and existing comparison semantics intact. No new
+      durable table, in-memory all-corpus set, or general search abstraction.
+- [ ] Test real local HTTP structured requests and effects for pagination,
+      below-floor explicit scoring, absent points, foreign returned IDs,
+      cancellation and failure. Run focused tests, package typecheck and scoped
+      lint/format serially with preserved logs, then commit only owned files.
 
 ### Subsequent delivery stages
 
