@@ -13,6 +13,7 @@ const passage = { kind: 'passage', sourceId: 'source', version: 'v1', start: 2, 
 const note = { kind: 'note', noteId: 'note', revision: 1 } as const;
 const vector = [1, ...Array<number>(767).fill(0)];
 const signal = () => new AbortController().signal;
+const allowCreate = () => {};
 type Request = {
   method: string;
   path: string;
@@ -73,7 +74,7 @@ it('creates and reopens a scoped collection with the measured settings and a dur
   const server = await fixture();
   try {
     const first = new MemorySearchIndex({ url: server.url }, owner);
-    const incarnation = await first.ensure(signal());
+    const incarnation = await first.ensure(signal(), allowCreate);
     expect(incarnation).toMatch(/^[0-9a-f-]{36}$/);
     const [path, config] = [...server.collections.entries()][0];
     expect(config).toMatchObject({
@@ -83,15 +84,17 @@ it('creates and reopens a scoped collection with the measured settings and a dur
       optimizer_config: { max_optimization_threads: 1, prevent_unoptimized: false },
     });
     const reopened = new MemorySearchIndex({ url: server.url }, owner);
-    expect(await reopened.ensure(signal())).toBe(incarnation);
+    expect(await reopened.ensure(signal(), allowCreate)).toBe(incarnation);
     expect(server.requests.filter(({ method }) => method === 'PUT')).toHaveLength(1);
     server.collections.delete(path);
-    expect(await reopened.ensure(signal())).not.toBe(incarnation);
+    expect(await reopened.ensure(signal(), allowCreate)).not.toBe(incarnation);
     await new MemorySearchIndex({ url: server.url }, { ...owner, generation: 'other' }).ensure(
-      signal()
+      signal(),
+      allowCreate
     );
     await new MemorySearchIndex({ url: server.url }, { ...owner, instanceId: 'other' }).ensure(
-      signal()
+      signal(),
+      allowCreate
     );
     expect(server.collections.size).toBe(3);
   } finally {
@@ -103,7 +106,7 @@ it('refuses foreign metadata and configuration without changing the collection',
   const server = await fixture();
   try {
     const original = new MemorySearchIndex({ url: server.url }, owner);
-    await original.ensure(signal());
+    await original.ensure(signal(), allowCreate);
     const [path, config] = [...server.collections.entries()][0];
     const metadata = config.metadata as object;
     for (const changed of [
@@ -115,7 +118,7 @@ it('refuses foreign metadata and configuration without changing the collection',
     ]) {
       server.collections.set(path, changed);
       const client = new MemorySearchIndex({ url: server.url }, owner);
-      await expect(client.ensure(signal())).rejects.toThrow(/collection/i);
+      await expect(client.ensure(signal(), allowCreate)).rejects.toThrow(/collection/i);
       await expect(client.query(vector, 1, signal())).rejects.toThrow(/collection/i);
       await expect(client.upsert([{ identity: passage, vector }], signal())).rejects.toThrow(
         /ensure/i
@@ -143,7 +146,7 @@ it('queries an existing collection with exact Dot search and validates returned 
     const reader = new MemorySearchIndex({ url: server.url }, owner);
     await expect(reader.query(vector, 1, signal())).rejects.toThrow(/404/);
     expect(server.requests.map(({ method }) => method)).toEqual(['GET']);
-    await new MemorySearchIndex({ url: server.url }, owner).ensure(signal());
+    await new MemorySearchIndex({ url: server.url }, owner).ensure(signal(), allowCreate);
     const [path, config] = [...server.collections.entries()][0];
     server.requests.length = 0;
     expect(await reader.query(vector, 1, signal())).toEqual([{ identity: passage, score: 0.75 }]);
@@ -197,7 +200,7 @@ it('sends bounded waited writes and stable revision-aware point deletions', asyn
   const server = await fixture();
   try {
     const client = new MemorySearchIndex({ url: server.url }, owner);
-    await client.ensure(signal());
+    await client.ensure(signal(), allowCreate);
     const secondRevision = { ...note, revision: 2 };
     const identities: MemorySearchIdentity[] = [
       { ...passage, ...{ text: 'private passage prose' } },
@@ -250,7 +253,7 @@ it('stops on ambiguous writes and rejects invalid vectors before sending them', 
   });
   try {
     const client = new MemorySearchIndex({ url: server.url }, owner);
-    await client.ensure(signal());
+    await client.ensure(signal(), allowCreate);
     server.requests.length = 0;
     const points = Array.from({ length: 129 }, (_, i) => ({
       identity: { ...note, noteId: `note-${i}` },
@@ -291,7 +294,7 @@ it('propagates caller cancellation without retrying a request', async () => {
   });
   try {
     const client = new MemorySearchIndex({ url: server.url }, owner);
-    await client.ensure(signal());
+    await client.ensure(signal(), allowCreate);
     server.requests.length = 0;
     const controller = new AbortController();
     const pending = client.query(vector, 1, controller.signal);
@@ -325,7 +328,7 @@ it('uses the key file once and keeps bounded, redacted diagnostics', async () =>
   try {
     const client = new MemorySearchIndex({ url: server.url, apiKeyFile: keyFile }, owner);
     writeFileSync(keyFile, 'replacement');
-    const error = await client.ensure(signal()).catch((error: Error) => error);
+    const error = await client.ensure(signal(), allowCreate).catch((error: Error) => error);
     expect(error).toBeInstanceOf(Error);
     const message = (error as Error).message;
     expect(message).toContain('HTTP 403');
@@ -350,7 +353,7 @@ it('refuses non-loopback endpoints and redirects', async () => {
   });
   try {
     const client = new MemorySearchIndex({ url: redirect.url }, owner);
-    await expect(client.ensure(signal())).rejects.toThrow(/request failed/);
+    await expect(client.ensure(signal(), allowCreate)).rejects.toThrow(/request failed/);
     expect(redirect.requests).toHaveLength(1);
     expect(target.requests).toHaveLength(0);
   } finally {

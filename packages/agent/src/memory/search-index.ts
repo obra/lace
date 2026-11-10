@@ -166,13 +166,14 @@ export class MemorySearchIndex {
     }
   }
 
-  async ensure(signal: AbortSignal): Promise<string> {
+  async ensure(signal: AbortSignal, beforeCreate: () => void): Promise<string> {
     signal.throwIfAborted();
     this.validation = 'unchecked';
     let info = await this.request<CollectionInfo>('GET', '', signal, undefined, true);
     let createdIncarnation: string | undefined;
     if (info === undefined) {
       createdIncarnation = randomUUID();
+      beforeCreate();
       const created = await this.request<boolean>('PUT', '', signal, {
         vectors: vectorConfig,
         hnsw_config: graphConfig,
