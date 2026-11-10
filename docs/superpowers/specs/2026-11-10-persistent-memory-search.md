@@ -263,6 +263,49 @@ explicit tools. A configured reader without a publisher reports unverified
 publication coverage as partial. Query preparation itself never runs or waits
 for publication.
 
+### Sen service and deployment
+
+Use the native Compose profile `memory-search` for one optional service of the
+same name. Enable it through `COMPOSE_PROFILES=memory-search` in the existing
+instance or coworker environment file, independently of `SEN_AUTO_RECALL`.
+Profile-off stacks do not start the service. Core has an optional
+`service_started` dependency (`required: false`), so a missing search engine
+does not prevent the colleague from starting and using text-only recall.
+
+Pin the qualified server image to
+`qdrant/qdrant@sha256:2d1b0bfd0a961275481ea09400fc98008216ae54e1b52ed7d24520d63050c644`.
+Share the existing proxy network namespace, bind only `127.0.0.1:6333`, publish
+no ports, and give the service its own Compose-scoped Linux named volume. Mount
+the small server configuration and health script read-only; no corpus or model
+mount is needed. Use two CPUs, four GiB memory with no additional swap, one
+search/indexing/optimizer thread, telemetry disabled, and `unless-stopped`
+restart. The private namespace is the same trust boundary as the existing proxy;
+this deployment introduces no credential mechanism. Lace's optional API key
+remains available for separately managed private servers.
+
+When automatic recall is enabled, Sen supplies the fixed private search URL
+alongside the existing model directory. Add `COMPOSE_PROFILES` to the local
+stack-owned environment keys and clear an inherited value when Garden resets
+profile variables. Compose itself reads the persisted profile from its existing
+environment files; do not introduce another parser or overlay-selection path.
+
+Ordinary and Garden upgrades must converge the active search service after the
+proxy/core namespace has been recreated. Detect activation from the resolved
+Compose service list, recreate only that instance's search container while
+preserving its volume, and verify its own health. Share one small upgrade helper
+between the two existing Compose callbacks. Keep the fixed Garden receipt image
+schema unchanged; record the search image digest and namespace separately for
+the pilot. Normal core restarts leave the search service alone.
+
+The official image contains Bash but no curl or wget. A small Bash health script
+checks the HTTP status from `/readyz` through `/dev/tcp`; Docker's health
+timeout bounds this operational probe. Test the script against real HTTP
+success/failure responses, not rendered command strings. Core availability does
+not depend on search health; deployment readiness for semantic recall does.
+Preserve the volume on recreation. Restoring older SQLite state or returning to
+an inactive encoder generation requires a stopped colleague and a fresh derived
+volume, followed by reseeding as already specified.
+
 After the fit results pass two independent reviews, replace vector nomination
 with engine candidate retrieval. Keep existing text/identifier recall and source
 validation. Candidate retrieval must account for candidates rejected by

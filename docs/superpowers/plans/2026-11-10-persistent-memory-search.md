@@ -220,20 +220,20 @@ passage rowid, generation and vector-presence metadata needed to reject stale
 engine hits and preserve nomination order. Source-prefix reads are paged by
 rowid with an optional version (event FTS matches all admitted versions).
 
-- [ ] Validate offset, finite threshold, and bounded page/identity limits.
+- [x] Validate offset, finite threshold, and bounded page/identity limits.
       Validate each scored result belongs to the requested identity set, reject
       unexpected/duplicate IDs, and preserve existing collection/error checks.
-- [ ] Add real SQLite passage-key lookup and source-prefix paging. Check the
+- [x] Add real SQLite passage-key lookup and source-prefix paging. Check the
       complete passage identity including end; join admitted sources. Exercise
       replacement, missing sources, generation changes and bounded pages without
       decoding vector content. Current note lookup and note-vector existence can
       use the existing note key; no new storage or index is required here.
-- [ ] Extend request-private scratch with bounded iteration of existing FTS
+- [x] Extend request-private scratch with bounded iteration of existing FTS
       match identities, a dedupe set of nominated point identities, and a way to
       clear ranking/dedupe after a semantic failure while retaining text
       matches. Keep aliases and existing comparison semantics intact. No new
       durable table, in-memory all-corpus set, or general search abstraction.
-- [ ] Test real local HTTP structured requests and effects for pagination,
+- [x] Test real local HTTP structured requests and effects for pagination,
       below-floor explicit scoring, absent points, foreign returned IDs,
       cancellation and failure. Run focused tests, package typecheck and scoped
       lint/format serially with preserved logs, then commit only owned files.
@@ -297,6 +297,46 @@ existing internal runtime dependencies; this is not a product backend API.
       focused protocol and agent tests, typecheck, lint and formatting serially
       with saved logs. Self-review and commit owned files. Two independent
       implementation reviews precede populated integration tests.
+
+### Task 7: Integrate Sen's private search service
+
+**Files:** Sen `docker-compose.yml`, `docker/memory-search/`,
+`src/instance/memory-runtime.ts`, `src/cli/up/stack-env.ts`, the existing Garden
+profile reset and coworker upgrade helper, focused behavioral tests, and
+evergreen automatic-memory, filesystem and deployment references. Root owns the
+final `.lace-ref` update after Lace merges. No production operations in this
+implementation task.
+
+**Contract:** Follow the Sen service section of the spec. A native Compose
+profile controls one private pinned Qdrant service with a persistent volume,
+explicit resource limits and health. Existing startup paths consume the same
+persisted profile. A small shared upgrade helper converges that service after
+namespace replacement. Search failure leaves core and text-only recall usable.
+
+- [ ] Add the optional `memory-search` profile/service, pinned image,
+      loopback-only configuration, Linux named volume, resource limits and Bash
+      readiness probe. Core's optional dependency uses `service_started` and
+      `required: false`. Reuse the proxy namespace and publish no port.
+- [ ] Supply the fixed search URL only with root recall configuration; keep
+      child configuration and explicit memory tools unchanged. Scrub inherited
+      `COMPOSE_PROFILES` in local stack and Garden profile handling without
+      adding another environment parser.
+- [ ] Resolve active services and converge only this instance's search container
+      in ordinary and Garden upgrades after final proxy/core replacement.
+      Preserve the named volume. Reuse a small helper with the existing Compose
+      callback and health waiter; no general service registry or receipt-schema
+      rewrite.
+- [ ] Exercise real behavior with deterministic tests: profile-off/on resolved
+      services, resource/network configuration, root initialization data,
+      environment isolation, HTTP readiness success/failure, and the shared
+      upgrade helper executed against fake commands. Do not assert large
+      rendered shell strings. Preserve saved failing/passing logs and coordinate
+      the single heavy-test slot with Lace work.
+- [ ] Update evergreen documentation for enablement, explicit text-only
+      fallback, data ownership and volume-preserving upgrades/restore. Run
+      focused checks plus required doc-drift/docs tests and relevant typecheck,
+      lint and formatting serially. Self-review and commit owned files; two
+      independent reviews follow. Root adds the real merged Lace pin later.
 
 ### Subsequent delivery stages
 
