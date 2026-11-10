@@ -90,6 +90,8 @@ export interface ProviderResponse {
      * Uncached input tokens. For Anthropic this maps to `input_tokens` from
      * the SDK response — note this is the tokens that were NOT served from
      * cache; cache-creation and cache-read tokens are reported separately.
+     * OpenAI counts cache hits inside `input_tokens` / `prompt_tokens`, so the
+     * OpenAI provider subtracts its `cached_tokens` here.
      */
     promptTokens: number;
     completionTokens: number;
@@ -102,8 +104,11 @@ export interface ProviderResponse {
     cacheCreationInputTokens?: number;
     /**
      * Tokens served from the prompt cache at the discounted read rate
-     * (Anthropic `cache_read_input_tokens`). Optional — providers that don't
-     * expose cache accounting omit it and runner accumulators treat it as 0.
+     * (Anthropic `cache_read_input_tokens`; OpenAI
+     * `input_tokens_details.cached_tokens` on the Responses API and
+     * `prompt_tokens_details.cached_tokens` on Chat Completions). Optional —
+     * providers that don't expose cache accounting omit it and runner
+     * accumulators treat it as 0.
      */
     cacheReadInputTokens?: number;
   };
