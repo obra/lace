@@ -162,6 +162,7 @@ it('queries an existing collection with exact Dot search and validates returned 
     for (const malformed of [
       [{ ...match, id: 'bad' }],
       [{ ...match, score: '0.75' }],
+      [{ ...match, score: 1e40 }],
       [{ ...match, payload: { ...match.payload, generation: 'other' } }],
       [{ ...match, payload: { ...match.payload, end: 1 } }],
       [match, match],
@@ -244,6 +245,139 @@ it('sends bounded waited writes and stable revision-aware point deletions', asyn
   }
 });
 
+it('requests bounded exact pages with an offset and a score threshold', async () => {
+  const identities = [passage, { ...passage, start: 3 }, { ...passage, start: 4 }];
+  const hits = identities.map((identity, index) => ({
+    id: passagePointId({ ...identity, generation: owner.generation }),
+    payload: { ...identity, generation: owner.generation },
+    score: [0.9, 0.8, 0.1][index],
+  }));
+  const server = await fixture((request, response) => {
+    if (!request.path.endsWith('/query')) return false;
+    const { offset = 0, score_threshold = -Infinity, limit } = request.body;
+    reply(response, {
+      points: hits
+        .filter(({ score }) => Math.fround(score) > Math.fround(Number(score_threshold)))
+        .slice(Number(offset), Number(offset) + Number(limit)),
+    });
+    return true;
+  });
+  try {
+    const index = new MemorySearchIndex({ url: server.url }, owner);
+    await index.ensure(signal(), allowCreate);
+    server.requests.length = 0;
+    expect(await index.query(vector, 1, signal(), { offset: 1, minScore: 0.5 })).toEqual([
+      { identity: identities[1], score: Math.fround(0.8) },
+    ]);
+    expect(await index.query(vector, 1, signal(), { offset: 2, minScore: 0.5 })).toEqual([]);
+    expect(server.requests.map(({ body }) => body)).toEqual(
+      [1, 2].map((offset) => ({
+        query: vector,
+        limit: 1,
+        offset,
+        score_threshold: 0.4999999701976776,
+        params: { exact: true },
+        with_payload: true,
+        with_vector: false,
+      }))
+    );
+    for (const offset of [-1, 0.5, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+      await expect(index.query(vector, 1, signal(), { offset })).rejects.toThrow(/offset/);
+    }
+    await expect(index.query(vector, 1, signal(), { minScore: Infinity })).rejects.toThrow(
+      /threshold/
+    );
+    await expect(index.query(vector, 1025, signal())).rejects.toThrow(/limit/);
+    expect(server.requests).toHaveLength(2);
+  } finally {
+    server.close();
+  }
+});
+
+it('includes native Float32 scores at the floor through Qdrant’s strict threshold', async () => {
+  const payload = { ...passage, generation: owner.generation };
+  const id = passagePointId(payload);
+  let score = 0;
+  const server = await fixture((request, response) => {
+    if (!request.path.endsWith('/query')) return false;
+    const threshold = request.body.score_threshold;
+    const points =
+      threshold === undefined || Math.fround(score) > Math.fround(Number(threshold))
+        ? [{ id, payload, score }]
+        : [];
+    reply(response, { points });
+    return true;
+  });
+  try {
+    const index = new MemorySearchIndex({ url: server.url }, owner);
+    await index.ensure(signal(), allowCreate);
+    for (const [floor, wireScore, threshold] of [
+      [0.8279641135636632, 0.8279641, 0.8279640674591064],
+      [0.50000001, 0.50000006, 0.5],
+      [0, 0, -1.401298464324817e-45],
+      [-1, -1, -1.0000001192092896],
+      [-3.4028234663852886e38, -3.4028235e38, undefined],
+    ] as const) {
+      score = wireScore;
+      const hits = await index.query(vector, 1, signal(), { minScore: floor });
+      expect(hits).toEqual([{ identity: passage, score: Math.fround(wireScore) }]);
+      expect(hits[0].score).toBeGreaterThanOrEqual(floor);
+      expect(server.requests.at(-1)?.body.score_threshold).toBe(threshold);
+    }
+  } finally {
+    server.close();
+  }
+});
+
+it('scores explicit identities below the semantic floor and rejects unrequested or duplicate results', async () => {
+  const missing = { ...passage, start: 3 };
+  const foreign = { ...passage, start: 4 };
+  const match = (identity: typeof missing) => ({
+    id: passagePointId({ ...identity, generation: owner.generation }),
+    payload: { ...identity, generation: owner.generation },
+    score: 0.15,
+  });
+  let points = [match(passage)];
+  let fail = false;
+  const server = await fixture((request, response) => {
+    if (!request.path.endsWith('/query')) return false;
+    if (fail) response.writeHead(503).end();
+    else reply(response, { points });
+    return true;
+  });
+  try {
+    const index = new MemorySearchIndex({ url: server.url }, owner);
+    await index.ensure(signal(), allowCreate);
+    server.requests.length = 0;
+    expect(await index.scores(vector, [], signal())).toEqual([]);
+    expect(await index.scores(vector, [passage, missing, passage], signal())).toEqual([
+      { identity: passage, score: Math.fround(0.15) },
+    ]);
+    expect(server.requests[0].body).toEqual({
+      query: vector,
+      limit: 2,
+      params: { exact: true },
+      with_payload: true,
+      with_vector: false,
+      filter: { must: [{ has_id: [match(passage).id, match(missing).id] }] },
+    });
+    points = [match(foreign)];
+    await expect(index.scores(vector, [passage, missing], signal())).rejects.toThrow(
+      /unrequested/i
+    );
+    points = [match(passage), match(passage)];
+    await expect(index.scores(vector, [passage, missing], signal())).rejects.toThrow(/duplicate/i);
+    await expect(
+      index.scores(vector, Array<MemorySearchIdentity>(1025).fill(passage), signal())
+    ).rejects.toThrow(/limit/);
+    fail = true;
+    await expect(index.scores(vector, [passage], signal())).rejects.toThrow(/503/);
+    expect(server.requests).toHaveLength(4);
+  } finally {
+    server.close();
+  }
+});
+
 it('stops on ambiguous writes and rejects invalid vectors before sending them', async () => {
   let status = 'acknowledged';
   const server = await fixture((request, response) => {
@@ -297,7 +431,7 @@ it('propagates caller cancellation without retrying a request', async () => {
     await client.ensure(signal(), allowCreate);
     server.requests.length = 0;
     const controller = new AbortController();
-    const pending = client.query(vector, 1, controller.signal);
+    const pending = client.scores(vector, [passage], controller.signal);
     await requested;
     controller.abort();
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });

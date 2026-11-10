@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 const DIMENSIONS = 768;
 const WRITE_BATCH_SIZE = 128;
+const QUERY_LIMIT = 1024;
 const PROJECTION_FORMAT = 'lace-memory-search-v1';
 const vectorConfig = { size: DIMENSIONS, distance: 'Dot', datatype: 'float32', memory: 'cold' };
 const graphConfig = { m: 16, ef_construct: 100, max_indexing_threads: 1, memory: 'cached' };
@@ -34,6 +35,7 @@ export type NoteSearchIdentity = z.infer<typeof noteSchema>;
 export type MemorySearchIdentity = z.infer<typeof identitySchema>;
 export type MemorySearchPoint = { identity: MemorySearchIdentity; vector: number[] };
 export type MemorySearchHit = { identity: MemorySearchIdentity; score: number };
+type QueryOptions = { offset?: number; minScore?: number };
 
 type Owner = { instanceId: string; generation: string };
 type CollectionInfo = {
@@ -100,6 +102,19 @@ function matchesSettings(
   expected: Record<string, unknown>
 ) {
   return Object.entries(expected).every(([key, value]) => actual?.[key] === value);
+}
+
+function thresholdBelow(floor: number): number | undefined {
+  // Qdrant's Dot threshold is strict and uses Float32. An inclusive floor needs
+  // the adjacent lower value when rounding reaches or exceeds the floor.
+  const rounded = Math.fround(floor);
+  if (rounded < floor) return rounded === -Infinity ? undefined : rounded;
+  if (rounded === 0) return -(2 ** -149);
+  const bits = new DataView(new ArrayBuffer(4));
+  bits.setFloat32(0, rounded);
+  bits.setUint32(0, bits.getUint32(0) + (rounded < 0 ? 1 : -1));
+  const threshold = bits.getFloat32(0);
+  return threshold === -Infinity ? undefined : threshold;
 }
 
 async function errorDetail(response: Response) {
@@ -216,11 +231,47 @@ export class MemorySearchIndex {
     await this.write('POST', '/points/delete?wait=true', ids, signal);
   }
 
-  async query(vector: number[], limit: number, signal: AbortSignal): Promise<MemorySearchHit[]> {
+  async query(
+    vector: number[],
+    limit: number,
+    signal: AbortSignal,
+    options: QueryOptions = {}
+  ): Promise<MemorySearchHit[]> {
     signal.throwIfAborted();
     validateVector(vector);
-    if (!Number.isSafeInteger(limit) || limit <= 0)
+    if (!Number.isSafeInteger(limit) || limit <= 0 || limit > QUERY_LIMIT)
       throw new Error('Invalid memory search query limit');
+    const { offset, minScore } = options;
+    if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0))
+      throw new Error('Invalid memory search query offset');
+    if (minScore !== undefined && !Number.isFinite(minScore))
+      throw new Error('Invalid memory search score threshold');
+    return this.find(vector, limit, signal, options);
+  }
+
+  async scores(
+    vector: number[],
+    identities: MemorySearchIdentity[],
+    signal: AbortSignal
+  ): Promise<MemorySearchHit[]> {
+    signal.throwIfAborted();
+    validateVector(vector);
+    if (identities.length > QUERY_LIMIT)
+      throw new Error('Memory search score request exceeds the identity limit');
+    if (!identities.length) return [];
+    const ids = new Set(
+      identities.map((identity) => pointId(parseIdentity(identity), this.owner.generation))
+    );
+    return this.find(vector, ids.size, signal, {}, ids);
+  }
+
+  private async find(
+    vector: number[],
+    limit: number,
+    signal: AbortSignal,
+    { offset, minScore }: QueryOptions,
+    requested?: ReadonlySet<string>
+  ): Promise<MemorySearchHit[]> {
     if (this.validation === 'unchecked') {
       this.validateCollection(await this.request<CollectionInfo>('GET', '', signal));
       if (this.validation === 'unchecked') this.validation = 'read';
@@ -228,6 +279,9 @@ export class MemorySearchIndex {
     const result = await this.request<{ points?: unknown }>('POST', '/points/query', signal, {
       query: vector,
       limit,
+      offset,
+      score_threshold: minScore === undefined ? undefined : thresholdBelow(minScore),
+      filter: requested === undefined ? undefined : { must: [{ has_id: [...requested] }] },
       params: { exact: true },
       with_payload: true,
       with_vector: false,
@@ -241,10 +295,14 @@ export class MemorySearchIndex {
       if (!match.success || match.data.payload.generation !== this.owner.generation) {
         throw new Error('Invalid Qdrant memory search hit');
       }
-      const { id, payload, score } = match.data;
+      const { id, payload } = match.data;
+      const score = Math.fround(match.data.score);
+      if (!Number.isFinite(score)) throw new Error('Invalid Qdrant memory search score');
       const identity = parseIdentity(payload);
       if (id !== pointId(identity, this.owner.generation))
         throw new Error('Invalid Qdrant memory search point ID');
+      if (requested && !requested.has(id))
+        throw new Error('Qdrant returned an unrequested memory search point');
       if (ids.has(id)) throw new Error('Duplicate Qdrant memory search point ID');
       ids.add(id);
       return { identity, score };

@@ -1,11 +1,13 @@
 // ABOUTME: Disposable, source-versioned passages with all-age scans and missing-original FTS.
 import { setImmediate as yieldTurn } from 'node:timers/promises';
+import type { Statement } from 'better-sqlite3';
 import { getRecallIndex } from '../storage/recall/index-db';
 import { logger } from '../utils/logger';
 import { sourceText } from './source-text';
 import type { MemoryNotes } from './notes';
 import type { MemorySources } from './sources';
 import type { MemoryEncoder } from './encoder';
+import type { PassageSearchIdentity } from './search-index';
 import type { Source, OriginalReference, OriginalEvidence, AutomaticRecallResult } from './types';
 import { originalHandle } from './types';
 export { originalHandle } from './types';
@@ -21,6 +23,11 @@ export type Passage = {
   text: string;
   vector?: number[];
 };
+export type PassageCandidate = Omit<Passage, 'vector'> & {
+  rowid: number;
+  generation: string | null;
+  hasVector: boolean;
+};
 type SourceRow = { id: string; version: string; reference: string };
 type PassageRow = SourceRow & {
   rowid: number;
@@ -29,6 +36,11 @@ type PassageRow = SourceRow & {
   text: string;
   vector: string | null;
 };
+type CandidateRow = Omit<PassageRow, 'vector'> & { generation: string | null; hasVector: 0 | 1 };
+const selectCandidate = `
+  SELECT p.rowid,p.id,p.version,p.start,p.end,p.text,p.generation,p.vector IS NOT NULL AS hasVector,s.reference
+  FROM memory_passages AS p JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
+`;
 const sourceOf = ({ id, version, reference }: SourceRow): Source => ({
   id,
   version,
@@ -40,6 +52,23 @@ const passageOf = ({ start, end, text, vector, ...row }: PassageRow): Passage =>
   end,
   text,
   ...(vector ? { vector: JSON.parse(vector) as number[] } : {}),
+});
+const candidateOf = ({
+  rowid,
+  start,
+  end,
+  text,
+  generation,
+  hasVector,
+  ...row
+}: CandidateRow): PassageCandidate => ({
+  source: sourceOf(row),
+  rowid,
+  start,
+  end,
+  text,
+  generation,
+  hasVector: hasVector === 1,
 });
 // UTF-8 bytes bound the tokenizer's worst case; reserve room for the document template.
 export function splitPassages(text: string): Array<{ start: number; end: number; text: string }> {
@@ -61,6 +90,12 @@ export function splitPassages(text: string): Array<{ start: number; end: number;
   return result;
 }
 export class MemoryPassages {
+  private lookups?: {
+    point: Statement<[string, string, number, number], CandidateRow>;
+    source: Statement<[string, number], CandidateRow>;
+    version: Statement<[string, string, number], CandidateRow>;
+  };
+
   constructor(
     private notes: MemoryNotes,
     private sources: MemorySources,
@@ -91,6 +126,45 @@ export class MemoryPassages {
       .get(id, version) as SourceRow | undefined;
     return row && sourceOf(row);
   }
+
+  candidate({
+    sourceId,
+    version,
+    start,
+    end,
+  }: PassageSearchIdentity): PassageCandidate | undefined {
+    const row = this.candidateLookups()?.point.get(sourceId, version, start, end);
+    return row && candidateOf(row);
+  }
+
+  sourcePage(id: string, version: string | undefined, after: number): PassageCandidate[] {
+    const lookups = this.candidateLookups();
+    if (!lookups) return [];
+    return (
+      version === undefined
+        ? lookups.source.all(id, after)
+        : lookups.version.all(id, version, after)
+    ).map(candidateOf);
+  }
+
+  private candidateLookups() {
+    if (!this.lookups && this.available()) {
+      const { db } = this.notes;
+      this.lookups = {
+        point: db.prepare(
+          `${selectCandidate} WHERE p.id=? AND p.version=? AND p.start=? AND p.end=?`
+        ),
+        source: db.prepare(
+          `${selectCandidate} WHERE p.id=? AND p.rowid>? ORDER BY p.rowid LIMIT 128`
+        ),
+        version: db.prepare(
+          `${selectCandidate} WHERE p.id=? AND p.version=? AND p.rowid>? ORDER BY p.rowid LIMIT 128`
+        ),
+      };
+    }
+    return this.lookups;
+  }
+
   sourceForOriginal({
     handle,
     source,
