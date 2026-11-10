@@ -742,6 +742,7 @@ async function run(input: Case, root: string) {
     );
   }
   const metrics = join(root, 'recall-evaluation-metrics.jsonl');
+  const providerContext = join(root, 'recall-evaluation-provider-context.jsonl');
   writeFileSync(metrics, '', { flag: 'wx', mode: 0o600 });
   const report = (phase: string, data = {}) =>
     appendFileSync(metrics, `${JSON.stringify({ phase, timeMs: Date.now(), ...data })}\n`);
@@ -765,6 +766,7 @@ async function run(input: Case, root: string) {
   let failed = false;
   const abort = new AbortController();
   try {
+    writeFileSync(providerContext, '', { flag: 'wx', mode: 0o600 });
     const before = cgroup?.usage();
     const binding = privateBinding(databasePath, synthetic);
     const remoteIncarnation = input.searchUrl
@@ -845,6 +847,7 @@ async function run(input: Case, root: string) {
         LACE_DISABLE_DYNAMIC_CATALOGS: '1',
         LACE_TEST_PROVIDER_RESPECT_WIRE_TOOLS: '1',
         LACE_TEST_PROVIDER_DELEGATE_BATCH_SIZE: String(input.workers),
+        LACE_TEST_PROVIDER_RECORD_CONTEXT: providerContext,
         LACE_LOG_LEVEL: 'debug',
         LACE_LOG_STDERR: 'true',
         LACE_PLUGINS: '',
@@ -1071,6 +1074,29 @@ async function run(input: Case, root: string) {
       assertTurn(completed[0], input, 1, true);
       workerTurns.push(completed[0]);
     }
+    const contextRecord = z.object({
+      pid: z.number().int().positive(),
+      temporaryContext: z.string().nullable(),
+    });
+    const contexts = readFileSync(providerContext, 'utf8')
+      .trimEnd()
+      .split('\n')
+      .map((line) => contextRecord.parse(JSON.parse(line)));
+    const rootPid = agent.proc.pid;
+    assert(rootPid, 'root process ID unavailable');
+    const rootContexts = contexts.filter(({ pid }) => pid === rootPid);
+    const workerContexts = contexts.filter(({ pid }) => pid !== rootPid);
+    const workerProcesses = new Set(workerContexts.map(({ pid }) => pid)).size;
+    assert(
+      rootContexts.some(({ temporaryContext }) => temporaryContext),
+      'root evidence capture missing'
+    );
+    assert.equal(workerProcesses, input.workers, 'native worker context records missing');
+    assert(
+      workerContexts.every(({ temporaryContext }) => temporaryContext === null),
+      'native worker provider received temporary context'
+    );
+    report('provider_context_recorded', { rootCalls: rootContexts.length, workerProcesses });
     const overlap = peakTurnOverlap(workerTurns);
     report('worker_overlap', { peakTurnOverlap: overlap, peakNativeWorkers });
     const workersCoveringMaintenance = workersDuringMaintenance(workerTurns, maintenanceWindow);

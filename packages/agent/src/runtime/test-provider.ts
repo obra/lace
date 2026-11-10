@@ -1,7 +1,9 @@
 import {
   AIProvider,
+  type ConversationState,
   type ProviderMessage,
   type ProviderResponse,
+  type RequestOptions,
 } from '../providers/base-provider';
 import type { WireTool } from '@lace/agent/providers/base-provider';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
@@ -197,19 +199,38 @@ export class TestAgentProvider extends AIProvider {
     messages: ProviderMessage[],
     _tools: WireTool[],
     _model: string,
-    _signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
-    const response = await this._createStreamingResponseImpl(messages, _tools, _model, _signal);
-    return response;
+    return this._createStreamingResponseImpl(
+      messages,
+      _tools,
+      _model,
+      signal,
+      conversationState,
+      options
+    );
   }
 
   protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
     _tools: WireTool[],
     _model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     recordRequestShape(messages);
+    // Compare the exact evidence delivered by native evaluation calls, including excerpts.
+    const contextReceipt = process.env.LACE_TEST_PROVIDER_RECORD_CONTEXT;
+    if (contextReceipt) {
+      appendFileSync(
+        contextReceipt,
+        `${JSON.stringify({ pid: process.pid, temporaryContext: options?.temporaryContext ?? null })}\n`,
+        { mode: 0o600 }
+      );
+    }
     if (signal?.aborted) {
       return { content: '', toolCalls: [], stopReason: 'cancelled' };
     }
