@@ -74,12 +74,12 @@ remove full-corpus JSON decoding and JavaScript scoring from each request while
 retaining the engine's persistent storage and resource controls. Any later
 approximation needs its own quality evidence.
 
-Next implement durable incremental publication, then replace vector nomination
-while preserving semantic, text and identifier routes, admission,
-current-account checks and evidence presentation. Validate selected evidence and
-actual answers, text-only fallback, interrupted publication, and the populated
-native-worker path before the Reeve-only deployment. These results do not
-establish total recall latency or answer-quality improvement.
+The subsequent integration implements durable incremental publication and
+replaces vector nomination while preserving semantic, text and identifier
+routes, admission, current-account checks and evidence presentation. Its
+selected-evidence, answer and native-worker checks are recorded below. Merge
+checks and Reeve-only deployment remain pending. These results do not establish
+general recall latency or answer-quality improvement.
 
 All private inputs, output events, comparisons and failed preflights remain in
 the incident evidence directory under `qdrant-fit.ZxJtHI`. The initial macOS
@@ -170,10 +170,44 @@ read conversation history and searched its journal; the persistent arm reopened
 the exact handoff record. Both also wrote private journal observations. Neither
 sent a second answer, and both ended normally without pending jobs or dead
 letters. These observed post-answer calls are not evidence of a retrieval
-failure or an answer-quality advantage. Interviews of private copies remain
-pending.
+failure or an answer-quality advantage.
+
+Both sessions were then resumed in private copies for the same neutral
+retrospective question. The same native session and historical bytes were
+preserved, and the original completed cells and seed remained unchanged. The
+persistent session said the handoff text was already in its working context
+before sending. The exhaustive session claimed only the question was available,
+then attributed the sources to later recall. That account conflicts with its
+original pre-answer trace and recall preparation. It also confused the
+historical question date with the experiment's publication date, then corrected
+that criticism after converting timestamps. Retrospective explanations are not
+authoritative evidence of what the model saw.
+
+For these answer runs, diagnostics record the selected recall block before the
+model call, and the runner passes that block as temporary request context. The
+original sessions refer to the handoff before their first send. There is no
+independent raw provider-request capture for these two live answer runs. The
+populated deterministic scenario above does capture each provider context.
+Original post-answer checks and additional interview searches also cross the
+existing required-verification reminder boundary; the persistent session's
+original trace explicitly identifies that reminder. Ordinary verification was
+unchanged. Two independent Sol reviews checked the interviews against the
+original chronology and found no new current-owner or index regression. The
+interviews do not establish a new quality or tool-efficiency result.
 
 This is one known regression case, not fresh held-out evidence or a new
 comparison against main. It establishes the observed answer and recall behavior
 for that case, not general quality improvement. Private receipts are under
 `rs-answer.fln6z6`; the original completed cells are preserved.
+
+## Integration checks
+
+The full protocol suite passed 106 tests, and the CLI suite passed 14 with two
+optional live tests skipped. Full typechecking and linting passed. The full
+agent suite on macOS recorded 4,669 passes, 31 failures and 36 skips. The
+failures were in unchanged tests assuming Linux `/proc`, GNU find, `setsid`, or
+Node in a fixed system path. All 166 tests across those 15 files passed on the
+first clean Linux run at `21561a31345ba04aed6531de16b92ac819509695`. Its build
+and root formatting check also passed. The original failed macOS run is
+retained; this does not claim a passing full Linux suite. PR CI and the
+dependent Sen pin and integration checks remain required before deployment.
