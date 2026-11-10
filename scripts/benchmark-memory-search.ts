@@ -151,7 +151,12 @@ async function main() {
           ? undefined
           : readFileSync(required('api-key-file'), 'utf8').trim();
       if (key !== undefined && !/^[\x21-\x7e]+$/.test(key)) throw new Error('Invalid API key file');
-      const collection = qdrantCollection(required('qdrant-url'), required('collection'), key);
+      const collection = qdrantCollection(
+        required('qdrant-url'),
+        required('collection'),
+        key,
+        record
+      );
       record({ event: 'target', collection: collection.name });
       switch (command) {
         case 'import':

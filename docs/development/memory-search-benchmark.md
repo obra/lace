@@ -72,7 +72,10 @@ absence.
 Keep `prepared.json`, `point-mapping.jsonl`, and every `events.jsonl` private.
 They can contain query vectors, point IDs, source identity, or scores. Each
 stage's JSON result is written on success. The events log records progress and
-errors for runs that stop partway through. The CLI prints stage status only.
+errors for runs that stop partway through. Failed HTTP requests include the
+method, path, status, and a bounded diagnostic with the API key redacted.
+Transport errors record an exception type and cause code when available. The CLI
+prints stage status only.
 
 - Raw results include Qdrant server time and client wall time per request.
   Client time includes HTTP overhead and payload decoding. The independent

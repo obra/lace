@@ -256,7 +256,41 @@ const vectorConfig = { size: DIMENSIONS, distance: 'Dot', datatype: 'float32', m
 const graphConfig = { m: 16, ef_construct: 100, max_indexing_threads: 1, memory: 'cached' };
 const optimizerConfig = { max_optimization_threads: 1, prevent_unoptimized: false };
 
-export function qdrantCollection(address: string, name: string, key?: string) {
+function qdrantErrorReason(envelope: unknown) {
+  const reason = (envelope as { status?: { error?: unknown } } | null)?.status?.error;
+  return typeof reason === 'string' ? reason : undefined;
+}
+
+async function readErrorReason(response: Response) {
+  const reader = response.body?.getReader();
+  if (!reader) return undefined;
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  for (;;) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    bytes += chunk.value.byteLength;
+    if (bytes > 16_384) {
+      await reader.cancel();
+      return 'Error response exceeded the diagnostic size limit';
+    }
+    text += decoder.decode(chunk.value, { stream: true });
+  }
+  text += decoder.decode();
+  try {
+    return qdrantErrorReason(JSON.parse(text));
+  } catch {
+    if (response.headers.get('content-type')?.startsWith('text/plain')) return text;
+  }
+}
+
+export function qdrantCollection(
+  address: string,
+  name: string,
+  key?: string,
+  record?: RecordEvent
+) {
   let url: URL;
   try {
     url = new URL(address);
@@ -274,10 +308,39 @@ export function qdrantCollection(address: string, name: string, key?: string) {
   )
     throw new Error('Expected a loopback Qdrant URL with no credentials or path');
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(name)) throw new Error('Invalid benchmark collection name');
+  const redact = (value: string) =>
+    key
+      ? value
+          .replaceAll(key, '[redacted]')
+          .replaceAll(JSON.stringify(key).slice(1, -1), '[redacted]')
+      : value;
   return {
     name,
     path: `/collections/${name}`,
     async request<T>(method: string, path: string, body?: object, allowNotFound = false) {
+      const route = { method, path: redact(path) };
+      function transportFailure(error: unknown, status?: number) {
+        const exception =
+          error instanceof Error && /^[A-Za-z]{1,40}$/.test(error.name)
+            ? redact(error.name)
+            : 'Unknown';
+        const cause =
+          error instanceof Error ? (error.cause as { code?: unknown } | undefined) : undefined;
+        const code = cause?.code;
+        const causeCode =
+          typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,39}$/.test(code)
+            ? redact(code)
+            : undefined;
+        record?.({ event: 'qdrant-transport-error', ...route, status, exception, causeCode });
+      }
+      function responseFailure(status: number, reason: string) {
+        record?.({
+          event: 'qdrant-response-error',
+          ...route,
+          status,
+          reason: redact(reason).trim().slice(0, 512),
+        });
+      }
       const headers = new Headers();
       if (key) headers.set('api-key', key);
       if (body) headers.set('content-type', 'application/json');
@@ -290,7 +353,8 @@ export function qdrantCollection(address: string, name: string, key?: string) {
           redirect: 'error',
           signal: AbortSignal.timeout(120_000),
         });
-      } catch {
+      } catch (error) {
+        transportFailure(error);
         throw new Error(`Qdrant ${method} request failed before a response`);
       }
       if (response.status === 404 && allowNotFound) {
@@ -298,16 +362,28 @@ export function qdrantCollection(address: string, name: string, key?: string) {
         return undefined;
       }
       if (!response.ok) {
-        await response.body?.cancel();
+        let reason: string | undefined;
+        try {
+          reason = await readErrorReason(response);
+        } catch (error) {
+          transportFailure(error, response.status);
+        }
+        responseFailure(response.status, reason || 'No readable Qdrant error reason');
         throw new Error(`Qdrant ${method} request returned HTTP ${response.status}`);
       }
       let envelope: QdrantReply<T> & { status: unknown };
       try {
         envelope = (await response.json()) as typeof envelope;
-      } catch {
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) transportFailure(error, response.status);
+        responseFailure(response.status, 'Invalid Qdrant JSON response');
         throw new Error(`Qdrant ${method} returned invalid JSON`);
       }
       if (envelope?.status !== 'ok' || envelope.result == null || !Number.isFinite(envelope.time)) {
+        responseFailure(
+          response.status,
+          qdrantErrorReason(envelope) ?? 'Invalid Qdrant result envelope'
+        );
         throw new Error(`Qdrant ${method} returned an invalid result envelope`);
       }
       return envelope;

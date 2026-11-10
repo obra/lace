@@ -207,6 +207,51 @@ it('rejects non-loopback Qdrant URLs before an HTTP request', () => {
   expect(() => qdrantCollection('https://example.com', 'benchmark')).toThrow(/loopback/);
 });
 
+it('preserves a bounded Qdrant error reason with the API key redacted', async () => {
+  const key = 'test-key-with-"quote"';
+  const events: Array<Record<string, unknown>> = [];
+  const server = createServer((request, response) => {
+    response.writeHead(422, { 'content-type': 'application/json' });
+    response.end(
+      JSON.stringify({
+        status: {
+          error: `Vector configuration rejected for key ${request.headers['api-key']}. ${'x'.repeat(700)}`,
+        },
+        result: 'private payload that is outside the error reason',
+      })
+    );
+  });
+  try {
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Expected TCP listener');
+    const collection = qdrantCollection(
+      `http://127.0.0.1:${address.port}`,
+      'benchmark',
+      key,
+      (event) => events.push(event)
+    );
+    await expect(collection.request('PUT', collection.path, { vectors: {} })).rejects.toThrow(
+      'Qdrant PUT request returned HTTP 422'
+    );
+    expect(events).toEqual([
+      {
+        event: 'qdrant-response-error',
+        method: 'PUT',
+        path: '/collections/benchmark',
+        status: 422,
+        reason: expect.stringMatching(/^Vector configuration rejected for key \[redacted\]\./),
+      },
+    ]);
+    expect(String(events[0].reason).length).toBeLessThanOrEqual(512);
+    expect(JSON.stringify(events)).not.toContain('test-key-with-');
+    expect(JSON.stringify(events)).not.toContain('private payload');
+  } finally {
+    server.close();
+  }
+});
+
 it('preserves a noncompleted waited write without counting the batch as imported', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'lace-search-benchmark-'));
   const file = join(directory, 'snapshot.sqlite');
