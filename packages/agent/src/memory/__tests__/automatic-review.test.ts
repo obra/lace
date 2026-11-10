@@ -20,7 +20,7 @@ import { MemoryNotes } from '../notes';
 import { MemorySources } from '../sources';
 import { MemoryPassages, originalReference } from '../passages';
 import { automaticRecall } from '../automatic';
-import { RecallScratch } from '../recall-scratch';
+import { RecallScratch, RECALL_PAGE_SIZE } from '../recall-scratch';
 import {
   originalHandle,
   sourceHandle,
@@ -509,7 +509,7 @@ it.each([
 
 it('refills beyond multiple sorted runs of higher-scoring rejected originals', async () => {
   const stale = 'bicycle stale.';
-  const count = 1025;
+  const count = 2 * RECALL_PAGE_SIZE + 1;
   for (let i = 0; i < count; i++) event(stale);
   event('bicycle violet.');
   event('bicycle green.');
