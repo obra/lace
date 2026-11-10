@@ -1,7 +1,7 @@
 // ABOUTME: Tests for the provider registry system
 // ABOUTME: Verifies provider registration, retrieval, and management functionality
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -400,7 +400,7 @@ describe('ProviderRegistry', () => {
   });
 
   describe('dynamic catalog support', () => {
-    it('should support dynamic catalog for openrouter', async () => {
+    it('should fetch and filter the dynamic OpenRouter catalog', async () => {
       // Set up OpenRouter instance with API key
       const config: ProviderInstancesConfig = {
         version: '1.0',
@@ -433,9 +433,32 @@ describe('ProviderRegistry', () => {
         JSON.stringify(credential, null, 2)
       );
 
-      const catalogProvider = await registry.getCatalogProvider('openrouter');
-      expect(catalogProvider).toBeDefined();
-      expect(catalogProvider?.id).toBe('openrouter');
+      const model = {
+        name: 'Registry fixture model',
+        context_length: 8192,
+        pricing: { prompt: '0.00003', completion: '0.00006' },
+      };
+      const fetchCatalog = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        Response.json({
+          data: [
+            { ...model, id: 'openai/registry-fixture' },
+            { ...model, id: 'google/registry-fixture' },
+          ],
+        })
+      );
+      try {
+        const catalogProvider = await registry.getCatalogProvider('openrouter');
+        expect(fetchCatalog).toHaveBeenCalledExactlyOnceWith(
+          'https://openrouter.ai/api/v1/models',
+          {
+            headers: { Authorization: 'Bearer sk-or-test123' },
+          }
+        );
+        expect(catalogProvider?.id).toBe('openrouter');
+        expect(catalogProvider?.models.map(({ id }) => id)).toEqual(['openai/registry-fixture']);
+      } finally {
+        fetchCatalog.mockRestore();
+      }
     });
 
     it('should fall back to static catalog when no OpenRouter instances configured', async () => {
