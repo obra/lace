@@ -2,6 +2,7 @@
 // ABOUTME: and gives them a request timeout guard plus an orderly shutdown.
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createNdjsonStdioTransport, JsonRpcPeer } from '@lace/ent-protocol';
 
@@ -77,6 +78,7 @@ async function sleep(ms: number): Promise<void> {
 export function spawnAgentProcess(options: {
   laceDir: string;
   env?: Record<string, string>;
+  stderrFile?: string;
   /**
    * Spawn the test agent the same way `subagent-spawn.ts` spawns a real
    * subagent: `detached: true` on POSIX, so it becomes the leader of its own
@@ -111,7 +113,8 @@ export function spawnAgentProcess(options: {
 
   proc.stderr.setEncoding('utf8');
   proc.stderr.on('data', (chunk) => {
-    stderrBuffer += chunk;
+    if (options.stderrFile) appendFileSync(options.stderrFile, chunk, { mode: 0o600 });
+    else stderrBuffer += chunk;
   });
 
   const transport = createNdjsonStdioTransport({ readable: proc.stdout, writable: proc.stdin });
