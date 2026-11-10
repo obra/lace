@@ -10,6 +10,7 @@ import {
 } from './historical-quotation';
 import { redact } from '../storage/recall/redact';
 import { getRecallIndex } from '../storage/recall/index-db';
+import { logger } from '../utils/logger';
 import type { MemoryNotes } from './notes';
 import type { MemorySources } from './sources';
 import type { MemoryPassages, Passage } from './passages';
@@ -132,6 +133,16 @@ type RecallRanking = {
   identifiers: RegExp[];
   ranked: Iterable<RankedPassage | AutomaticEvidence>;
 };
+type RecallStages = {
+  reused: boolean;
+  coverageMs: number;
+  scratchOpenMs?: number;
+  encodeMs?: number;
+  fts?: Partial<Record<MatchSurface, { durationMs: number; rows: number }>>;
+  passages?: { durationMs: number; rows: number; candidates: number };
+  notes?: { durationMs: number; rows: number; candidates: number };
+  mergeRunsMs?: number;
+};
 
 async function copyTextMatches(
   scratch: RecallScratch,
@@ -141,8 +152,10 @@ async function copyTextMatches(
   query: string,
   fence: () => void
 ) {
+  const started = performance.now();
   const statement = db.prepare(sql);
   let after = 0;
+  let rows = 0;
   while (true) {
     fence();
     const page = statement.all(query, after, RECALL_PAGE_SIZE) as Array<{
@@ -150,7 +163,8 @@ async function copyTextMatches(
       id: string;
       version?: string;
     }>;
-    if (!page.length) return;
+    if (!page.length) return { durationMs: performance.now() - started, rows };
+    rows += page.length;
     scratch.addMatches(surface, page);
     after = page.at(-1)!.rowid;
     await yieldTurn();
@@ -162,12 +176,14 @@ async function rankPassages(
   deps: RecallDependencies,
   coverage: RecallCoverage,
   scratch: RecallScratch,
-  fence: () => void
+  fence: () => void,
+  stages: RecallStages
 ): Promise<RecallRanking> {
   const { notes, passages, encoder } = deps;
   let mode: AutomaticRecallResult['mode'] = 'hybrid';
   let reason: string | undefined;
   let query: number[] | undefined;
+  let started = performance.now();
   try {
     [query] = await encoder.encode(
       [`${input.query.slice(0, 2400)}\n${input.tail?.slice(-800) ?? ''}`],
@@ -181,6 +197,8 @@ async function rankPassages(
     query = undefined;
     mode = 'text-only';
     reason = `Semantic retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`;
+  } finally {
+    stages.encodeMs = performance.now() - started;
   }
   const fts = literalQuery(input.query);
   let originalMatches = false;
@@ -191,9 +209,11 @@ async function rankPassages(
     reason = `${reason ? `${reason}; ` : ''}Text retrieval unavailable: ${error instanceof Error ? error.name : 'Error'}`;
   };
   if (deps.textual !== false) {
+    const ftsStages: NonNullable<RecallStages['fts']> = {};
+    stages.fts = ftsStages;
     try {
       if (fts && passages.available()) {
-        await copyTextMatches(
+        ftsStages.event = await copyTextMatches(
           scratch,
           'event',
           getRecallIndex(),
@@ -201,7 +221,7 @@ async function rankPassages(
           fts,
           fence
         );
-        await copyTextMatches(
+        ftsStages.original = await copyTextMatches(
           scratch,
           'original',
           notes.db,
@@ -216,7 +236,7 @@ async function rankPassages(
     }
     try {
       if (fts && notes.available())
-        await copyTextMatches(
+        ftsStages.note = await copyTextMatches(
           scratch,
           'note',
           notes.db,
@@ -273,8 +293,11 @@ async function rankPassages(
       },
     ];
   }
+  started = performance.now();
+  let passageRows = 0;
   for await (const page of passages.pages(query ? encoder.generation : undefined, fence)) {
     fence();
+    passageRows += page.length;
     scratch.addRun(
       page.flatMap((passage) =>
         nominate(
@@ -288,12 +311,21 @@ async function rankPassages(
       )
     );
   }
+  stages.passages = {
+    durationMs: performance.now() - started,
+    rows: passageRows,
+    candidates: ordinal,
+  };
   if (notes.available() && coverage.passages) {
+    started = performance.now();
+    let noteRows = 0;
+    const passageCandidates = ordinal;
     let after = 0;
     while (true) {
       fence();
       const page = notes.page(after, RECALL_PAGE_SIZE);
       if (!page.length) break;
+      noteRows += page.length;
       after = page.at(-1)!.rowid;
       scratch.addRun(
         page.flatMap((note) => {
@@ -310,8 +342,16 @@ async function rankPassages(
       );
       await yieldTurn();
     }
+    stages.notes = {
+      durationMs: performance.now() - started,
+      rows: noteRows,
+      candidates: ordinal - passageCandidates,
+    };
   }
-  return { mode, reason, identifiers, ranked: await scratch.ordered(fence) };
+  started = performance.now();
+  const ranked = await scratch.ordered(fence);
+  stages.mergeRunsMs = performance.now() - started;
+  return { mode, reason, identifiers, ranked };
 }
 
 export async function automaticRecall(
@@ -323,7 +363,12 @@ export async function automaticRecall(
     input.signal.throwIfAborted();
   };
   fence();
+  let started = performance.now();
   const coverage = deps.passages.coverage(deps.encoder.generation);
+  const stages: RecallStages = {
+    reused: !!input.selection,
+    coverageMs: performance.now() - started,
+  };
   coverage.partial ||= !!deps.indexing?.();
   if (!input.query.trim())
     return packEvidence(
@@ -342,9 +387,12 @@ export async function automaticRecall(
         ranked: input.selection.groups,
       },
       undefined,
-      fence
+      fence,
+      stages
     );
+  started = performance.now();
   const scratch = new RecallScratch(deps.notes.db.name);
+  stages.scratchOpenMs = performance.now() - started;
   let closed = false;
   const close = () => {
     if (closed) return;
@@ -353,8 +401,8 @@ export async function automaticRecall(
   };
   input.signal.addEventListener('abort', close, { once: true });
   try {
-    const ranking = await rankPassages(input, deps, coverage, scratch, fence);
-    return await validateEvidence(input, deps, coverage, ranking, scratch, fence);
+    const ranking = await rankPassages(input, deps, coverage, scratch, fence, stages);
+    return await validateEvidence(input, deps, coverage, ranking, scratch, fence, stages);
   } finally {
     input.signal.removeEventListener('abort', close);
     close();
@@ -367,8 +415,10 @@ async function validateEvidence(
   coverage: RecallCoverage,
   { mode, reason, identifiers, ranked }: RecallRanking,
   scratch: RecallScratch | undefined,
-  fence: () => void
+  fence: () => void,
+  stages: RecallStages
 ): Promise<AutomaticRecallResult> {
+  const started = performance.now();
   fence();
   const { notes, sources, passages, accountsFor } = deps;
   const groups = new Map<number, AutomaticEvidence>();
@@ -626,10 +676,15 @@ async function validateEvidence(
       );
     });
   fence();
-  return packEvidence(
+  const result = packEvidence(
     { mode, reason, coverage, groups: current.map(([, group]) => group) },
     input.maxTokens
   );
+  logger.debug('memory.recall.stages', {
+    ...stages,
+    validation: { durationMs: performance.now() - started, examined: considered },
+  });
+  return result;
 }
 function originalReferenceKey(source: {
   kind: string;
