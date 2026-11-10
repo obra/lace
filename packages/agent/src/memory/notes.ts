@@ -1,5 +1,5 @@
 // ABOUTME: Atomic current notes, immutable revisions/offers and extraction coverage.
-import type { Database } from 'better-sqlite3';
+import type { Database, Statement } from 'better-sqlite3';
 import type { HostMemoryBinding } from '@lace/ent-protocol';
 import { randomUUID, createHash } from 'node:crypto';
 import { assertMemoryAccess } from './authority';
@@ -8,6 +8,7 @@ import type { Proposal } from './extraction';
 
 type SourceRow = { id: string; version: string; reference: string; status: string };
 type NoteRow = Omit<Note, 'sources'> & { sources: string };
+type CandidateRow = NoteRow & { rowid: number; hasVector: 0 | 1 };
 const noteOf = <T extends NoteRow>(row: T): Omit<T, 'sources'> & Note => ({
   ...row,
   sources: JSON.parse(row.sources) as Source[],
@@ -41,6 +42,8 @@ export function initializeRevisionLinks(db: Database): void {
 }
 
 export class MemoryNotes {
+  private candidateLookup?: Statement<[string, string], CandidateRow>;
+
   constructor(
     readonly db: Database,
     initialize = true,
@@ -125,6 +128,21 @@ export class MemoryNotes {
       | NoteRow
       | undefined;
     return row && noteOf(row);
+  }
+  candidate(
+    id: string,
+    generation: string
+  ): (Note & { rowid: number; hasVector: boolean }) | undefined {
+    if (!this.candidateLookup) {
+      if (!this.available()) return undefined;
+      this.candidateLookup = this.db.prepare(`
+        SELECT n.rowid,n.*,EXISTS (
+          SELECT 1 FROM memory_vectors AS v WHERE v.note_id=n.id AND v.revision=n.revision AND v.generation=?
+        ) AS hasVector FROM memory_notes AS n WHERE n.id=?
+      `);
+    }
+    const row = this.candidateLookup.get(generation, id);
+    return row && { ...noteOf(row), hasVector: row.hasVector === 1 };
   }
   page(after: number, limit: number, missingGeneration?: string): Array<Note & { rowid: number }> {
     const generation = missingGeneration ?? null;

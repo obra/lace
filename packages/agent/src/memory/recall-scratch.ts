@@ -3,10 +3,12 @@ import { mkdtempSync, rmSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { setImmediate as yieldTurn } from 'node:timers/promises';
 import Database, { type Database as Db } from 'better-sqlite3';
+import type { MemorySearchIdentity } from './search-index';
 
 export const RECALL_PAGE_SIZE = 128;
 const mergeFanIn = 8;
 export type MatchSurface = 'event' | 'original' | 'note';
+type MatchIdentity = { id: string; version: string };
 export type RankedPassage = {
   id: string;
   version: string;
@@ -35,6 +37,7 @@ export class RecallScratch {
   private readonly removeRunPage;
   private readonly insertMatches;
   private readonly match;
+  private readonly insertNomination;
   private readonly getAlias;
   private readonly putAlias;
   private readonly moveAliasPage;
@@ -60,6 +63,7 @@ export class RecallScratch {
         CREATE TABLE matches (
           surface TEXT, id TEXT, version TEXT, PRIMARY KEY(surface,id,version)
         ) WITHOUT ROWID;
+        CREATE TABLE nominations (identity TEXT PRIMARY KEY) WITHOUT ROWID;
         CREATE TABLE aliases (key TEXT PRIMARY KEY, owner INTEGER NOT NULL) WITHOUT ROWID;
         CREATE INDEX alias_owner ON aliases(owner);
       `);
@@ -86,6 +90,7 @@ export class RecallScratch {
         }
       );
       this.match = db.prepare('SELECT 1 FROM matches WHERE surface=? AND id=? AND version=?');
+      this.insertNomination = db.prepare('INSERT OR IGNORE INTO nominations VALUES(?)');
       this.getAlias = db.prepare<[string], { owner: number }>(
         'SELECT owner FROM aliases WHERE key=?'
       );
@@ -113,6 +118,48 @@ export class RecallScratch {
 
   hasMatch(surface: MatchSurface, id: string, version = ''): boolean {
     return !!this.match.get(surface, id, version);
+  }
+
+  *matchPages(surface: MatchSurface): Iterable<MatchIdentity[]> {
+    const select = 'SELECT id,version FROM matches WHERE surface=?';
+    const order = `ORDER BY id,version LIMIT ${RECALL_PAGE_SIZE}`;
+    const first = this.db.prepare<[MatchSurface], MatchIdentity>(`${select} ${order}`);
+    const next = this.db.prepare<[MatchSurface, string, string], MatchIdentity>(
+      `${select} AND (id,version)>(?,?) ${order}`
+    );
+    let page = first.all(surface);
+    while (page.length) {
+      const { id, version } = page[page.length - 1];
+      yield page;
+      page = next.all(surface, id, version);
+    }
+  }
+
+  nominate(identity: MemorySearchIdentity): boolean {
+    const key =
+      identity.kind === 'passage'
+        ? [identity.kind, identity.sourceId, identity.version, identity.start, identity.end]
+        : [identity.kind, identity.noteId, identity.revision];
+    return this.insertNomination.run(JSON.stringify(key)).changes === 1;
+  }
+
+  async clearRanking(check: () => void): Promise<void> {
+    check();
+    const removeNominationPage = this.db.prepare(`
+      DELETE FROM nominations WHERE identity IN (
+        SELECT identity FROM nominations ORDER BY identity LIMIT ${RECALL_PAGE_SIZE}
+      )
+    `);
+    for (const removePage of [
+      () => this.removeRunPage.run(0, this.nextRun),
+      () => removeNominationPage.run(),
+    ]) {
+      while (removePage().changes > 0) {
+        await yieldTurn();
+        check();
+      }
+    }
+    this.nextRun = 0;
   }
 
   alias(key: string): number | undefined {

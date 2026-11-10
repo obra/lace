@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { claimMemoryOwner, configureMemoryRoles, openMemoryDatabase } from '../authority';
-import { createMemoryRuntime } from '../runtime';
+import { createFixtureMemoryRuntime as createMemoryRuntime } from './search-fixture';
 import { closeRecallIndex } from '../../storage/recall/index-db';
 import type { MemoryReader, MemoryRuntime } from '../types';
 const sessionId = 'sess_11111111-1111-4111-8111-111111111111';
@@ -457,14 +457,27 @@ it('allows scoped children to read shared originals and rejects their revoked au
   );
   try {
     const childReader = child.reader(binding);
-    const result = await childReader.automatic({
-      query: 'cycling',
-      cueIds: [],
-      represented: [],
-      signal: new AbortController().signal,
-      maxTokens: 2000,
-    });
+    const { sessionMemory } = await import('../session');
+    const state = { memory: runtime } as Parameters<typeof sessionMemory>[0];
+    const childSession = {
+      meta: { sessionId, persona: 'child', parent: 'parent' },
+      state: { memoryInstanceId: 'instance' },
+    } as Parameters<typeof sessionMemory>[1];
+    expect(sessionMemory(state, childSession)?.prepareAutomaticRecall).toBeUndefined();
+    await expect(
+      childReader.automatic({
+        query: 'cycling',
+        cueIds: [],
+        represented: [],
+        signal: new AbortController().signal,
+        maxTokens: 2000,
+      })
+    ).rejects.toThrow(/root/i);
+    const result = await request('cycling');
     expect(result.groups).toHaveLength(1);
+    expect((await childReader.readOriginal(result.groups[0].originals[0].handle))?.text).toContain(
+      'bicycle violet'
+    );
     const db = openMemoryDatabase(runtime.configuration.databasePath, 'instance', false);
     configureMemoryRoles(db, runtime.configuration.binding, {
       root: grant,
@@ -520,6 +533,7 @@ it('returns available evidence with partial coverage without waiting for held lo
     await blocked;
     await discover.call(this);
   });
+  const maintenance = runtime.wake();
   try {
     const result = await request('cycling');
     expect(result.groups).toHaveLength(1);
@@ -527,7 +541,7 @@ it('returns available evidence with partial coverage without waiting for held lo
   } finally {
     release();
     spy.mockRestore();
-    await runtime.wake();
+    await maintenance;
   }
 });
 

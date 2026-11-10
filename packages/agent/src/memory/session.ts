@@ -37,10 +37,11 @@ export function sessionMemory(
   }
   const reader = runtime.reader(entry.binding);
   const sessionEntry = entry;
+  const automatic = runtime.configuration.recall && sessionEntry.binding.isRoot;
   return {
     memoryInstanceId: runtime.configuration.binding.instanceId,
     reader,
-    prepareAutomaticRecall: runtime.configuration.recall
+    prepareAutomaticRecall: automatic
       ? async (input: AutomaticRecallInput) => {
           const started = performance.now();
           const key = JSON.stringify(input.cueIds);

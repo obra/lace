@@ -1,12 +1,15 @@
 import {
   AIProvider,
+  type ConversationState,
   type ProviderMessage,
   type ProviderResponse,
+  type RequestOptions,
 } from '../providers/base-provider';
 import type { WireTool } from '@lace/agent/providers/base-provider';
 import type { ToolCall, ToolResult } from '@lace/agent/tools/types';
 import { getTextContent } from '@lace/agent/providers/utils/content-helpers';
 import { appendFileSync } from 'node:fs';
+import { MAX_CONCURRENT_JOBS } from '../server-types';
 
 type TestProviderState = {
   phase: 'needs_tool' | 'awaiting_retry' | 'final';
@@ -196,19 +199,38 @@ export class TestAgentProvider extends AIProvider {
     messages: ProviderMessage[],
     _tools: WireTool[],
     _model: string,
-    _signal?: AbortSignal
+    signal?: AbortSignal,
+    conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
-    const response = await this._createStreamingResponseImpl(messages, _tools, _model, _signal);
-    return response;
+    return this._createStreamingResponseImpl(
+      messages,
+      _tools,
+      _model,
+      signal,
+      conversationState,
+      options
+    );
   }
 
   protected async _createStreamingResponseImpl(
     messages: ProviderMessage[],
     _tools: WireTool[],
     _model: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    _conversationState?: ConversationState,
+    options?: RequestOptions
   ): Promise<ProviderResponse> {
     recordRequestShape(messages);
+    // Compare the exact evidence delivered by native evaluation calls, including excerpts.
+    const contextReceipt = process.env.LACE_TEST_PROVIDER_RECORD_CONTEXT;
+    if (contextReceipt) {
+      appendFileSync(
+        contextReceipt,
+        `${JSON.stringify({ pid: process.pid, temporaryContext: options?.temporaryContext ?? null })}\n`,
+        { mode: 0o600 }
+      );
+    }
     if (signal?.aborted) {
       return { content: '', toolCalls: [], stopReason: 'cancelled' };
     }
@@ -316,10 +338,20 @@ export class TestAgentProvider extends AIProvider {
             }
           }
 
-          const toolCallId = `test_tool_${this.state.nextToolCallId++}`;
-          const toolCalls: ToolCall[] = [
-            { id: toolCallId, name: requested.name, arguments: requested.args },
-          ];
+          const batchSize =
+            requested.name === 'delegate'
+              ? Number(process.env.LACE_TEST_PROVIDER_DELEGATE_BATCH_SIZE ?? '1')
+              : 1;
+          if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > MAX_CONCURRENT_JOBS) {
+            throw new Error(
+              `LACE_TEST_PROVIDER_DELEGATE_BATCH_SIZE must be an integer from 1 to ${MAX_CONCURRENT_JOBS}`
+            );
+          }
+          const toolCalls: ToolCall[] = Array.from({ length: batchSize }, () => ({
+            id: `test_tool_${this.state.nextToolCallId++}`,
+            name: requested.name,
+            arguments: requested.args,
+          }));
           this.emit('token', { token: content });
           this.emit('complete', { response: { content, toolCalls, stopReason: 'tool_use' } });
           // If retry-on-error is enabled, transition to awaiting_retry so we can retry on failure
