@@ -328,11 +328,25 @@ export function createMemoryRuntime(
   let localRunning: Promise<void> | undefined;
   let localPending = false;
   let vectorRunning: Promise<void> | undefined;
+  let activeAutomaticReads = 0;
+  let resumeMaintenance: (() => void) | undefined;
   const encoder = deps.encoder ?? localMemoryEncoder;
   function checkLocal() {
     if (closed || controller.signal.aborted) throw new Error('Memory runtime closed');
     assertMemoryAccess(db, binding, true);
   }
+  const maintenanceEncoder = {
+    generation: encoder.generation,
+    async encode(texts: string[]) {
+      // vectorRunning serializes the passage and note passes, so only one batch can wait.
+      while (!closed && activeAutomaticReads > 0) {
+        await new Promise<void>((resolve) => (resumeMaintenance = resolve));
+        resumeMaintenance = undefined;
+      }
+      checkLocal();
+      return encoder.encode(texts, 'document');
+    },
+  };
   function localWake(): Promise<void> {
     if (
       closed ||
@@ -381,17 +395,14 @@ export function createMemoryRuntime(
     return local.then(async () => {
       if (configuration.recall && binding.isRoot && !vectorRunning) {
         vectorRunning = (async () => {
-          await passages.vectors(encoder, checkLocal);
+          await passages.vectors(maintenanceEncoder, checkLocal);
           let after = 0;
           while (true) {
             checkLocal();
             const batch = notes.page(after, 4, encoder.generation);
             if (!batch.length) break;
             after = batch.at(-1)!.rowid;
-            const vectors = await encoder.encode(
-              batch.map((note) => note.text),
-              'document'
-            );
+            const vectors = await maintenanceEncoder.encode(batch.map((note) => note.text));
             checkLocal();
             for (const [index, note] of batch.entries())
               notes.cacheVector(note, encoder.generation, vectors[index]);
@@ -432,19 +443,23 @@ export function createMemoryRuntime(
         async automatic(input) {
           checkReader(readBinding);
           if (!configuration.recall) throw new Error('Automatic recall is not configured');
-          void localWake().catch(() => {});
-          checkReader(readBinding);
-          return automaticRecall(input, {
-            notes,
-            sources,
-            passages,
-            encoder,
-            floor: deps.semanticFloor ?? 0.8279641135636632,
-            check: () => checkReader(readBinding),
-            accountsFor: reader.accountsFor,
-            indexing: () => !!localRunning,
-            textual: deps.textual,
-          });
+          activeAutomaticReads++;
+          try {
+            void localWake().catch(() => {});
+            return await automaticRecall(input, {
+              notes,
+              sources,
+              passages,
+              encoder,
+              floor: deps.semanticFloor ?? 0.8279641135636632,
+              check: () => checkReader(readBinding),
+              accountsFor: reader.accountsFor,
+              indexing: () => !!localRunning,
+              textual: deps.textual,
+            });
+          } finally {
+            if (--activeAutomaticReads === 0) resumeMaintenance?.();
+          }
         },
         async readOriginal(handle) {
           checkReader(readBinding);
@@ -642,6 +657,7 @@ export function createMemoryRuntime(
       if (timer) clearInterval(timer);
       // Fence synchronously before aborting; a provider may ignore the abort.
       controller.abort();
+      resumeMaintenance?.();
       db.close();
     },
   };
