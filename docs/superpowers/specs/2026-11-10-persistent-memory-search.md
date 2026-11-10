@@ -208,6 +208,42 @@ and measure the complete path before claiming a speed improvement. The retained
 FTS materialization and request-private ranking may still cost time; this change
 does not claim to eliminate every corpus-dependent operation.
 
+The runtime records an in-process publication epoch at the start and settlement
+of each coalesced publication run. Recall captures it before nomination and
+after validation. An epoch change or observed pending publication marks coverage
+partial, including a whole completed write between page requests. Offset
+advances by raw engine hits, not hydrated or admitted hits. Dedupe cannot
+recover a point skipped by concurrent offset shifts; do not claim a consistent
+snapshot or retry the request. Semantic hits compute both semantic and textual
+flags before dedupe. A missing engine score for a locally indexed text candidate
+keeps that candidate at the existing missing-vector score of -1 and marks
+coverage partial.
+
+### Lace configuration and lifetime
+
+Add optional trusted `recall.search: {url, apiKeyFile?}` to `initialize.memory`.
+The concrete client validates its literal loopback endpoint and optional key.
+Without a configured search index, automatic recall explicitly falls back to
+text; it does not keep the replaced JavaScript vector path. The memory
+database/model configuration and explicit tools remain independent. Children
+continue receiving only database identity and role binding, without automatic
+recall or the search endpoint.
+
+Construct one client per configured runtime and one publisher only for a root
+with mutation authority. Use an internal injected search-client dependency for
+unit fixtures, matching only the concrete client's public methods; do not add a
+public pluggable-backend API. Automatic retrieval needs only query and scoring.
+
+The existing `wake()` starts publication immediately, independently of discovery
+and encoding, and joins that work. Once local projection/vector work finishes,
+publish its queued changes as well, including when encoding fails after some
+successful writes. Coalesce all publication under its own lifetime promise, use
+the existing maintenance tick and append events, and report failures without
+blocking core startup or losing the queue. Closing aborts pending search work
+before closing SQLite. A configured reader without a publisher reports
+unverified publication coverage as partial. Query preparation itself never runs
+or waits for publication.
+
 After the fit results pass two independent reviews, replace vector nomination
 with engine candidate retrieval. Keep existing text/identifier recall and source
 validation. Candidate retrieval must account for candidates rejected by

@@ -237,6 +237,61 @@ rowid with an optional version (event FTS matches all admitted versions).
       cancellation and failure. Run focused tests, package typecheck and scoped
       lint/format serially with preserved logs, then commit only owned files.
 
+### Task 6: Wire persistent search into automatic recall
+
+**Files:** `packages/agent/src/memory/automatic.ts`, `runtime.ts`, a narrow
+current-note metadata accessor in `notes.ts` if needed, `search-publication.ts`
+only for its concrete client dependency type, protocol memory schema and tests,
+automatic/runtime regression fixtures and tests, and
+`docs/architecture/automatic-memory.md`. Task 5 query helpers are prerequisites.
+
+**Contract:** Production automatic recall uses `MemorySearchIndex` for all
+semantic scores and existing SQLite FTS for text admission. The source,
+current-account, quotation, grouping and packing contracts are unchanged.
+`recall.search` is optional trusted host configuration, `{url, apiKeyFile?}`. An
+absent or failed engine gives explicit text-only fallback. No former local
+vector scan remains as a runtime fallback. Small deterministic test fixtures may
+inject the public-method shape of the concrete search client through the
+existing internal runtime dependencies; this is not a product backend API.
+
+- [ ] Replace fresh nomination with paged engine hits through the semantic
+      floor, then remaining FTS-hit passage/note identities and explicit bounded
+      score calls. Hydrate by key without vector JSON. Reject stale generation,
+      passage end, absent vector and note-revision hits. Compute both route
+      flags before dedupe, retain the exact-identifier rule, and preserve
+      passage rowid order with note rowids after passages for otherwise equal
+      ranks. Advance native offset by raw returned count. No fixed total
+      candidate cap.
+- [ ] Missing engine points stay eligible for textual admission, score -1 and
+      partial coverage when a local matching-generation vector exists. Any
+      actual semantic error clears partial ranking and nominated identities,
+      then reruns text-only nomination with existing overlap scores and a
+      visible reason. Abort/authority errors still propagate. Preserve same-cue
+      reuse and source revalidation without repeated semantic queries.
+- [ ] Construct the client from trusted configuration and root publisher after
+      passage initialization. Start/coalesce publication independently of model
+      loading and local discovery on each existing wake, and drain newly queued
+      work after vector/projection work settles. Failure keeps pending work and
+      logs a bounded diagnostic. Closing aborts publication/search before SQLite
+      closes. Non-root and read-only bindings never publish or create indexes.
+- [ ] Track publication start/settlement with one in-process epoch. Recall
+      compares the epoch and pending status before/after the whole operation;
+      publication overlap makes coverage partial without retries or waiting.
+      Keep child automatic recall disabled and explicit tools unchanged.
+- [ ] Retain the meaningful existing automatic-recall regression suite using a
+      small deterministic search fixture. Add cases for a semantic-only
+      paraphrase, below-floor text ordering, identifier priority, note identity,
+      more than one native page with rejected hits, same-cue revalidation,
+      engine absence/failure after a completed page, and publisher activity
+      during pagination. Prove no request reads vector JSON by using candidate
+      SQLite rows whose vector content cannot be decoded with engine scores
+      supplied independently. Exercise actual runtime wake/close with a local
+      HTTP fixture for publisher independence and cancellation.
+- [ ] Update the evergreen architecture example and operational semantics. Run
+      focused protocol and agent tests, typecheck, lint and formatting serially
+      with saved logs. Self-review and commit owned files. Two independent
+      implementation reviews precede populated integration tests.
+
 ### Subsequent delivery stages
 
 The agreed sequence is incremental publication and query integration in Lace;
