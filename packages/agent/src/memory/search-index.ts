@@ -363,7 +363,8 @@ export class MemorySearchIndex {
     allowMissing = false
   ): Promise<T | undefined> {
     signal.throwIfAborted();
-    const headers = new Headers();
+    // Retire the connection after the response so an idle socket cannot be reused after peer close.
+    const headers = new Headers({ connection: 'close' });
     if (this.key) headers.set('api-key', this.key);
     if (body) headers.set('content-type', 'application/json');
     let response: Response;

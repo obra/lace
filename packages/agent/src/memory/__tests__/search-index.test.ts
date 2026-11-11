@@ -2,6 +2,7 @@
 import { once } from 'node:events';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type ServerResponse } from 'node:http';
+import type { Socket } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -19,6 +20,7 @@ type Request = {
   path: string;
   key?: string | string[];
   body: Record<string, unknown>;
+  socket: Socket;
 };
 
 function reply(response: ServerResponse, result: unknown) {
@@ -37,6 +39,7 @@ async function fixture(handle?: (request: Request, response: ServerResponse) => 
       path: incoming.url!,
       key: incoming.headers['api-key'],
       body: chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {},
+      socket: incoming.socket,
     };
     requests.push(request);
     if (handle?.(request, response)) return;
@@ -97,6 +100,30 @@ it('creates and reopens a scoped collection with the measured settings and a dur
       allowCreate
     );
     expect(server.collections.size).toBe(3);
+  } finally {
+    server.close();
+  }
+});
+
+it('uses a fresh connection for each memory index request', async () => {
+  const server = await fixture((request, response) => {
+    if (!request.path.endsWith('/query')) return false;
+    reply(response, { points: [] });
+    return true;
+  });
+  try {
+    const index = new MemorySearchIndex({ url: server.url }, owner);
+    await index.ensure(signal(), allowCreate);
+    await index.upsert([{ identity: passage, vector }], signal());
+    expect(await index.query(vector, 1, signal())).toEqual([]);
+    expect(server.requests.map(({ method }) => method)).toEqual([
+      'GET',
+      'PUT',
+      'GET',
+      'PUT',
+      'POST',
+    ]);
+    expect(new Set(server.requests.map(({ socket }) => socket)).size).toBe(server.requests.length);
   } finally {
     server.close();
   }
@@ -439,6 +466,32 @@ it('propagates caller cancellation without retrying a request', async () => {
       name: 'AbortError',
     });
     expect(server.requests.map(({ method }) => method)).toEqual(['POST']);
+  } finally {
+    server.close();
+  }
+});
+
+it('rejects a write acknowledgment when the response body is interrupted', async () => {
+  const server = await fixture((request, response) => {
+    if (!request.path.endsWith('?wait=true')) return false;
+    const body = JSON.stringify({ status: 'ok', result: { status: 'completed' } });
+    response
+      .writeHead(200, {
+        'content-type': 'application/json',
+        'content-length': Buffer.byteLength(body) + 1,
+      })
+      .write(body);
+    response.socket!.end();
+    return true;
+  });
+  try {
+    const index = new MemorySearchIndex({ url: server.url }, owner);
+    await index.ensure(signal(), allowCreate);
+    server.requests.length = 0;
+    await expect(index.upsert([{ identity: passage, vector }], signal())).rejects.toThrow(
+      /Invalid Qdrant memory search JSON response/
+    );
+    expect(server.requests.map(({ method }) => method)).toEqual(['PUT']);
   } finally {
     server.close();
   }
