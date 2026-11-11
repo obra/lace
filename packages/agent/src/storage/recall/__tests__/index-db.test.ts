@@ -3,11 +3,12 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { closeRecallIndex, getRecallIndex, openRecallIndex, type Db } from '../index-db';
 import { insertRow } from '../index-writer';
+import { backfillIndex } from '../backfill';
 
 describe('openRecallIndex', () => {
   let dir: string | undefined;
@@ -335,6 +336,40 @@ describe('schema version and track column', () => {
       expect(db.prepare('SELECT content FROM events').pluck().all()).toEqual(['repopulated']);
     } finally {
       db.close();
+    }
+  });
+
+  it('rescans completed transcripts after an FTS rebuild', () => {
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-rebuild-'));
+    const dbPath = join(dir, 'index.sqlite');
+    const shard = join(dir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(shard, { recursive: true });
+    const line =
+      '{"eventSeq":1,"type":"prompt","timestamp":"2026-05-23T00:00:00Z","data":{"content":[{"type":"text","text":"rebuild me"}]}}';
+    writeFileSync(join(shard, 'sess_11111111-1111-4111-8111-111111111111.jsonl'), line + '\n');
+    vi.stubEnv('LACE_DIR', dir);
+    try {
+      const before = openRecallIndex(dbPath);
+      try {
+        expect(backfillIndex(before, dir).inserted).toBe(1);
+        expect(backfillIndex(before, dir).scanned).toBe(0);
+        before.exec("UPDATE _meta SET value = '2' WHERE key = 'schema_version'");
+      } finally {
+        before.close();
+      }
+
+      const after = openRecallIndex(dbPath);
+      try {
+        expect(after.prepare('SELECT content FROM events').pluck().all()).toEqual([]);
+        expect(after.prepare('SELECT line FROM event_journal').pluck().all()).toEqual([line]);
+        expect(backfillIndex(after, dir).inserted).toBe(1);
+        expect(after.prepare('SELECT content FROM events').pluck().all()).toEqual(['rebuild me']);
+        expect(backfillIndex(after, dir).scanned).toBe(0);
+      } finally {
+        after.close();
+      }
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 });

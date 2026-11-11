@@ -123,14 +123,26 @@ Other event types are not searchable, but `read` and `thread` still show them:
 journal, so neither is limited to the five indexed types.
 
 The recall database stores searchable content in FTS5 and transcript identifiers
-in an ordinary SQLite table indexed by event and session. Startup catch-up still
-scans transcript files, using each session's identifiers to find missing events,
-including gaps below later sequence numbers. Before backfill reads a session's
-identifiers or a new write checks for a duplicate, Lace imports any FTS rows
-beyond the last examined rowid. This also picks up rows appended by an older
-version-3 writer that writes only to FTS. New FTS rows, identifiers, and the
-rowid marker commit together. The additive table uses the existing FTS schema
-version.
+in an ordinary SQLite table indexed by event and session. Before catch-up reads
+a session's identifiers or a new write checks for a duplicate, Lace imports any
+FTS rows beyond the last examined rowid. This also picks up rows appended by an
+older version-3 writer that writes only to FTS. New FTS rows, identifiers, and
+the rowid marker commit together.
+
+Startup catch-up checks metadata for each transcript file. It skips fully
+processed, unchanged files and resumes growing files after the last successfully
+processed newline. Each file's checkpoint commits with the FTS and verbatim
+journal work. A failed conversion or write leaves the checkpoint before the
+failed record, so a later startup retries it even if subsequent events were
+indexed. A valid unterminated final line can be indexed immediately and is
+retried until a newline completes it.
+
+Lace scans new, replaced, or shortened transcript files from the beginning. It
+also rescans a completed file whose modification time changes at the same size.
+Catch-up adds missing rows, so edits to existing transcript records require a
+fresh index for the derived contents to match the edited files. A fresh recall
+database scans all transcripts. An FTS schema rebuild also clears the
+checkpoints and scans all transcripts while retaining the verbatim journal.
 
 ## Redaction
 
