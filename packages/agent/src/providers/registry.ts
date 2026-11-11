@@ -444,9 +444,14 @@ export class ProviderRegistry {
       throw new Error(`Catalog provider not found: ${instance.catalogProviderId}`);
     }
 
-    // Fetch dynamic catalog for this specific instance to ensure we have latest models
-    // This triggers catalog discovery for instances like Apple FM that have custom endpoints
-    const instanceCatalog = await this.getCatalogForInstance(instanceId);
+    // Discovery already prefers local Anthropic metadata for known IDs. An
+    // exact match can use it without waiting on the upstream model list.
+    const exactAnthropicModel =
+      instance.catalogProviderId === 'anthropic' &&
+      catalogProvider.models.some((model) => model.id === modelId);
+    const instanceCatalog = exactAnthropicModel
+      ? catalogProvider
+      : await this.getCatalogForInstance(instanceId);
 
     // Verify model exists in instance-specific catalog. Resolve aliases through the
     // live catalog with the built-in static catalog as a fallback — the live catalog

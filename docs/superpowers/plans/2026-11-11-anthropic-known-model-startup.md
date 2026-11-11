@@ -21,13 +21,15 @@ changing the injection reader as a fix for that historical incident.
 
 ## Small change
 
-In `ProviderRegistry.createProviderFromInstanceAndModel`, use the shipped
-catalog directly when the provider is `anthropic` and that catalog contains the
-exact requested model ID. Otherwise retain the existing dynamic discovery and
-alias-resolution path. Model listing and explicit refresh still discover models.
-Other providers retain their existing routing and model filtering.
+In `ProviderRegistry.createProviderFromInstanceAndModel`, use the effective
+local catalog directly when the provider is `anthropic` and that catalog
+contains the exact requested model ID. This is the shipped catalog unless a user
+has supplied a same-ID catalog override. Otherwise retain the existing dynamic
+discovery and alias-resolution path. Model listing and explicit refresh still
+discover models. Other providers retain their existing routing and model
+filtering.
 
-The shipped metadata already takes precedence for known models, and the existing
+The local metadata already takes precedence for known models, and the existing
 fallback already permits these exact IDs when discovery fails or omits them.
 This removes an unnecessary network dependency from inference; it does not
 introduce a timeout, retry, background refresh, cache layer, API, configuration

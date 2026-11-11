@@ -1,7 +1,5 @@
-// ABOUTME: A model the shipped static catalog describes must keep its real metadata when
-// ABOUTME: the instance's dynamic catalog is a stale cache that omits it or holds an inferred
-// ABOUTME: guess — the Sen case where Claude Platform refreshes of /v1/models keep failing.
-// ABOUTME: Also covers the OpenAI dynamic catalog, which is built through the same registry path.
+// ABOUTME: Verifies local model metadata and dynamic discovery behavior when a catalog cache
+// ABOUTME: predates a model or contains inferred metadata and the upstream refresh fails.
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createServer, type Server } from 'node:http';
@@ -146,33 +144,62 @@ describe('a stale dynamic Anthropic catalog', () => {
     expect(fake.messagesBodies[0].output_config?.effort).toBe('medium');
   }
 
-  it('that is fresh but predates the model still gives it the shipped metadata', async () => {
-    seedCache([opus5], new Date());
-
-    await expectShippedOpus55Metadata();
-    // Fresh cache: no refresh was attempted, so the cache is what was served.
-    expect(fake.modelsRequests).toHaveLength(0);
-  });
-
-  it('that is expired and cannot refresh still gives the model the shipped metadata', async () => {
+  it('uses shipped metadata without refreshing an expired catalog that omits the model', async () => {
     seedCache([opus5], new Date(Date.now() - 9 * DAY_MS));
 
     await expectShippedOpus55Metadata();
-    // The refresh was attempted and failed, so the stale cache was served.
-    expect(fake.modelsRequests.length).toBeGreaterThan(0);
+    expect(fake.modelsRequests).toHaveLength(0);
   });
 
-  it('that is expired, cannot refresh, and holds an inferred guess for the model upgrades it', async () => {
+  it('uses exact model metadata from a local Anthropic catalog override', async () => {
+    const localModel = { ...opus5, id: 'claude-local-model', context_window: 123_456 };
+    const userCatalogDir = path.join(process.env.LACE_DIR!, 'user-catalog');
+    fs.mkdirSync(userCatalogDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(userCatalogDir, 'anthropic.json'),
+      JSON.stringify({ ...readShippedCatalog('anthropic'), models: [localModel] })
+    );
+
+    const registry = ProviderRegistry.getInstance();
+    const provider = await registry.createProviderFromInstanceAndModel(INSTANCE_ID, localModel.id);
+
+    expect(provider.config.model).toBe('claude-local-model');
+    expect(provider.contextWindowForModel('claude-local-model')).toBe(123_456);
+    expect(fake.modelsRequests).toHaveLength(0);
+  });
+
+  it('tries discovery for a dynamic-only model and falls back to the expired cache', async () => {
+    const dynamicOnly: CatalogModel = {
+      id: 'claude-dynamic-only',
+      name: 'Claude Dynamic Only',
+      context_window: 200_000,
+      default_max_tokens: 32_000,
+    };
+    seedCache([dynamicOnly], new Date(Date.now() - 9 * DAY_MS));
+
+    const registry = ProviderRegistry.getInstance();
+    const provider = await registry.createProviderFromInstanceAndModel(INSTANCE_ID, dynamicOnly.id);
+
+    expect(provider.config.model).toBe('claude-dynamic-only');
+    expect(fake.modelsRequests).toHaveLength(1);
+  });
+
+  it('tries explicit refresh and upgrades inferred metadata when discovery fails', async () => {
     const inferred: CatalogModel = {
       id: MODEL_ID,
       name: 'Claude Opus 5.5',
       context_window: 200_000,
       default_max_tokens: 32_000,
     };
-    seedCache([opus5, inferred], new Date(Date.now() - 9 * DAY_MS));
+    seedCache([inferred], new Date());
 
-    await expectShippedOpus55Metadata();
-    expect(fake.modelsRequests.length).toBeGreaterThan(0);
+    const registry = ProviderRegistry.getInstance();
+    const catalog = await registry.getCatalogForInstance(INSTANCE_ID, true);
+
+    expect(fake.modelsRequests).toHaveLength(1);
+    expect(catalog?.models).toMatchObject([
+      { id: MODEL_ID, context_window: 1_000_000, default_max_tokens: 50_000 },
+    ]);
   });
 });
 
