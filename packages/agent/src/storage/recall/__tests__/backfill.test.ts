@@ -3,7 +3,17 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import fs, {
+  appendFileSync,
+  mkdtempSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openRecallIndex, type Db } from '../index-db';
@@ -75,11 +85,19 @@ describe('backfillIndex', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    syncBuiltinESMExports();
     db.close();
     rmSync(laceDir, { recursive: true, force: true });
     if (savedLaceDir === undefined) delete process.env.LACE_DIR;
     else process.env.LACE_DIR = savedLaceDir;
   });
+
+  function transcriptFile(sessionId: string, date = '2026-05-23'): string {
+    const dir = join(laceDir, 'transcripts', 'ada', date);
+    mkdirSync(dir, { recursive: true });
+    return join(dir, `${sessionId}.jsonl`);
+  }
 
   it('backfills events from legacy <laceDir>/agent-sessions layout', () => {
     const sessionId = SESSION_IDS.legacy;
@@ -212,8 +230,229 @@ describe('backfillIndex', () => {
     const second = backfillIndex(db, laceDir);
 
     expect(first.inserted).toBe(3);
-    expect(second.inserted).toBe(0);
+    expect(second).toEqual({ scanned: 0, inserted: 0, skipped: 0, errors: 0 });
     expect(allRows(db)).toHaveLength(3);
+  });
+
+  it('checks an unchanged transcript without opening it or taking a sibling writer lock', () => {
+    const file = transcriptFile(SESSION_IDS.idem);
+    writeJsonl(file, [promptEvent(1, 'indexed')]);
+    expect(backfillIndex(db, laceDir).inserted).toBe(1);
+
+    const open = vi.spyOn(fs, 'openSync');
+    const readFile = vi.spyOn(fs, 'readFileSync');
+    syncBuiltinESMExports();
+    expect(backfillIndex(db, laceDir).scanned).toBe(0);
+    expect(open.mock.calls.some(([name]) => name === file)).toBe(false);
+    expect(readFile.mock.calls.some(([name]) => name === file)).toBe(false);
+
+    const sibling = new Database(join(laceDir, 'recall', 'index.sqlite'));
+    db.pragma('busy_timeout = 0');
+    try {
+      sibling
+        .transaction(() => {
+          expect(backfillIndex(db, laceDir)).toEqual({
+            scanned: 0,
+            inserted: 0,
+            skipped: 0,
+            errors: 0,
+          });
+        })
+        .immediate();
+    } finally {
+      sibling.close();
+    }
+  });
+
+  it('reads only the appended bytes after reopening the index', () => {
+    const file = transcriptFile(SESSION_IDS.partial);
+    const first = JSON.stringify(promptEvent(1, 'café')) + '\n';
+    const next = JSON.stringify(promptEvent(2, '🧪')) + '\n';
+    writeFileSync(file, first);
+    expect(backfillIndex(db, laceDir).inserted).toBe(1);
+    db.close();
+    db = openRecallIndex(join(laceDir, 'recall', 'index.sqlite'));
+    appendFileSync(file, next);
+
+    const read = vi.spyOn(fs, 'readSync');
+    syncBuiltinESMExports();
+    expect(backfillIndex(db, laceDir)).toEqual({
+      scanned: 1,
+      inserted: 1,
+      skipped: 0,
+      errors: 0,
+    });
+    expect(read.mock.calls.map(([, , , length, position]) => [length, Number(position)])).toEqual([
+      [Buffer.byteLength(next), Buffer.byteLength(first)],
+    ]);
+    expect(allRows(db).map((row) => row.content)).toEqual(['café', '🧪']);
+  });
+
+  it('honors a short read and leaves concurrent appends for the next pass', () => {
+    const file = transcriptFile(SESSION_IDS.partial);
+    writeJsonl(file, [promptEvent(1, 'opened snapshot')]);
+    const read = fs.readSync;
+    vi.spyOn(fs, 'readSync').mockImplementationOnce(((
+      fd: number,
+      buffer: Buffer,
+      offset: number,
+      length: number,
+      position: number | bigint | null
+    ) => {
+      appendFileSync(file, JSON.stringify(promptEvent(2, 'concurrent append')) + '\n');
+      return read(fd, buffer, offset, Math.min(length, 17), position);
+    }) as typeof fs.readSync);
+    syncBuiltinESMExports();
+
+    expect(backfillIndex(db, laceDir).inserted).toBe(1);
+    expect(allRows(db).map((row) => row.content)).toEqual(['opened snapshot']);
+    expect(backfillIndex(db, laceDir).scanned).toBe(1);
+    expect(allRows(db).map((row) => row.content)).toEqual(['opened snapshot', 'concurrent append']);
+  });
+
+  it('imports new day shards and fork files alongside previously indexed legacy history', () => {
+    const sessionId = SESSION_IDS.legacyMix;
+    const legacy = join(laceDir, 'agent-sessions', sessionId);
+    mkdirSync(legacy, { recursive: true });
+    writeMeta(legacy, sessionId, 'ada');
+    writeJsonl(join(legacy, 'events.jsonl'), [promptEvent(1, 'legacy')]);
+    writeJsonl(transcriptFile(sessionId), [promptEvent(2, 'first shard')]);
+    expect(backfillIndex(db, laceDir).inserted).toBe(2);
+
+    const fork = SESSION_IDS.newMix;
+    writeJsonl(transcriptFile(sessionId, '2026-05-24'), [promptEvent(3, 'new shard')]);
+    writeJsonl(transcriptFile(fork, '2026-05-24'), [promptEvent(2, 'forked copy')]);
+    expect(backfillIndex(db, laceDir)).toEqual({
+      scanned: 2,
+      inserted: 2,
+      skipped: 0,
+      errors: 0,
+    });
+    expect(allRows(db).map((row) => [row.session_id, row.content])).toEqual([
+      [sessionId, 'legacy'],
+      [sessionId, 'first shard'],
+      [sessionId, 'new shard'],
+      [fork, 'forked copy'],
+    ]);
+  });
+
+  it('imports a readable shard when another shard for the session cannot be opened', () => {
+    const sessionId = SESSION_IDS.partial;
+    const broken = transcriptFile(sessionId);
+    symlinkSync(broken, broken);
+    writeJsonl(transcriptFile(sessionId, '2026-05-24'), [promptEvent(2, 'readable shard')]);
+
+    expect(backfillIndex(db, laceDir).inserted).toBe(1);
+    expect(allRows(db).map((row) => row.content)).toEqual(['readable shard']);
+  });
+
+  it.each(['metadata', 'read'] as const)(
+    'commits readable sibling shards and retries unread bytes after an open shard %s error',
+    (fault) => {
+      const sessionId = SESSION_IDS.partial;
+      for (const date of ['2026-05-23', '2026-05-24', '2026-05-25']) {
+        transcriptFile(sessionId, date);
+      }
+      // Use discovery's actual directory order so the fault follows one
+      // readable shard and precedes another on any filesystem.
+      const [before, broken, after] = fs
+        .readdirSync(join(laceDir, 'transcripts', 'ada'))
+        .map((date) => transcriptFile(sessionId, date));
+      writeJsonl(broken, [promptEvent(1, 'saved prefix')]);
+      expect(backfillIndex(db, laceDir).inserted).toBe(1);
+      writeJsonl(before, [promptEvent(2, 'sibling before')]);
+      writeJsonl(after, [promptEvent(5, 'sibling after')]);
+      const complete = JSON.stringify(promptEvent(3, 'read before fault')) + '\n';
+      const unread = JSON.stringify(promptEvent(4, 'retry after fault'));
+      appendFileSync(broken, complete + unread + '\n');
+
+      const inode = fs.statSync(broken, { bigint: true }).ino;
+      const fstat = fs.fstatSync;
+      const read = fs.readSync;
+      const error = Object.assign(new Error('injected shard I/O failure'), { code: 'EIO' });
+      if (fault === 'metadata') {
+        vi.spyOn(fs, 'fstatSync').mockImplementation(((fd: number, options: { bigint: true }) => {
+          const stat = fstat(fd, options);
+          if (stat.ino === inode) throw error;
+          return stat;
+        }) as typeof fs.fstatSync);
+      } else {
+        let shortRead = false;
+        vi.spyOn(fs, 'readSync').mockImplementation(((
+          fd: number,
+          buffer: Buffer,
+          offset: number,
+          length: number,
+          position: number | bigint | null
+        ) => {
+          if (fstat(fd, { bigint: true }).ino !== inode) {
+            return read(fd, buffer, offset, length, position);
+          }
+          if (shortRead) throw error;
+          shortRead = true;
+          return read(fd, buffer, offset, Buffer.byteLength(complete + unread), position);
+        }) as typeof fs.readSync);
+      }
+      syncBuiltinESMExports();
+
+      const journal = db.prepare('SELECT event_seq FROM event_journal ORDER BY event_seq').pluck();
+      expect(backfillIndex(db, laceDir).inserted).toBe(fault === 'metadata' ? 2 : 3);
+      expect(journal.all()).toEqual(fault === 'metadata' ? [1, 2, 5] : [1, 2, 3, 5]);
+      expect(allRows(db).map((row) => row.content)).toEqual(
+        fault === 'metadata'
+          ? ['saved prefix', 'sibling before', 'sibling after']
+          : ['saved prefix', 'sibling before', 'read before fault', 'sibling after']
+      );
+
+      vi.restoreAllMocks();
+      syncBuiltinESMExports();
+      const retry = fault === 'metadata' ? 2 : 1;
+      expect(backfillIndex(db, laceDir)).toEqual({
+        scanned: retry,
+        inserted: retry,
+        skipped: 0,
+        errors: 0,
+      });
+      expect(journal.all()).toEqual([1, 2, 3, 4, 5]);
+      expect(backfillIndex(db, laceDir).scanned).toBe(0);
+    }
+  );
+
+  it.each(['replacement', 'shortening', 'same-size rewrite'] as const)(
+    'replays a transcript after %s and skips it once caught up',
+    (change) => {
+      const file = transcriptFile(SESSION_IDS.partial);
+      writeJsonl(file, [promptEvent(1, 'old')]);
+      utimesSync(file, 1, 1);
+      expect(backfillIndex(db, laceDir).inserted).toBe(1);
+
+      if (change === 'replacement') {
+        writeJsonl(file + '.new', [promptEvent(2, 'new')]);
+        utimesSync(file + '.new', 1, 1);
+        renameSync(file + '.new', file);
+      } else {
+        writeJsonl(file, [promptEvent(2, change === 'shortening' ? 'x' : 'new')]);
+        utimesSync(file, 2, 2);
+      }
+      expect(backfillIndex(db, laceDir).inserted).toBe(1);
+      expect(backfillIndex(db, laceDir).scanned).toBe(0);
+      expect(allRows(db).map((row) => row.event_id)).toEqual([
+        `${SESSION_IDS.partial}:1`,
+        `${SESSION_IDS.partial}:2`,
+      ]);
+    }
+  );
+
+  it('replays a shortened transcript even when it is still larger than the prior checkpoint', () => {
+    const file = transcriptFile(SESSION_IDS.partial);
+    const prefix = JSON.stringify(promptEvent(1, 'old')) + '\n';
+    writeFileSync(file, prefix + '{"torn":"' + 'x'.repeat(1024));
+    expect(backfillIndex(db, laceDir).inserted).toBe(1);
+
+    writeJsonl(file, [promptEvent(2, 'new'), promptEvent(3, 'tail')]);
+    expect(backfillIndex(db, laceDir).inserted).toBe(2);
+    expect(backfillIndex(db, laceDir).scanned).toBe(0);
+    expect(allRows(db).map((row) => row.content)).toEqual(['old', 'new', 'tail']);
   });
 
   it('writes persona: null for events under the _unknown bucket', () => {
@@ -358,6 +597,55 @@ describe('backfillIndex', () => {
     }
   });
 
+  it('uses the checkpoint a sibling backfill committed before the write lock', () => {
+    writeJsonl(transcriptFile(SESSION_IDS.partial), [promptEvent(1, 'sibling backfill')]);
+    const sibling = openRecallIndex(join(laceDir, 'recall', 'index.sqlite'));
+    const transaction = db.transaction.bind(db);
+    const boundary = vi.spyOn(db, 'transaction').mockImplementationOnce((fn) => {
+      expect(backfillIndex(sibling, laceDir).inserted).toBe(1);
+      return transaction(fn);
+    });
+    try {
+      expect(backfillIndex(db, laceDir)).toEqual({
+        scanned: 0,
+        inserted: 0,
+        skipped: 0,
+        errors: 0,
+      });
+      expect(allRows(db).map((row) => row.content)).toEqual(['sibling backfill']);
+    } finally {
+      boundary.mockRestore();
+      sibling.close();
+    }
+  });
+
+  it('retains prior byte progress when a transaction rolls back successful catch-up writes', () => {
+    const file = transcriptFile(SESSION_IDS.partial);
+    writeJsonl(file, [promptEvent(1, 'committed prefix')]);
+    expect(backfillIndex(db, laceDir).inserted).toBe(1);
+    appendFileSync(file, JSON.stringify(promptEvent(2, 'uncommitted suffix')) + '\n');
+
+    expect(() =>
+      db
+        .transaction(() => {
+          expect(backfillIndex(db, laceDir).inserted).toBe(1);
+          throw new Error('abort after catch-up');
+        })
+        .immediate()
+    ).toThrow('abort after catch-up');
+    expect(allRows(db).map((row) => row.content)).toEqual(['committed prefix']);
+    expect(backfillIndex(db, laceDir)).toEqual({
+      scanned: 1,
+      inserted: 1,
+      skipped: 0,
+      errors: 0,
+    });
+    expect(allRows(db).map((row) => row.content)).toEqual([
+      'committed prefix',
+      'uncommitted suffix',
+    ]);
+  });
+
   it('rolls back a failed FTS row while retaining successful rows in the session', () => {
     const sessionId = SESSION_IDS.partial;
     const dir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
@@ -395,9 +683,9 @@ describe('backfillIndex', () => {
 
       db.exec('DROP TRIGGER reject_marker');
       expect(backfillIndex(db, laceDir)).toEqual({
-        scanned: 3,
+        scanned: 2,
         inserted: 1,
-        skipped: 2,
+        skipped: 1,
         errors: 0,
       });
       expect(allRows(db).map((r) => r.content)).toEqual(['one', 'two', 'three']);
@@ -469,6 +757,38 @@ describe('backfillIndex', () => {
     expect(stats.inserted).toBe(2);
     const rows = allRows(db).filter((r) => r.session_id === sessionId);
     expect(rows.map((r) => r.event_id).sort()).toEqual([`${sessionId}:1`, `${sessionId}:3`]);
+  });
+
+  it('retains later events but keeps retrying a failed FTS conversion', () => {
+    const sessionId = SESSION_IDS.malformed;
+    writeJsonl(transcriptFile(sessionId), [
+      promptEvent(1, 'before'),
+      {
+        eventSeq: 2,
+        timestamp: '2026-05-23T00:00:02Z',
+        type: 'context_compacted',
+        data: { strategy: { toString: null, valueOf: null } },
+      },
+      promptEvent(3, 'after'),
+    ]);
+
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(backfillIndex(db, laceDir)).toEqual({
+      scanned: 3,
+      inserted: 2,
+      skipped: 0,
+      errors: 1,
+    });
+    expect(backfillIndex(db, laceDir)).toEqual({
+      scanned: 2,
+      inserted: 0,
+      skipped: 1,
+      errors: 1,
+    });
+    expect(allRows(db).map((row) => row.content)).toEqual(['before', 'after']);
+    expect(
+      db.prepare('SELECT event_seq FROM event_journal ORDER BY event_seq').pluck().all()
+    ).toEqual([1, 2, 3]);
   });
 
   it('one malformed event in session A does not roll back session B (C2)', () => {

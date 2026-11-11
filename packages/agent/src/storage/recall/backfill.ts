@@ -1,5 +1,5 @@
-// ABOUTME: One-time-per-startup scan of JSONL files; insert any events missing from FTS
-// ABOUTME: Catches up sessions whose JSONL pre-dates write-through indexing
+// ABOUTME: Catches up recall from transcript bytes after each file's durable checkpoint
+// ABOUTME: Commits contiguous progress together with FTS and verbatim journal rows
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -9,6 +9,11 @@ import { listTranscriptFiles, transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '..
 import { eventToRow } from './event-to-row';
 import { reconcileEventKeys } from './event-keys';
 import { insertRow, insertJournalRow } from './index-writer';
+import {
+  readTranscriptLines,
+  transcriptCheckpoints,
+  transcriptStart,
+} from './transcript-checkpoints';
 import { agentSessionsDir, readSessionMeta } from '../session-store';
 import type { TypedDurableEvent } from '../event-types';
 import type { DurableEvent } from '../event-log';
@@ -65,6 +70,7 @@ export function backfillIndex(db: Db, laceDir: string): BackfillStats {
   }
 
   const haveStmt = db.prepare('SELECT event_id FROM event_keys WHERE session_id = ?');
+  const checkpoints = transcriptCheckpoints(db);
 
   for (const [sessionId, sessionPasses] of passesBySession) {
     // One transaction per session, NOT one transaction for the whole pass.
@@ -78,13 +84,30 @@ export function backfillIndex(db: Db, laceDir: string): BackfillStats {
     // other processes (H2). With default DEFERRED, two backfills could both
     // pass the existence check and both INSERT, duplicating FTS rows.
     try {
+      const pending = sessionPasses.filter(({ filePath }) => {
+        let file: fs.BigIntStats;
+        try {
+          file = fs.statSync(filePath, { bigint: true });
+        } catch {
+          return false;
+        }
+        return file.isFile() && transcriptStart(file, checkpoints.get(filePath)) !== null;
+      });
+      if (pending.length === 0) continue;
+
       const run = db.transaction(() => {
-        reconcileEventKeys(db);
-        const have = new Set<string>(
-          (haveStmt.all(sessionId) as Array<{ event_id: string }>).map((r) => r.event_id)
-        );
-        for (const pass of sessionPasses) {
-          catchUpFile(db, pass, have, stats);
+        let have: Set<string> | undefined;
+        const indexedIds = () => {
+          if (!have) {
+            reconcileEventKeys(db);
+            have = new Set(
+              (haveStmt.all(sessionId) as Array<{ event_id: string }>).map((r) => r.event_id)
+            );
+          }
+          return have;
+        };
+        for (const pass of pending) {
+          catchUpFile(db, pass, checkpoints, indexedIds, stats);
         }
       }).immediate;
       run();
@@ -168,58 +191,116 @@ function newLayoutPersonaForSession(laceDir: string, sessionId: string): string 
   return null;
 }
 
-function catchUpFile(db: Db, pass: SessionPass, have: Set<string>, stats: BackfillStats): void {
-  for (const { line, event: ev } of readEvents(pass.filePath)) {
-    stats.scanned++;
-    if (typeof ev.eventSeq !== 'number') {
-      stats.skipped++;
-      continue;
+function catchUpFile(
+  db: Db,
+  pass: SessionPass,
+  checkpoints: ReturnType<typeof transcriptCheckpoints>,
+  indexedIds: () => Set<string>,
+  stats: BackfillStats
+): void {
+  let fd: number;
+  try {
+    fd = fs.openSync(pass.filePath, 'r');
+  } catch {
+    return;
+  }
+  try {
+    // A sibling can finish catch-up before we acquire the write lock, or
+    // the path can change between discovery and open. Use the locked
+    // checkpoint and the opened descriptor to choose the byte range.
+    let file: fs.BigIntStats;
+    try {
+      file = fs.fstatSync(fd, { bigint: true });
+    } catch {
+      return;
     }
-    const eventId = `${pass.sessionId}:${ev.eventSeq}`;
+    if (!file.isFile()) return;
+    const start = transcriptStart(file, checkpoints.get(pass.filePath));
+    if (start === null) return;
 
-    // Journal EVERY scanned event (not just the FTS-indexed kinds), storing the
-    // raw JSONL line verbatim. The PK dedups, so re-running backfill is safe and
-    // a journal write here is independent of the FTS membership check below.
-    // Failures here must not poison the session's FTS catch-up; per-row guard.
-    try {
-      insertJournalRow(db, {
-        session_id: pass.sessionId,
-        event_seq: ev.eventSeq,
-        type: typeof ev.type === 'string' ? ev.type : 'unknown',
-        ts: typeof ev.timestamp === 'string' ? ev.timestamp : '',
-        line,
-      });
-    } catch (err) {
-      console.error(`recall backfill: insertJournalRow failed for ${eventId}:`, err);
+    let offset = start;
+    let contiguous = true;
+    for (const { line, end } of readTranscriptLines(fd, start, file.size)) {
+      const processed = catchUpLine(db, pass, indexedIds, line, stats);
+      // A failed record remains the first byte to retry, even if later
+      // records succeed. An unterminated line never advances the offset.
+      contiguous &&= processed;
+      if (contiguous && end !== null) offset = end;
     }
+    checkpoints.save(pass.filePath, file, offset);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
 
-    if (have.has(eventId)) {
-      stats.skipped++;
-      continue;
-    }
-    let row;
-    try {
-      row = eventToRow(ev as TypedDurableEvent, {
-        sessionId: pass.sessionId,
-        persona: pass.persona,
-      });
-    } catch (err) {
-      stats.errors++;
-      console.error(`recall backfill: eventToRow failed for ${eventId}:`, err);
-      continue;
-    }
-    if (!row) {
-      stats.skipped++;
-      continue;
-    }
-    try {
-      insertRow(db, row);
-      have.add(eventId);
-      stats.inserted++;
-    } catch (err) {
-      stats.errors++;
-      console.error(`recall backfill: insertRow failed for ${eventId}:`, err);
-    }
+function catchUpLine(
+  db: Db,
+  pass: SessionPass,
+  indexedIds: () => Set<string>,
+  line: string,
+  stats: BackfillStats
+): boolean {
+  if (!line) return true;
+  let ev: DurableEvent | null;
+  try {
+    ev = JSON.parse(line) as DurableEvent | null;
+  } catch {
+    return true;
+  }
+  stats.scanned++;
+  if (typeof ev?.eventSeq !== 'number') {
+    stats.skipped++;
+    return true;
+  }
+  const eventId = `${pass.sessionId}:${ev.eventSeq}`;
+  const have = indexedIds();
+
+  // The journal stores the original line, including for events excluded from
+  // FTS. A failed journal row can be retried independently of its FTS row.
+  let journaled = true;
+  try {
+    insertJournalRow(db, {
+      session_id: pass.sessionId,
+      event_seq: ev.eventSeq,
+      type: typeof ev.type === 'string' ? ev.type : 'unknown',
+      ts: typeof ev.timestamp === 'string' ? ev.timestamp : '',
+      line,
+    });
+  } catch (err) {
+    if (!db.inTransaction) throw err;
+    journaled = false;
+    console.error(`recall backfill: insertJournalRow failed for ${eventId}:`, err);
+  }
+
+  if (have.has(eventId)) {
+    stats.skipped++;
+    return journaled;
+  }
+  let row;
+  try {
+    row = eventToRow(ev as TypedDurableEvent, {
+      sessionId: pass.sessionId,
+      persona: pass.persona,
+    });
+  } catch (err) {
+    stats.errors++;
+    console.error(`recall backfill: eventToRow failed for ${eventId}:`, err);
+    return false;
+  }
+  if (!row) {
+    stats.skipped++;
+    return journaled;
+  }
+  try {
+    insertRow(db, row);
+    have.add(eventId);
+    stats.inserted++;
+    return journaled;
+  } catch (err) {
+    if (!db.inTransaction) throw err;
+    stats.errors++;
+    console.error(`recall backfill: insertRow failed for ${eventId}:`, err);
+    return false;
   }
 }
 
@@ -244,27 +325,5 @@ function readPersonaSafe(sessionDir: string): string | null {
     return readSessionMeta(sessionDir).persona ?? null;
   } catch {
     return null;
-  }
-}
-
-function* readEvents(filePath: string): Generator<{ line: string; event: DurableEvent }> {
-  let raw = '';
-  try {
-    raw = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return;
-  }
-  for (const line of raw.split('\n')) {
-    if (!line) continue;
-    let event: DurableEvent;
-    try {
-      event = JSON.parse(line) as DurableEvent;
-    } catch {
-      // skip malformed line (e.g. partial write)
-      continue;
-    }
-    // Yield the raw line verbatim so the journal stores byte-identical bytes to
-    // what is on disk (the same string a JSONL line read returns).
-    yield { line, event };
   }
 }

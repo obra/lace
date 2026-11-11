@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
 import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../transcript-paths';
 import { EVENT_KEYS_SCHEMA, resetEventKeys } from './event-keys';
+import { TRANSCRIPT_CHECKPOINTS_SCHEMA } from './transcript-checkpoints';
 
 export type { Db };
 
@@ -147,6 +148,7 @@ function applySchema(db: Db): void {
   // existing index gains them without a rebuild.
   db.exec(EVENT_JOURNAL_SCHEMA);
   db.exec(EVENT_KEYS_SCHEMA);
+  db.exec(TRANSCRIPT_CHECKPOINTS_SCHEMA);
 
   const readVersion = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).pluck();
   if (Number(readVersion.get()) === SCHEMA_VERSION) return;
@@ -159,6 +161,7 @@ function applySchema(db: Db): void {
     db.exec(`DROP TABLE IF EXISTS events;`);
     db.exec(EVENTS_SCHEMA);
     resetEventKeys(db);
+    db.exec('DELETE FROM transcript_checkpoints');
     db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
       String(SCHEMA_VERSION)
     );

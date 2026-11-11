@@ -1,8 +1,8 @@
 // ABOUTME: Tests for the event_journal store — verbatim-line recall over real SQLite
 // ABOUTME: Covers schema, unfiltered writer, write-through on append, backfill, and recall return
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -160,6 +160,126 @@ describe('event_journal backfill', () => {
       process.env.LACE_DIR = savedLaceDir;
     }
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  function legacyTranscript(sessionId: string): string {
+    const sessionDir = join(dir, 'agent-sessions', sessionId);
+    mkdirSync(sessionDir, { recursive: true });
+    return join(sessionDir, 'events.jsonl');
+  }
+
+  it('retries a journal gap even when the FTS row and later journal rows succeeded', () => {
+    const sessionId = `sess_${randomUUID()}`;
+    const file = legacyTranscript(sessionId);
+    const lines = [1, 2, 3].map((eventSeq) =>
+      JSON.stringify({
+        eventSeq,
+        timestamp: '2026-06-18T00:00:00Z',
+        type: 'prompt',
+        data: { content: [{ type: 'text', text: `prompt ${eventSeq}` }] },
+      })
+    );
+    writeFileSync(file, lines.join('\n') + '\n');
+    const db = openRecallIndex(join(dir, 'recall', 'index.sqlite'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      db.exec(`
+        CREATE TRIGGER reject_journal BEFORE INSERT ON event_journal
+        WHEN NEW.event_seq = 2 BEGIN
+          SELECT RAISE(ABORT, 'injected journal failure');
+        END;
+      `);
+      const journal = db.prepare('SELECT line FROM event_journal ORDER BY event_seq').pluck();
+      expect(backfillIndex(db, dir).inserted).toBe(3);
+      expect(journal.all()).toEqual([lines[0], lines[2]]);
+
+      db.exec('DROP TRIGGER reject_journal');
+      expect(backfillIndex(db, dir)).toEqual({
+        scanned: 2,
+        inserted: 0,
+        skipped: 2,
+        errors: 0,
+      });
+      expect(journal.all()).toEqual(lines);
+      expect(backfillIndex(db, dir).scanned).toBe(0);
+    } finally {
+      error.mockRestore();
+      db.close();
+    }
+  });
+
+  it('stops writing when a SQLite error rolls back the session transaction', () => {
+    const file = legacyTranscript(`sess_${randomUUID()}`);
+    const first = '{"eventSeq":1,"type":"turn_end"}';
+    const second = '{"eventSeq":2,"type":"turn_end"}';
+    const third = '{"eventSeq":3,"type":"turn_end"}';
+    writeFileSync(file, first + '\n');
+
+    const db = openRecallIndex(join(dir, 'recall', 'index.sqlite'));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const journal = db.prepare('SELECT line FROM event_journal ORDER BY event_seq').pluck();
+      expect(backfillIndex(db, dir).scanned).toBe(1);
+      appendFileSync(file, second + '\n' + third + '\n');
+      db.exec(`
+        CREATE TRIGGER rollback_journal BEFORE INSERT ON event_journal
+        WHEN NEW.event_seq = 2 BEGIN
+          SELECT RAISE(ROLLBACK, 'injected transaction failure');
+        END;
+      `);
+      expect(backfillIndex(db, dir).errors).toBe(1);
+      expect(journal.all()).toEqual([first]);
+
+      db.exec('DROP TRIGGER rollback_journal');
+      expect(backfillIndex(db, dir).scanned).toBe(2);
+      expect(journal.all()).toEqual([first, second, third]);
+    } finally {
+      error.mockRestore();
+      db.close();
+    }
+  });
+
+  it('keeps exact UTF-8 text across a read boundary and retries a valid unterminated line', () => {
+    const file = legacyTranscript(`sess_${randomUUID()}`);
+    const start = '{"eventSeq":1,"type":"turn_end","data":{"padding":"';
+    const first = start + 'x'.repeat(64 * 1024 - start.length - 1) + '🧪"}} \r';
+    const final = ' {"eventSeq":2,"type":"turn_end"} ';
+    writeFileSync(file, first + '\n' + final);
+
+    const db = openRecallIndex(join(dir, 'recall', 'index.sqlite'));
+    try {
+      const journal = db.prepare('SELECT line FROM event_journal ORDER BY event_seq').pluck();
+      expect(backfillIndex(db, dir).scanned).toBe(2);
+      expect(journal.all()).toEqual([first, final]);
+
+      appendFileSync(file, '\n');
+      expect(backfillIndex(db, dir).scanned).toBe(1);
+      expect(journal.all()).toEqual([first, final]);
+      expect(backfillIndex(db, dir).scanned).toBe(0);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('resumes before a torn tail and consumes it after the writer separates the next record', () => {
+    const file = legacyTranscript(`sess_${randomUUID()}`);
+    const first = '{"eventSeq":1,"type":"turn_end"}';
+    const next = '{"eventSeq":3,"type":"turn_end"}';
+    writeFileSync(file, first + '\n{"eventSeq":2');
+
+    const db = openRecallIndex(join(dir, 'recall', 'index.sqlite'));
+    try {
+      const journal = db.prepare('SELECT line FROM event_journal ORDER BY event_seq').pluck();
+      expect(backfillIndex(db, dir).scanned).toBe(1);
+      expect(journal.all()).toEqual([first]);
+
+      appendFileSync(file, '\n\nnull\n{"type":"turn_end"}\n' + next + '\n');
+      expect(backfillIndex(db, dir).errors).toBe(0);
+      expect(journal.all()).toEqual([first, next]);
+      expect(backfillIndex(db, dir).scanned).toBe(0);
+    } finally {
+      db.close();
+    }
   });
 
   it('journals every scanned event (incl. turn_end) with the raw JSONL line', () => {
