@@ -198,6 +198,59 @@ describe('credential env overlay over Ent RPC (PRI-3672)', () => {
     }
   });
 
+  // jesse-claude's review on PR #458: keys weren't shape-checked at all, so
+  // `PATH=/tmp/evil:/usr/bin` could be smuggled in as a map KEY (not a value)
+  // and slip past the PATH denylist check, which only ever looked at the
+  // key's literal spelling.
+  it.each([
+    'PATH=/tmp/evil:/usr/bin', // the exact smuggled-assignment-as-key case from review
+    'FOO BAR', // space
+    'foo_cred', // lowercase
+    'Foo_Cred', // mixed case
+    '1FOO', // leading digit
+    'FOO-BAR', // hyphen
+    'FOO.BAR', // dot
+    '', // empty
+    'FOO\nBAR', // embedded newline
+  ])('refuses the malformed env var name %j and sets nothing from that call', async (badName) => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', { cwd: workDir, mcpServers: [] });
+
+      await expect(
+        client.request('ent/session/env_overlay/set', {
+          vars: { [badName]: 'test-placeholder-xyz', SAFE_CRED: 'test-placeholder-abc' },
+        })
+      ).rejects.toMatchObject({ code: -32602 });
+      // All-or-nothing: SAFE_CRED in the same call was not set either.
+      expect(state.envOverlay ?? {}).toEqual({});
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
+  it('accepts a well-formed uppercase-with-underscores name', async () => {
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', { cwd: workDir, mcpServers: [] });
+
+      expect(
+        await client.request('ent/session/env_overlay/set', {
+          vars: { MY_API_KEY_2: 'test-placeholder-xyz' },
+        })
+      ).toEqual({});
+      expect(state.envOverlay).toEqual({ MY_API_KEY_2: { value: 'test-placeholder-xyz' } });
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
   it('never writes the overlay value into any file under the session directory', async () => {
     const state = createAgentServerState();
     const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
@@ -223,5 +276,82 @@ describe('credential env overlay over Ent RPC (PRI-3672)', () => {
       client.close();
       server.close();
     }
+  });
+
+  // jesse-claude's review on PR #458: the overlay is process-level, never
+  // cleared on session load, session/new, close or /new. Session A's
+  // credential would otherwise still be sitting in state.envOverlay when
+  // session B becomes the active session.
+  describe('session lifetime (does not outlive its session)', () => {
+    it('clears the overlay when session/new creates a different session', async () => {
+      const state = createAgentServerState();
+      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+      try {
+        await client.request('initialize', defaultInitializeParams());
+        await client.request('session/new', { cwd: workDir, mcpServers: [] });
+        await client.request('ent/session/env_overlay/set', {
+          vars: { MINTED_CRED: 'test-placeholder-xyz' },
+        });
+        expect(state.envOverlay).toEqual({ MINTED_CRED: { value: 'test-placeholder-xyz' } });
+
+        // A fresh session (e.g. a new conversation) must not inherit it.
+        await client.request('session/new', { cwd: workDir, mcpServers: [] });
+        expect(state.envOverlay ?? {}).toEqual({});
+      } finally {
+        client.close();
+        server.close();
+      }
+    });
+
+    it('clears the overlay on session/close', async () => {
+      const state = createAgentServerState();
+      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+      try {
+        await client.request('initialize', defaultInitializeParams());
+        await client.request('session/new', { cwd: workDir, mcpServers: [] });
+        const sessionId = state.activeSession!.meta.sessionId;
+        await client.request('ent/session/env_overlay/set', {
+          vars: { MINTED_CRED: 'test-placeholder-xyz' },
+        });
+        expect(state.envOverlay).toEqual({ MINTED_CRED: { value: 'test-placeholder-xyz' } });
+
+        await client.request('session/close', { sessionId });
+        expect(state.envOverlay ?? {}).toEqual({});
+      } finally {
+        client.close();
+        server.close();
+      }
+    });
+
+    it('clears the overlay on session/load (switching to a different stored session)', async () => {
+      const state = createAgentServerState();
+      const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+      try {
+        await client.request('initialize', defaultInitializeParams());
+
+        await client.request('session/new', { cwd: workDir, mcpServers: [] });
+        const sessionAId = state.activeSession!.meta.sessionId;
+
+        // A second session becomes active; mint a credential under IT.
+        await client.request('session/new', { cwd: workDir, mcpServers: [] });
+        await client.request('ent/session/env_overlay/set', {
+          vars: { MINTED_CRED: 'test-placeholder-xyz' },
+        });
+        expect(state.envOverlay).toEqual({ MINTED_CRED: { value: 'test-placeholder-xyz' } });
+
+        // Switching back to session A must not carry session B's credential
+        // along — this is the PR-body claim ("cleared on load/resume") the
+        // review found false on the current head.
+        await client.request('session/load', {
+          sessionId: sessionAId,
+          cwd: workDir,
+          mcpServers: [],
+        });
+        expect(state.envOverlay ?? {}).toEqual({});
+      } finally {
+        client.close();
+        server.close();
+      }
+    });
   });
 });
