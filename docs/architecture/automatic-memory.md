@@ -309,15 +309,36 @@ pages can repeat that work. Publication in flight, queued work, and overlap
 between publication and preparation make coverage partial. Native pagination
 does not provide a snapshot across requests.
 
+Before expanding passages or requesting their scores, each text surface
+(transcript events, retained originals, and note heads) nominates at most 128
+distinct admitted source identities in ascending FTS5 BM25 rank, with rowid
+breaking ties. It separately nominates up to 128 for safely quoted complete
+identifiers from the incoming question, preserving each identifier as a phrase
+instead of splitting its components into OR alternatives. The two routes share
+the existing request-private match union. Duplicate and orphan FTS rows do not
+consume the budget; ranked pages refill it. Notes require a current head, and
+events and originals require an admitted source version with a passage, without
+filtering by extraction status. An original identity includes its version; an
+event identity can expand all its admitted versions. Final source currentness
+and exact identifier validation still happen after nomination.
+
+The limit bounds nominated sources, independently of transport page sizing; one
+large source can still expand to many passages. This shortlist changes selection
+from exhaustive text retrieval. The semantic route can discover evidence beyond
+it, and the separate identifier route protects exact references from
+ordinary-word competition, but neither route promises every matching source.
+Ranking, grouping, and the 2,000-token allowance apply to the nominated union as
+before.
+
 FTS matches, nominated identities, sorted runs, and group aliases use
 request-private SQLite scratch space on the memory database's state volume. The
 host needs room for that scratch data. On POSIX hosts, Lace unlinks the file
 before writing request data and holds it open only for that preparation. The
 connection has a bounded page cache and closes on completion, cancellation, or
 failure. Bounded fan-in merges preserve JavaScript locale ordering and SQLite
-nomination order for equal native scores. Validation consumes candidates in
-order, with no fixed cutoff before checking originals and their required current
-accounts.
+nomination order for equal native scores. Validation consumes nominated
+candidates in order, with no further fixed cutoff before checking originals and
+their required current accounts.
 
 The `memory.recall.stages` debug event reports wall-clock times and aggregate
 row or candidate counts for successful preparations. Native query time, page
