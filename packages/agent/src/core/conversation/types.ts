@@ -311,6 +311,12 @@ export interface RunResult {
      * same shape as its emitted turn_end event.
      */
     lastCallInputContextTokens?: number;
+    /**
+     * The model's context window as the runner's post-turn compaction check
+     * resolved it (`provider.contextWindowForModel`). Result-only: the durable
+     * turn_end event does not record it. Absent when that check did not run.
+     */
+    contextWindow?: number;
     costUsd?: number;
   };
   /**

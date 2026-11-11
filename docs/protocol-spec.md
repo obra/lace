@@ -2283,6 +2283,7 @@ interface UsageInfo {
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
   lastCallInputContextTokens?: number;
+  contextWindow?: number;
   thinkingTokens?: number;
   totalTokens?: number;
   costUsd?: number;
@@ -2302,6 +2303,15 @@ It is optional and is **absent, never zero**, when the agent does not report it
 (a provider with no cache accounting, or an agent predating the field). Treat
 absent as unknown and fall back; reading it as 0 would look like an empty
 context and suppress compaction indefinitely.
+
+`contextWindow` is the model's context window in tokens, as the agent resolved
+it for its own end-of-turn compaction check (the same number its persona
+`compaction.breakpoints` are fractions of). Divide `lastCallInputContextTokens`
+by it to get how full the window is in the agent's own terms. When the provider
+catalog does not describe the model, the agent's lookup falls back to 200,000,
+and that fallback is what is reported. It is optional and absent when the agent
+did not run that check (for example a turn cancelled before it started) or
+predates the field.
 
 ### 11.7 ToolResult
 

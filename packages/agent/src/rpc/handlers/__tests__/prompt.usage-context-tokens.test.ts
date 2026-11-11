@@ -2,7 +2,8 @@
 // ABOUTME: lastCallInputContextTokens on the ent-protocol wire — both the
 // ABOUTME: session/update turn_end notification and the session/prompt result —
 // ABOUTME: so an embedder can gate compaction on real context occupancy rather
-// ABOUTME: than the turn-cumulative input+cache sum.
+// ABOUTME: than the turn-cumulative input+cache sum. The model's contextWindow
+// ABOUTME: rides alongside so the embedder can compare the two.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -24,6 +25,7 @@ type RunnerUsage = {
   cacheCreationInputTokens?: number;
   cacheReadInputTokens?: number;
   lastCallInputContextTokens?: number;
+  contextWindow?: number;
   costUsd?: number;
 };
 
@@ -137,6 +139,49 @@ describe('prompt handler: lastCallInputContextTokens on the wire', () => {
     }
   });
 
+  it('carries the model context window next to the last call context size', async () => {
+    // An embedder compacting at a fraction of the window needs the window the
+    // runner measured pressure against, on the same turn_end as the measurement.
+    stubRunnerUsage({
+      inputTokens: 36,
+      outputTokens: 300,
+      lastCallInputContextTokens: 66_212,
+      contextWindow: 524_288,
+    });
+
+    const state = createAgentServerState();
+    const { client, server } = createPairedPeers((peer) => registerAgentRpcMethods(peer, state));
+    const turnEnds: unknown[] = [];
+    client.onRequest('session/update', async (params) => {
+      if ((params as { type?: string })?.type === 'turn_end') turnEnds.push(params);
+      return undefined;
+    });
+
+    try {
+      await client.request('initialize', defaultInitializeParams());
+      await client.request('session/new', { cwd: workDir, mcpServers: [] });
+
+      const result = (await client.request('session/prompt', {
+        content: [{ type: 'text', text: 'hello' }],
+      })) as { usage: Record<string, unknown> };
+
+      expect(result.usage.contextWindow).toBe(524_288);
+      expect(turnEnds).toHaveLength(1);
+      const notified = turnEnds[0] as { usage: Record<string, unknown> };
+      expect(notified.usage.contextWindow).toBe(524_288);
+      expect(() =>
+        SessionUpdateNotificationSchema.parse({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: notified,
+        })
+      ).not.toThrow();
+    } finally {
+      client.close();
+      server.close();
+    }
+  });
+
   it('omits the field when the runner did not report one', async () => {
     // Providers with no cache accounting (or a runner predating the field)
     // must produce a payload with the key absent, not present-and-zero: zero
@@ -156,6 +201,7 @@ describe('prompt handler: lastCallInputContextTokens on the wire', () => {
       })) as { usage: Record<string, unknown> };
 
       expect('lastCallInputContextTokens' in result.usage).toBe(false);
+      expect('contextWindow' in result.usage).toBe(false);
     } finally {
       client.close();
       server.close();

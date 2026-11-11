@@ -57,6 +57,33 @@ interface OpenAIProviderConfig extends ProviderConfig {
 // See OpenAIProvider.boundedRetryFor.
 const GATEWAY_MODEL_NOT_FOUND_MAX_ATTEMPTS = 3;
 
+/**
+ * Build lace usage from OpenAI wire usage. OpenAI counts prompt-cache hits
+ * inside the input total (Responses `input_tokens_details.cached_tokens`,
+ * Chat Completions `prompt_tokens_details.cached_tokens`), while lace follows
+ * Anthropic: `promptTokens` is uncached input only and cache hits go in
+ * `cacheReadInputTokens`. That way the runner prices each cached token once,
+ * at the cache-read rate, and `promptTokens + cacheReadInputTokens` is still
+ * the full input sent. When the wire has no cached count, the field is
+ * omitted as for any provider without cache accounting.
+ */
+function usageWithCachedInput(
+  inputTokens: number,
+  cachedTokens: number | undefined,
+  completionTokens: number,
+  totalTokens: number
+): NonNullable<ProviderResponse['usage']> {
+  if (cachedTokens === undefined) {
+    return { promptTokens: inputTokens, completionTokens, totalTokens };
+  }
+  return {
+    promptTokens: Math.max(0, inputTokens - cachedTokens),
+    cacheReadInputTokens: cachedTokens,
+    completionTokens,
+    totalTokens,
+  };
+}
+
 export class OpenAIProvider extends AIProvider {
   private _openai: OpenAI | null = null;
   private _encoderCache = new Map<string, Tiktoken>();
@@ -734,11 +761,12 @@ export class OpenAIProvider extends AIProvider {
       toolCalls,
       stopReason,
       stopDetails,
-      usage: {
-        promptTokens: response.usage?.input_tokens || 0,
-        completionTokens: response.usage?.output_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
-      },
+      usage: usageWithCachedInput(
+        response.usage?.input_tokens || 0,
+        response.usage?.input_tokens_details?.cached_tokens,
+        response.usage?.output_tokens || 0,
+        response.usage?.total_tokens || 0
+      ),
       responseId: response.id, // Store response ID for conversation chaining
     };
   }
@@ -934,11 +962,12 @@ export class OpenAIProvider extends AIProvider {
         // Extract usage data from response, or estimate if missing (for OpenAI-compatible endpoints)
         let usage: ProviderResponse['usage'];
         if (response.usage) {
-          usage = {
-            promptTokens: response.usage.prompt_tokens,
-            completionTokens: response.usage.completion_tokens,
-            totalTokens: response.usage.total_tokens,
-          };
+          usage = usageWithCachedInput(
+            response.usage.prompt_tokens,
+            response.usage.prompt_tokens_details?.cached_tokens,
+            response.usage.completion_tokens,
+            response.usage.total_tokens
+          );
           this._recordMeasuredInputRatio(model, messages, tools, response.usage.prompt_tokens);
         } else {
           // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
@@ -1190,11 +1219,12 @@ export class OpenAIProvider extends AIProvider {
 
               // Emit token usage updates during streaming
               this.emit('token_usage_update', {
-                usage: {
-                  promptTokens: usage.prompt_tokens,
-                  completionTokens: usage.completion_tokens,
-                  totalTokens: usage.total_tokens,
-                },
+                usage: usageWithCachedInput(
+                  usage.prompt_tokens,
+                  usage.prompt_tokens_details?.cached_tokens,
+                  usage.completion_tokens,
+                  usage.total_tokens
+                ),
               });
             }
           }
@@ -1247,11 +1277,12 @@ export class OpenAIProvider extends AIProvider {
             typeof usage.completion_tokens === 'number' &&
             typeof usage.total_tokens === 'number'
           ) {
-            finalUsage = {
-              promptTokens: usage.prompt_tokens,
-              completionTokens: usage.completion_tokens,
-              totalTokens: usage.total_tokens,
-            };
+            finalUsage = usageWithCachedInput(
+              usage.prompt_tokens,
+              usage.prompt_tokens_details?.cached_tokens,
+              usage.completion_tokens,
+              usage.total_tokens
+            );
             this._recordMeasuredInputRatio(model, messages, tools, usage.prompt_tokens);
           } else {
             // Fallback: estimate tokens when OpenAI-compatible endpoints don't provide usage
@@ -1384,7 +1415,12 @@ export class OpenAIProvider extends AIProvider {
           let responseId: string | undefined;
           let hasThinkingBlock = false;
           let completionUsage:
-            | { input_tokens: number; output_tokens: number; total_tokens: number }
+            | {
+                input_tokens: number;
+                input_tokens_details?: { cached_tokens?: number };
+                output_tokens: number;
+                total_tokens: number;
+              }
             | undefined;
           // Capture the terminal response object so we can route status,
           // incomplete_details, and error fields through the shared
@@ -1515,11 +1551,12 @@ export class OpenAIProvider extends AIProvider {
                 if (event.response.usage) {
                   completionUsage = event.response.usage;
                   this.emit('token_usage_update', {
-                    usage: {
-                      promptTokens: event.response.usage.input_tokens,
-                      completionTokens: event.response.usage.output_tokens,
-                      totalTokens: event.response.usage.total_tokens,
-                    },
+                    usage: usageWithCachedInput(
+                      event.response.usage.input_tokens,
+                      event.response.usage.input_tokens_details?.cached_tokens,
+                      event.response.usage.output_tokens,
+                      event.response.usage.total_tokens
+                    ),
                   });
                   // Emit thinking_end with reasoning tokens if we had a thinking block
                   if (hasThinkingBlock) {
@@ -1660,11 +1697,12 @@ export class OpenAIProvider extends AIProvider {
             stopReason,
             stopDetails,
             usage: completionUsage
-              ? {
-                  promptTokens: completionUsage.input_tokens,
-                  completionTokens: completionUsage.output_tokens,
-                  totalTokens: completionUsage.total_tokens,
-                }
+              ? usageWithCachedInput(
+                  completionUsage.input_tokens,
+                  completionUsage.input_tokens_details?.cached_tokens,
+                  completionUsage.output_tokens,
+                  completionUsage.total_tokens
+                )
               : {
                   promptTokens: estimatedPromptTokens,
                   completionTokens: estimatedOutputTokens,
