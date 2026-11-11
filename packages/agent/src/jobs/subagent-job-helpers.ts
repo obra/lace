@@ -225,8 +225,8 @@ export interface EnvOverlayForwardBatch {
 
 /**
  * Group a (pruned) env overlay snapshot into the batches needed to forward it
- * to a freshly-spawned subagent over its own `env_overlay/set` RPC (PRI-3672
- * condition 3: a subagent is a separate lace process with its own in-memory
+ * to a freshly-spawned subagent over its own `env_overlay/set` RPC (PRI-3672:
+ * a subagent is a separate lace process with its own in-memory
  * `AgentServerState.envOverlay`, so the parent's overlay does not exist there
  * until something copies it across).
  *
