@@ -280,24 +280,85 @@ describe('ConversationRunner env overlay (PRI-3672)', () => {
     expect(context.processEnv).toMatchObject({ MINTED_CRED: 'test-placeholder-xyz' });
   });
 
-  it('is read fresh at EVERY tool call, not cached once per run', async () => {
+  // jesse-claude's review on PR #458: the previous version of this test
+  // mutated the overlay BETWEEN two separate `run()` calls. A runner that
+  // reads the overlay once per `run()` (cached at the top of the call)
+  // rather than once per tool call still passes that version, because each
+  // `run()` only ever made one tool call. This version drives THREE tool
+  // calls inside a SINGLE `run()` (via maxTurns), mutating the overlay
+  // between them, so a once-per-run cache would make call 2 miss the
+  // just-minted credential — and it also drives the overlay back to
+  // undefined between calls 2 and 3, so a stale reference that keeps
+  // returning the old value after a clear would make call 3 wrongly still
+  // see it. A test that only ever asserts "present" can't fail that second
+  // way, so this one asserts "absent", "present", then "absent" again.
+  it('is read fresh at EVERY tool call inside one run, and does not leak into a later call once cleared', async () => {
     let overlay: Record<string, string> | undefined = undefined;
     const mockTool = { name: 'bash', description: 'mock bash', schema: {} } as unknown as Tool;
-    const execute = vi
-      .fn()
-      .mockResolvedValue({ status: 'completed', content: [{ type: 'text', text: 'ok' }] });
+    const toolCallIds = ['tc_1', 'tc_2', 'tc_3'];
+    let callIndex = 0;
+
+    class ThreeToolCallProvider extends AIProvider {
+      get providerName(): string {
+        return 'env-overlay-test-3call';
+      }
+      isConfigured(): boolean {
+        return true;
+      }
+      get supportsStreaming(): boolean {
+        return true;
+      }
+      async createResponse(
+        messages: ProviderMessage[],
+        tools: Tool[],
+        model: string,
+        signal?: AbortSignal,
+        conversationState?: ConversationState,
+        options?: RequestOptions
+      ): Promise<ProviderResponse> {
+        return this.createStreamingResponse(
+          messages,
+          tools,
+          model,
+          signal,
+          conversationState,
+          options
+        );
+      }
+      async createStreamingResponse(): Promise<ProviderResponse> {
+        const id = toolCallIds[Math.min(callIndex, toolCallIds.length - 1)];
+        return {
+          content: '',
+          toolCalls: [{ id, name: 'bash', arguments: { command: 'true' } }],
+          stopReason: 'tool_use',
+        };
+      }
+    }
+
+    const execute = vi.fn().mockImplementation(async () => {
+      // Mutate the overlay AFTER reading it for this call (the mock runs
+      // synchronously with respect to the runner's env-overlay read, which
+      // happens before toolExecutor.execute is invoked — see runner.ts's
+      // executeToolByName), so this models the credential changing state
+      // strictly BETWEEN tool calls, never mid-call.
+      callIndex++;
+      if (callIndex === 1) {
+        // "Mint" the credential right after call 1 resolves, as sen-core's
+        // broker would via ent/session/env_overlay/set.
+        overlay = { LATE_CRED: 'test-placeholder-xyz' };
+      } else if (callIndex === 2) {
+        // Clear it right after call 2 resolves (session end / explicit clear).
+        overlay = undefined;
+      }
+      return { status: 'completed', content: [{ type: 'text', text: 'ok' }] };
+    });
 
     const deps = createMockDeps({
-      createProvider: vi
-        .fn()
-        .mockImplementation(async () => new SingleToolCallProvider('tc_1', 'bash')),
+      createProvider: vi.fn().mockImplementation(async () => new ThreeToolCallProvider()),
       createToolExecutor: vi.fn().mockReturnValue({
         executor: { getTool: vi.fn().mockReturnValue(mockTool), execute },
         toolsForProvider: [mockTool],
       }),
-      // Returns whatever `overlay` currently points to — mutated BETWEEN runs
-      // below, simulating a credential minted mid-session via
-      // ent/session/env_overlay/set after the runner was already constructed.
       getEnvOverlay: () => overlay,
     });
 
@@ -313,30 +374,29 @@ describe('ConversationRunner env overlay (PRI-3672)', () => {
     );
 
     await runner.run({
-      content: [{ type: 'text', text: 'first' }],
+      content: [{ type: 'text', text: 'go' }],
       abortController: new AbortController(),
       turnId: `turn_${randomUUID()}`,
       startedAt: new Date().toISOString(),
-      maxTurns: 1,
+      maxTurns: 3,
     });
-    expect(
-      (execute.mock.calls[0][1] as { processEnv?: Record<string, string> }).processEnv
-    ).not.toMatchObject({ LATE_CRED: 'test-placeholder-xyz' });
 
-    // "Mint" the credential mid-session, as sen-core's broker would via
-    // ent/session/env_overlay/set — no new ConversationRunner is constructed.
-    overlay = { LATE_CRED: 'test-placeholder-xyz' };
+    // All three tool calls happened inside this ONE run() call.
+    expect(execute).toHaveBeenCalledTimes(3);
 
-    await runner.run({
-      content: [{ type: 'text', text: 'second' }],
-      abortController: new AbortController(),
-      turnId: `turn_${randomUUID()}`,
-      startedAt: new Date().toISOString(),
-      maxTurns: 1,
-    });
-    expect(execute).toHaveBeenCalledTimes(2);
-    expect(
-      (execute.mock.calls[1][1] as { processEnv?: Record<string, string> }).processEnv
-    ).toMatchObject({ LATE_CRED: 'test-placeholder-xyz' });
+    const envAt = (callNumber: number) =>
+      (execute.mock.calls[callNumber - 1][1] as { processEnv?: Record<string, string> }).processEnv;
+
+    // Call 1: overlay not minted yet. Fails if the overlay is somehow applied
+    // before it was ever set (e.g. a stale default).
+    expect(envAt(1)).not.toMatchObject({ LATE_CRED: 'test-placeholder-xyz' });
+    // Call 2: overlay was minted between calls 1 and 2, inside this same run.
+    // Fails (a once-per-run cache would miss this) if the overlay isn't
+    // applied.
+    expect(envAt(2)).toMatchObject({ LATE_CRED: 'test-placeholder-xyz' });
+    // Call 3: overlay was cleared between calls 2 and 3, inside this same
+    // run. Fails if a previously-forwarded credential leaks into a later
+    // call that shouldn't have it.
+    expect(envAt(3)).not.toMatchObject({ LATE_CRED: 'test-placeholder-xyz' });
   });
 });
