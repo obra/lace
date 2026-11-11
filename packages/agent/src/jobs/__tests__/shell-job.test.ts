@@ -348,4 +348,109 @@ describe('createRunShellJobProcess', () => {
       );
     });
   });
+
+  // PRI-3672: `bash background:true` runs through this file, not through
+  // ToolContext.processEnv (bash.ts's foreground path), so without its own
+  // wiring a background job silently never sees a credential the agent just
+  // minted — a divergence a reviewer would have to notice by comparing two
+  // code paths, not something a type error or a foreground-only test catches.
+  it('forwards the live credential env overlay to the spawned process', async () => {
+    const mutableState = {
+      activeSession: {
+        dir: '/tmp/test-session',
+        meta: {
+          sessionId: 'sess_overlay',
+          workDir: '/tmp',
+          projectId: 'test-project',
+          rootDir: '/tmp',
+          personaId: 'default',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      } as LoadedSession,
+      config: { approvalMode: 'dangerouslySkipPermissions' as const },
+      jobStreaming: 'none' as const,
+      // Fake placeholder shape, not a real credential value.
+      getEnvOverlay: () => ({ MINTED_CRED: 'test-fake-placeholder-overlay' }),
+    };
+
+    const runShellJobProcess = createRunShellJobProcess({
+      getState: () => mutableState,
+      runExclusive: vi.fn().mockImplementation(<T>(fn: () => T) => fn()),
+      emitSessionUpdate: vi.fn().mockResolvedValue(undefined),
+      requestPermissionFromClient: vi.fn().mockResolvedValue({ decision: 'allow' }),
+      finalizeJob: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const job: JobState = {
+      jobId: 'job_overlay_present',
+      type: 'bash',
+      status: 'running',
+      command: 'true',
+      startedAt: new Date().toISOString(),
+      outputPath: '/tmp/test-output',
+      finished: false,
+      completion: Promise.resolve(),
+      resolveCompletion: vi.fn(),
+    };
+
+    runShellJobProcess(job);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    const spawnOptions = mockSpawn.mock.calls[0][2] as { env?: Record<string, string> };
+    // Fails if the overlay never reaches the background job's spawned process.
+    expect(spawnOptions.env).toMatchObject({ MINTED_CRED: 'test-fake-placeholder-overlay' });
+  });
+
+  it('does not forward a stale credential once the overlay is gone', async () => {
+    const mutableState = {
+      activeSession: {
+        dir: '/tmp/test-session',
+        meta: {
+          sessionId: 'sess_overlay_cleared',
+          workDir: '/tmp',
+          projectId: 'test-project',
+          rootDir: '/tmp',
+          personaId: 'default',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      } as LoadedSession,
+      config: { approvalMode: 'dangerouslySkipPermissions' as const },
+      jobStreaming: 'none' as const,
+      // Simulates the overlay having been cleared (session end / expiry) by
+      // the time this background job actually spawns its process.
+      getEnvOverlay: () => undefined,
+    };
+
+    const runShellJobProcess = createRunShellJobProcess({
+      getState: () => mutableState,
+      runExclusive: vi.fn().mockImplementation(<T>(fn: () => T) => fn()),
+      emitSessionUpdate: vi.fn().mockResolvedValue(undefined),
+      requestPermissionFromClient: vi.fn().mockResolvedValue({ decision: 'allow' }),
+      finalizeJob: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const job: JobState = {
+      jobId: 'job_overlay_absent',
+      type: 'bash',
+      status: 'running',
+      command: 'true',
+      startedAt: new Date().toISOString(),
+      outputPath: '/tmp/test-output',
+      finished: false,
+      completion: Promise.resolve(),
+      resolveCompletion: vi.fn(),
+    };
+
+    runShellJobProcess(job);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    const spawnOptions = mockSpawn.mock.calls[0][2] as { env?: Record<string, string> };
+    // Fails if a previously-forwarded credential leaks into a later
+    // background job that was never given one.
+    expect(spawnOptions.env).not.toHaveProperty('MINTED_CRED');
+  });
 });
