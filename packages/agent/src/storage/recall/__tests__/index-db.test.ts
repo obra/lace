@@ -1,11 +1,13 @@
 // ABOUTME: Tests for index-db.ts — SQLite FTS5 opener for the recall index
 // ABOUTME: Verifies schema creation, idempotency, and FTS round-trip on real SQLite
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { closeRecallIndex, getRecallIndex, openRecallIndex } from '../index-db';
+import { closeRecallIndex, getRecallIndex, openRecallIndex, type Db } from '../index-db';
+import { insertRow } from '../index-writer';
 
 describe('openRecallIndex', () => {
   let dir: string | undefined;
@@ -53,6 +55,34 @@ describe('openRecallIndex', () => {
       expect(tables).toHaveLength(1);
     } finally {
       db.close();
+    }
+  });
+
+  it('opens a current index for reads while another connection holds the write lock', () => {
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-'));
+    const dbPath = join(dir, 'index.sqlite');
+    const writer = openRecallIndex(dbPath);
+    try {
+      const append = writer.prepare('INSERT INTO events (content) VALUES (?)');
+      append.run('committed transcript');
+      writer
+        .transaction(() => {
+          append.run('uncommitted transcript');
+          const reader = openRecallIndex(dbPath);
+          try {
+            expect(
+              reader
+                .prepare("SELECT content FROM events WHERE events MATCH 'transcript'")
+                .pluck()
+                .all()
+            ).toEqual(['committed transcript']);
+          } finally {
+            reader.close();
+          }
+        })
+        .immediate();
+    } finally {
+      writer.close();
     }
   });
 
@@ -139,7 +169,7 @@ describe('schema version and track column', () => {
         | { value: string }
         | undefined;
       expect(row).toBeDefined();
-      expect(Number(row!.value)).toBeGreaterThan(0);
+      expect(row!.value).toBe('3');
     } finally {
       db.close();
     }
@@ -172,13 +202,12 @@ describe('schema version and track column', () => {
     }
   });
 
-  it('rebuilds the events table when the DB has an older schema version', async () => {
+  it('rebuilds the events table when the DB has an older schema version', () => {
     dir = mkdtempSync(join(tmpdir(), 'recall-idx-rebuild-'));
     const dbPath = join(dir, 'index.sqlite');
 
     // Simulate an old DB: create the old 6-column schema (no track) manually,
     // set _meta.schema_version to 0 so openRecallIndex detects a stale schema.
-    const Database = (await import('better-sqlite3')).default;
     const oldDb = new Database(dbPath);
     oldDb.exec(`
       CREATE VIRTUAL TABLE events USING fts5(
@@ -228,6 +257,82 @@ describe('schema version and track column', () => {
       // Old rows were dropped (backfill repopulates them — that's the known trade-off)
       const oldRow = db.prepare(`SELECT 1 FROM events WHERE event_id = ?`).get('sess_y:1');
       expect(oldRow).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('preserves rows written by another opener that finished the rebuild first', () => {
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-rebuild-'));
+    const dbPath = join(dir, 'index.sqlite');
+    const oldDb = openRecallIndex(dbPath);
+    try {
+      oldDb.exec("UPDATE _meta SET value = '2' WHERE key = 'schema_version'");
+    } finally {
+      oldDb.close();
+    }
+
+    const transaction = Database.prototype.transaction;
+    // Let the sibling finish the rebuild after the first version read and
+    // before the outer opener acquires the write lock.
+    const boundary = vi.spyOn(Database.prototype, 'transaction').mockImplementationOnce(function (
+      this: Db,
+      fn
+    ) {
+      const sibling = openRecallIndex(dbPath);
+      try {
+        sibling.prepare('INSERT INTO events (content) VALUES (?)').run('sibling transcript');
+      } finally {
+        sibling.close();
+      }
+      return transaction.call(this, fn);
+    });
+    try {
+      const db = openRecallIndex(dbPath);
+      try {
+        expect(db.prepare('SELECT content FROM events').pluck().all()).toEqual([
+          'sibling transcript',
+        ]);
+      } finally {
+        db.close();
+      }
+    } finally {
+      boundary.mockRestore();
+    }
+  });
+
+  it('resets the derived keys and rowid marker when the FTS index is rebuilt', () => {
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-rebuild-'));
+    const dbPath = join(dir, 'index.sqlite');
+    const before = openRecallIndex(dbPath);
+    try {
+      before.exec(`
+        CREATE TABLE IF NOT EXISTS event_keys (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL);
+        INSERT INTO event_keys VALUES ('sess_x:1', 'sess_x');
+        INSERT INTO _meta VALUES ('events_last_rowid', '42');
+        UPDATE _meta SET value = '2' WHERE key = 'schema_version';
+      `);
+    } finally {
+      before.close();
+    }
+
+    const db = openRecallIndex(dbPath);
+    try {
+      expect(db.prepare('SELECT event_id FROM event_keys').pluck().all()).toEqual([]);
+      expect(
+        db.prepare("SELECT value FROM _meta WHERE key = 'events_last_rowid'").pluck().get()
+      ).toBeUndefined();
+
+      insertRow(db, {
+        event_id: 'sess_x:1',
+        session_id: 'sess_x',
+        ts: '2026-06-01T00:00:00Z',
+        persona: null,
+        kind: 'user_message',
+        content: 'repopulated',
+        track: null,
+      });
+      expect(db.prepare('SELECT content FROM events').pluck().all()).toEqual(['repopulated']);
     } finally {
       db.close();
     }

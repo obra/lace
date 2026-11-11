@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
 import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../transcript-paths';
+import { EVENT_KEYS_SCHEMA, resetEventKeys } from './event-keys';
 
 export type { Db };
 
@@ -142,32 +143,26 @@ function applySchema(db: Db): void {
     );
   `);
 
-  // The journal is a plain table (not FTS5), so it can be created additively
-  // every open without dropping data. Run it unconditionally — independent of
-  // the FTS version gate below — so existing DBs gain the table without losing
-  // their FTS index, and so a brand-new DB has it before any write-through.
+  // Create the ordinary tables independently of the FTS version so an
+  // existing index gains them without a rebuild.
   db.exec(EVENT_JOURNAL_SCHEMA);
+  db.exec(EVENT_KEYS_SCHEMA);
 
-  const metaRow = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).get() as
-    | { value: string }
-    | undefined;
+  const readVersion = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).pluck();
+  if (Number(readVersion.get()) === SCHEMA_VERSION) return;
 
-  const storedVersion = metaRow !== undefined ? Number(metaRow.value) : 0;
+  db.transaction(() => {
+    // Another opener may have finished the rebuild while we waited for the
+    // write lock. Recheck before dropping any FTS data.
+    if (Number(readVersion.get()) === SCHEMA_VERSION) return;
 
-  if (storedVersion === SCHEMA_VERSION) {
-    // Schema is current — nothing to do.
-    return;
-  }
-
-  // Version mismatch (or first open on a DB that never had _meta).
-  // Drop the existing FTS5 table (if any) and recreate with the current schema.
-  // FTS5 stores index data in shadow tables named events_*, so a simple
-  // DROP TABLE on the virtual table removes them all.
-  db.exec(`DROP TABLE IF EXISTS events;`);
-  db.exec(EVENTS_SCHEMA);
-  db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
-    String(SCHEMA_VERSION)
-  );
+    db.exec(`DROP TABLE IF EXISTS events;`);
+    db.exec(EVENTS_SCHEMA);
+    resetEventKeys(db);
+    db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
+      String(SCHEMA_VERSION)
+    );
+  }).immediate();
 }
 
 let _instance: Db | null = null;

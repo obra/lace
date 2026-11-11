@@ -1,7 +1,8 @@
 // ABOUTME: Tests for backfill.ts — one-time-per-startup catch-up scan of JSONL transcripts
 // ABOUTME: Covers new and legacy layouts, partial-index resume, idempotency, and _unknown bucket
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -325,6 +326,84 @@ describe('backfillIndex', () => {
       `${sessionId}:4`,
       `${sessionId}:5`,
     ]);
+  });
+
+  it('counts an event committed just before the backfill write lock as already indexed', () => {
+    const sessionId = SESSION_IDS.partial;
+    const dir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(dir, { recursive: true });
+    writeJsonl(join(dir, `${sessionId}.jsonl`), [promptEvent(1, 'one'), promptEvent(2, 'two')]);
+
+    const sibling = new Database(join(laceDir, 'recall', 'index.sqlite'));
+    const transaction = db.transaction.bind(db);
+    // Commit from a second connection before the first per-session BEGIN IMMEDIATE.
+    // A membership snapshot taken before the lock won't include this event.
+    const boundary = vi.spyOn(db, 'transaction').mockImplementationOnce((fn) => {
+      sibling
+        .prepare('INSERT INTO events (event_id, session_id, content) VALUES (?, ?, ?)')
+        .run(`${sessionId}:2`, sessionId, 'sibling writer');
+      return transaction(fn);
+    });
+    try {
+      expect(backfillIndex(db, laceDir)).toEqual({
+        scanned: 2,
+        inserted: 1,
+        skipped: 1,
+        errors: 0,
+      });
+      expect(allRows(db).map((r) => r.content)).toEqual(['one', 'sibling writer']);
+    } finally {
+      boundary.mockRestore();
+      sibling.close();
+    }
+  });
+
+  it('rolls back a failed FTS row while retaining successful rows in the session', () => {
+    const sessionId = SESSION_IDS.partial;
+    const dir = join(laceDir, 'transcripts', 'ada', '2026-05-23');
+    mkdirSync(dir, { recursive: true });
+    writeJsonl(join(dir, `${sessionId}.jsonl`), [
+      promptEvent(1, 'one'),
+      promptEvent(2, 'two'),
+      promptEvent(3, 'three'),
+    ]);
+    // Fail the marker write only after the FTS row exists. The outer session
+    // transaction catches the error and must still commit the other rows.
+    db.exec(`
+      CREATE TRIGGER reject_marker BEFORE INSERT ON _meta
+      WHEN NEW.key = 'events_last_rowid'
+        AND EXISTS (SELECT 1 FROM events WHERE event_id = '${sessionId}:2')
+      BEGIN
+        SELECT RAISE(ABORT, 'injected marker failure');
+      END;
+    `);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(backfillIndex(db, laceDir)).toEqual({
+        scanned: 3,
+        inserted: 2,
+        skipped: 0,
+        errors: 1,
+      });
+      expect(allRows(db).map((r) => r.content)).toEqual(['one', 'three']);
+      expect(db.prepare('SELECT event_id FROM event_keys ORDER BY event_id').pluck().all()).toEqual(
+        [`${sessionId}:1`, `${sessionId}:3`]
+      );
+      expect(
+        db.prepare('SELECT event_seq FROM event_journal ORDER BY event_seq').pluck().all()
+      ).toEqual([1, 2, 3]);
+
+      db.exec('DROP TRIGGER reject_marker');
+      expect(backfillIndex(db, laceDir)).toEqual({
+        scanned: 3,
+        inserted: 1,
+        skipped: 2,
+        errors: 0,
+      });
+      expect(allRows(db).map((r) => r.content)).toEqual(['one', 'two', 'three']);
+    } finally {
+      error.mockRestore();
+    }
   });
 
   it('does not skip legacy events when new-layout for same session is processed first (C1/A1)', () => {
