@@ -271,6 +271,14 @@ const MAX_EMERGENCY_COMPACTIONS = 2;
 const CLEAN_STOP_REASONS = new Set(['end_turn', 'stop_sequence', 'max_turns']);
 
 /**
+ * Stops where a person or a policy chose to end the work. A compaction emits
+ * `compaction_complete`, and hosts answer that by waking the agent to resume
+ * in-flight work, which would undo the stop. Every other non-clean stop is a
+ * failure, and a session over its compact level must still compact after one.
+ */
+const DELIBERATE_STOP_REASONS = new Set(['cancelled', 'permission_cancelled', 'budget_exceeded']);
+
+/**
  * The reminder injected at the bare-text stop-checkpoint (model returned text,
  * no tool call, after a tool round-trip). Normally it nudges the model to verify
  * its work before stopping. But if a message was injected mid-turn, that ritual
@@ -1604,9 +1612,7 @@ export class ConversationRunner {
       // after the turn_end write. Uses the raw appendDurableEvent +
       // writeSessionState path (no writeAndAdvance) so we don't acquire a
       // nested runExclusive lock and deadlock. Failures are logged but never
-      // abort the turn — pressure stays high and the next clean turn
-      // re-evaluates. The clean-stop-reason gate below (compactionRequest gate
-      // skips it) mirrors the prior shouldFireCompaction gate.
+      // abort the turn — pressure stays high and the next turn re-evaluates.
       try {
         const usage = {
           inputTokens: totalInputTokens,
@@ -1622,12 +1628,23 @@ export class ConversationRunner {
 
         const isCleanStop = CLEAN_STOP_REASONS.has(stopReason);
 
-        // Evaluate persona breakpoints (only on clean stops; compactionRequest
-        // bypasses the clean-stop gate entirely so the agent can explicitly
-        // request compaction at any stop reason).
+        // Evaluate persona breakpoints. compactionRequest bypasses this
+        // entirely so the agent can explicitly request compaction at any stop
+        // reason.
+        //
+        // A failed turn can still compact. Its pressure comes from the last
+        // call that succeeded before the failure, a lower bound on what the
+        // next request will send. Without this, a session that fails every
+        // turn once it is large (gateway timeouts, cut streams) is never
+        // compacted and grows until the provider rejects it outright.
+        //
+        // Notify and reset stay clean-stop-only. A failure before any call
+        // reported usage measures zero pressure, which is an absence of
+        // measurement and must not reset the latch; and a pressure notice on
+        // a failed turn is noise the next clean turn delivers anyway.
         let breakpointCompactCrossed = false;
         let pendingBreakpointLatch: number | null = null;
-        if (isCleanStop) {
+        if (!DELIBERATE_STOP_REASONS.has(stopReason)) {
           const breakpoints = compactionBreakpointsForPersona(
             this.config.persona ?? null,
             this.deps.personaRegistry ?? personaRegistry,
@@ -1640,13 +1657,13 @@ export class ConversationRunner {
             highestFiredAt: currentHighestFiredAt,
           });
 
-          if (ev.reset) {
+          if (ev.reset && isCleanStop) {
             // Pressure has dropped below all breakpoints: reset once-per-crossing state
             await this.deps.runExclusive(() => {
               const sessionState = readSessionState(sessionDir);
               writeSessionState(sessionDir, { ...sessionState, highestFiredBreakpointAt: 0 });
             });
-          } else if (ev.fire?.action === 'notify') {
+          } else if (ev.fire?.action === 'notify' && isCleanStop) {
             // Notify action: inject a notification and persist the crossed level
             const pressurePct = Math.round(pressure * 100);
             await this.deps.runExclusive(() => {
@@ -1700,7 +1717,7 @@ export class ConversationRunner {
           // sessions, zero `context_compacted` events, some of them twenty
           // turns long at 63% of their window.
           //
-          // Leaving the latch alone means the next clean turn re-evaluates and
+          // Leaving the latch alone means the next turn re-evaluates and
           // tries again. Retrying is cheap — track-based is pure and takes no
           // model call — and it is the only thing that lets a session compact
           // as soon as it becomes able to.
