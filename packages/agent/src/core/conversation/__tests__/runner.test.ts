@@ -2408,11 +2408,10 @@ describe('ConversationRunner', () => {
       expect(result.usage.contextWindow).toBe(524_288);
     });
 
-    it('does not fire compaction when provider throws (non-clean stop reason)', async () => {
-      // When the provider throws, the runner sets stopReason = mapErrorToStopReason(err)
-      // which produces 'internal_error', 'provider_error_overloaded', etc. — all
-      // non-clean stop reasons that must NOT trigger compaction, even at emergency
-      // pressure levels.
+    it('does not fire compaction when the provider throws before reporting usage', async () => {
+      // The provider fails on its first call, so the turn measured no context
+      // and no breakpoint is crossed. A failure AFTER a call measured past the
+      // compact level does compact; runner.breakpoints.test.ts covers that.
       class ThrowingHighPressureProvider extends AIProvider {
         get providerName(): string {
           return 'throwing-high-pressure';

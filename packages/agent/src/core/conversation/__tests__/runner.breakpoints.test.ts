@@ -15,7 +15,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConversationRunner } from '../runner';
 import type { RunnerConfig, RunnerDependencies } from '../types';
 import { invalidatePersonaCache, readDurableEvents } from '@lace/agent/storage/event-log';
-import { readSessionState } from '@lace/agent/storage/session-store';
+import { readSessionState, writeSessionState } from '@lace/agent/storage/session-store';
 import {
   AIProvider,
   type ProviderResponse,
@@ -865,13 +865,13 @@ describe('ConversationRunner - configurable breakpoints', () => {
     expect(compactedCount2).toBe(compactedCount1);
   });
 
-  it('error stop reason (via thrown error) does not fire breakpoints', async () => {
+  it('a provider error before any call reports usage fires no breakpoint', async () => {
     // Persona breakpoints: compact at 0.5
     mockBreakpoints.mockReturnValue([{ at: 0.5, action: 'compact' }]);
     seedSession(sessionDir, sessionId, cwd, 'compact-gate');
 
-    // Provider throws an overloaded error → mapErrorToStopReason → 'provider_error_overloaded'
-    // which is NOT in CLEAN_STOP_REASONS → breakpoints should not fire
+    // Provider throws an overloaded error on the first call, so the turn
+    // measured no context at all and no breakpoint is crossed.
     class ThrowingProvider extends AIProvider {
       get providerName() {
         return 'throwing-test';
@@ -939,6 +939,203 @@ describe('ConversationRunner - configurable breakpoints', () => {
     const state = readSessionState(sessionDir);
     expect(state.highestFiredBreakpointAt ?? 0).toBe(0);
   });
+
+  // -------------------------------------------------------------------------
+  // A compact breakpoint crossed on a failed turn still compacts
+  // -------------------------------------------------------------------------
+  //
+  // A long session can sit just under its compact level on its last clean turn
+  // and then fail every turn after that: a gateway times the oversized request
+  // out, or the stream is cut. Those turns still measured their context on the
+  // calls that succeeded before the failure, and that measurement crossed the
+  // compact level. If only clean turns could compact, nothing would stop the
+  // session growing until the provider rejected it outright.
+
+  /**
+   * Answers its first call with a tool call that measured `promptTokens` of
+   * context, then fails the next call the way a gateway does. `onSecondCall`
+   * runs instead of the failure when given.
+   */
+  function toolCallThenFailure(promptTokens: number, onSecondCall?: () => ProviderResponse) {
+    class ToolCallThenFailureProvider extends AIProvider {
+      private calls = 0;
+      get providerName() {
+        return 'tool-call-then-failure';
+      }
+      getProviderInfo() {
+        return { name: 'tool-call-then-failure', displayName: 'Failing', requiresApiKey: false };
+      }
+      isConfigured() {
+        return true;
+      }
+      get supportsStreaming() {
+        return true;
+      }
+      override contextWindowForModel() {
+        return 1_000_000;
+      }
+      async createResponse(): Promise<ProviderResponse> {
+        return this.createStreamingResponse();
+      }
+      async createStreamingResponse(): Promise<ProviderResponse> {
+        this.calls++;
+        if (this.calls === 1) {
+          return {
+            content: '',
+            toolCalls: [{ id: 'tc_todo', name: 'todo_read', arguments: {} }],
+            stopReason: 'tool_use',
+            usage: { promptTokens, completionTokens: 10, totalTokens: promptTokens + 10 },
+          };
+        }
+        if (onSecondCall) return onSecondCall();
+        throw new Error('scheduler admission timeout');
+      }
+    }
+    return new ToolCallThenFailureProvider();
+  }
+
+  function runnerFor(persona: string, provider: AIProvider) {
+    const executor = new ToolExecutor();
+    executor.registerAllAvailableTools({ skillDirs: [] } as any);
+    return new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve', persona },
+      createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+        createToolExecutor: vi.fn().mockReturnValue({
+          executor,
+          toolsForProvider: executor.getAllTools(),
+        }),
+      })
+    );
+  }
+
+  async function runExpectingFailure(
+    runner: ConversationRunner,
+    abortController?: AbortController
+  ) {
+    try {
+      await runner.run({
+        content: [{ type: 'text', text: 'hello' }],
+        abortController: abortController ?? new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+    } catch {
+      // A provider failure is rethrown after turn_end is written.
+    }
+    return readDurableEvents(sessionDir, { limit: Number.MAX_SAFE_INTEGER }).events;
+  }
+
+  const lastStopReason = (events: ReturnType<typeof readDurableEvents>['events']) =>
+    events.filter((e) => e.type === 'turn_end').at(-1)?.data.stopReason;
+
+  const LONG_SESSION_BREAKPOINTS = [
+    { at: 0.55, action: 'notify' as const },
+    { at: 0.75, action: 'notify' as const },
+    { at: 0.9, action: 'compact' as const },
+  ];
+
+  it('a provider error after a call measured past the compact level compacts', async () => {
+    mockBreakpoints.mockReturnValue(LONG_SESSION_BREAKPOINTS);
+    seedSession(sessionDir, sessionId, cwd, 'long-session');
+    writeSessionState(sessionDir, {
+      ...readSessionState(sessionDir),
+      highestFiredBreakpointAt: 0.75,
+    });
+
+    const events = await runExpectingFailure(
+      runnerFor('long-session', toolCallThenFailure(935_000))
+    );
+
+    expect(lastStopReason(events)).toBe('provider_error_other');
+    expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
+    expect(readSessionState(sessionDir).highestFiredBreakpointAt).toBe(0.9);
+  });
+
+  it('a provider error below the compact level neither compacts nor notifies', async () => {
+    mockBreakpoints.mockReturnValue(LONG_SESSION_BREAKPOINTS);
+    seedSession(sessionDir, sessionId, cwd, 'long-session');
+
+    // 80% crosses both notify levels, but notifications stay clean-stop-only.
+    const events = await runExpectingFailure(
+      runnerFor('long-session', toolCallThenFailure(800_000))
+    );
+
+    expect(lastStopReason(events)).toBe('provider_error_other');
+    expect(events.some((e) => e.type === 'context_compacted')).toBe(false);
+    expect(events.some((e) => e.type === 'context_injected')).toBe(false);
+    expect(readSessionState(sessionDir).highestFiredBreakpointAt ?? 0).toBe(0);
+  });
+
+  it('a provider error that measured nothing leaves a spent breakpoint spent', async () => {
+    mockBreakpoints.mockReturnValue(LONG_SESSION_BREAKPOINTS);
+    seedSession(sessionDir, sessionId, cwd, 'long-session');
+    writeSessionState(sessionDir, {
+      ...readSessionState(sessionDir),
+      highestFiredBreakpointAt: 0.9,
+    });
+
+    // The very first call fails, so the turn's measured pressure is zero. That
+    // is an absence of measurement, not a session that shrank below every level.
+    class FailsImmediatelyProvider extends AIProvider {
+      get providerName() {
+        return 'fails-immediately';
+      }
+      getProviderInfo() {
+        return { name: 'fails-immediately', displayName: 'Failing', requiresApiKey: false };
+      }
+      isConfigured() {
+        return true;
+      }
+      get supportsStreaming() {
+        return true;
+      }
+      override contextWindowForModel() {
+        return 1_000_000;
+      }
+      async createResponse(): Promise<ProviderResponse> {
+        return this.createStreamingResponse();
+      }
+      async createStreamingResponse(): Promise<ProviderResponse> {
+        throw new Error('scheduler admission timeout');
+      }
+    }
+
+    const events = await runExpectingFailure(
+      runnerFor('long-session', new FailsImmediatelyProvider())
+    );
+
+    expect(lastStopReason(events)).toBe('provider_error_other');
+    expect(readSessionState(sessionDir).highestFiredBreakpointAt).toBe(0.9);
+  });
+
+  it('a cancelled turn past the compact level does not compact', async () => {
+    // A compaction tells the host to wake the agent and resume in-flight work,
+    // which would undo the cancel.
+    mockBreakpoints.mockReturnValue(LONG_SESSION_BREAKPOINTS);
+    seedSession(sessionDir, sessionId, cwd, 'long-session');
+    const abortController = new AbortController();
+
+    const events = await runExpectingFailure(
+      runnerFor(
+        'long-session',
+        toolCallThenFailure(935_000, () => {
+          abortController.abort();
+          return {
+            content: 'interrupted',
+            toolCalls: [],
+            stopReason: 'end_turn',
+            usage: { promptTokens: 935_000, completionTokens: 10, totalTokens: 935_010 },
+          };
+        })
+      ),
+      abortController
+    );
+
+    expect(lastStopReason(events)).toBe('cancelled');
+    expect(events.some((e) => e.type === 'context_compacted')).toBe(false);
+  });
+
   // -------------------------------------------------------------------------
   // A compaction that did nothing must not consume the breakpoint (PRI-2945)
   // -------------------------------------------------------------------------
