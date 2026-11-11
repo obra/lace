@@ -29,6 +29,15 @@ export type ShellJobContext = {
     jobStreaming: 'full' | 'coalesced' | 'none';
     containerManager?: ProjectedContainerManager | null;
     runtimeSecretResolver?: RuntimeSecretResolver;
+    /**
+     * The live credential env overlay (PRI-3672), read fresh right before
+     * spawning this job's process — the background-job equivalent of the
+     * runner's `dynamicEnvOverlay = this.deps.getEnvOverlay?.()` read at every
+     * foreground tool call. Without this, `bash background:true` is a way to
+     * run a shell command that never sees a credential the agent just minted,
+     * silently diverging from foreground bash (bash.ts's `processEnv`).
+     */
+    getEnvOverlay?: () => Record<string, string> | undefined;
   };
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   emitSessionUpdate: (
@@ -218,10 +227,18 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
           secretResolver: state.runtimeSecretResolver,
         });
         const detached = process.platform !== 'win32';
+        // Read fresh right before spawning — the background-job counterpart
+        // of the runner's per-foreground-tool-call env overlay read (PRI-3672).
+        // `env` here is `RuntimeProcessOptions.env`, exactly the field
+        // bash.ts passes as `context.processEnv` for foreground bash; a
+        // background job must reach the same place or it silently misses any
+        // credential the agent just minted.
+        const envOverlay = state.getEnvOverlay?.();
         proc = await runtime.process.start(['/bin/bash', '-c', job.command ?? ''], {
           detached,
           // /dev/null, not an open unwritten pipe — see PRI-3243.
           stdin: 'ignore',
+          ...(envOverlay ? { env: envOverlay } : {}),
         });
         job.proc = createJobProcessAdapter(proc, { processGroup: detached });
       } catch (error) {

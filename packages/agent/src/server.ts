@@ -19,6 +19,7 @@ import { ToolExecutor } from './tools/executor';
 import type { Tool as CoreTool } from '@lace/agent/tools/tool';
 import type { SkillRegistry } from '@lace/agent/skills';
 import { createRunShellJobProcess } from './jobs/shell-job';
+import { liveEnvOverlay } from './core/env-overlay';
 import { runSubagentJobProcess as runSubagentJobProcessImpl } from './jobs/subagent-job';
 import {
   createQueueJobNotification,
@@ -437,6 +438,9 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
       jobStreaming: state.jobManager.getStreamingMode(),
       containerManager: state.containerManager,
       runtimeSecretResolver: state.runtimeSecretResolver,
+      // bash background:true must see the same credential env overlay
+      // foreground bash does (PRI-3672) — see shell-job.ts's getEnvOverlay use.
+      getEnvOverlay: () => liveEnvOverlay(state),
     }),
     runExclusive,
     emitSessionUpdate,
