@@ -104,7 +104,7 @@ export function openRecallIndex(dbPath: string): Db {
   // BUSY, re-read the mode — most often a sibling process won the race and
   // already put it in WAL. Only re-throw if it's still not WAL.
   ensureWalMode(db);
-  db.transaction(() => applySchema(db)).immediate();
+  applySchema(db);
   // Apply 0o600 to the index file and any WAL/SHM sidecars. In-memory
   // databases (dbPath === ':memory:') have no on-disk file; skip them.
   if (dbPath !== ':memory:') {
@@ -148,27 +148,21 @@ function applySchema(db: Db): void {
   db.exec(EVENT_JOURNAL_SCHEMA);
   db.exec(EVENT_KEYS_SCHEMA);
 
-  const metaRow = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).get() as
-    | { value: string }
-    | undefined;
+  const readVersion = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).pluck();
+  if (Number(readVersion.get()) === SCHEMA_VERSION) return;
 
-  const storedVersion = metaRow !== undefined ? Number(metaRow.value) : 0;
+  db.transaction(() => {
+    // Another opener may have finished the rebuild while we waited for the
+    // write lock. Recheck before dropping any FTS data.
+    if (Number(readVersion.get()) === SCHEMA_VERSION) return;
 
-  if (storedVersion === SCHEMA_VERSION) {
-    // Schema is current — nothing to do.
-    return;
-  }
-
-  // Version mismatch (or first open on a DB that never had _meta).
-  // Drop the existing FTS5 table (if any) and recreate with the current schema.
-  // FTS5 stores index data in shadow tables named events_*, so a simple
-  // DROP TABLE on the virtual table removes them all.
-  db.exec(`DROP TABLE IF EXISTS events;`);
-  db.exec(EVENTS_SCHEMA);
-  resetEventKeys(db);
-  db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
-    String(SCHEMA_VERSION)
-  );
+    db.exec(`DROP TABLE IF EXISTS events;`);
+    db.exec(EVENTS_SCHEMA);
+    resetEventKeys(db);
+    db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
+      String(SCHEMA_VERSION)
+    );
+  }).immediate();
 }
 
 let _instance: Db | null = null;
