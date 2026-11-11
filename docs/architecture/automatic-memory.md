@@ -347,9 +347,11 @@ merging is reported separately from validation, which consumes the final lazy
 merge. Reused preparations report coverage and validation only.
 
 The passage and current-vector counts can use metadata indexes, avoiding a scan
-of vector-bearing rows. The writable root creates the partial vector index once
-when initializing a store that lacks it. A read-only store can still compute
-exact coverage without it.
+of vector-bearing rows. Passage vector maintenance seeks pending generations in
+a SQLite index and reads up to four admitted passages at a time within each
+generation. The writable root creates the coverage and generation indexes when
+initializing a store that lacks them. A read-only store can still compute exact
+coverage without them.
 
 Transcript FTS hits join to admitted source versions by event identity.
 Validation uses keyed admission reads and keeps only a bounded cache of source
