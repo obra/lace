@@ -281,6 +281,10 @@ service, the root reports text-only recall and explicit memory tools remain
 available. Child sessions retain scoped explicit readers and have no automatic
 recall preparation.
 
+Each memory index request asks Qdrant to close the connection after its
+response. Publication and recall therefore leave no idle connections for a later
+request to reuse after Qdrant's idle timeout.
+
 Root initialization, durable event appends and the maintenance timer trigger
 coalesced local maintenance. Foreground recall uses the available index coverage
 without waiting for corpus catch-up. A running document embedding batch may
