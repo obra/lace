@@ -1302,6 +1302,12 @@ List available models for a connection. Model catalogs are connection-scoped
 because available models can vary by endpoint and credentials (especially for
 OpenAI-compatible providers).
 
+For a turn with an exact model ID in the local Anthropic catalog, Lace uses the
+local metadata and sends the prompt without querying the upstream model list.
+The local catalog is bundled with Lace and can be overridden by the user.
+Aliases and model IDs absent from that catalog still go through
+connection-scoped discovery when it is enabled.
+
 ```typescript
 // Request
 {
