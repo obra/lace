@@ -68,6 +68,7 @@ const caseSchema = z
     expectedVectors: z.number().int().positive(),
     expectedGeneration: z.literal(ENCODER_GENERATION),
     cue: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_./@-]{0,199}$/),
+    query: z.string().trim().min(1).optional(),
     expectedOriginalHandle: z
       .string()
       .regex(/^source:[a-f0-9]{64}$/)
@@ -996,7 +997,7 @@ async function run(input: Case, root: string) {
       return result.turnId;
     };
     report(synthetic ? 'root_synthetic_start' : 'root_copy_cold_start');
-    const question = `Recall historical evidence for '${input.cue}'`;
+    const question = input.query ?? `Recall historical evidence for '${input.cue}'`;
     initialRootSession = sessionId;
     const firstTurn = await prompt(question);
     initialRootSession = undefined;

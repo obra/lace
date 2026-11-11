@@ -6,6 +6,15 @@ encodes only the query panel. Each command writes a new private run directory.
 
 ## Inputs
 
+The separate `packages/agent/tests/scenarios/recall-native-evaluation.ts`
+scenario accepts an optional `query` in its private case JSON. It uses that
+text for the initial recall and the existing worker-overlap turn. Without it,
+the scenario asks for historical evidence containing `cue`. The cue still
+checks the frozen event index, and `expectedOriginalHandle` still must appear
+in supplied context. Use identical queries and evaluator code in both arms;
+this controlled-provider scenario measures retrieval and runtime behavior,
+not delivered-answer quality.
+
 - Use Node 22, the repository dependencies, and a locally installed pinned Lace
   memory encoder. The benchmark uses the generation declared by that encoder.
 - Use a sealed SQLite backup in DELETE journal mode. Keep it read-only and
