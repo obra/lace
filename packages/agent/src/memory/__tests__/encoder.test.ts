@@ -1,6 +1,35 @@
 // ABOUTME: The encoder preserves the pinned model's complete token boundary and validates projected output.
+import { execFile } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { expect, it } from 'vitest';
 import { prepareEncoderTokens, normalizedEmbeddings } from '../encoder';
+
+const run = promisify(execFile);
+const probe = fileURLToPath(new URL('./encoder-worker-probe.mjs', import.meta.url));
+
+it.each(['source', 'tsImport', 'compiled'])(
+  'loads the actual %s encoder worker and checks local assets',
+  async (mode) => {
+    const args = mode === 'source' ? ['--import', 'tsx'] : [];
+    const { stdout } = await run(process.execPath, [...args, probe, mode, 'missing'], {
+      timeout: 10_000,
+    });
+    expect(stdout.trim()).toBe('completed');
+  },
+  15_000
+);
+
+it.each(['request-error', 'zero-exit', 'uncaught-error'])(
+  'settles pending worker requests after %s and exits when idle',
+  async (scenario) => {
+    const { stdout } = await run(process.execPath, ['--import', 'tsx', probe, 'source', scenario], {
+      timeout: 10_000,
+    });
+    expect(stdout.trim()).toBe('completed');
+  },
+  15_000
+);
 
 it('keeps BOS and terminal EOS inside a bounded right-padded batch', () => {
   const prepared = prepareEncoderTokens(
@@ -61,4 +90,33 @@ it('gives waiting queries the next batch slot and cancels queued work', async ()
   await Promise.all([background, foreground]);
   expect(await rejection).toBeInstanceOf(Error);
   expect(calls).toEqual([['a', 'b', 'c', 'd'], ['question'], ['e']]);
+});
+
+it('discards a cancelled active batch and does not start its next batch', async () => {
+  const { scheduledMemoryEncoder } = await import('../encoder');
+  const calls: string[][] = [];
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const encoder = scheduledMemoryEncoder({
+    generation: 'test',
+    async encode(texts) {
+      calls.push(texts);
+      if (calls.length === 1) await blocked;
+      return texts.map(() => [1, 0]);
+    },
+  });
+  const controller = new AbortController();
+  const abandoned = encoder.encode(['a', 'b', 'c', 'd', 'e'], 'document', {
+    signal: controller.signal,
+  });
+  const query = encoder.encode(['question'], 'query');
+  expect(calls).toEqual([['a', 'b', 'c', 'd']]);
+  controller.abort();
+  const result = abandoned.catch((error: unknown) => error);
+  release();
+  expect(await result).toBe(controller.signal.reason);
+  expect(await query).toEqual([[1, 0]]);
+  expect(calls).toEqual([['a', 'b', 'c', 'd'], ['question']]);
 });
