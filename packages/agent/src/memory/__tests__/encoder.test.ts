@@ -8,7 +8,7 @@ import { prepareEncoderTokens, normalizedEmbeddings } from '../encoder';
 const run = promisify(execFile);
 const probe = fileURLToPath(new URL('./encoder-worker-probe.mjs', import.meta.url));
 
-it.each(['source', 'compiled'])(
+it.each(['source', 'tsImport', 'compiled'])(
   'loads the actual %s encoder worker and checks local assets',
   async (mode) => {
     const args = mode === 'source' ? ['--import', 'tsx'] : [];

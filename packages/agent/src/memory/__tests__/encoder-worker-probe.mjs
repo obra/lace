@@ -15,6 +15,15 @@ import threads, {
   workerData,
 } from 'node:worker_threads';
 
+async function loadEncoder(mode) {
+  if (mode === 'compiled') return import('../../../dist/memory/encoder.js');
+  if (mode === 'tsImport') {
+    const { tsImport } = await import('tsx/esm/api');
+    return tsImport('../encoder.ts', import.meta.url);
+  }
+  return import('../encoder.ts');
+}
+
 if (isMainThread) {
   const [mode, scenario] = process.argv.slice(2);
   let workers = 0;
@@ -37,9 +46,7 @@ if (isMainThread) {
   };
   syncBuiltinESMExports();
 
-  const { configureMemoryEncoderDirectory, localMemoryEncoder } = await import(
-    mode === 'source' ? '../encoder.ts' : '../../../dist/memory/encoder.js'
-  );
+  const { configureMemoryEncoderDirectory, localMemoryEncoder } = await loadEncoder(mode);
   const directory = await mkdtemp(join(tmpdir(), 'lace-encoder-test-'));
   try {
     assert.deepEqual(await localMemoryEncoder.encode([], 'query'), []);
@@ -51,7 +58,7 @@ if (isMainThread) {
         error.message.includes('ENOENT') && error.message.includes(directory);
       await assert.rejects(localMemoryEncoder.encode(['hello'], 'query'), missing);
       assert.equal(workers, 1, 'the local encoder must verify assets inside its worker');
-      const extension = mode === 'source' ? 'ts' : 'js';
+      const extension = mode === 'compiled' ? 'js' : 'ts';
       await assert.rejects(localMemoryEncoder.encode(['hello'], 'query'), (error) => {
         return missing(error) && error.stack.includes(`/encoder-worker.${extension}:`);
       });

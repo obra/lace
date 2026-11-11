@@ -78,7 +78,8 @@ export function configureMemoryEncoderDirectory(directory: string): void {
 
 function startEncoderWorker(directory: string): Worker {
   const options = { workerData: directory };
-  if (!import.meta.url.endsWith('.ts')) {
+  // The scoped tsx loader appends a namespace to the module URL's query.
+  if (!new URL(import.meta.url).pathname.endsWith('.ts')) {
     return new Worker(new URL('./encoder-worker.js', import.meta.url), options);
   }
   // Source tools use tsx, but a worker needs its own loader for the TypeScript entry.
