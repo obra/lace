@@ -2,6 +2,7 @@
 // ABOUTME: Verifies first-write happens and duplicate event_id is a no-op
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -18,6 +19,15 @@ const ROW: RecallRow = {
   content: 'hello world',
   track: null,
 };
+
+// The version-3 writer inserts directly into FTS and knows nothing about keys.
+function appendFtsOnly(db: Db, eventId: string, content: string): void {
+  db.prepare('INSERT INTO events (event_id, session_id, content) VALUES (?, ?, ?)').run(
+    eventId,
+    ROW.session_id,
+    content
+  );
+}
 
 describe('insertRow', () => {
   let dir: string;
@@ -47,6 +57,12 @@ describe('insertRow', () => {
         content: 'hello world',
       },
     ]);
+    expect(db.prepare('SELECT event_id, session_id FROM event_keys').all()).toEqual([
+      { event_id: 'sess_x:1', session_id: 'sess_x' },
+    ]);
+    expect(
+      db.prepare("SELECT value FROM _meta WHERE key = 'events_last_rowid'").pluck().get()
+    ).toBe('1');
   });
 
   it('is a no-op when event_id is already present (no duplicate, no throw)', () => {
@@ -67,6 +83,47 @@ describe('insertRow', () => {
       .prepare(`SELECT content, persona FROM events WHERE event_id = ?`)
       .get(ROW.event_id) as { content: string; persona: string };
     expect(row).toEqual({ content: 'hello world', persona: 'ada' });
+  });
+
+  it('imports identifiers from a version-3 index and retains duplicate FTS rows', () => {
+    db.exec('DROP TABLE IF EXISTS event_keys');
+    appendFtsOnly(db, ROW.event_id, 'first record');
+    appendFtsOnly(db, ROW.event_id, 'historical duplicate');
+    db.close();
+    db = openRecallIndex(join(dir, 'index.sqlite'));
+
+    insertRow(db, ROW);
+
+    expect(db.prepare('SELECT content FROM events ORDER BY rowid').pluck().all()).toEqual([
+      'first record',
+      'historical duplicate',
+    ]);
+    expect(db.prepare('SELECT event_id FROM event_keys').pluck().all()).toEqual(['sess_x:1']);
+    expect(
+      db.prepare("SELECT value FROM _meta WHERE key = 'events_last_rowid'").pluck().get()
+    ).toBe('2');
+  });
+
+  it('records rows appended by a prior writer while the upgraded connection stays open', () => {
+    insertRow(db, ROW);
+    const prior = new Database(join(dir, 'index.sqlite'));
+    try {
+      appendFtsOnly(prior, 'sess_x:2', 'prior writer');
+
+      insertRow(db, { ...ROW, event_id: 'sess_x:3', content: 'upgraded writer' });
+      insertRow(db, { ...ROW, event_id: 'sess_x:2', content: 'would be duplicate' });
+
+      expect(db.prepare('SELECT content FROM events ORDER BY rowid').pluck().all()).toEqual([
+        'hello world',
+        'prior writer',
+        'upgraded writer',
+      ]);
+      expect(db.prepare('SELECT event_id FROM event_keys ORDER BY event_id').pluck().all()).toEqual(
+        ['sess_x:1', 'sess_x:2', 'sess_x:3']
+      );
+    } finally {
+      prior.close();
+    }
   });
 
   it('handles null persona', () => {

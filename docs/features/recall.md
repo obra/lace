@@ -122,6 +122,16 @@ Other event types are not searchable, but `read` and `thread` still show them:
 `read` reads the session transcript files and `thread` reads the verbatim event
 journal, so neither is limited to the five indexed types.
 
+The recall database stores searchable content in FTS5 and transcript identifiers
+in an ordinary SQLite table indexed by event and session. Startup catch-up still
+scans transcript files, using each session's identifiers to find missing events,
+including gaps below later sequence numbers. Before backfill reads a session's
+identifiers or a new write checks for a duplicate, Lace imports any FTS rows
+beyond the last examined rowid. This also picks up rows appended by an older
+version-3 writer that writes only to FTS. New FTS rows, identifiers, and the
+rowid marker commit together. The additive table uses the existing FTS schema
+version.
+
 ## Redaction
 
 Every `recall` output, including previews, full content and error hints, is

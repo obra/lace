@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { getLaceDir } from '../../config/lace-dir';
 import { SECURE_DIR_MODE, SECURE_FILE_MODE } from '../transcript-paths';
+import { EVENT_KEYS_SCHEMA, resetEventKeys } from './event-keys';
 
 export type { Db };
 
@@ -103,7 +104,7 @@ export function openRecallIndex(dbPath: string): Db {
   // BUSY, re-read the mode — most often a sibling process won the race and
   // already put it in WAL. Only re-throw if it's still not WAL.
   ensureWalMode(db);
-  applySchema(db);
+  db.transaction(() => applySchema(db)).immediate();
   // Apply 0o600 to the index file and any WAL/SHM sidecars. In-memory
   // databases (dbPath === ':memory:') have no on-disk file; skip them.
   if (dbPath !== ':memory:') {
@@ -142,11 +143,10 @@ function applySchema(db: Db): void {
     );
   `);
 
-  // The journal is a plain table (not FTS5), so it can be created additively
-  // every open without dropping data. Run it unconditionally — independent of
-  // the FTS version gate below — so existing DBs gain the table without losing
-  // their FTS index, and so a brand-new DB has it before any write-through.
+  // Create the ordinary tables independently of the FTS version so an
+  // existing index gains them without a rebuild.
   db.exec(EVENT_JOURNAL_SCHEMA);
+  db.exec(EVENT_KEYS_SCHEMA);
 
   const metaRow = db.prepare(`SELECT value FROM _meta WHERE key = 'schema_version'`).get() as
     | { value: string }
@@ -165,6 +165,7 @@ function applySchema(db: Db): void {
   // DROP TABLE on the virtual table removes them all.
   db.exec(`DROP TABLE IF EXISTS events;`);
   db.exec(EVENTS_SCHEMA);
+  resetEventKeys(db);
   db.prepare(`INSERT OR REPLACE INTO _meta (key, value) VALUES ('schema_version', ?)`).run(
     String(SCHEMA_VERSION)
   );

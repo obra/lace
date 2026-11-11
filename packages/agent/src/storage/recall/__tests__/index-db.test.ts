@@ -6,6 +6,7 @@ import { mkdtempSync, rmSync, existsSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { closeRecallIndex, getRecallIndex, openRecallIndex } from '../index-db';
+import { insertRow } from '../index-writer';
 
 describe('openRecallIndex', () => {
   let dir: string | undefined;
@@ -139,7 +140,7 @@ describe('schema version and track column', () => {
         | { value: string }
         | undefined;
       expect(row).toBeDefined();
-      expect(Number(row!.value)).toBeGreaterThan(0);
+      expect(row!.value).toBe('3');
     } finally {
       db.close();
     }
@@ -228,6 +229,43 @@ describe('schema version and track column', () => {
       // Old rows were dropped (backfill repopulates them — that's the known trade-off)
       const oldRow = db.prepare(`SELECT 1 FROM events WHERE event_id = ?`).get('sess_y:1');
       expect(oldRow).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  it('resets the derived keys and rowid marker when the FTS index is rebuilt', () => {
+    dir = mkdtempSync(join(tmpdir(), 'recall-idx-rebuild-'));
+    const dbPath = join(dir, 'index.sqlite');
+    const before = openRecallIndex(dbPath);
+    try {
+      before.exec(`
+        CREATE TABLE IF NOT EXISTS event_keys (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL);
+        INSERT INTO event_keys VALUES ('sess_x:1', 'sess_x');
+        INSERT INTO _meta VALUES ('events_last_rowid', '42');
+        UPDATE _meta SET value = '2' WHERE key = 'schema_version';
+      `);
+    } finally {
+      before.close();
+    }
+
+    const db = openRecallIndex(dbPath);
+    try {
+      expect(db.prepare('SELECT event_id FROM event_keys').pluck().all()).toEqual([]);
+      expect(
+        db.prepare("SELECT value FROM _meta WHERE key = 'events_last_rowid'").pluck().get()
+      ).toBeUndefined();
+
+      insertRow(db, {
+        event_id: 'sess_x:1',
+        session_id: 'sess_x',
+        ts: '2026-06-01T00:00:00Z',
+        persona: null,
+        kind: 'user_message',
+        content: 'repopulated',
+        track: null,
+      });
+      expect(db.prepare('SELECT content FROM events').pluck().all()).toEqual(['repopulated']);
     } finally {
       db.close();
     }

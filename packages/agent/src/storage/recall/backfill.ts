@@ -7,6 +7,7 @@ import { isSessionId } from '@lace/ent-protocol';
 import type { Db } from './index-db';
 import { listTranscriptFiles, transcriptsRoot, UNKNOWN_PERSONA_BUCKET } from '../transcript-paths';
 import { eventToRow } from './event-to-row';
+import { reconcileEventKeys } from './event-keys';
 import { insertRow, insertJournalRow } from './index-writer';
 import { agentSessionsDir, readSessionMeta } from '../session-store';
 import type { TypedDurableEvent } from '../event-types';
@@ -63,12 +64,9 @@ export function backfillIndex(db: Db, laceDir: string): BackfillStats {
     passesBySession.set(p.sessionId, list);
   }
 
-  const haveStmt = db.prepare(`SELECT event_id FROM events WHERE session_id = ?`);
+  const haveStmt = db.prepare('SELECT event_id FROM event_keys WHERE session_id = ?');
 
   for (const [sessionId, sessionPasses] of passesBySession) {
-    const have = new Set<string>(
-      (haveStmt.all(sessionId) as Array<{ event_id: string }>).map((r) => r.event_id)
-    );
     // One transaction per session, NOT one transaction for the whole pass.
     // C2 requires that one malformed row not roll back unrelated sessions'
     // inserts. Per-row try/catch inside the transaction skips bad rows
@@ -81,6 +79,10 @@ export function backfillIndex(db: Db, laceDir: string): BackfillStats {
     // pass the existence check and both INSERT, duplicating FTS rows.
     try {
       const run = db.transaction(() => {
+        reconcileEventKeys(db);
+        const have = new Set<string>(
+          (haveStmt.all(sessionId) as Array<{ event_id: string }>).map((r) => r.event_id)
+        );
         for (const pass of sessionPasses) {
           catchUpFile(db, pass, have, stats);
         }
@@ -177,7 +179,7 @@ function catchUpFile(db: Db, pass: SessionPass, have: Set<string>, stats: Backfi
 
     // Journal EVERY scanned event (not just the FTS-indexed kinds), storing the
     // raw JSONL line verbatim. The PK dedups, so re-running backfill is safe and
-    // a journal write here is independent of the FTS `have` watermark below.
+    // a journal write here is independent of the FTS membership check below.
     // Failures here must not poison the session's FTS catch-up; per-row guard.
     try {
       insertJournalRow(db, {
