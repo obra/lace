@@ -231,10 +231,14 @@ written (`packages/agent/src/core/conversation/runner.ts`).
 
 The cache fields come from each provider's parsed usage
 (`cacheCreationInputTokens` / `cacheReadInputTokens` on `ProviderResponse.usage`
-in `base-provider.ts`). Anthropic populates them on every response; OpenAI and
-Gemini report no cache split today, so their counts read zero and the signal is
-most meaningful for Anthropic, where the cost of drift is highest. A sustained
-drop in the cache-read rate, or a recurring miss reason, means a prefix
-regression reached production — investigate the most recent change to the
-message-building or prompt-rendering path. The line is logged at `info`; set
-`LACE_LOG_LEVEL=info` (or lower) to see it.
+in `base-provider.ts`). Anthropic populates them on every response. OpenAI
+(Responses and Chat Completions, including OpenAI-compatible gateways) reports
+cache reads as `cached_tokens` inside its input count; the provider moves them
+into `cacheReadInputTokens` and leaves only the uncached remainder in
+`promptTokens`, and leaves the field unset when the wire omits the count. OpenAI
+has no cache-creation count. Gemini reports no cache split today, so its counts
+read zero. The signal is most meaningful for Anthropic, where the cost of drift
+is highest. A sustained drop in the cache-read rate, or a recurring miss reason,
+means a prefix regression reached production — investigate the most recent
+change to the message-building or prompt-rendering path. The line is logged at
+`info`; set `LACE_LOG_LEVEL=info` (or lower) to see it.
