@@ -116,5 +116,43 @@ describe('env-overlay helpers (PRI-3672)', () => {
         expect(isDangerousEnvVarName(name)).toBe(true);
       }
     });
+
+    // jesse-claude's review on PR #458: the original denylist was missing
+    // these mechanisms (proxy/TLS redirection, git's own command/config
+    // injection hooks, shell/interpreter startup files, and a few more).
+    it.each([
+      'GIT_SSH_COMMAND',
+      'HTTP_PROXY',
+      'HTTPS_PROXY',
+      'ALL_PROXY',
+      'SSL_CERT_FILE',
+      'CURL_CA_BUNDLE',
+      'REQUESTS_CA_BUNDLE',
+      'NODE_TLS_REJECT_UNAUTHORIZED',
+      'HOME',
+      'SHELL',
+      'PAGER',
+      'EDITOR',
+      'JAVA_TOOL_OPTIONS',
+      'PYTHONHOME',
+      'NODE_PATH',
+      'GCONV_PATH',
+      'ZDOTDIR',
+    ])('refuses %s (review follow-up)', (name) => {
+      expect(isDangerousEnvVarName(name)).toBe(true);
+    });
+
+    // GIT_CONFIG_COUNT/KEY_<n>/VALUE_<n> are an unbounded indexed family, not
+    // literal names, so they need prefix matching rather than a Set lookup.
+    it.each(['GIT_CONFIG_COUNT', 'GIT_CONFIG_KEY_0', 'GIT_CONFIG_VALUE_0', 'GIT_CONFIG_KEY_17'])(
+      'refuses %s via prefix match',
+      (name) => {
+        expect(isDangerousEnvVarName(name)).toBe(true);
+      }
+    );
+
+    it('does not refuse a name that merely contains "GIT_CONFIG" as a substring, not a prefix', () => {
+      expect(isDangerousEnvVarName('MY_GIT_CONFIG_TOKEN')).toBe(false);
+    });
   });
 });

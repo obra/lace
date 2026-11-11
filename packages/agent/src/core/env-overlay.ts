@@ -36,6 +36,7 @@ export const DANGEROUS_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'PATH',
   'NODE_OPTIONS',
   'NODE_EXTRA_CA_CERTS',
+  'NODE_PATH',
   'LD_PRELOAD',
   'LD_LIBRARY_PATH',
   'LD_AUDIT',
@@ -44,6 +45,7 @@ export const DANGEROUS_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'DYLD_FRAMEWORK_PATH',
   'PYTHONPATH',
   'PYTHONSTARTUP',
+  'PYTHONHOME',
   'PERL5LIB',
   'PERL5OPT',
   'RUBYOPT',
@@ -54,10 +56,36 @@ export const DANGEROUS_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'IFS',
   'PROMPT_COMMAND',
   'GLOBIGNORE',
+  'GIT_SSH_COMMAND',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'ALL_PROXY',
+  'SSL_CERT_FILE',
+  'CURL_CA_BUNDLE',
+  'REQUESTS_CA_BUNDLE',
+  'NODE_TLS_REJECT_UNAUTHORIZED',
+  'HOME',
+  'SHELL',
+  'PAGER',
+  'EDITOR',
+  'JAVA_TOOL_OPTIONS',
+  'GCONV_PATH',
+  'ZDOTDIR',
 ]);
 
+// GIT_CONFIG_COUNT, GIT_CONFIG_KEY_<n> and GIT_CONFIG_VALUE_<n> are an
+// unbounded family (indexed by <n>), not a fixed set of names, so they can't
+// live in DANGEROUS_ENV_VAR_NAMES as literal entries. Any of them injects
+// arbitrary git config — including core.sshCommand/core.fsmonitor — into
+// every git invocation a tool call makes, same hijack class as GIT_SSH_COMMAND.
+const DANGEROUS_ENV_VAR_PREFIXES: readonly string[] = ['GIT_CONFIG_'];
+
 export function isDangerousEnvVarName(name: string): boolean {
-  return DANGEROUS_ENV_VAR_NAMES.has(name.toUpperCase());
+  const upper = name.toUpperCase();
+  return (
+    DANGEROUS_ENV_VAR_NAMES.has(upper) ||
+    DANGEROUS_ENV_VAR_PREFIXES.some((prefix) => upper.startsWith(prefix))
+  );
 }
 
 /**
