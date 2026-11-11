@@ -200,10 +200,12 @@ async function copyTextMatches(
       const page = statement.all(query, RECALL_PAGE_SIZE, offset) as Array<{
         id: string;
         version?: string;
+        admitted?: 0 | 1;
       }>;
       rows += page.length;
       const matches: typeof page = [];
       for (const match of page) {
+        if (match.admitted === 0) continue;
         const key = JSON.stringify([match.id, match.version ?? '']);
         if (selected.has(key) || (admitted && !admitted(match.id))) continue;
         selected.add(key);
@@ -294,12 +296,15 @@ async function rankPassages(
           scratch,
           'original',
           notes.db,
-          `SELECT id,version FROM memory_original_fts WHERE memory_original_fts MATCH ?
-           AND EXISTS (
+          `SELECT h.id,h.version,EXISTS (
              SELECT 1 FROM memory_sources AS s
              JOIN memory_passages AS p ON p.id=s.id AND p.version=s.version
-             WHERE s.id=memory_original_fts.id AND s.version=memory_original_fts.version
-           ) ORDER BY rank,rowid LIMIT ? OFFSET ?`,
+             WHERE s.id=h.id AND s.version=h.version
+           ) AS admitted
+           FROM (
+             SELECT id,version,rank,rowid FROM memory_original_fts
+             WHERE memory_original_fts MATCH ? ORDER BY rank,rowid LIMIT ? OFFSET ?
+           ) AS h ORDER BY h.rank,h.rowid`,
           textQueries,
           fence
         );

@@ -821,6 +821,59 @@ it.each(['event', 'original', 'note'] as const)(
   }
 );
 
+it('checks original admission only for the ranked page when it fills the shortlist', async () => {
+  const content = 'The bicycle queue is violet.';
+  for (let index = 0; index <= RECALL_PAGE_SIZE; index++) event(content);
+  const originals = new MemorySources(notes, configuration);
+  await originals.discover();
+  const passages = new MemoryPassages(notes, originals, true);
+  await passages.index(() => {});
+  indexedPassages();
+  const admitted = sources();
+  getRecallIndex().exec('DELETE FROM events');
+  db.exec('DELETE FROM memory_original_fts');
+  const insert = db.prepare('INSERT INTO memory_original_fts(id,version,content) VALUES(?,?,?)');
+  for (const { id, version } of admitted) insert.run(id, version, content);
+
+  // Observe reads through the real source table, including indexed admission probes.
+  const observed = new Set<string>();
+  db.function('observe_source', (id: string) => {
+    observed.add(id);
+    return 1;
+  });
+  db.exec(`
+    CREATE TEMP VIEW memory_sources AS
+    SELECT * FROM main.memory_sources WHERE observe_source(id)
+  `);
+  let checkedDuringNomination = new Set<string>();
+  const result = await automaticRecall(input('bicycle'), {
+    notes,
+    sources: originals,
+    passages,
+    floor: 0.7,
+    check: () => {},
+    accountsFor: async () => [{ accounts: [] }],
+    encoder: {
+      generation: 'review-controlled',
+      async encode() {
+        observed.clear(); // Coverage precedes FTS and reads the full source table.
+        return [[1, 0]];
+      },
+    },
+    search: {
+      async query() {
+        checkedDuringNomination = new Set(observed); // Expansion follows the native query.
+        return [];
+      },
+      async scores(_vector, identities) {
+        return identities.map((identity) => ({ identity, score: 0.2 }));
+      },
+    },
+  });
+  expect(result.selected[0].originals[0].text).toBe(content);
+  expect(checkedDuringNomination).toEqual(new Set(admitted.slice(0, -1).map(({ id }) => id)));
+});
+
 it('ranks text by literal overlap while the available engine has no passage vectors', async () => {
   event('The bicycle is violet.');
   event('The bicycle route is green.');
