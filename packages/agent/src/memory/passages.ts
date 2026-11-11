@@ -110,6 +110,7 @@ export class MemoryPassages {
       );
       CREATE INDEX IF NOT EXISTS memory_passages_coverage
         ON memory_passages(generation,id,version) WHERE vector IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS memory_passages_generation ON memory_passages(generation);
       CREATE TABLE IF NOT EXISTS memory_projected (id TEXT NOT NULL, version TEXT NOT NULL, PRIMARY KEY(id,version));
       CREATE VIRTUAL TABLE IF NOT EXISTS memory_original_fts USING fts5(id UNINDEXED, version UNINDEXED, content, tokenize='porter unicode61');
     `)
@@ -248,23 +249,38 @@ export class MemoryPassages {
   }
   async vectors(encoder: MemoryEncoder, check: () => void): Promise<void> {
     if (!this.available()) return;
+    const { db } = this.notes;
+    // Seek distinct generation keys and visit only pending rows in rowid order within each key.
+    const firstGeneration = db.prepare<[], { generation: string }>(
+      'SELECT generation FROM memory_passages WHERE generation IS NOT NULL ORDER BY generation LIMIT 1'
+    );
+    const nextGeneration = db.prepare<[string], { generation: string }>(
+      'SELECT generation FROM memory_passages WHERE generation > ? ORDER BY generation LIMIT 1'
+    );
+    const pending = db.prepare<
+      [string | null, number],
+      Pick<PassageRow, 'rowid' | 'id' | 'version' | 'start' | 'text'>
+    >(
+      `SELECT p.rowid,p.id,p.version,p.start,p.text
+       FROM memory_passages AS p INDEXED BY memory_passages_generation
+       JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
+       WHERE p.generation IS ? AND p.rowid>? ORDER BY p.rowid LIMIT 4`
+    );
+    check();
+    let generation = firstGeneration.get()?.generation ?? null;
     let after = 0;
     while (true) {
       check();
-      const rows = this.notes.db
-        .prepare(
-          `SELECT p.rowid,p.id,p.version,p.start,p.text FROM memory_passages AS p
-           JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
-           WHERE p.rowid>? AND (p.generation IS NULL OR p.generation!=?) ORDER BY p.rowid LIMIT 4`
-        )
-        .all(after, encoder.generation) as Array<{
-        rowid: number;
-        id: string;
-        version: string;
-        start: number;
-        text: string;
-      }>;
-      if (!rows.length) return;
+      if (generation === encoder.generation)
+        generation = nextGeneration.get(generation)?.generation ?? null;
+      const rows = pending.all(generation, after);
+      if (!rows.length) {
+        // Process the NULL generation last, including projections added during stale work.
+        if (generation === null) return;
+        generation = nextGeneration.get(generation)?.generation ?? null;
+        after = 0;
+        continue;
+      }
       after = rows.at(-1)!.rowid;
       const vectors = await encoder.encode(
         rows.map((row) => row.text),
@@ -297,12 +313,22 @@ export class MemoryPassages {
   coverage(generation: string): AutomaticRecallResult['coverage'] {
     const hasSources = this.notes.available();
     if (!hasSources) return { sources: 0, passages: 0, vectors: 0, partial: false };
-    if (!this.available()) {
+    const schema = this.notes.db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE name IN ('memory_passages', 'memory_passages_coverage')"
+      )
+      .pluck()
+      .all() as string[];
+    if (!schema.includes('memory_passages')) {
       const { sources } = this.notes.db
         .prepare('SELECT count(*) AS sources FROM memory_sources')
         .get() as { sources: number };
       return { sources, passages: 0, vectors: 0, partial: sources > 0 };
     }
+    // The generation index alone would require passage table reads for this count.
+    const coverageIndex = schema.includes('memory_passages_coverage')
+      ? 'INDEXED BY memory_passages_coverage'
+      : '';
     const { sources, unprojected, passages, vectors } = this.notes.db
       .prepare(
         `
@@ -314,7 +340,7 @@ export class MemoryPassages {
         SELECT count(*) AS passages FROM memory_passages AS p
           JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
       ), (
-        SELECT count(*) AS vectors FROM memory_passages AS p
+        SELECT count(*) AS vectors FROM memory_passages AS p ${coverageIndex}
           JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
           WHERE p.generation=? AND p.vector IS NOT NULL
       )
