@@ -247,6 +247,9 @@ export async function handleSlashCommand(
         // Switch to the new session (reload to pick up the new event).
         state.activeSession = loadSession(newSessionId);
         state.temporaryContext = null;
+        // See rpc/handlers/session.ts's session/open handler: the credential
+        // overlay (PRI-3672) is session-scoped and must not reach the new one.
+        state.envOverlay = undefined;
         clearSessionMemory(state);
 
         // Notify the client that the session has changed
