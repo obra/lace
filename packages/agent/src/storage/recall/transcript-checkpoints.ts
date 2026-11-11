@@ -74,7 +74,14 @@ export function* readTranscriptLines(
   let position = start;
   while (position < size) {
     const length = Math.min(chunk.length, Number(size - position));
-    const bytesRead = fs.readSync(fd, chunk, 0, length, position);
+    let bytesRead: number;
+    try {
+      bytesRead = fs.readSync(fd, chunk, 0, length, position);
+    } catch {
+      // Drop the unfinished line and let the next pass retry it. Complete
+      // lines already yielded can commit with the other files in the session.
+      return;
+    }
     if (bytesRead === 0) return; // The opened file shortened during the read.
 
     const bytes = chunk.subarray(0, bytesRead);

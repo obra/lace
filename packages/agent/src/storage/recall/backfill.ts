@@ -208,7 +208,12 @@ function catchUpFile(
     // A sibling can finish catch-up before we acquire the write lock, or
     // the path can change between discovery and open. Use the locked
     // checkpoint and the opened descriptor to choose the byte range.
-    const file = fs.fstatSync(fd, { bigint: true });
+    let file: fs.BigIntStats;
+    try {
+      file = fs.fstatSync(fd, { bigint: true });
+    } catch {
+      return;
+    }
     if (!file.isFile()) return;
     const start = transcriptStart(file, checkpoints.get(pass.filePath));
     if (start === null) return;

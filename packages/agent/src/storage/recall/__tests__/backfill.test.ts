@@ -346,6 +346,78 @@ describe('backfillIndex', () => {
     expect(allRows(db).map((row) => row.content)).toEqual(['readable shard']);
   });
 
+  it.each(['metadata', 'read'] as const)(
+    'commits readable sibling shards and retries unread bytes after an open shard %s error',
+    (fault) => {
+      const sessionId = SESSION_IDS.partial;
+      for (const date of ['2026-05-23', '2026-05-24', '2026-05-25']) {
+        transcriptFile(sessionId, date);
+      }
+      // Use discovery's actual directory order so the fault follows one
+      // readable shard and precedes another on any filesystem.
+      const [before, broken, after] = fs
+        .readdirSync(join(laceDir, 'transcripts', 'ada'))
+        .map((date) => transcriptFile(sessionId, date));
+      writeJsonl(broken, [promptEvent(1, 'saved prefix')]);
+      expect(backfillIndex(db, laceDir).inserted).toBe(1);
+      writeJsonl(before, [promptEvent(2, 'sibling before')]);
+      writeJsonl(after, [promptEvent(5, 'sibling after')]);
+      const complete = JSON.stringify(promptEvent(3, 'read before fault')) + '\n';
+      const unread = JSON.stringify(promptEvent(4, 'retry after fault'));
+      appendFileSync(broken, complete + unread + '\n');
+
+      const inode = fs.statSync(broken, { bigint: true }).ino;
+      const fstat = fs.fstatSync;
+      const read = fs.readSync;
+      const error = Object.assign(new Error('injected shard I/O failure'), { code: 'EIO' });
+      if (fault === 'metadata') {
+        vi.spyOn(fs, 'fstatSync').mockImplementation(((fd: number, options: { bigint: true }) => {
+          const stat = fstat(fd, options);
+          if (stat.ino === inode) throw error;
+          return stat;
+        }) as typeof fs.fstatSync);
+      } else {
+        let shortRead = false;
+        vi.spyOn(fs, 'readSync').mockImplementation(((
+          fd: number,
+          buffer: Buffer,
+          offset: number,
+          length: number,
+          position: number | bigint | null
+        ) => {
+          if (fstat(fd, { bigint: true }).ino !== inode) {
+            return read(fd, buffer, offset, length, position);
+          }
+          if (shortRead) throw error;
+          shortRead = true;
+          return read(fd, buffer, offset, Buffer.byteLength(complete + unread), position);
+        }) as typeof fs.readSync);
+      }
+      syncBuiltinESMExports();
+
+      const journal = db.prepare('SELECT event_seq FROM event_journal ORDER BY event_seq').pluck();
+      expect(backfillIndex(db, laceDir).inserted).toBe(fault === 'metadata' ? 2 : 3);
+      expect(journal.all()).toEqual(fault === 'metadata' ? [1, 2, 5] : [1, 2, 3, 5]);
+      expect(allRows(db).map((row) => row.content)).toEqual(
+        fault === 'metadata'
+          ? ['saved prefix', 'sibling before', 'sibling after']
+          : ['saved prefix', 'sibling before', 'read before fault', 'sibling after']
+      );
+
+      vi.restoreAllMocks();
+      syncBuiltinESMExports();
+      const retry = fault === 'metadata' ? 2 : 1;
+      expect(backfillIndex(db, laceDir)).toEqual({
+        scanned: retry,
+        inserted: retry,
+        skipped: 0,
+        errors: 0,
+      });
+      expect(journal.all()).toEqual([1, 2, 3, 4, 5]);
+      expect(backfillIndex(db, laceDir).scanned).toBe(0);
+    }
+  );
+
   it.each(['replacement', 'shortening', 'same-size rewrite'] as const)(
     'replays a transcript after %s and skips it once caught up',
     (change) => {
