@@ -447,6 +447,10 @@ async function activateStoredSession(
 
   state.activeSession = loadedWithMcpServers;
   state.temporaryContext = null;
+  // The credential env overlay is memory-only and session-scoped (PRI-3672):
+  // it must not survive a switch to a different session, or a credential
+  // minted under session A would silently reach session B's tool calls.
+  state.envOverlay = undefined;
   clearSessionMemory(state);
   rehydrateServerConfigFromSession(state, state.activeSession.state);
 
@@ -915,6 +919,9 @@ export function registerSessionHandlers(
 
     state.activeSession = loadSession(sessionId);
     state.temporaryContext = null;
+    // See the session/open handler above: the overlay is session-scoped and
+    // must not reach the freshly created session.
+    state.envOverlay = undefined;
     clearSessionMemory(state);
     await ensureSchedulers();
     await reconcileMcpServersForActiveSession(state);
@@ -1200,6 +1207,9 @@ export function registerSessionHandlers(
     state.activeTurn = null;
     state.activeSession = null;
     state.temporaryContext = null;
+    // See the session/open handler above: nothing should read a closed
+    // session's credential overlay afterward.
+    state.envOverlay = undefined;
     clearSessionMemory(state);
 
     return {};

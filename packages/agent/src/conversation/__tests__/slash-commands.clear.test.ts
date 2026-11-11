@@ -168,4 +168,74 @@ describe('/clear writes system_prompt_set in the new session', () => {
 
     expect(events[0]?.type).toBe('system_prompt_set');
   });
+
+  // jesse-claude's review on PR #458: /clear ('/new' from the user's
+  // perspective) didn't clear state.envOverlay alongside temporaryContext,
+  // so a credential minted in the old session would still be sitting in
+  // memory once the new session became active.
+  it('clears the credential env overlay (PRI-3672) along with temporaryContext', async () => {
+    const sourceSessionId = `sess_${randomUUID()}`;
+    const sourceSessionDir = getSessionDir(sourceSessionId);
+    writeSessionMeta(sourceSessionDir, {
+      sessionId: sourceSessionId,
+      workDir: laceDir,
+      created: new Date().toISOString(),
+    });
+    writeSessionState(sourceSessionDir, {
+      nextEventSeq: 1,
+      nextStreamSeq: 1,
+      config: {
+        executionMode: 'execute',
+        approvalMode: 'ask',
+        connectionId: 'test-conn',
+        modelId: 'test-model',
+        personaName: 'lace',
+      },
+    });
+    ensureSessionFiles(sourceSessionDir);
+    const sourceSession = loadSession(sourceSessionId);
+
+    const state: AgentServerState = {
+      initialized: true,
+      activeSession: sourceSession,
+      temporaryContext: 'old session only',
+      // Fake placeholder shape, not a real credential value.
+      envOverlay: { MINTED_CRED: { value: 'test-placeholder-xyz' } },
+      config: {
+        executionMode: 'execute',
+        approvalMode: 'ask',
+        connectionId: 'test-conn',
+        modelId: 'test-model',
+      },
+      activeTurn: null,
+      providerCatalog: {} as AgentServerState['providerCatalog'],
+      providerCatalogLoaded: false,
+      providerInstances: {} as AgentServerState['providerInstances'],
+      mcpServerManager: {} as AgentServerState['mcpServerManager'],
+      jobManager: {} as AgentServerState['jobManager'],
+      pendingPermissionRequests: new Map(),
+      sessionMutex: Promise.resolve(),
+      toolExecutorCache: new Map(),
+      personaRegistry: {
+        personaSkillsDir: () => null,
+      } as unknown as AgentServerState['personaRegistry'],
+      containerMounts: {},
+      containerManager: null,
+    } as unknown as AgentServerState;
+
+    await handleSlashCommand(
+      state,
+      'clear',
+      '',
+      'turn-002',
+      vi.fn().mockResolvedValue(undefined),
+      vi.fn().mockResolvedValue(undefined),
+      makeMockCreateToolExecutorForMode()
+    );
+
+    expect(state.temporaryContext).toBeNull();
+    // Fails if /new (slash 'clear') leaves a stale credential in memory for
+    // the session it just switched to.
+    expect(state.envOverlay).toBeUndefined();
+  });
 });
