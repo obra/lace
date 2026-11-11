@@ -2382,6 +2382,32 @@ describe('ConversationRunner', () => {
       expect(events.some((e) => e.type === 'context_compacted')).toBe(true);
     });
 
+    it('reports the context window it measured pressure against in the run result', async () => {
+      // An embedder deciding when to compact needs the same window this
+      // runner's breakpoints use, or the two disagree about how full it is.
+      const provider = new CompactionTestProvider(524_288, 1_000, 'end_turn');
+      const config: RunnerConfig = {
+        sessionDir,
+        sessionId,
+        cwd,
+        executionMode: 'execute',
+        approvalMode: 'approve',
+      };
+      const deps = createMockDeps({
+        createProvider: vi.fn().mockImplementation(async () => provider),
+      });
+      const runner = new ConversationRunner(config, deps);
+
+      const result = await runner.run({
+        content: [{ type: 'text', text: 'hello' }],
+        abortController: new AbortController(),
+        turnId: `turn_${randomUUID()}`,
+        startedAt: new Date().toISOString(),
+      });
+
+      expect(result.usage.contextWindow).toBe(524_288);
+    });
+
     it('does not fire compaction when the provider throws before reporting usage', async () => {
       // The provider fails on its first call, so the turn measured no context
       // and no breakpoint is crossed. A failure AFTER a call measured past the

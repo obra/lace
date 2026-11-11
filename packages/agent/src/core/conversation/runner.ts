@@ -583,6 +583,10 @@ export class ConversationRunner {
     let lastCallInputTokens = 0;
     let lastCallCacheCreationInputTokens = 0;
     let lastCallCacheReadInputTokens = 0;
+    // The window the post-turn compaction check measures pressure against.
+    // Set there and reported on the run result, so an embedder compacting at a
+    // fraction of the window uses exactly the number lace's breakpoints use.
+    let contextWindowSize: number | undefined;
     const previousSessionCostUsd = this.deps.getSessionCostUsd();
     let sessionCostUsd = previousSessionCostUsd;
 
@@ -1623,7 +1627,7 @@ export class ConversationRunner {
             lastCallInputTokens + lastCallCacheCreationInputTokens + lastCallCacheReadInputTokens,
           costUsd: turnCostUsd,
         };
-        const contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
+        contextWindowSize = provider.contextWindowForModel(modelId ?? 'default');
         const pressure = computePressure(usage, contextWindowSize);
 
         const isCleanStop = CLEAN_STOP_REASONS.has(stopReason);
@@ -1774,6 +1778,7 @@ export class ConversationRunner {
         cacheReadInputTokens: totalCacheReadInputTokens,
         lastCallInputContextTokens:
           lastCallInputTokens + lastCallCacheCreationInputTokens + lastCallCacheReadInputTokens,
+        ...(contextWindowSize !== undefined ? { contextWindow: contextWindowSize } : {}),
         costUsd: turnCostUsd,
       },
       ...(lastStructuredOutput !== undefined ? { structuredOutput: lastStructuredOutput } : {}),

@@ -191,6 +191,14 @@ export const UsageInfoSchema = z
      * consumers must treat absent as unknown and fall back, never as 0.
      */
     lastCallInputContextTokens: z.number().optional(),
+    /**
+     * The model's context window, in tokens, as the agent resolved it for the
+     * pressure check it runs at the end of this turn. Pair it with
+     * `lastCallInputContextTokens` to know how full the window is in the same
+     * terms the agent's own compaction breakpoints use. Optional, and absent
+     * when the agent did not run that check or predates the field.
+     */
+    contextWindow: z.number().optional(),
     thinkingTokens: z.number().optional(),
     totalTokens: z.number().optional(),
     costUsd: z.number().optional(),
