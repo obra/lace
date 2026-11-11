@@ -611,7 +611,7 @@ it.each([
   }
 );
 
-it('refills beyond multiple sorted runs of higher-scoring rejected originals', async () => {
+it('refills semantic results past rejected originals while retaining a text-shortlisted unindexed original', async () => {
   const stale = 'bicycle stale.';
   const count = 2 * RECALL_PAGE_SIZE + 1;
   for (let i = 0; i < count; i++) event(stale);
@@ -625,7 +625,8 @@ it('refills beyond multiple sorted runs of higher-scoring rejected originals', a
     sources().at(-1)!.id
   );
   writeFileSync(file(), readFileSync(file(), 'utf8').replaceAll(stale, 'bicycle gone!.'));
-  const result = await recall(runtime, 'bicycle');
+  // The unindexed original must enter through text before semantic validation refills.
+  const result = await recall(runtime, 'bicycle vector');
   expect(result.mode).toBe('hybrid');
   expect(result.coverage).toMatchObject({
     sources: count + 3,
@@ -705,6 +706,120 @@ it('uses below-floor scores for FTS candidates and marks a missing indexed score
     'Bicycle finish is amber.',
   ]);
 });
+
+it.each(['event', 'original', 'note'] as const)(
+  'bounds %s expansion and scoring while rescuing a complete identifier below the ordinary cutoff',
+  async (surface) => {
+    const filler = 'bicycle TASK bicycle 271';
+    const distractor = (index: number) => (index === 139 ? filler : `${filler} ${index}`);
+    for (let index = 0; index < 140; index++) event(distractor(index));
+    const exact = `TASK-271 uses the violet queue. ${'Unrelated background. '.repeat(10)}`;
+    event(exact);
+    const originals = new MemorySources(notes, configuration);
+    await originals.discover();
+    const passages = new MemoryPassages(notes, originals, true);
+    await passages.index(() => {});
+    indexedPassages();
+    const admitted = sources();
+    let target = admitted.at(-1)!.id;
+    const matches: Array<{ id: string; version: string; text: string }> = [];
+    if (surface === 'note') {
+      for (const [index, source] of admitted.entries()) {
+        const note = accept(index === 140 ? exact : distractor(index), [source]);
+        notes.cacheVector(note, 'review-controlled', [1, 0]);
+        matches.push({ id: note.id, version: '', text: note.text });
+        if (index === 140) target = note.id;
+      }
+    } else
+      for (const [index, source] of admitted.entries())
+        matches.push({ ...source, text: index === 140 ? exact : distractor(index) });
+    if (surface !== 'event') getRecallIndex().exec('DELETE FROM events');
+    if (surface !== 'original') db.exec('DELETE FROM memory_original_fts');
+    const ftsDb = surface === 'event' ? getRecallIndex() : db;
+    const table =
+      surface === 'event' ? 'events' : surface === 'note' ? 'memory_fts' : 'memory_original_fts';
+    ftsDb.exec(`DELETE FROM ${table}`);
+    const insert = ftsDb.prepare(
+      surface === 'event'
+        ? 'INSERT INTO events(event_id,content) VALUES(?,?)'
+        : surface === 'note'
+          ? 'INSERT INTO memory_fts(id,content) VALUES(?,?)'
+          : 'INSERT INTO memory_original_fts(id,version,content) VALUES(?,?,?)'
+    );
+    const insertMatch = ({ id, version, text }: (typeof matches)[number]) => {
+      if (surface === 'original') insert.run(id, version, text);
+      else insert.run(surface === 'event' ? id.replace(/^event:/, '') : id, text);
+    };
+    // Orphans and duplicate rows span several pages before the distinct admitted matches.
+    for (let index = 0; index < 130; index++)
+      insertMatch({ id: `absent-${index}`, version: 'absent', text: `${filler} ${index}` });
+    if (surface !== 'note') {
+      const unprojected = { ...admitted[0], id: 'unprojected' };
+      notes.discover(unprojected);
+      insertMatch({ ...unprojected, text: `${filler} 0` });
+      insertMatch({ ...admitted[0], version: 'unadmitted-version', text: `${filler} 0` });
+    }
+    for (let index = 0; index < 140; index++) insertMatch(matches[0]);
+    for (const match of matches) insertMatch(match);
+    const id = surface === 'event' ? "'event:' || event_id" : 'id';
+    const ordinary = ftsDb
+      .prepare(`SELECT ${id} AS id FROM ${table} WHERE ${table} MATCH ? ORDER BY rank,rowid`)
+      .all('"bicycle" OR "TASK" OR "271"') as Array<{ id: string }>;
+    expect(ordinary.findIndex((row) => row.id === target)).toBeGreaterThanOrEqual(128);
+
+    const expanded = vi.spyOn(MemoryPassages.prototype, 'sourcePage');
+    const resolved = vi.spyOn(MemoryNotes.prototype, 'candidate');
+    const scored: Array<Parameters<MemorySearchIndex['scores']>[1][number]> = [];
+    const runtime = start(true, 'root', {
+      async query() {
+        return [];
+      },
+      async scores(_vector, identities) {
+        scored.push(...identities);
+        return identities.map((identity) => ({ identity, score: 0.2 }));
+      },
+    });
+    try {
+      const result = await recall(runtime, 'bicycle TASK-271');
+      expect(result.groups[0].originals[0].text).toContain('violet queue');
+      expect(scored).toHaveLength(129);
+      const ids = scored.map((identity) =>
+        identity.kind === 'note' ? identity.noteId : identity.sourceId
+      );
+      // The shorter late row outranks the longer ties; tied rows retain their FTS rowid order.
+      expect(ids.sort()).toEqual(
+        [...matches.slice(0, 127), matches[139], matches[140]].map(({ id }) => id).sort()
+      );
+      if (surface === 'note') expect(resolved.mock.calls).toHaveLength(258);
+      else expect(expanded.mock.results.flatMap((result) => result.value)).toHaveLength(129);
+      expanded.mockClear();
+      resolved.mockClear();
+      const fallback = await recall(
+        start(true, 'root', {
+          async query() {
+            throw new Error('offline');
+          },
+          async scores() {
+            throw new Error('Text-only fallback must not request scores');
+          },
+        }),
+        'bicycle TASK-271'
+      );
+      expect(fallback.mode).toBe('text-only');
+      expect(fallback.groups[0].originals[0].text).toContain('violet queue');
+      if (surface === 'note') expect(resolved.mock.calls).toHaveLength(129);
+      else expect(expanded.mock.results.flatMap((result) => result.value)).toHaveLength(129);
+      const fallbackIds =
+        surface === 'note'
+          ? resolved.mock.calls.map(([id]) => id)
+          : expanded.mock.calls.map(([id]) => id);
+      expect(fallbackIds).not.toContain(matches[127].id);
+    } finally {
+      expanded.mockRestore();
+      resolved.mockRestore();
+    }
+  }
+);
 
 it('ranks text by literal overlap while the available engine has no passage vectors', async () => {
   event('The bicycle is violet.');
