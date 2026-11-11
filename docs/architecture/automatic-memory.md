@@ -123,14 +123,19 @@ Install the fixed public q8 text assets explicitly with
 `LACE_MEMORY_MODEL_DIR` to a shared model directory containing `config.json`,
 tokenizer files and `onnx/model_quantized.onnx` plus its data file. Setup
 downloads only the pinned revision and verifies exact sizes and SHA-256 hashes.
-Runtime verifies local assets and loads one lazy process-wide text model, with
-vision and audio disabled, 2 intra-op / 1 inter-op CPU threads, serialized
-batches of four, with waiting foreground queries taking the next batch slot, and
-the projected normalized 768-dimensional `sentence_embedding`. The 512-token
-encoder window preserves BOS/content/EOS; the extractor still receives complete
-admitted originals. This bounded window and the 16-candidate union cannot ensure
-complete contradiction coverage. Missing-model initialization is not retried on
-every worker wake.
+One worker thread verifies local assets, loads the process-wide text model on
+the first nonempty request, and runs tokenization and inference. The parent
+schedules one batch of up to four at a time; waiting foreground queries take the
+next slot. Cancelled queued batches are skipped, and cancellation during
+inference discards the result after the batch finishes. Pending batches keep the
+process alive; the idle encoder does not. Failed initialization or loss of the
+worker leaves the encoder unavailable for the process lifetime. An individual
+batch error leaves a healthy worker usable. The model runs with vision and audio
+disabled and 2 intra-op / 1 inter-op CPU threads, returning the projected
+normalized 768-dimensional `sentence_embedding`. The 512-token encoder window
+preserves BOS/content/EOS; the extractor still receives complete admitted
+originals. This bounded window and the 16-candidate union cannot ensure complete
+contradiction coverage.
 
 Each admitted fresh original gets related-note reconciliation before further
 fresh originals consume support capacity. A batch splits when needed. Candidate
