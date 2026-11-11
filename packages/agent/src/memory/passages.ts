@@ -313,12 +313,22 @@ export class MemoryPassages {
   coverage(generation: string): AutomaticRecallResult['coverage'] {
     const hasSources = this.notes.available();
     if (!hasSources) return { sources: 0, passages: 0, vectors: 0, partial: false };
-    if (!this.available()) {
+    const schema = this.notes.db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE name IN ('memory_passages', 'memory_passages_coverage')"
+      )
+      .pluck()
+      .all() as string[];
+    if (!schema.includes('memory_passages')) {
       const { sources } = this.notes.db
         .prepare('SELECT count(*) AS sources FROM memory_sources')
         .get() as { sources: number };
       return { sources, passages: 0, vectors: 0, partial: sources > 0 };
     }
+    // The generation index alone would require passage table reads for this count.
+    const coverageIndex = schema.includes('memory_passages_coverage')
+      ? 'INDEXED BY memory_passages_coverage'
+      : '';
     const { sources, unprojected, passages, vectors } = this.notes.db
       .prepare(
         `
@@ -330,7 +340,7 @@ export class MemoryPassages {
         SELECT count(*) AS passages FROM memory_passages AS p
           JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
       ), (
-        SELECT count(*) AS vectors FROM memory_passages AS p
+        SELECT count(*) AS vectors FROM memory_passages AS p ${coverageIndex}
           JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
           WHERE p.generation=? AND p.vector IS NOT NULL
       )
