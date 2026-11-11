@@ -327,6 +327,11 @@ filtering by extraction status. An original identity includes its version; an
 event identity can expand all its admitted versions. Final source currentness
 and exact identifier validation still happen after nomination.
 
+For retained originals, SQLite ranks a raw FTS page before checking source
+admission for that page in the same statement. Recall skips rejected rows and
+advances by the number of raw rows returned, including duplicates and rejected
+rows, so later pages can fill the distinct-source allowance.
+
 The limit bounds nominated sources, independently of transport page sizing; one
 large source can still expand to many passages. This shortlist changes selection
 from exhaustive text retrieval. The semantic route can discover evidence beyond
