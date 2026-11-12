@@ -52,7 +52,10 @@ import type {
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { appendTemporaryContext } from '@lace/agent/providers/temporary-context';
-import { projectInputTokens } from '@lace/agent/providers/utils/output-token-budget';
+import {
+  INPUT_ESTIMATE_UNDERCOUNT_FACTOR,
+  projectInputTokens,
+} from '@lace/agent/providers/utils/output-token-budget';
 import { createModelCallCorrelation } from '@lace/agent/providers/model-call-correlation';
 import { logger } from '@lace/agent/utils/logger';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
@@ -710,22 +713,6 @@ export class ConversationRunner {
     const compactionRequest: { requested: boolean; guidance?: string } = { requested: false };
 
     const prepareAutomaticRecall = this.deps.prepareAutomaticRecall;
-    const replayPausedAssistant = (
-      text: string,
-      thinkingBlocks: ThinkingBlock[],
-      replace = true
-    ) => {
-      const assistant: ProviderMessage = {
-        role: 'assistant',
-        content: text,
-        ...(thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
-      };
-      providerMessages =
-        replace && providerMessages.at(-1)?.role === 'assistant'
-          ? [...providerMessages.slice(0, -1), assistant]
-          : [...providerMessages, assistant];
-    };
-
     const reloadCompactedHistory = () => {
       const compactedEntry = projectionCache
         ? projectTurnEntry(sessionDir, runtimeBinding.toolRuntime.cwd, projectionCache, sessionId)
@@ -749,6 +736,12 @@ export class ConversationRunner {
       injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
       lastResponseId = undefined;
 
+      // Start fresh from durable history. A paused response is request-local
+      // and may predate an arrival already folded into the rebuilt history.
+      partialAssistantText = '';
+      partialThinkingBlocks = [];
+      pauseResumeCount = 0;
+
       // A verification reminder is request-only. Its preceding assistant text
       // is durable except when we supplied an empty-response placeholder.
       if (pendingVerification) {
@@ -756,6 +749,7 @@ export class ConversationRunner {
           providerMessages = [...providerMessages, { role: 'assistant', content: '(no response)' }];
         }
         providerMessages = appendOrMergeUser(providerMessages, pendingVerification.reminder);
+        nextRequestOptions = { toolChoice: 'required' };
       }
     };
 
@@ -841,17 +835,14 @@ export class ConversationRunner {
         if (cue && prepareAutomaticRecall) {
           const window = provider.contextWindowForModel(modelId ?? 'default');
           const estimatedHistoryTokens = estimateProviderTokens(providerMessages);
-          const estimatedExcess = (callerText: string | null) =>
-            projectInputTokens(
-              estimatedHistoryTokens +
-                Math.ceil(
-                  Buffer.byteLength(currentSystemPrompt + toolDefinitions + (callerText ?? '')) / 4
-                ) +
-                MAX_AUTOMATIC_RECALL_TOKENS
-            ) +
-            outputAllowance -
-            window;
-          let excess = estimatedExcess(callerContext);
+          const fixedInputTokens = (callerText: string | null) =>
+            Math.ceil(
+              Buffer.byteLength(currentSystemPrompt + toolDefinitions + (callerText ?? '')) / 4
+            ) + MAX_AUTOMATIC_RECALL_TOKENS;
+          let fixedTokens = fixedInputTokens(callerContext);
+          const estimatedExcess = () =>
+            projectInputTokens(estimatedHistoryTokens + fixedTokens) + outputAllowance - window;
+          let excess = estimatedExcess();
           if (excess <= 0) {
             const tail = recallTail
               .slice(-4)
@@ -878,7 +869,8 @@ export class ConversationRunner {
             const latestCallerContext = this.deps.getTemporaryContext?.() ?? null;
             if (latestCallerContext !== callerContext) {
               callerContext = latestCallerContext;
-              excess = estimatedExcess(callerContext);
+              fixedTokens = fixedInputTokens(callerContext);
+              excess = estimatedExcess();
             }
           }
           if (excess > 0) {
@@ -893,6 +885,11 @@ export class ConversationRunner {
                   modelId,
                   turnId,
                   contextWindow: window,
+                  historyTokenBudget: Math.max(
+                    0,
+                    Math.floor((window - outputAllowance) / INPUT_ESTIMATE_UNDERCOUNT_FACTOR) -
+                      fixedTokens
+                  ),
                   ...(lastCallContextTokens > 0
                     ? { measuredContextTokens: lastCallContextTokens }
                     : {}),
@@ -913,9 +910,6 @@ export class ConversationRunner {
             }
             if (compacted) {
               reloadCompactedHistory();
-              if (pauseResumeCount > 0) {
-                replayPausedAssistant(partialAssistantText, partialThinkingBlocks, false);
-              }
               preflightCompacted = true;
               completedTurns--;
               continue;
@@ -1268,7 +1262,17 @@ export class ConversationRunner {
             // tool_result would cause Anthropic to 400 on the next request.
             // Thinking blocks are carried through so the resumed turn keeps its
             // own partial reasoning (replayed verbatim before any text).
-            replayPausedAssistant(concatenatedAssistantText, concatenatedThinkingBlocks);
+            const assistant: ProviderMessage = {
+              role: 'assistant',
+              content: concatenatedAssistantText,
+              ...(concatenatedThinkingBlocks.length > 0
+                ? { thinkingBlocks: concatenatedThinkingBlocks }
+                : {}),
+            };
+            providerMessages =
+              providerMessages.at(-1)?.role === 'assistant'
+                ? [...providerMessages.slice(0, -1), assistant]
+                : [...providerMessages, assistant];
             // Cancel the for-loop's `completedTurns++` so this pause doesn't
             // count as a logical turn against maxTurns.
             completedTurns--;
@@ -1350,15 +1354,6 @@ export class ConversationRunner {
             // Replay tool results and prior injects from the compacted log;
             // restore only request-local state still needed by this call.
             reloadCompactedHistory();
-            // A tail of pre-compaction generation must not be glued onto the
-            // post-compaction answer. `pause_turn` accumulates text and
-            // thinking across iterations for a single durable 'message' event,
-            // and the terminal-stop switch arm above does not reset them — so a
-            // turn that paused, then overflowed, would persist
-            // "<partial><recovered answer>" as one message.
-            partialAssistantText = '';
-            partialThinkingBlocks = [];
-            pauseResumeCount = 0;
             // The compacted history is the whole point of the retry. If it is
             // STILL over the window, the retry will 400 again and the session
             // churns. Since PRI-2906 the tail budget is a fraction of this
@@ -1873,6 +1868,7 @@ export class ConversationRunner {
      * unknown, and the strategy falls back to its estimate.
      */
     measuredContextTokens?: number;
+    historyTokenBudget?: number;
     signal?: AbortSignal;
     /** Stream seq for the compaction_complete update. */
     updateTurnSeq: number;
@@ -1898,6 +1894,7 @@ export class ConversationRunner {
       connectionId: this.config.connectionId,
       modelId: params.modelId ?? undefined,
       contextWindow: params.contextWindow,
+      historyTokenBudget: params.historyTokenBudget,
       ...(params.measuredContextTokens !== undefined
         ? { measuredContextTokens: params.measuredContextTokens }
         : {}),

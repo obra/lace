@@ -82,6 +82,7 @@ export function buildCompactionContext(
     guidance?: string;
     referenceTimestamp?: string;
     contextWindow?: number;
+    historyTokenBudget?: number;
     measuredContextTokens?: number;
   },
   deps?: BuildContextDeps
@@ -94,6 +95,9 @@ export function buildCompactionContext(
     sessionDir: opts.sessionDir,
     referenceTimestamp: opts.referenceTimestamp ?? new Date().toISOString(),
     ...(opts.contextWindow !== undefined ? { contextWindow: opts.contextWindow } : {}),
+    ...(opts.historyTokenBudget !== undefined
+      ? { historyTokenBudget: opts.historyTokenBudget }
+      : {}),
     // Only a real, positive reading is passed on. A zero or a NaN from a
     // provider that reports nothing must arrive at the strategy as ABSENT, not
     // as "this session's context is empty" — see CompactionContext.

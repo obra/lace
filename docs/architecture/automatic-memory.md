@@ -429,12 +429,15 @@ count against the 2,000 estimated tokens reserved for recall. Before each
 request with an automatic recall cue, including after resume and tool results,
 the runner estimates the messages, system prompt, tool definitions and current
 caller text together with the full recall allowance and the model's requested
-output allowance. It compacts and rechecks if the estimate exceeds the window.
-Caller updates during retrieval are included in that check before submission.
+output allowance. If the estimate exceeds the window, the runner passes the
+space available for history to compaction and rechecks the rebuilt request. An
+unfinished paused response restarts from durable history after compaction.
+Caller updates during retrieval are included in the check before submission.
 Packing prioritizes group coverage before sibling expansion and keeps every
 required current account together with its original. A complete unit that
-exceeds the recall budget is omitted. If the compaction strategy cannot leave
-room for both allowances, the runner returns a context-window stop.
+exceeds the recall budget is omitted. If the strategy's retained tail and
+summary still leave too little room for both allowances, the runner returns a
+context-window stop.
 
 Prompt and inject requests can carry retrieval-only
 `recall: { query: string; context?: string }` alongside provider content. The

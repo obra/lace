@@ -196,7 +196,7 @@ export async function compact(
   const { earlier, tail } = trimTailToTokenBudget(
     events,
     TAIL_TURNS,
-    tailTokenBudget(ctx.contextWindow),
+    tailTokenBudget(ctx.contextWindow, ctx.historyTokenBudget),
     undefined,
     ctx.measuredContextTokens
   );

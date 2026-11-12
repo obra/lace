@@ -43,6 +43,8 @@ export interface CompactionContext {
    * assume the provider's own conservative fallback.
    */
   readonly contextWindow?: number;
+  /** Estimated tokens (chars/4) available for the compacted history and its summary. */
+  readonly historyTokenBudget?: number;
   /**
    * What the provider reported the session's context actually cost on its most
    * recent API call — the whole input: system prompt, tool schemas, images,
