@@ -160,6 +160,24 @@ tools; adding it does not change source hashes or authenticate the author or a
 claim's effective date. Existing strict proposal and acceptance checks remain in
 force.
 
+The extraction prompt explains that its durable account will guide future
+answers and actions, so reports, intentions and completed actions must remain
+distinct. It explains revisions as a way for later readers to understand what
+changed since an older original, and source references as the way to inspect a
+note's basis. The format-repair instruction preserves supported meaning while
+repairing the storage contract.
+
+The extractor is instructed to name a speaker only when the supplied text or
+metadata identifies them for that specific statement and to leave the speaker
+unnamed when the only identity available is another message's sender, addressee
+or parent message author. It is also instructed to preserve stated action
+targets and scope. A successful tool result supports only the operation on its
+recorded target. A message send records publication; it does not establish that
+an action described in the message happened. Retained plans, work in progress
+and reports of completion keep their attribution and status. Applicable
+corrections and clarifications to an existing account belong in one supported
+revision.
+
 The only proposal shape is:
 
 ```json
