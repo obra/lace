@@ -735,15 +735,10 @@ async function validateEvidence(
       }
       let presentation = sourceTexts.get(original.handle);
       if (presentation === undefined) {
-        const status = await sources.status(source);
-        fence();
-        if (status !== 'current') {
-          valid = false;
-          break;
-        }
         try {
           const loaded = await sources.load(source, true);
           fence();
+          // A readable pinned blob may no longer be current at its committed path.
           sources.validateAtAcceptance([{ ...loaded, sourceStatus: 'current' }]);
           presentation = {
             text: sourceText(loaded.content),
