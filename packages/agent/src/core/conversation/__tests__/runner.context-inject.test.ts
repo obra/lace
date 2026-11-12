@@ -468,25 +468,32 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
       initial: null,
       next: 'caller updated',
       expected: 'caller updated\n\nautomatic data',
-      overflow: false,
+      fits: true,
     },
     {
       action: 'clear',
       initial: 'caller before',
       next: null,
       expected: 'automatic data',
-      overflow: false,
+      fits: true,
     },
     {
       action: 'replace with larger text',
       initial: 'caller before',
       next: 'expanded caller context '.repeat(250),
       expected: 'expanded caller context '.repeat(250) + '\n\nautomatic data',
-      overflow: true,
+      fits: true,
+    },
+    {
+      action: 'expand past the context window',
+      initial: null,
+      next: 'expanded caller context '.repeat(500),
+      expected: undefined,
+      fits: false,
     },
   ])(
     'uses caller context $action while automatic preparation is pending',
-    async ({ initial, next, expected, overflow }) => {
+    async ({ initial, next, expected, fits }) => {
       injectContextEvent(sessionDir, 'Where is TASK-271?');
       let caller: string | null = initial;
       let release!: () => void;
@@ -502,23 +509,13 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
           response: {
             content: 'done',
             toolCalls: [],
-            stopReason: overflow ? 'context_window_exceeded' : 'end_turn',
+            stopReason: 'end_turn',
             usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
           },
         },
-        ...(overflow
-          ? [
-              {
-                response: {
-                  content: 'done',
-                  toolCalls: [],
-                  stopReason: 'end_turn' as const,
-                  usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
-                },
-              },
-            ]
-          : []),
       ]);
+      provider.contextWindowForModel = () => 8192;
+      provider.config.maxTokens = 1024;
       const runner = new ConversationRunner(
         { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
         createMockDeps({
@@ -541,23 +538,14 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
       expect(provider.callCount).toBe(0);
       caller = next;
       release();
-      await running;
+      const result = await running;
+      expect(result.stopReason).toBe(fits ? 'end_turn' : 'context_window_exceeded');
+      expect(provider.callCount).toBe(fits ? 1 : 0);
       expect(provider.receivedOptions[0]?.temporaryContext).toBe(expected);
-      if (overflow) {
-        expect(provider.receivedOptions.map((options) => options?.temporaryContext)).toEqual([
-          expected,
-          next,
-        ]);
-        expect(
-          readDurableEvents(sessionDir, {}).events.some(
-            (event) => event.type === 'context_compacted'
-          )
-        ).toBe(false);
-      }
     }
   );
 
-  it('retries overflow once without automatic evidence while preserving caller text and output format', async () => {
+  it('surfaces provider overflow when there is no history to compact', async () => {
     injectContextEvent(sessionDir, 'Where is TASK-271?');
     const provider = new ScriptedProvider([
       {
@@ -566,14 +554,6 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
           toolCalls: [],
           stopReason: 'context_window_exceeded',
           usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
-        },
-      },
-      {
-        response: {
-          content: 'done',
-          toolCalls: [],
-          stopReason: 'end_turn',
-          usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
         },
       },
     ]);
@@ -586,31 +566,62 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
         prepareAutomaticRecall: async () => ({ block: 'automatic data' }),
       })
     );
-    await runner.run({
+    const result = await runner.run({
       content: [],
       outputFormat,
       abortController: new AbortController(),
       turnId: `turn_${randomUUID()}`,
       startedAt: new Date().toISOString(),
     });
-    expect(provider.receivedOptions.map((options) => options?.temporaryContext)).toEqual([
-      'caller sticky\n\nautomatic data',
-      'caller sticky',
-    ]);
-    expect(
-      provider.receivedOptions.every((options) => options?.outputFormat === outputFormat)
-    ).toBe(true);
+    expect(result.stopReason).toBe('context_window_exceeded');
+    expect(provider.callCount).toBe(1);
+    expect(provider.receivedOptions[0]).toMatchObject({
+      temporaryContext: 'caller sticky\n\nautomatic data',
+      outputFormat,
+    });
     expect(
       readDurableEvents(sessionDir, {}).events.some((event) => event.type === 'context_compacted')
     ).toBe(false);
   });
 
+  it('records cancellation while automatic recall is preparing', async () => {
+    injectContextEvent(sessionDir, 'Where is TASK-271?');
+    const provider = new ScriptedProvider([]);
+    const abortController = new AbortController();
+    const runner = new ConversationRunner(
+      { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
+      createMockDeps({
+        createProvider: async () => provider,
+        prepareAutomaticRecall: async ({ signal }) => {
+          abortController.abort();
+          signal.throwIfAborted();
+          return { block: null };
+        },
+      })
+    );
+    const result = await runner.run({
+      content: [],
+      abortController,
+      turnId: `turn_${randomUUID()}`,
+      startedAt: new Date().toISOString(),
+    });
+
+    expect(result.stopReason).toBe('cancelled');
+    expect(provider.callCount).toBe(0);
+    const turnEnd = readDurableEvents(sessionDir, {}).events.find(
+      (event) => event.type === 'turn_end'
+    );
+    expect(turnEnd?.data.stopReason).toBe('cancelled');
+  });
+
   it.each([
-    { window: 8192, output: 1024, configured: true },
-    { window: 64000, output: 32000, configured: false },
+    { output: 1024, configured: true, recallEnabled: true, fits: true },
+    { output: 6000, configured: true, recallEnabled: true, fits: false },
+    { output: 6000, configured: false, recallEnabled: true, fits: false },
+    { output: 6000, configured: false, recallEnabled: false, fits: true },
   ])(
-    'reserves selected output allowance for automatic recall ($window/$output)',
-    async ({ window, output, configured }) => {
+    'accounts for configured or catalog response output ($output/$configured/$recallEnabled)',
+    async ({ output, configured, recallEnabled, fits }) => {
       injectContextEvent(sessionDir, 'Where is TASK-271?');
       const provider = new ScriptedProvider([
         {
@@ -622,13 +633,13 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
           },
         },
       ]);
-      provider.contextWindowForModel = () => window;
+      provider.contextWindowForModel = () => 8192;
       provider.getAvailableModels = () => [
         {
           id: 'budget-model',
           displayName: 'Budget',
-          contextWindow: window,
-          maxOutputTokens: output,
+          contextWindow: 8192,
+          maxOutputTokens: configured ? 8192 : output,
         },
       ];
       if (configured) provider.config.maxTokens = output;
@@ -644,27 +655,39 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
         },
         createMockDeps({
           createProvider: async () => provider,
-          prepareAutomaticRecall: async (input) => {
-            allowance = input.maxTokens;
-            return { block: null };
-          },
+          prepareAutomaticRecall: recallEnabled
+            ? async (input) => {
+                allowance = input.maxTokens;
+                return { block: 'automatic data' };
+              }
+            : undefined,
         })
       );
-      await runner.run({
+      const result = await runner.run({
         content: [],
         abortController: new AbortController(),
         turnId: `turn_${randomUUID()}`,
         startedAt: new Date().toISOString(),
       });
-      expect(allowance).toBeGreaterThan(0);
-      expect(allowance).toBeLessThanOrEqual(window - output);
+      expect(result.stopReason).toBe(fits ? 'end_turn' : 'context_window_exceeded');
+      expect(provider.callCount).toBe(fits ? 1 : 0);
+      expect(allowance).toBe(fits && recallEnabled ? 2000 : -1);
+      if (!fits) {
+        expect(result.stopDetails).toMatchObject({
+          type: 'context_window_exceeded',
+          source: 'preflight_token_estimate',
+          estimatedExcessTokens: expect.any(Number),
+        });
+      }
     }
   );
 
   it('budgets MCP tool schemas without serializing their live clients', async () => {
     const client = new Client({ name: 'recall-budget-test', version: '1.0.0' });
-    const allowances: number[] = [];
-    for (const description of ['query', 'query'.repeat(601)]) {
+    for (const [description, fits] of [
+      ['query', true],
+      ['query'.repeat(2500), false],
+    ] as const) {
       injectContextEvent(sessionDir, 'Where is TASK-271?');
       const tool = new MCPToolAdapter(
         {
@@ -689,14 +712,11 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
           },
         },
       ]);
-      provider.contextWindowForModel = () => 64000;
+      provider.contextWindowForModel = () => 8192;
       provider.config.maxTokens = 1024;
       const deps = createMockDeps({
         createProvider: async () => provider,
-        prepareAutomaticRecall: async (input) => {
-          allowances.push(input.maxTokens);
-          return { block: 'automatic data' };
-        },
+        prepareAutomaticRecall: async () => ({ block: 'automatic data' }),
       });
       const createToolExecutor = deps.createToolExecutor;
       deps.createToolExecutor = async (...args) => ({
@@ -707,17 +727,15 @@ describe('ConversationRunner - mid-turn context_injected re-read', () => {
         { sessionDir, sessionId, cwd, executionMode: 'execute', approvalMode: 'approve' },
         deps
       );
-      await runner.run({
+      const result = await runner.run({
         content: [],
         abortController: new AbortController(),
         turnId: `turn_${randomUUID()}`,
         startedAt: new Date().toISOString(),
       });
-      expect(provider.callCount).toBe(1);
-      expect(provider.receivedOptions[0]?.temporaryContext).toBe('automatic data');
+      expect(result.stopReason).toBe(fits ? 'end_turn' : 'context_window_exceeded');
+      expect(provider.callCount).toBe(fits ? 1 : 0);
     }
-    expect(allowances).toHaveLength(2);
-    expect(allowances[0] - allowances[1]).toBeGreaterThanOrEqual(1000);
   });
 
   it('dispatches before awaiting its recall diagnostic observer', async () => {

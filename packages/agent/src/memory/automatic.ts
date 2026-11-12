@@ -24,6 +24,7 @@ import {
   type RankedPassage,
 } from './recall-scratch';
 import {
+  MAX_AUTOMATIC_RECALL_TOKENS,
   sourceReadHandle,
   type AutomaticRecallInput,
   type AutomaticRecallResult,
@@ -66,7 +67,6 @@ function termPattern(identifier: string) {
     'u'
   );
 }
-const maxRecallTokens = 2000;
 const maxTextSources = 128;
 const maxSemanticPoints = 128;
 const framing =
@@ -77,7 +77,7 @@ export function packEvidence(
 ): AutomaticRecallResult {
   const groups: AutomaticEvidence[] = [];
   const expansions: Array<{ group: AutomaticEvidence; siblings: OriginalEvidence[] }> = [];
-  const budget = Math.max(0, Math.min(maxRecallTokens, allowance));
+  const budget = Math.max(0, Math.min(MAX_AUTOMATIC_RECALL_TOKENS, allowance));
   const render = () =>
     `${framing}\n${escapeHistorical(JSON.stringify({ mode: result.mode, ...(result.reason ? { reason: result.reason } : {}), coverage: result.coverage }))}\n${groups
       .map(
@@ -680,7 +680,10 @@ async function validateEvidence(
     });
   }
   const fits = (group: AutomaticEvidence) => {
-    const packed = packEvidence({ mode, reason, coverage, groups: [group] }, maxRecallTokens);
+    const packed = packEvidence(
+      { mode, reason, coverage, groups: [group] },
+      MAX_AUTOMATIC_RECALL_TOKENS
+    );
     // Selection bounds every sibling; request packing may use a shorter ranked prefix.
     return packed.groups[0]?.originals.length === group.originals.length;
   };
@@ -757,7 +760,7 @@ async function validateEvidence(
       const key = JSON.stringify(originalReferenceKey(original.source));
       let account = accountReads.get(key);
       if (!account) {
-        [account] = await accountsFor([original.source], [], maxRecallTokens * 3);
+        [account] = await accountsFor([original.source], [], MAX_AUTOMATIC_RECALL_TOKENS * 3);
         fence();
         if (account) remember(accountReads, key, account);
       }

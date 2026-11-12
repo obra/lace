@@ -4,6 +4,7 @@
 
 import { appendOrdinaryCue, recallConversationText } from '../../memory/recall-input';
 import { representedToolText } from '../../memory/source-text';
+import { MAX_AUTOMATIC_RECALL_TOKENS } from '../../memory/types';
 import { randomUUID } from 'node:crypto';
 import { join, basename, resolve as resolvePath, isAbsolute as isAbsolutePath } from 'node:path';
 import type { ToolResult } from '@lace/ent-protocol';
@@ -45,11 +46,13 @@ import type { RunnerConfig, RunnerDependencies, RunParams, RunResult, ApprovalMo
 import type {
   BetaCacheMissReason,
   LaceStopDetails,
+  ProviderMessage,
   RequestOptions,
   ThinkingBlock,
 } from '@lace/agent/providers/base-provider';
 import { EntErrorCodes } from '@lace/ent-protocol';
 import { appendTemporaryContext } from '@lace/agent/providers/temporary-context';
+import { projectInputTokens } from '@lace/agent/providers/utils/output-token-budget';
 import { createModelCallCorrelation } from '@lace/agent/providers/model-call-correlation';
 import { logger } from '@lace/agent/utils/logger';
 import { personaRegistry } from '@lace/agent/config/persona-registry';
@@ -553,14 +556,14 @@ export class ConversationRunner {
     // the try/finally that calls provider.cleanup(), the provider would leak
     // EventEmitter listeners and open HTTP sockets.
     const rebuiltMessages = turnEntry.messages;
-    const frozenSystemPrompt = turnEntry.systemPrompt;
+    let currentSystemPrompt = turnEntry.systemPrompt;
     let providerMessages = rebuiltMessages;
 
     // The system prompt is invariant for the session lifetime and is written
     // by session/new as a system_prompt_set event. An empty result means the
     // session is corrupt or was created without one — fail loudly rather
     // than letting the provider's fallback string silently mask the bug.
-    if (!frozenSystemPrompt) {
+    if (!currentSystemPrompt) {
       throw new Error(
         `Session ${sessionDir} has no system_prompt_set event; ` +
           `the session is corrupt or was created before the invariant was enforced.`
@@ -619,7 +622,7 @@ export class ConversationRunner {
       });
     };
 
-    provider.setSystemPrompt(frozenSystemPrompt);
+    provider.setSystemPrompt(currentSystemPrompt);
     // Watermark for mid-turn re-reads of durable events. Events with
     // eventSeq <= this value are already reflected in providerMessages (either
     // from the initial build above or appended on a previous iteration).
@@ -661,9 +664,9 @@ export class ConversationRunner {
     // standby/verify wrap-up.
     let injectedArrival: MidTurnArrival = 'none';
     let nextRequestOptions: RequestOptions | undefined;
+    let pendingVerification: { reminder: string; placeholder: boolean } | undefined;
     let usedTemporaryContext = false;
-    let automaticRemovedForOverflow = false;
-    let automaticBlock: string | null = null;
+    let preflightCompacted = false;
     let cue = turnEntry.latestCue;
     let recallTail = [...turnEntry.recallTail];
     let represented = turnEntry.retainedOriginals.map((entry) => ({
@@ -706,7 +709,72 @@ export class ConversationRunner {
     // reference via ToolContext) mutates the runner's local state in place.
     const compactionRequest: { requested: boolean; guidance?: string } = { requested: false };
 
+    const prepareAutomaticRecall = this.deps.prepareAutomaticRecall;
+    const replayPausedAssistant = (
+      text: string,
+      thinkingBlocks: ThinkingBlock[],
+      replace = true
+    ) => {
+      const assistant: ProviderMessage = {
+        role: 'assistant',
+        content: text,
+        ...(thinkingBlocks.length > 0 ? { thinkingBlocks } : {}),
+      };
+      providerMessages =
+        replace && providerMessages.at(-1)?.role === 'assistant'
+          ? [...providerMessages.slice(0, -1), assistant]
+          : [...providerMessages, assistant];
+    };
+
+    const reloadCompactedHistory = () => {
+      const compactedEntry = projectionCache
+        ? projectTurnEntry(sessionDir, runtimeBinding.toolRuntime.cwd, projectionCache, sessionId)
+        : loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
+      cue = compactedEntry.latestCue;
+      providerMessages = compactedEntry.messages;
+      recallTail = [...compactedEntry.recallTail];
+      represented = compactedEntry.retainedOriginals.map((entry) => ({
+        kind: 'event' as const,
+        sessionId,
+        eventSeq: entry.eventSeq,
+        text: entry.text,
+      }));
+      if (compactedEntry.systemPrompt) {
+        currentSystemPrompt = compactedEntry.systemPrompt;
+        provider.setSystemPrompt(currentSystemPrompt);
+      }
+      // Re-seed at the rebuilt projection's watermark so an inject already
+      // folded by the rebuild is not appended again on the next iteration.
+      lastSeenEventSeq = compactedEntry.maxFoldedSeq;
+      injectTailer = createInjectTailer(getLaceDir(), basename(sessionDir), lastSeenEventSeq);
+      lastResponseId = undefined;
+
+      // A verification reminder is request-only. Its preceding assistant text
+      // is durable except when we supplied an empty-response placeholder.
+      if (pendingVerification) {
+        if (pendingVerification.placeholder && providerMessages.at(-1)?.role !== 'assistant') {
+          providerMessages = [...providerMessages, { role: 'assistant', content: '(no response)' }];
+        }
+        providerMessages = appendOrMergeUser(providerMessages, pendingVerification.reminder);
+      }
+    };
+
     try {
+      const toolDefinitions = prepareAutomaticRecall
+        ? JSON.stringify(
+            toolsForProvider.map((tool) => ({
+              name: tool.name,
+              description: tool.description,
+              input_schema: tool.inputSchema,
+            }))
+          )
+        : '';
+      const outputAllowance = prepareAutomaticRecall
+        ? provider.config.maxTokens ||
+          provider.getAvailableModels().find((model) => model.id === modelId)?.maxOutputTokens ||
+          (provider.providerName === 'openai' ? 16384 : 8192)
+        : 0;
+
       for (; completedTurns < maxTurns; completedTurns++) {
         // Pick up any priority='immediate' context_injected events
         // that landed since we last looked. These come from ent/session/inject
@@ -732,7 +800,6 @@ export class ConversationRunner {
           // An arrival can be persisted before the response to the in-flight provider call.
           // Durable order keeps this view identical on restart.
           recallTail.sort((a, b) => a.eventSeq - b.eventSeq);
-          automaticRemovedForOverflow = false;
         }
         for (const content of injections) {
           providerMessages = appendOrMergeUser(providerMessages, content);
@@ -767,6 +834,102 @@ export class ConversationRunner {
             '<system-reminder>You have completed many agentic turns. If you believe you are stuck in a loop or not making progress, stop and ask the user for guidance. Otherwise, continue.</system-reminder>';
           providerMessages = appendOrMergeUser(providerMessages, reminder);
         }
+
+        let callerContext = this.deps.getTemporaryContext?.() ?? null;
+        let automaticBlock: string | null = null;
+        let recallDiagnostics: Record<string, unknown> | undefined;
+        if (cue && prepareAutomaticRecall) {
+          const window = provider.contextWindowForModel(modelId ?? 'default');
+          const estimatedHistoryTokens = estimateProviderTokens(providerMessages);
+          const estimatedExcess = (callerText: string | null) =>
+            projectInputTokens(
+              estimatedHistoryTokens +
+                Math.ceil(
+                  Buffer.byteLength(currentSystemPrompt + toolDefinitions + (callerText ?? '')) / 4
+                ) +
+                MAX_AUTOMATIC_RECALL_TOKENS
+            ) +
+            outputAllowance -
+            window;
+          let excess = estimatedExcess(callerContext);
+          if (excess <= 0) {
+            const tail = recallTail
+              .slice(-4)
+              .map((entry) => entry.text)
+              .join('\n')
+              .slice(-800);
+            const prepared = await prepareAutomaticRecall({
+              query: cue.text,
+              tail,
+              cueIds: cue.ids.map((seq) => `${sessionId}:${seq}`),
+              represented,
+              signal: abortController.signal,
+              maxTokens: MAX_AUTOMATIC_RECALL_TOKENS,
+            }).catch((err: unknown) => {
+              if (abortController.signal.aborted) return null;
+              throw err;
+            });
+            if (!prepared || abortController.signal.aborted) {
+              stopReason = 'cancelled';
+              break;
+            }
+            automaticBlock = prepared.block;
+            recallDiagnostics = prepared.diagnostics;
+            const latestCallerContext = this.deps.getTemporaryContext?.() ?? null;
+            if (latestCallerContext !== callerContext) {
+              callerContext = latestCallerContext;
+              excess = estimatedExcess(callerContext);
+            }
+          }
+          if (excess > 0) {
+            let compacted = false;
+            if (!preflightCompacted) {
+              const lastCallContextTokens =
+                lastCallInputTokens +
+                lastCallCacheCreationInputTokens +
+                lastCallCacheReadInputTokens;
+              try {
+                compacted = await this.compactSession({
+                  modelId,
+                  turnId,
+                  contextWindow: window,
+                  ...(lastCallContextTokens > 0
+                    ? { measuredContextTokens: lastCallContextTokens }
+                    : {}),
+                  signal: abortController.signal,
+                  updateTurnSeq: durableTurnSeq,
+                });
+              } catch (compactionErr) {
+                logger.error('runner: request preflight compaction failed', {
+                  err: errorMessage(compactionErr),
+                  turnId,
+                  sessionId,
+                });
+              }
+            }
+            if (abortController.signal.aborted) {
+              stopReason = 'cancelled';
+              break;
+            }
+            if (compacted) {
+              reloadCompactedHistory();
+              if (pauseResumeCount > 0) {
+                replayPausedAssistant(partialAssistantText, partialThinkingBlocks, false);
+              }
+              preflightCompacted = true;
+              completedTurns--;
+              continue;
+            }
+            stopReason = 'context_window_exceeded';
+            stopDetails = {
+              type: stopReason,
+              source: 'preflight_token_estimate',
+              estimatedExcessTokens: excess,
+            };
+            break;
+          }
+        }
+        preflightCompacted = false;
 
         const messageTurnSeq = streamTurnSeq++;
         let streamedAny = false;
@@ -850,52 +1013,6 @@ export class ConversationRunner {
           // nextRequestOptions (a one-shot tool_choice nudge), outputFormat
           // applies to every call this turn so the final answer stays
           // schema-constrained even after tool-use iterations.
-          let recallDiagnostics: Record<string, unknown> | undefined;
-          automaticBlock = null;
-          if (cue && this.deps.prepareAutomaticRecall && !automaticRemovedForOverflow) {
-            const callerContext = this.deps.getTemporaryContext?.() ?? null;
-            const outputAllowance =
-              provider.config.maxTokens ||
-              provider.getAvailableModels().find((model) => model.id === modelId)
-                ?.maxOutputTokens ||
-              (provider.providerName === 'openai' ? 16384 : 8192);
-            const allowance = Math.max(
-              0,
-              provider.contextWindowForModel(modelId ?? 'default') -
-                estimateProviderTokens(providerMessages) -
-                Math.ceil(
-                  Buffer.byteLength(
-                    frozenSystemPrompt +
-                      (callerContext ?? '') +
-                      JSON.stringify(
-                        toolsForProvider.map((tool) => ({
-                          name: tool.name,
-                          description: tool.description,
-                          input_schema: tool.inputSchema,
-                        }))
-                      )
-                  ) / 3
-                ) -
-                outputAllowance
-            );
-            const tail = recallTail
-              .slice(-4)
-              .map((entry) => entry.text)
-              .join('\n')
-              .slice(-800);
-            const prepared = await this.deps.prepareAutomaticRecall({
-              query: cue.text,
-              tail,
-              cueIds: cue.ids.map((seq) => `${sessionId}:${seq}`),
-              represented,
-              signal: abortController.signal,
-              maxTokens: allowance,
-            });
-            abortController.signal.throwIfAborted();
-            automaticBlock = prepared.block;
-            recallDiagnostics = prepared.diagnostics;
-          }
-          const callerContext = this.deps.getTemporaryContext?.() ?? null;
           const temporaryContext =
             [callerContext, automaticBlock].filter((text) => text !== null).join('\n\n') ||
             (callerContext === '' ? '' : null);
@@ -922,7 +1039,12 @@ export class ConversationRunner {
                 _meta: { automaticRecall: recallDiagnostics },
               });
           }
-          nextRequestOptions = undefined; // Reset after use
+          if (response.stopReason !== 'context_window_exceeded') {
+            nextRequestOptions = undefined;
+            if (response.stopReason !== 'pause_turn') {
+              pendingVerification = undefined;
+            }
+          }
           if (response.structuredOutput !== undefined) {
             lastStructuredOutput = response.structuredOutput;
           }
@@ -1146,18 +1268,7 @@ export class ConversationRunner {
             // tool_result would cause Anthropic to 400 on the next request.
             // Thinking blocks are carried through so the resumed turn keeps its
             // own partial reasoning (replayed verbatim before any text).
-            const last = providerMessages[providerMessages.length - 1];
-            const mergedAssistant = {
-              role: 'assistant' as const,
-              content: concatenatedAssistantText,
-              ...(concatenatedThinkingBlocks.length > 0
-                ? { thinkingBlocks: concatenatedThinkingBlocks }
-                : {}),
-            };
-            providerMessages =
-              last?.role === 'assistant'
-                ? [...providerMessages.slice(0, -1), mergedAssistant]
-                : [...providerMessages, mergedAssistant];
+            replayPausedAssistant(concatenatedAssistantText, concatenatedThinkingBlocks);
             // Cancel the for-loop's `completedTurns++` so this pause doesn't
             // count as a logical turn against maxTurns.
             completedTurns--;
@@ -1204,16 +1315,6 @@ export class ConversationRunner {
         // looping.
         if (
           stopReason === 'context_window_exceeded' &&
-          automaticBlock &&
-          !automaticRemovedForOverflow
-        ) {
-          automaticRemovedForOverflow = true;
-          lastResponseId = undefined;
-          completedTurns--;
-          continue;
-        }
-        if (
-          stopReason === 'context_window_exceeded' &&
           emergencyCompactions < MAX_EMERGENCY_COMPACTIONS
         ) {
           emergencyCompactions++;
@@ -1233,6 +1334,7 @@ export class ConversationRunner {
               ...(lastCallContextTokens > 0
                 ? { measuredContextTokens: lastCallContextTokens }
                 : {}),
+              signal: abortController.signal,
               updateTurnSeq: durableTurnSeq,
             });
           } catch (compactionErr) {
@@ -1245,55 +1347,9 @@ export class ConversationRunner {
             });
           }
           if (compacted) {
-            // Rebuild the message prefix from the now-compacted log. The
-            // per-turn in-memory mutations made before this point (loop
-            // reminders, tool-choice nudges, appended tool results, injects
-            // picked up earlier this turn) are dropped on purpose: the durable
-            // events behind them are folded into the compacted projection, and
-            // re-applying them would resurrect the history we just summarized
-            // away. The mutable per-turn state that is NOT part of
-            // providerMessages is reset explicitly below.
-            const compactedEntry = projectionCache
-              ? projectTurnEntry(
-                  sessionDir,
-                  runtimeBinding.toolRuntime.cwd,
-                  projectionCache,
-                  sessionId
-                )
-              : loadTurnEntryProjection(sessionDir, runtimeBinding.toolRuntime.cwd);
-            // Replay can regroup older inputs; only an unconsumed arrival re-enables evidence.
-            if (compactedEntry.latestCue?.ids.some((eventSeq) => eventSeq > lastSeenEventSeq)) {
-              automaticRemovedForOverflow = false;
-            }
-            cue = compactedEntry.latestCue;
-            providerMessages = compactedEntry.messages;
-            recallTail = [...compactedEntry.recallTail];
-            represented = compactedEntry.retainedOriginals.map((entry) => ({
-              kind: 'event' as const,
-              sessionId,
-              eventSeq: entry.eventSeq,
-              text: entry.text,
-            }));
-            if (compactedEntry.systemPrompt) {
-              // rerenderPersonaAfterCompaction may have written a new
-              // system_prompt_set; the retry should use it.
-              provider.setSystemPrompt(compactedEntry.systemPrompt);
-            }
-            // Re-seed the inject tailer at the rebuilt projection's watermark.
-            // The rebuild folded EVERY logged event, including any peer
-            // context_injected that landed while the oversized call was failing
-            // and the compaction was running (10.7s in the live incident — long
-            // enough for a Slack message or a job completion). Without the
-            // re-seed the old tailer, still holding its pre-call watermark,
-            // re-emits that inject at the top of the retry iteration and the
-            // model sees it twice. Same phantom-double the between-turn seeding
-            // above exists to prevent.
-            lastSeenEventSeq = compactedEntry.maxFoldedSeq;
-            injectTailer = createInjectTailer(
-              getLaceDir(),
-              basename(sessionDir),
-              compactedEntry.maxFoldedSeq
-            );
+            // Replay tool results and prior injects from the compacted log;
+            // restore only request-local state still needed by this call.
+            reloadCompactedHistory();
             // A tail of pre-compaction generation must not be glued onto the
             // post-compaction answer. `pause_turn` accumulates text and
             // thinking across iterations for a single durable 'message' event,
@@ -1345,9 +1401,6 @@ export class ConversationRunner {
                   ' earlier in this session.',
               });
             });
-            // A server-side response chain describes the pre-compaction message
-            // list; it no longer matches what we are about to send.
-            lastResponseId = undefined;
             stopReason = 'end_turn';
             stopDetails = null;
             logger.warn('runner: emergency compaction after context_window_exceeded, retrying', {
@@ -1390,12 +1443,14 @@ export class ConversationRunner {
             // untouched.
             const assistantPlaceholder =
               assistantText.trim().length > 0 ? assistantText : '(no response)';
+            const reminder = bareTextStopReminder(injectedArrival);
+            pendingVerification = { reminder, placeholder: !assistantText.trim() };
             providerMessages = [
               ...providerMessages,
               { role: 'assistant' as const, content: assistantPlaceholder },
               {
                 role: 'user' as const,
-                content: bareTextStopReminder(injectedArrival),
+                content: reminder,
               },
             ];
             nextRequestOptions = { toolChoice: 'required' };
@@ -1793,9 +1848,8 @@ export class ConversationRunner {
    * Returns true when the log was actually compacted; a strategy noop (nothing
    * worth summarizing) returns false and writes nothing.
    *
-   * Shared by the two triggers: the post-turn one in run()'s finally block
-   * (persona breakpoints and the compact_session tool) and the mid-turn
-   * emergency one that fires on context_window_exceeded.
+   * Shared by request preflight, emergency recovery and the post-turn
+   * persona breakpoint and compact_session paths.
    */
   private async compactSession(params: {
     modelId?: string;
@@ -1819,10 +1873,12 @@ export class ConversationRunner {
      * unknown, and the strategy falls back to its estimate.
      */
     measuredContextTokens?: number;
+    signal?: AbortSignal;
     /** Stream seq for the compaction_complete update. */
     updateTurnSeq: number;
   }): Promise<boolean> {
     const { sessionDir, sessionId } = this.config;
+    if (params.signal?.aborted) return false;
     const snapshotHead = readHead(sessionDir);
     const allEvents = readDurableEvents(sessionDir, {
       limit: Number.MAX_SAFE_INTEGER,
@@ -1881,6 +1937,7 @@ export class ConversationRunner {
     }
 
     const committed = await this.deps.runExclusive(async () => {
+      if (params.signal?.aborted) return false;
       // A strategy may await a summary while RPCs append incoming context.
       // The preserved prefix covers only the snapshot the strategy received.
       if (readHead(sessionDir) !== snapshotHead) {
