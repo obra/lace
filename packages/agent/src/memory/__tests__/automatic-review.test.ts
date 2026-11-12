@@ -611,11 +611,11 @@ it.each([
   }
 );
 
-it('refills semantic results past rejected originals while retaining a text-shortlisted unindexed original', async () => {
+it('keeps text-shortlisted originals when stale semantic nominees fill the shortlist', async () => {
   const stale = 'bicycle stale.';
-  const count = 2 * RECALL_PAGE_SIZE + 1;
+  const count = RECALL_PAGE_SIZE + 1;
   for (let i = 0; i < count; i++) event(stale);
-  event('bicycle violet.');
+  event('train violet.');
   event('bicycle green.');
   event('bicycle no vector.');
   vector = (text, kind) => (kind === 'query' || text.includes(stale) ? [1, 0] : [0.8, 0.6]);
@@ -625,8 +625,9 @@ it('refills semantic results past rejected originals while retaining a text-shor
     sources().at(-1)!.id
   );
   writeFileSync(file(), readFileSync(file(), 'utf8').replaceAll(stale, 'bicycle gone!.'));
-  // The unindexed original must enter through text before semantic validation refills.
-  const result = await recall(runtime, 'bicycle vector');
+  // The train is beyond the semantic shortlist. "green" and "vector" help the
+  // bicycle originals outrank the stale rows in FTS.
+  const result = await recall(runtime, 'bicycle green vector');
   expect(result.mode).toBe('hybrid');
   expect(result.coverage).toMatchObject({
     sources: count + 3,
@@ -637,40 +638,51 @@ it('refills semantic results past rejected originals while retaining a text-shor
   expect(
     result.selected.flatMap((group) => group.originals.map((original) => original.text))
   ).toEqual([
-    expect.stringContaining('bicycle violet.'),
     expect.stringContaining('bicycle green.'),
     expect.stringContaining('bicycle no vector.'),
   ]);
 });
 
-it('advances native pages by raw hits and admits an exactly-at-floor paraphrase without reading vector JSON', async () => {
+it('queries one full mixed semantic shortlist and admits current notes and at-floor passages', async () => {
   await projectedOriginals(3);
-  const [target] = indexedPassages();
-  const offsets: number[] = [];
+  const [target, deeper] = indexedPassages();
+  const note = accept('The port has a new permit.', [sources()[2]]);
+  notes.cacheVector(note, 'review-controlled', [1, 0]);
+  const requests: Array<{ limit: number; minScore?: number }> = [];
   const runtime = start(false, 'root', {
-    async query(_vector, limit, _signal, { offset = 0, minScore } = {}) {
-      offsets.push(offset);
-      expect(minScore).toBe(0.7);
-      return offset === 0
-        ? Array.from({ length: limit }, (_, i) => ({
-            identity: { ...target, sourceId: `absent-${i}` },
-            score: 1,
-          }))
-        : [{ identity: target, score: 0.7 }];
+    async query(_vector, limit, _signal, { minScore } = {}) {
+      requests.push({ limit, minScore });
+      if (requests.length > 1) return [{ identity: deeper, score: 0.7 }];
+      return [
+        {
+          identity: { kind: 'note' as const, noteId: note.id, revision: note.revision },
+          score: 1,
+        },
+        ...Array.from({ length: 126 }, (_, i) => ({
+          identity: { ...target, sourceId: `absent-${i}` },
+          score: 0.8,
+        })),
+        { identity: target, score: 0.7 },
+      ].slice(0, limit);
     },
     async scores() {
       throw new Error('No text-only point should be scored');
     },
   });
   const first = await recall(runtime, 'pedaling');
-  expect(offsets).toEqual([0, RECALL_PAGE_SIZE]);
   expect(first.mode).toBe('semantic-only');
-  expect(first.groups[0].originals[0].text).toContain('violet');
+  expect(first.groups.flatMap(({ accounts }) => accounts)).toEqual([
+    expect.objectContaining({ id: note.id, revision: note.revision, text: note.text }),
+  ]);
+  expect(first.groups.flatMap(({ originals }) => originals.map(({ text }) => text))).toContain(
+    'The bicycle queue is violet.'
+  );
+  expect(requests).toEqual([{ limit: 128, minScore: 0.7 }]);
   const reused = await recall(runtime, 'pedaling', {
     selection: { ...first, groups: first.selected },
   });
   expect(reused.groups).toEqual(first.groups);
-  expect(offsets).toEqual([0, RECALL_PAGE_SIZE]);
+  expect(requests).toHaveLength(1);
 });
 
 it('uses below-floor scores for FTS candidates and marks a missing indexed score partial', async () => {
@@ -892,31 +904,51 @@ it('ranks text by literal overlap while the available engine has no passage vect
   expect(engine.query).not.toHaveBeenCalled();
 });
 
-it('discards a completed semantic page and reranks retained text after a later engine failure', async () => {
+it('discards semantic ranks and reranks retained text when exact scoring fails', async () => {
   await projectedOriginals(3);
   const [textual, , semantic] = indexedPassages();
+  let scoreRequests = 0;
   const runtime = start(true, 'root', {
-    async query(_vector, limit, _signal, { offset = 0 } = {}) {
-      if (offset) throw new Error('offline');
+    async query() {
       return [
         { identity: semantic, score: 1 },
         { identity: textual, score: 0.9 },
-        ...Array.from({ length: limit - 2 }, (_, i) => ({
-          identity: { ...semantic, sourceId: `absent-${i}` },
-          score: 0.8,
-        })),
       ];
     },
     async scores() {
-      throw new Error('Text-only fallback must not request scores');
+      scoreRequests++;
+      throw new Error('offline');
     },
   });
   const result = await recall(runtime, 'bicycle queue');
+  expect(scoreRequests).toBe(1);
   expect(result.mode).toBe('text-only');
   expect(result.reason).toContain('Semantic retrieval unavailable');
   const text = result.selected.flatMap(({ originals }) => originals.map(({ text }) => text));
   expect(text).toContain('The bicycle queue is violet.');
   expect(text.every((value) => !value.includes('harbor'))).toBe(true);
+});
+
+it('propagates cancellation during semantic nomination before scoring text matches', async () => {
+  await projectedOriginals(3);
+  indexedPassages();
+  const controller = new AbortController();
+  const reason = new Error('fixture cancelled');
+  let scoreRequests = 0;
+  const runtime = start(true, 'root', {
+    async query() {
+      controller.abort(reason);
+      return [];
+    },
+    async scores() {
+      scoreRequests++;
+      return [];
+    },
+  });
+  await expect(recall(runtime, 'bicycle queue', { signal: controller.signal })).rejects.toBe(
+    reason
+  );
+  expect(scoreRequests).toBe(0);
 });
 
 it('rejects an old note identity revised while its explicit score was in flight', async () => {
@@ -946,8 +978,8 @@ it('rejects an old note identity revised while its explicit score was in flight'
   expect(result.selected).toEqual([]);
 });
 
-it('marks rendered coverage partial if publication starts and settles between native pages', async () => {
-  const { originals, passages } = await projectedOriginals(RECALL_PAGE_SIZE + 1);
+it('marks coverage partial if publication starts and settles during semantic nomination', async () => {
+  const { originals, passages } = await projectedOriginals(3);
   const identities = indexedPassages();
   async function prepare(overlap: boolean) {
     let epoch = 0;
@@ -967,11 +999,9 @@ it('marks rendered coverage partial if publication starts and settles between na
       accountsFor: async () => [{ accounts: [] }],
       publication: () => ({ epoch, partial: false }),
       search: {
-        async query(_vector, limit, _signal, { offset = 0 } = {}) {
-          if (overlap && offset === 0) epoch += 2;
-          return identities
-            .slice(offset, offset + limit)
-            .map((identity) => ({ identity, score: 1 }));
+        async query(_vector, limit) {
+          if (overlap) epoch += 2;
+          return identities.slice(0, limit).map((identity) => ({ identity, score: 1 }));
         },
         async scores() {
           return [];
@@ -979,7 +1009,6 @@ it('marks rendered coverage partial if publication starts and settles between na
       },
     });
     expect(result.coverage.partial).toBe(overlap);
-    expect(result.block).toContain(`"partial":${overlap}`);
   }
   await prepare(false);
   await prepare(true);

@@ -35,7 +35,7 @@ export type NoteSearchIdentity = z.infer<typeof noteSchema>;
 export type MemorySearchIdentity = z.infer<typeof identitySchema>;
 export type MemorySearchPoint = { identity: MemorySearchIdentity; vector: number[] };
 export type MemorySearchHit = { identity: MemorySearchIdentity; score: number };
-type QueryOptions = { offset?: number; minScore?: number };
+type QueryOptions = { minScore?: number };
 
 type Owner = { instanceId: string; generation: string };
 type CollectionInfo = {
@@ -235,18 +235,15 @@ export class MemorySearchIndex {
     vector: number[],
     limit: number,
     signal: AbortSignal,
-    options: QueryOptions = {}
+    { minScore }: QueryOptions = {}
   ): Promise<MemorySearchHit[]> {
     signal.throwIfAborted();
     validateVector(vector);
     if (!Number.isSafeInteger(limit) || limit <= 0 || limit > QUERY_LIMIT)
       throw new Error('Invalid memory search query limit');
-    const { offset, minScore } = options;
-    if (offset !== undefined && (!Number.isSafeInteger(offset) || offset < 0))
-      throw new Error('Invalid memory search query offset');
     if (minScore !== undefined && !Number.isFinite(minScore))
       throw new Error('Invalid memory search score threshold');
-    return this.find(vector, limit, signal, options);
+    return this.find(vector, limit, signal, minScore);
   }
 
   async scores(
@@ -262,14 +259,14 @@ export class MemorySearchIndex {
     const ids = new Set(
       identities.map((identity) => pointId(parseIdentity(identity), this.owner.generation))
     );
-    return this.find(vector, ids.size, signal, {}, ids);
+    return this.find(vector, ids.size, signal, undefined, ids);
   }
 
   private async find(
     vector: number[],
     limit: number,
     signal: AbortSignal,
-    { offset, minScore }: QueryOptions,
+    minScore?: number,
     requested?: ReadonlySet<string>
   ): Promise<MemorySearchHit[]> {
     if (this.validation === 'unchecked') {
@@ -279,10 +276,9 @@ export class MemorySearchIndex {
     const result = await this.request<{ points?: unknown }>('POST', '/points/query', signal, {
       query: vector,
       limit,
-      offset,
       score_threshold: minScore === undefined ? undefined : thresholdBelow(minScore),
       filter: requested === undefined ? undefined : { must: [{ has_id: [...requested] }] },
-      params: { exact: true },
+      params: requested === undefined ? { exact: false, hnsw_ef: 1024 } : { exact: true },
       with_payload: true,
       with_vector: false,
     });

@@ -306,17 +306,20 @@ settle. A Qdrant outage leaves work durable. Query preparation never creates or
 waits for a collection. To restore an older SQLite backup, provision a fresh
 owned derived collection and reseed.
 
-Fresh recall reads coverage with SQLite aggregates and asks Qdrant for exact Dot
-scores in bounded pages through the semantic floor. It resolves passage and note
-identities against current SQLite metadata, and requests scores for remaining
-FTS candidates by point ID. Missing engine scores leave text candidates
-eligible. If projected passages have no vectors in the active generation, recall
-ranks text by literal overlap. An engine failure discards partial semantic ranks
-and reranks the retained text matches. Neither path decodes stored vector JSON.
-Qdrant exact search can still scan the corpus internally, and deeper offset
-pages can repeat that work. Publication in flight, queued work, and overlap
-between publication and preparation make coverage partial. Native pagination
-does not provide a snapshot across requests.
+Fresh recall reads coverage with SQLite aggregates. When semantic retrieval is
+available, recall makes one approximate Qdrant Dot query for up to 128 passage
+and current-note points at or above the semantic floor. The query uses
+`exact: false` and `hnsw_ef: 1024`. Recall resolves those identities against
+current SQLite metadata. Stale, already represented, or subsequently grouped
+points consume shortlist slots. Useful evidence can fall outside the shortlist.
+
+Recall requests exact scores by point ID for remaining text and identifier
+candidates. Missing engine scores leave text candidates eligible. If projected
+passages have no vectors in the active generation, recall ranks text by literal
+overlap. An engine failure discards partial semantic ranks and reranks the
+retained text matches. Neither path decodes stored vector JSON. Publication in
+flight, queued work, and overlap between publication and preparation make
+coverage partial.
 
 Before expanding passages or requesting their scores, each text surface
 (transcript events, retained originals, and note heads) nominates at most 128
@@ -355,8 +358,8 @@ candidates in order, with no further fixed cutoff before checking originals and
 their required current accounts.
 
 The `memory.recall.stages` debug event reports wall-clock times and aggregate
-row or candidate counts for successful preparations. Native query time, page
-count, largest offset, and explicit score batches are recorded separately. Run
+row or candidate counts for successful preparations. It records semantic query
+count and duration separately from exact score batch count and duration. Run
 merging is reported separately from validation, which consumes the final lazy
 merge. Reused preparations report coverage and validation only.
 

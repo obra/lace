@@ -159,7 +159,7 @@ it('refuses foreign metadata and configuration without changing the collection',
   }
 });
 
-it('queries an existing collection with exact Dot search and validates returned identities', async () => {
+it('queries an existing collection and validates returned identities', async () => {
   const id = passagePointId({ ...passage, generation: owner.generation });
   const match = { id, score: 0.75, payload: { ...passage, generation: owner.generation } };
   let points: unknown[] = [match];
@@ -179,13 +179,6 @@ it('queries an existing collection with exact Dot search and validates returned 
     expect(await reader.query(vector, 1, signal())).toEqual([{ identity: passage, score: 0.75 }]);
     expect(await reader.query(vector, 1, signal())).toHaveLength(1);
     expect(server.requests.map(({ method }) => method)).toEqual(['GET', 'POST', 'POST']);
-    expect(server.requests[1].body).toEqual({
-      query: vector,
-      limit: 1,
-      params: { exact: true },
-      with_payload: true,
-      with_vector: false,
-    });
     for (const malformed of [
       [{ ...match, id: 'bad' }],
       [{ ...match, score: '0.75' }],
@@ -272,7 +265,7 @@ it('sends bounded waited writes and stable revision-aware point deletions', asyn
   }
 });
 
-it('requests bounded exact pages with an offset and a score threshold', async () => {
+it('requests a bounded approximate shortlist with a score threshold', async () => {
   const identities = [passage, { ...passage, start: 3 }, { ...passage, start: 4 }];
   const hits = identities.map((identity, index) => ({
     id: passagePointId({ ...identity, generation: owner.generation }),
@@ -281,11 +274,11 @@ it('requests bounded exact pages with an offset and a score threshold', async ()
   }));
   const server = await fixture((request, response) => {
     if (!request.path.endsWith('/query')) return false;
-    const { offset = 0, score_threshold = -Infinity, limit } = request.body;
+    const { score_threshold = -Infinity, limit } = request.body;
     reply(response, {
       points: hits
         .filter(({ score }) => Math.fround(score) > Math.fround(Number(score_threshold)))
-        .slice(Number(offset), Number(offset) + Number(limit)),
+        .slice(0, Number(limit)),
     });
     return true;
   });
@@ -293,29 +286,24 @@ it('requests bounded exact pages with an offset and a score threshold', async ()
     const index = new MemorySearchIndex({ url: server.url }, owner);
     await index.ensure(signal(), allowCreate);
     server.requests.length = 0;
-    expect(await index.query(vector, 1, signal(), { offset: 1, minScore: 0.5 })).toEqual([
-      { identity: identities[1], score: Math.fround(0.8) },
+    expect(await index.query(vector, 1, signal(), { minScore: 0.5 })).toEqual([
+      { identity: identities[0], score: Math.fround(0.9) },
     ]);
-    expect(await index.query(vector, 1, signal(), { offset: 2, minScore: 0.5 })).toEqual([]);
-    expect(server.requests.map(({ body }) => body)).toEqual(
-      [1, 2].map((offset) => ({
+    expect(server.requests.map(({ body }) => body)).toEqual([
+      {
         query: vector,
         limit: 1,
-        offset,
         score_threshold: 0.4999999701976776,
-        params: { exact: true },
+        params: { exact: false, hnsw_ef: 1024 },
         with_payload: true,
         with_vector: false,
-      }))
-    );
-    for (const offset of [-1, 0.5, NaN, Number.MAX_SAFE_INTEGER + 1]) {
-      await expect(index.query(vector, 1, signal(), { offset })).rejects.toThrow(/offset/);
-    }
+      },
+    ]);
     await expect(index.query(vector, 1, signal(), { minScore: Infinity })).rejects.toThrow(
       /threshold/
     );
     await expect(index.query(vector, 1025, signal())).rejects.toThrow(/limit/);
-    expect(server.requests).toHaveLength(2);
+    expect(server.requests).toHaveLength(1);
   } finally {
     server.close();
   }

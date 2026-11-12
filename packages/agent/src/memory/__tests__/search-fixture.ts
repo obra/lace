@@ -57,10 +57,10 @@ export function exhaustiveSearch(
     }
   }
   return {
-    async query(vector, limit, signal, { offset = 0, minScore = -Infinity } = {}) {
+    async query(vector, limit, signal, { minScore = -Infinity } = {}) {
       return ranked(vector, signal)
         .filter(({ score }) => score >= minScore)
-        .slice(offset, offset + limit);
+        .slice(0, limit);
     },
     async scores(vector, identities, signal) {
       const wanted = new Set(identities.map(identityKey));
