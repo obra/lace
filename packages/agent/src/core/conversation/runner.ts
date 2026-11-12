@@ -738,9 +738,9 @@ export class ConversationRunner {
 
       // Start fresh from durable history. A paused response is request-local
       // and may predate an arrival already folded into the rebuilt history.
+      if (pauseResumeCount > 0) finalAssistantContent = '';
       partialAssistantText = '';
       partialThinkingBlocks = [];
-      pauseResumeCount = 0;
 
       // A verification reminder is request-only. Its preceding assistant text
       // is durable except when we supplied an empty-response placeholder.
@@ -1354,6 +1354,7 @@ export class ConversationRunner {
             // Replay tool results and prior injects from the compacted log;
             // restore only request-local state still needed by this call.
             reloadCompactedHistory();
+            pauseResumeCount = 0;
             // The compacted history is the whole point of the retry. If it is
             // STILL over the window, the retry will 400 again and the session
             // churns. Since PRI-2906 the tail budget is a fraction of this

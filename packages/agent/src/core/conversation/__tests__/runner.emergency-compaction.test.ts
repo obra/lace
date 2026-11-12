@@ -423,8 +423,8 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     provider.contextWindowForModel = () => 204_800;
     provider.getAvailableModels = () => [
       {
-        id: 'glm-5.3',
-        displayName: 'GLM 5.3',
+        id: 'glm-4.7',
+        displayName: 'GLM-4.7',
         contextWindow: 204_800,
         maxOutputTokens: 131_072,
       },
@@ -438,7 +438,7 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
           return { block: recall };
         },
       },
-      { modelId: 'glm-5.3' }
+      { modelId: 'glm-4.7' }
     );
     const result = await promise;
 
@@ -516,6 +516,61 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     expect(provider.sentOptions[3]?.toolChoice).toBe('required');
     expect(provider.sentTemporaryContexts[3]).toBe('recalled evidence for new ordinary query');
     expect(result.content).toEqual([{ type: 'text', text: CLEAN_TURN.content }]);
+  });
+
+  it('enforces the pause limit across repeated compactions', async () => {
+    seedLargeTurns(12, 3_100);
+    const paused: ProviderResponse = {
+      content: 'x'.repeat(80_000),
+      toolCalls: [],
+      stopReason: 'pause_turn',
+      usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+    };
+    const provider = new ScriptedProvider([
+      ...Array.from({ length: 12 }, () => paused),
+      CLEAN_TURN,
+    ]);
+    provider.contextWindowForModel = () => 30_000;
+    const { promise } = run(provider, {
+      prepareAutomaticRecall: async () => ({ block: 'recalled evidence' }),
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      data: { stopDetails: { code: 'pause_turn_loop' } },
+    });
+    expect(provider.callCount).toBe(11);
+    expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(10);
+  });
+
+  it('returns no abandoned partial when a rebuilt request cannot fit', async () => {
+    seedLargeTurns(12, 3_100);
+    const provider = new ScriptedProvider([
+      {
+        content: 'Abandoned partial: ' + 'x'.repeat(9_000),
+        toolCalls: [],
+        stopReason: 'pause_turn',
+        usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+      },
+      CLEAN_TURN,
+    ]);
+    provider.contextWindowForModel = () => 30_000;
+    const { promise } = run(provider, {
+      prepareAutomaticRecall: async () => ({ block: 'recalled evidence' }),
+      rerenderPersonaAfterCompaction: async () => {
+        const state = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, state, {
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: 'x'.repeat(80_000), rerender: true },
+        });
+        writeSessionState(sessionDir, nextState);
+      },
+    });
+    const result = await promise;
+
+    expect(result.stopReason).toBe('context_window_exceeded');
+    expect(provider.callCount).toBe(1);
+    expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(1);
+    expect(result.content).toEqual([]);
   });
 
   it('keeps ordinary verification when its request needs compaction', async () => {
