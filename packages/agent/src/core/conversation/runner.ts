@@ -27,6 +27,7 @@ import {
   readDurableEvents,
   type DurableEvent,
 } from '@lace/agent/storage/event-log';
+import { readHead } from '@lace/agent/storage/seq-head';
 import { executeTodoRead, executeTodoWrite } from '@lace/agent/todo/todo-tools';
 import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
 import { projectTurnEntry } from '@lace/agent/message-building/incremental-projection';
@@ -1822,6 +1823,7 @@ export class ConversationRunner {
     updateTurnSeq: number;
   }): Promise<boolean> {
     const { sessionDir, sessionId } = this.config;
+    const snapshotHead = readHead(sessionDir);
     const allEvents = readDurableEvents(sessionDir, {
       limit: Number.MAX_SAFE_INTEGER,
     }).events;
@@ -1878,7 +1880,13 @@ export class ConversationRunner {
       return false;
     }
 
-    await this.deps.runExclusive(async () => {
+    const committed = await this.deps.runExclusive(async () => {
+      // A strategy may await a summary while RPCs append incoming context.
+      // The preserved prefix covers only the snapshot the strategy received.
+      if (readHead(sessionDir) !== snapshotHead) {
+        logger.info('runner: conversation advanced during compaction', { sessionId });
+        return false;
+      }
       const sessionState = readSessionState(sessionDir);
       const { nextState } = appendDurableEvent(sessionDir, sessionState, {
         type: 'context_compacted',
@@ -1890,7 +1898,9 @@ export class ConversationRunner {
       // Re-render the persona (model + system prompt) from the current
       // persona file so the compacted session reflects the live persona.
       await this.deps.rerenderPersonaAfterCompaction?.();
+      return true;
     });
+    if (!committed) return false;
     // Notify clients that an in-place compaction ran, mirroring the
     // ent/session/compact handler's compaction_complete emit. sen-core's
     // post-compaction wake keys on this update; without it, breakpoint

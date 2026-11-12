@@ -25,7 +25,9 @@ import {
   type RequestOptions,
   type WireTool,
 } from '@lace/agent/providers/base-provider';
-import { resetRegistriesForTest } from '@lace/agent/plugins';
+import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
+import { trackBasedStrategy } from '@lace/agent/compaction/track-strategy';
+import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
 import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 
 const CONTEXT_EXCEEDED: ProviderResponse = {
@@ -269,13 +271,18 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
   });
 
-  function run(provider: AIProvider, depOverrides: Partial<RunnerDependencies> = {}) {
+  function run(
+    provider: AIProvider,
+    depOverrides: Partial<RunnerDependencies> = {},
+    configOverrides: Partial<RunnerConfig> = {}
+  ) {
     const config: RunnerConfig = {
       sessionDir,
       sessionId,
       cwd,
       executionMode: 'execute',
       approvalMode: 'approve',
+      ...configOverrides,
     };
     const deps = createMockDeps(provider, depOverrides);
     const runner = new ConversationRunner(config, deps);
@@ -458,6 +465,52 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     const retryText = messagesAsText(provider.sentMessages[1]!);
     expect(retryText).toContain(marker);
     expect(retryText.split(marker)).toHaveLength(2);
+  });
+
+  it('keeps an arrival appended after the compaction strategy took its snapshot', async () => {
+    const marker = 'PEER-INJECT-AFTER-STRATEGY-SNAPSHOT';
+    let begin!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      begin = resolve;
+    });
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    registries.compaction.register(
+      'blocked-track-based',
+      {
+        name: 'blocked-track-based',
+        async compact(events, ctx) {
+          begin();
+          await blocked;
+          return trackBasedStrategy.compact(events, ctx);
+        },
+      },
+      'test'
+    );
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    const { promise } = run(
+      provider,
+      {
+        personaRegistry: {
+          parsePersona: () => ({
+            config: { compaction: { strategy: 'blocked-track-based' } },
+          }),
+        } as RunnerDependencies['personaRegistry'],
+      },
+      { persona: 'test' }
+    );
+    await Promise.race([entered, promise]);
+    injectNotification({ sessionDir, kind: 'job-completed', body: marker });
+    release();
+    const result = await promise;
+
+    const replay = loadTurnEntryProjection(sessionDir, cwd);
+    expect(messagesAsText(replay.messages)).toContain(marker);
+    expect(durableEvents().some((event) => event.type === 'context_compacted')).toBe(false);
+    expect(result.stopReason).toBe('context_window_exceeded');
+    expect(provider.callCount).toBe(1);
   });
 
   it.each(['message', 'continuation'] as const)(
