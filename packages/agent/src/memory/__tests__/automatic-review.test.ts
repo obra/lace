@@ -1077,6 +1077,7 @@ it.each([8, 16])(
   async (count) => {
     const { originals, passages, selection } = await projectedOriginals(count);
     const sourceForOriginal = vi.spyOn(passages, 'sourceForOriginal');
+    const load = vi.spyOn(originals, 'load');
     const validate = vi.spyOn(originals, 'validateAtAcceptance');
     const result = await automaticRecall(input('bicycle', { selection }), {
       notes,
@@ -1100,6 +1101,10 @@ it.each([8, 16])(
     expect(result.groups.map((group) => group.originals[0].text)).toEqual([
       expect.stringContaining('The bicycle queue is violet.'),
       expect.stringContaining('The bicycle route is green.'),
+    ]);
+    expect(load.mock.calls.map(([source]) => source.id)).toEqual([
+      `event:${sessionId}:1`,
+      `event:${sessionId}:2`,
     ]);
     expect(
       validate.mock.calls.flatMap(([expected]) => expected.map((source) => source.id))
@@ -1130,7 +1135,7 @@ it('joins event FTS to admitted versions across match pages and deduplicates rep
     insert.run(`${sessionId}:${eventSeq}`, 'bicycle');
   insert.run(`${sessionId}:1`, 'bicycle');
   insert.run(`${sessionId}:1`, 'bicycle');
-  const status = vi.spyOn(originals, 'status');
+  const load = vi.spyOn(originals, 'load');
   const result = await automaticRecall(input('bicycle'), {
     notes,
     sources: originals,
@@ -1145,10 +1150,7 @@ it('joins event FTS to admitted versions across match pages and deduplicates rep
     },
     accountsFor: async () => [{ accounts: [] }],
   });
-  expect(status.mock.calls.map(([source]) => source.version)).toEqual([
-    first.version,
-    stale.version,
-  ]);
+  expect(load.mock.calls.map(([source]) => source.version)).toEqual([first.version, stale.version]);
   expect(
     result.selected.flatMap((group) => group.originals.map((original) => original.handle))
   ).toEqual([originalHandle(first)]);
@@ -1178,6 +1180,82 @@ it('omits a selected original withdrawn during an awaited account read', async (
     { kind: 'event', sessionId, eventSeq: 2 },
   ]);
 });
+
+it.each(['superseded', 'missing', 'changed during load'] as const)(
+  'omits a selected document whose committed path is %s',
+  async (change) => {
+    const repo = join(dir, 'documents');
+    mkdirSync(repo);
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
+    git('init');
+    const commit = () => {
+      git('add', '--', 'handbook.md');
+      git(
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.invalid',
+        'commit',
+        '-m',
+        'fixture'
+      );
+    };
+    const original = 'Bicycle handbook: distribute packet A.';
+    const replacement = 'Bicycle handbook: distribute packet B.';
+    const handbook = join(repo, 'handbook.md');
+    writeFileSync(handbook, original);
+    commit();
+    const blob = git('rev-parse', 'HEAD:handbook.md').trim();
+    configuration.documentSources = { gitRoot: repo, paths: ['handbook.md'] };
+    event('Bicycle queue: retain this separate original.');
+    const runtime = start();
+    await runtime.wake();
+    const first = await recall(runtime, 'bicycle');
+    const selectedOriginals = first.selected.flatMap((group) => group.originals);
+    expect(selectedOriginals.map(({ source }) => source.kind).sort()).toEqual([
+      'document',
+      'event',
+    ]);
+
+    const update = () => {
+      if (change === 'missing') rmSync(handbook);
+      else writeFileSync(handbook, replacement);
+      commit();
+    };
+    let restoreLoad: (() => void) | undefined;
+    if (change === 'changed during load') {
+      const load = MemorySources.prototype.load;
+      let changed = false;
+      const spy = vi
+        .spyOn(MemorySources.prototype, 'load')
+        .mockImplementation(async function (source, images) {
+          const result = await load.call(this, source, images);
+          if (!changed && source.reference.kind === 'document') {
+            update();
+            changed = true;
+          }
+          return result;
+        });
+      restoreLoad = () => spy.mockRestore();
+    } else {
+      update();
+    }
+    try {
+      const result = await recall(runtime, 'bicycle', {
+        selection: { ...first, groups: first.selected },
+      });
+      expect(git('cat-file', 'blob', blob)).toBe(original);
+      if (change === 'changed during load')
+        expect(git('show', 'HEAD:handbook.md')).toBe(replacement);
+      expect(
+        result.selected.flatMap((group) => group.originals.map(({ source }) => source))
+      ).toEqual([{ kind: 'event', sessionId, eventSeq: 1 }]);
+    } finally {
+      restoreLoad?.();
+    }
+  }
+);
 
 it('expands an old opaque original with its revised account, or omits the whole unsupported original', async () => {
   event('2025: Alice owns the bicycle queue.');
