@@ -9,12 +9,10 @@ export const RECALL_PAGE_SIZE = 128;
 const mergeFanIn = 8;
 export type MatchSurface = 'event' | 'original' | 'note';
 type MatchIdentity = { id: string; version: string };
-export type RankedPassage = {
-  id: string;
-  version: string;
-  start: number;
-  end: number;
-  text: string;
+export type RankedCandidate = (
+  | { kind: 'passage'; id: string; version: string; start: number; end: number; text: string }
+  | { kind: 'note'; id: string; revision: number }
+) & {
   exact: boolean;
   score: number;
   semantic: boolean;
@@ -22,11 +20,12 @@ export type RankedPassage = {
   ordinal: number;
 };
 
-const compare = (a: RankedPassage, b: RankedPassage) =>
+const compare = (a: RankedCandidate, b: RankedCandidate) =>
   Number(b.exact) - Number(a.exact) ||
   b.score - a.score ||
+  Number(a.kind === 'note') - Number(b.kind === 'note') ||
   a.id.localeCompare(b.id) ||
-  a.start - b.start ||
+  (a.kind === 'passage' && b.kind === 'passage' ? a.start - b.start : 0) ||
   a.ordinal - b.ordinal;
 
 export class RecallScratch {
@@ -71,10 +70,12 @@ export class RecallScratch {
       unlinkSync(file);
       rmSync(directory, { recursive: true, force: true });
       const insertCandidate = db.prepare('INSERT INTO candidates VALUES(?,?,?)');
-      this.insertRunPage = db.transaction((run: number, offset: number, page: RankedPassage[]) => {
-        for (const [i, descriptor] of page.entries())
-          insertCandidate.run(run, offset + i, JSON.stringify(descriptor));
-      });
+      this.insertRunPage = db.transaction(
+        (run: number, offset: number, page: RankedCandidate[]) => {
+          for (const [i, descriptor] of page.entries())
+            insertCandidate.run(run, offset + i, JSON.stringify(descriptor));
+        }
+      );
       this.runPage = db.prepare<[number, number], { position: number; descriptor: string }>(
         `SELECT position,descriptor FROM candidates WHERE run=? AND position>? ORDER BY position LIMIT ${RECALL_PAGE_SIZE}`
       );
@@ -176,11 +177,11 @@ export class RecallScratch {
     }
   }
 
-  addRun(page: RankedPassage[]): void {
+  addRun(page: RankedCandidate[]): void {
     if (page.length) this.insertRunPage(this.nextRun++, 0, page.sort(compare));
   }
 
-  async ordered(check: () => void): Promise<Iterable<RankedPassage>> {
+  async ordered(check: () => void): Promise<Iterable<RankedCandidate>> {
     let first = 0;
     while (this.nextRun - first > mergeFanIn) {
       const end = this.nextRun;
@@ -189,7 +190,7 @@ export class RecallScratch {
         const last = Math.min(first + mergeFanIn, end);
         const run = this.nextRun++;
         let position = 0;
-        let page: RankedPassage[] = [];
+        let page: RankedCandidate[] = [];
         for (const candidate of this.merge(first, last)) {
           page.push(candidate);
           if (page.length < RECALL_PAGE_SIZE) continue;
@@ -210,17 +211,17 @@ export class RecallScratch {
     return this.merge(first, this.nextRun);
   }
 
-  private *rows(run: number): Generator<RankedPassage, undefined> {
+  private *rows(run: number): Generator<RankedCandidate, undefined> {
     let position = -1;
     while (true) {
       const page = this.runPage.all(run, position);
       if (!page.length) return undefined;
-      for (const row of page) yield JSON.parse(row.descriptor) as RankedPassage;
+      for (const row of page) yield JSON.parse(row.descriptor) as RankedCandidate;
       position = page.at(-1)!.position;
     }
   }
 
-  private *merge(first: number, end: number): Generator<RankedPassage> {
+  private *merge(first: number, end: number): Generator<RankedCandidate> {
     const runs = Array.from({ length: end - first }, (_, i) => this.rows(first + i));
     const heads = runs.map((run) => run.next().value);
     while (true) {

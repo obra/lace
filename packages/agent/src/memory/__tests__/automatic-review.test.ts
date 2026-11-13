@@ -792,8 +792,10 @@ it.each(['event', 'original', 'note'] as const)(
       },
     });
     try {
+      const selectedText = (result: Awaited<ReturnType<typeof recall>>) =>
+        surface === 'note' ? result.groups[0].accounts[0].text : result.groups[0].originals[0].text;
       const result = await recall(runtime, 'bicycle TASK-271');
-      expect(result.groups[0].originals[0].text).toContain('violet queue');
+      expect(selectedText(result)).toContain('violet queue');
       expect(scored).toHaveLength(129);
       const ids = scored.map((identity) =>
         identity.kind === 'note' ? identity.noteId : identity.sourceId
@@ -818,7 +820,7 @@ it.each(['event', 'original', 'note'] as const)(
         'bicycle TASK-271'
       );
       expect(fallback.mode).toBe('text-only');
-      expect(fallback.groups[0].originals[0].text).toContain('violet queue');
+      expect(selectedText(fallback)).toContain('violet queue');
       if (surface === 'note') expect(resolved.mock.calls).toHaveLength(129);
       else expect(expanded.mock.results.flatMap((result) => result.value)).toHaveLength(129);
       const fallbackIds =
@@ -865,6 +867,7 @@ it('checks original admission only for the ranked page when it fills the shortli
     floor: 0.7,
     check: () => {},
     accountsFor: async () => [{ accounts: [] }],
+    resolveAccount: async () => undefined,
     encoder: {
       generation: 'review-controlled',
       async encode() {
@@ -997,6 +1000,7 @@ it('marks coverage partial if publication starts and settles during semantic nom
         },
       },
       accountsFor: async () => [{ accounts: [] }],
+      resolveAccount: async () => undefined,
       publication: () => ({ epoch, partial: false }),
       search: {
         async query(_vector, limit) {
@@ -1057,6 +1061,7 @@ it.each(['completed', 'cancelled', 'failed'] as const)(
         if (outcome === 'failed') throw new Error('fixture failed');
         return [{ accounts: [] }];
       },
+      resolveAccount: async () => undefined,
     });
     try {
       if (outcome === 'completed')
@@ -1101,6 +1106,190 @@ it('omits a group whose required accounts cannot fit before reading their suppor
   expect(manual?.current_accounts).toHaveLength(110);
 });
 
+it.each(['semantic-only', 'text-only'] as const)(
+  'packs a directly nominated current account without its over-budget journal group in %s mode',
+  async (mode) => {
+    vector = (text, kind) => {
+      if (kind === 'query' && mode === 'text-only') throw new Error('encoder offline');
+      return kind === 'query' || text.includes('bicycle') ? [1, 0] : [0, 1];
+    };
+    event('bicycle routing: Morgan held the release before the correction.');
+    const runtime = start(mode === 'text-only');
+    await runtime.wake();
+    const journal = sources()[0];
+    const old = accept('Morgan holds the bicycle release.', [journal]);
+    const current = accept('Nadia now holds the bicycle release.', [journal], old);
+    for (const topic of ['claims', 'inventory', 'finance'])
+      accept(`${topic}: ${'unrelated journal detail '.repeat(86)}`, [journal]);
+    await runtime.wake();
+
+    const result = await recall(runtime, 'bicycle release');
+    expect(result.mode).toBe(mode);
+    expect(result.groups).toEqual([
+      {
+        originals: [],
+        accounts: [
+          {
+            id: current.id,
+            revision: current.revision,
+            text: 'Nadia now holds the bicycle release.',
+            attribution: current.producer,
+            support: [{ handle: `${sessionId}:1`, status: 'current' }],
+          },
+        ],
+      },
+    ]);
+    expect(result.tokens).toBeLessThanOrEqual(2000);
+    const selection = { ...result, groups: result.selected };
+    const beforeReuse = queries;
+    expect((await recall(runtime, 'bicycle release', { selection })).groups).toEqual(result.groups);
+    expect(queries).toBe(beforeReuse);
+    expect(
+      (await recall(runtime, 'bicycle release', { selection, maxTokens: 350 })).groups
+    ).toEqual([]);
+
+    accept('Oren now holds the bicycle release.', [journal], current);
+    expect((await recall(runtime, 'bicycle release', { selection })).groups).toEqual([]);
+    await runtime.wake();
+    const revised = await recall(runtime, 'bicycle release');
+    expect(revised.groups[0].accounts).toEqual([
+      expect.objectContaining({
+        id: current.id,
+        revision: 3,
+        text: 'Oren now holds the bicycle release.',
+      }),
+    ]);
+  }
+);
+
+it('recalls a pinned superseded document account even without a projected passage for its support', async () => {
+  const repo = join(dir, 'documents');
+  mkdirSync(repo);
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
+  git('init');
+  const handbook = join(repo, 'handbook.md');
+  const commit = (text: string) => {
+    writeFileSync(handbook, text);
+    git('add', '--', 'handbook.md');
+    git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', 'commit', '-m', 'fixture');
+  };
+  commit('First edition: the release holder is Nadia.');
+  configuration.documentSources = { gitRoot: repo, paths: ['handbook.md'] };
+  vector = (text, kind) => (kind === 'query' || text.includes('bicycle') ? [1, 0] : [0, 1]);
+  const runtime = start(false);
+  await runtime.wake();
+  const [superseded] = sources();
+  const note = accept('Nadia holds the bicycle release for the first edition.', [superseded]);
+  commit('Second edition: the release holder is Oren.');
+  await runtime.wake();
+  db.prepare('DELETE FROM memory_passages WHERE id=? AND version=?').run(
+    superseded.id,
+    superseded.version
+  );
+
+  const result = await recall(runtime, 'bicycle release');
+  expect(result.groups).toEqual([
+    {
+      originals: [],
+      accounts: [
+        expect.objectContaining({
+          id: note.id,
+          text: note.text,
+          support: [{ handle: originalHandle(superseded), status: 'superseded' }],
+        }),
+      ],
+    },
+  ]);
+
+  git('rm', '--', 'handbook.md');
+  git(
+    '-c',
+    'user.name=Test',
+    '-c',
+    'user.email=test@example.invalid',
+    'commit',
+    '-m',
+    'withdraw source'
+  );
+  expect(
+    (
+      await recall(runtime, 'bicycle release', {
+        selection: { ...result, groups: result.selected },
+      })
+    ).groups
+  ).toEqual([]);
+});
+
+it.each(['changed head', 'mutated support', 'revoked authority'] as const)(
+  'does not release an earlier directly nominated account after %s during later support validation',
+  async (change) => {
+    event('First historical entry: Morgan transferred the release to Nadia.');
+    event('Second historical entry: Oren received the manifests.');
+    vector = (text, kind) =>
+      kind === 'query' || text.startsWith('Nadia')
+        ? [1, 0]
+        : text.startsWith('Oren')
+          ? [0.8, 0.6]
+          : [0, 1];
+    const runtime = start(false);
+    await runtime.wake();
+    const [release, manifests] = sources();
+    const first = accept('Nadia holds the bicycle release.', [release]);
+    const second = accept('Oren files the bicycle manifests.', [manifests]);
+    await runtime.wake();
+    const before = await recall(runtime, 'bicycle');
+    expect(before.groups.map(({ accounts }) => accounts[0].id)).toEqual([first.id, second.id]);
+    expect(before.groups.every(({ originals }) => originals.length === 0)).toBe(true);
+
+    const status = MemorySources.prototype.status;
+    let changed = false;
+    const spy = vi
+      .spyOn(MemorySources.prototype, 'status')
+      .mockImplementation(async function (source) {
+        const loaded = await status.call(this, source);
+        if (!changed && source.id === manifests.id) {
+          changed = true;
+          if (change === 'changed head') {
+            accept('The bicycle release moved to Oren.', [release], first);
+          } else if (change === 'mutated support') {
+            const retained = readFileSync(file(), 'utf8');
+            writeFileSync(
+              file(),
+              retained.replace(
+                'Morgan transferred the release to Nadia.',
+                'The release entry is withdrawn.'
+              )
+            );
+          } else {
+            configureMemoryRoles(
+              db,
+              { ...configuration.binding, canMutate: false },
+              { root: { ...grant, canMutate: false } }
+            );
+          }
+        }
+        return loaded;
+      });
+    try {
+      const recalled = recall(runtime, 'bicycle', {
+        selection: { ...before, groups: before.selected },
+      });
+      if (change === 'revoked authority') {
+        await expect(recalled).rejects.toThrow('Memory access denied');
+      } else {
+        expect((await recalled).groups).toEqual([before.groups[1]]);
+        expect(
+          (await recall(runtime, 'bicycle', { selection: { ...before, groups: before.selected } }))
+            .groups
+        ).toEqual([before.groups[1]]);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+  }
+);
+
 it.each([8, 16])(
   'bounds source-list reconstruction while revalidating fixed evidence among %i originals',
   async (count) => {
@@ -1121,6 +1310,7 @@ it.each([8, 16])(
       floor: 0.7,
       check: () => {},
       accountsFor: async () => [{ accounts: [] }],
+      resolveAccount: async () => undefined,
       indexing: () => true,
     });
     expect(result.groups.map((group) => group.originals[0].source)).toEqual([
@@ -1178,6 +1368,7 @@ it('joins event FTS to admitted versions across match pages and deduplicates rep
       },
     },
     accountsFor: async () => [{ accounts: [] }],
+    resolveAccount: async () => undefined,
   });
   expect(load.mock.calls.map(([source]) => source.version)).toEqual([first.version, stale.version]);
   expect(
@@ -1203,6 +1394,7 @@ it('omits a selected original withdrawn during an awaited account read', async (
       db.prepare('DELETE FROM memory_sources WHERE id=?').run(`event:${sessionId}:1`);
       return [{ accounts: [] }];
     },
+    resolveAccount: async () => undefined,
     indexing: () => true,
   });
   expect(result.groups.map((group) => group.originals[0].source)).toEqual([
@@ -1511,7 +1703,81 @@ it('admits an above-floor exact identifier beyond 24 higher-cosine topic groups'
   const result = await recall(runtime, 'bicycle TICKET-73');
   expect(result.groups[0].originals[0].text).toContain('TICKET-73');
 });
-it('preserves an exact identifier carried by a note-nominated original rather than the note prose', async () => {
+it('recalls a fitting independent hit after duplicate account presentations', async () => {
+  const independent = 'The gate code for bicycle pickup is green.';
+  vector = (text, kind) =>
+    kind === 'document' && text.includes(independent) ? [0.9, Math.sqrt(0.19)] : [1, 0];
+  for (let index = 1; index <= 12; index++) event(`Bicycle routing update ${index}.`);
+  event(independent);
+  const runtime = start(false);
+  await runtime.wake();
+  for (const [index, source] of sources().slice(0, 12).entries()) {
+    accept(`Bicycle route ${index + 1}: ${'follow the marker. '.repeat(145)}`, [source]);
+  }
+  await runtime.wake();
+
+  const result = await recall(runtime, 'bicycle routing and pickup');
+  expect(result.mode).toBe('semantic-only');
+  expect(
+    result.groups.map(({ originals, accounts }) => ({
+      events: originals.flatMap(({ source }) => (source.kind === 'event' ? [source.eventSeq] : [])),
+      accounts: accounts.length,
+    }))
+  ).toEqual([
+    { events: [1], accounts: 1 },
+    { events: [13], accounts: 0 },
+  ]);
+});
+it('packs a smaller account presentation after both methods fill the shortlist', async () => {
+  for (let index = 1; index <= 24; index++)
+    event(`Bicycle routing update ${index}: ${'The dispatch route is under review. '.repeat(7)}`);
+  const runtime = start();
+  await runtime.wake();
+  const accounts = sources().map((source, index) =>
+    accept(`Bicycle route ${index + 1}: ${'follow the marker. '.repeat(index < 2 ? 82 : 5)}`, [
+      source,
+    ])
+  );
+  await runtime.wake();
+
+  const result = await recall(runtime, 'bicycle');
+  expect(result.mode).toBe('hybrid');
+  expect(result.groups[0].originals).not.toHaveLength(0);
+  expect(result.groups[0].accounts[0].id).toBe(accounts[0].id);
+  const directAccounts = result.groups
+    .filter(({ originals }) => !originals.length)
+    .flatMap(({ accounts }) => accounts.map(({ id }) => id));
+  expect(directAccounts.length).toBeGreaterThan(0);
+  for (const id of directAccounts) expect(accounts.map((account) => account.id)).toContain(id);
+});
+it('keeps the semantic admission limit when an attached account has textual-only support', async () => {
+  const support = 'TICKET-73 retained original.';
+  const outside = 'The gate code for bicycle pickup is green.';
+  vector = (text, kind) => {
+    if (kind === 'document' && text === support) return [0, 1];
+    if (kind === 'document' && text === outside) return [0.9, Math.sqrt(0.19)];
+    return [1, 0];
+  };
+  event(support);
+  for (let index = 1; index <= 23; index++) event(`Bicycle routing update ${index}.`);
+  event(outside);
+  const runtime = start();
+  await runtime.wake();
+  const account = accept('The latest bicycle schedule is posted.', [sources()[0]]);
+  await runtime.wake();
+
+  const result = await recall(runtime, 'TICKET-73');
+  expect(result.mode).toBe('hybrid');
+  expect(result.groups[0].originals[0].text).toBe(support);
+  expect(result.selected).toContainEqual({
+    originals: [],
+    accounts: [expect.objectContaining({ id: account.id })],
+  });
+  expect(
+    result.selected.flatMap(({ originals }) => originals.map(({ text }) => text))
+  ).not.toContain(outside);
+});
+it('prefers an independently nominated exact original over a relevant account that lacks the identifier', async () => {
   vector = (text, kind) =>
     kind === 'document' && text === 'TICKET-73 retained original' ? [0, 1] : [1, 0];
   for (let index = 0; index < 7; index++) event(`bicycle topic ${index}`);
@@ -1649,8 +1915,9 @@ it('packs a later group with its full required account before expanding earlier 
   );
   await runtime.wake();
   const result = await recall(runtime, 'bicycle', { maxTokens: 1100 });
-  expect(result.selected).toHaveLength(2);
-  expect(result.selected[0].originals).toHaveLength(4);
+  const originalGroups = result.selected.filter((group) => group.originals.length);
+  expect(originalGroups).toHaveLength(2);
+  expect(originalGroups[0].originals).toHaveLength(4);
   expect(result.groups.map((group) => group.accounts.map((account) => account.id))).toEqual([
     [finish.id],
     [approval.id],
@@ -1665,7 +1932,7 @@ it('packs a later group with its full required account before expanding earlier 
     sessionId,
     eventSeq: 5,
   });
-  expect(result.groups[0].originals.length).toBeLessThan(result.selected[0].originals.length);
+  expect(result.groups[0].originals.length).toBeLessThan(originalGroups[0].originals.length);
   expect(result.tokens).toBeLessThanOrEqual(1100);
   expect(result.block).toContain(approval.text);
 });

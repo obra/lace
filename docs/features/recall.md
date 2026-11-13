@@ -34,9 +34,11 @@ status. Readable pinned document versions may remain attached as `superseded`
 historical evidence; their claims need current applicable evidence before use as
 present instructions. Lace omits the affected original group if required support
 is missing, unavailable or changes during the read, or if the full attachment
-exceeds its budget. Automatic recall still selects only current originals, while
-keeping these status-qualified summaries attached. Historical source reads keep
-the exact requested version and its status rather than substituting newer text.
+exceeds its budget. Automatic recall selects only current originals and keeps
+their required accounts attached. It can also present a directly retrieved
+current account on its own, with status-qualified source handles if a concrete
+detail needs checking. Historical source reads keep the exact requested version
+and its status rather than substituting newer text.
 
 ## Actions
 

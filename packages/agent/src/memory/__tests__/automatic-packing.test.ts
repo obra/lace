@@ -66,6 +66,28 @@ it('omits a required account above the hard cap without trimming it and continue
   expect(packEvidence(input, 0)).toMatchObject({ groups: [], block: null, tokens: 0 });
 });
 
+it('keeps the first fitting presentation of a current account and skips the entire duplicate group', () => {
+  const account = {
+    id: 'release',
+    revision: 2,
+    text: 'Nadia holds the release.',
+    attribution: 'root',
+    support: [{ handle: 'session:1', status: 'current' }],
+  };
+  const direct = { originals: [], accounts: [account] };
+  const original = group(1, ['Morgan held the release before the handoff.']);
+  original.accounts = [account, { ...account, id: 'routing', text: 'Oren handles routing.' }];
+  const unrelated = group(2);
+  expect(packEvidence(evidence([direct, original, unrelated]), 2000).groups).toEqual([
+    direct,
+    unrelated,
+  ]);
+  expect(packEvidence(evidence([original, direct, unrelated]), 2000).groups).toEqual([
+    original,
+    unrelated,
+  ]);
+});
+
 it('redacts first originals, sibling expansions and accounts while keeping the selection reusable', () => {
   const secret = 'xoxb-1234567890123456789012345';
   const selected = group(1, [`First fact ${secret}`, `Sibling fact ${secret}`]);

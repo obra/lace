@@ -385,18 +385,4 @@ export class MemoryPassages {
     }
     logger.debug('memory.recall.passage_scan', scan);
   }
-  first(support: Source[]): Passage | undefined {
-    if (!this.available()) return undefined;
-    const lookup = this.notes.db.prepare(`
-      SELECT p.rowid,p.id,p.version,p.start,p.end,p.text,s.reference,NULL AS vector
-      FROM memory_passages AS p JOIN memory_sources AS s ON s.id=p.id AND s.version=p.version
-      WHERE p.id=? AND p.version=? ORDER BY p.rowid LIMIT 1
-    `);
-    let first: PassageRow | undefined;
-    for (const { id, version } of support) {
-      const row = lookup.get(id, version) as PassageRow | undefined;
-      if (row && (!first || row.rowid < first.rowid)) first = row;
-    }
-    return first && passageOf(first);
-  }
 }
