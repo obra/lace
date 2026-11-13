@@ -739,17 +739,23 @@ const ASSUMED_CONTEXT_WINDOW = 200_000;
  * another compaction that also could not help. We only failed to notice
  * because the fleet runs ~1M-window models.
  */
-export function tailTokenBudget(contextWindow?: number): number {
+export function tailTokenBudget(contextWindow?: number, historyTokenBudget?: number): number {
   const window =
     contextWindow !== undefined && Number.isFinite(contextWindow) && contextWindow > 0
       ? contextWindow
       : ASSUMED_CONTEXT_WINDOW;
   const fromWindow = Math.floor(window * TAIL_BUDGET_WINDOW_FRACTION) - NON_TAIL_OVERHEAD_ALLOWANCE;
+  // A request that reserves output and recall has a smaller history budget.
+  // Reserve the other half of that budget for the summary prefix.
+  const fromHistory =
+    historyTokenBudget === undefined
+      ? fromWindow
+      : Math.floor(historyTokenBudget * TAIL_BUDGET_WINDOW_FRACTION);
   // Never negative. On a window too small to hold the overhead at all, the
   // budget collapses to zero and `trimTailToTokenBudget` falls through to its
   // preserve-the-in-flight-turn-anyway path, which is the right degenerate
   // answer: there is no tail size that would fit.
-  return Math.max(0, Math.min(TAIL_TOKEN_BUDGET_CAP, fromWindow));
+  return Math.max(0, Math.min(TAIL_TOKEN_BUDGET_CAP, fromWindow, fromHistory));
 }
 
 /**

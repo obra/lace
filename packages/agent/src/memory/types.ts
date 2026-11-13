@@ -60,6 +60,8 @@ export type CurrentAccount = {
   support: Array<{ handle: string; status: string }>;
 };
 export type RepresentedOriginal = OriginalReference & { text: string };
+export const MAX_AUTOMATIC_RECALL_TOKENS = 2000;
+
 export type AutomaticRecallInput = {
   query: string;
   tail?: string;

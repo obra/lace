@@ -25,7 +25,9 @@ import {
   type RequestOptions,
   type WireTool,
 } from '@lace/agent/providers/base-provider';
-import { resetRegistriesForTest } from '@lace/agent/plugins';
+import { registries, resetRegistriesForTest } from '@lace/agent/plugins';
+import { trackBasedStrategy } from '@lace/agent/compaction/track-strategy';
+import { loadTurnEntryProjection } from '@lace/agent/message-building/turn-entry-projection';
 import { estimateProviderTokens } from '@lace/agent/message-building/message-builder';
 
 const CONTEXT_EXCEEDED: ProviderResponse = {
@@ -53,6 +55,7 @@ class ScriptedProvider extends AIProvider {
   readonly sentTemporaryContexts: (string | null | undefined)[] = [];
   readonly sentSystemPrompts: string[] = [];
   readonly sentPreviousResponseIds: (string | undefined)[] = [];
+  readonly sentOptions: (RequestOptions | undefined)[] = [];
 
   /**
    * @param beforeRespond runs before each scripted response is returned, with
@@ -112,6 +115,7 @@ class ScriptedProvider extends AIProvider {
     _options?: RequestOptions
   ): Promise<ProviderResponse> {
     this.sentTemporaryContexts.push(_options?.temporaryContext);
+    this.sentOptions.push(_options);
     this.sentMessages.push(structuredClone(messages));
     this.sentSystemPrompts.push(this.systemPrompt);
     this.sentPreviousResponseIds.push(state?.previousResponseId ?? undefined);
@@ -269,13 +273,18 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     if (existsSync(cwd)) rmSync(cwd, { recursive: true, force: true });
   });
 
-  function run(provider: AIProvider, depOverrides: Partial<RunnerDependencies> = {}) {
+  function run(
+    provider: AIProvider,
+    depOverrides: Partial<RunnerDependencies> = {},
+    configOverrides: Partial<RunnerConfig> = {}
+  ) {
     const config: RunnerConfig = {
       sessionDir,
       sessionId,
       cwd,
       executionMode: 'execute',
       approvalMode: 'approve',
+      ...configOverrides,
     };
     const deps = createMockDeps(provider, depOverrides);
     const runner = new ConversationRunner(config, deps);
@@ -327,12 +336,275 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
       push('message', { content: [{ type: 'text', text: 'x'.repeat(chars) }] }, tid);
       push('turn_end', { stopReason: 'end_turn' }, tid);
     }
+    lines.push(
+      JSON.stringify({
+        eventSeq: seq++,
+        timestamp: now,
+        type: 'prompt',
+        data: { type: 'prompt', content: [{ type: 'text', text: 'Continue the current task.' }] },
+      })
+    );
     writeFileSync(join(sessionDir, 'events.jsonl'), lines.join('\n') + '\n');
     writeFileSync(
       join(sessionDir, 'state.json'),
       JSON.stringify({ nextEventSeq: seq, nextStreamSeq: 1 })
     );
   }
+
+  it('makes room for a full recall block and response before the first call on resumed history', async () => {
+    seedLargeTurns(12, 4_000);
+    const provider = new ScriptedProvider([{ ...CLEAN_TURN, usage: undefined }]);
+    provider.contextWindowForModel = () => 30_000;
+    provider.config.maxTokens = 8_000;
+    const allowances: number[] = [];
+    const recall = 'abc '.repeat(1_500);
+    const { promise } = run(provider, {
+      getTemporaryContext: () => 'current caller context',
+      prepareAutomaticRecall: async ({ maxTokens }) => {
+        allowances.push(maxTokens);
+        return { block: recall };
+      },
+    });
+    const result = await promise;
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(provider.callCount).toBe(1);
+    expect(messagesAsText(provider.sentMessages[0])).toContain('compacted by track');
+    expect(provider.sentTemporaryContexts[0]).toBe('current caller context\n\n' + recall);
+    expect(allowances).toEqual([2_000]);
+    expect(durableEvents().some((event) => event.type === 'context_compacted')).toBe(true);
+  });
+
+  it('rechecks headroom after a tool batch and retains its result in the next request', async () => {
+    seedLargeTurns(12, 3_220);
+    const provider = new ScriptedProvider([
+      {
+        content: '',
+        toolCalls: [{ id: 'large_result', name: 'test_tool', arguments: {} }],
+        stopReason: 'tool_use',
+        usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+        responseId: 'before-tool-compaction',
+      },
+      CLEAN_TURN,
+    ]);
+    provider.contextWindowForModel = () => 30_000;
+    const marker = 'large tool result: ' + 'x'.repeat(7_900);
+    const createTools = createMockDeps(provider).createToolExecutor;
+    const { promise } = run(provider, {
+      createToolExecutor: async (...args) => {
+        const built = await createTools(...args);
+        built.executor.getTool = vi.fn().mockReturnValue({ name: 'test_tool' });
+        built.executor.execute = vi.fn().mockResolvedValue({
+          id: 'large_result',
+          status: 'completed',
+          content: [{ type: 'text', text: marker }],
+        });
+        return built;
+      },
+      prepareAutomaticRecall: async () => ({ block: 'recalled evidence' }),
+    });
+    await promise;
+
+    expect(messagesAsText(provider.sentMessages[0])).not.toContain('compacted by track');
+    expect(messagesAsText(provider.sentMessages[1])).toContain('compacted by track');
+    expect(provider.sentMessages[1].flatMap((message) => message.toolResults ?? [])).toContainEqual(
+      expect.objectContaining({
+        id: 'large_result',
+        content: [{ type: 'text', text: marker }],
+      })
+    );
+    expect(provider.sentTemporaryContexts[1]).toBe('recalled evidence');
+    expect(provider.sentPreviousResponseIds[1]).toBeUndefined();
+  });
+
+  it('fits the catalog response allowance on a short, dense GLM session', async () => {
+    seedLargeTurns(5, 40_000);
+    const provider = new ScriptedProvider([{ ...CLEAN_TURN, usage: undefined }]);
+    provider.contextWindowForModel = () => 204_800;
+    provider.getAvailableModels = () => [
+      {
+        id: 'glm-4.7',
+        displayName: 'GLM-4.7',
+        contextWindow: 204_800,
+        maxOutputTokens: 131_072,
+      },
+    ];
+    const recall = 'abc '.repeat(1_500);
+    const { promise } = run(
+      provider,
+      {
+        prepareAutomaticRecall: async ({ maxTokens }) => {
+          expect(maxTokens).toBe(2_000);
+          return { block: recall };
+        },
+      },
+      { modelId: 'glm-4.7' }
+    );
+    const result = await promise;
+
+    expect(result.stopReason).toBe('end_turn');
+    expect(provider.callCount).toBe(1);
+    expect(messagesAsText(provider.sentMessages[0])).toContain('compacted by track');
+    expect(provider.sentTemporaryContexts[0]).toBe(recall);
+    expect(result.usage.contextWindow).toBe(204_800);
+  });
+
+  it('restarts paused verification on compacted history with a new arrival', async () => {
+    seedLargeTurns(12, 3_100);
+    const partial = 'pending partial text: ' + 'x'.repeat(9_000);
+    const arrival = '<messages>New ordinary input during pause</messages>';
+    const thinkingBlocks = [
+      { type: 'thinking' as const, thinking: 'pending reasoning', signature: 'sig' },
+    ];
+    const provider = new ScriptedProvider(
+      [
+        {
+          content: '',
+          toolCalls: [{ id: 'small_result', name: 'test_tool', arguments: {} }],
+          stopReason: 'tool_use',
+          usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+        },
+        { ...CLEAN_TURN, content: 'Tool work is complete.', usage: undefined },
+        {
+          content: partial,
+          thinkingBlocks,
+          toolCalls: [],
+          stopReason: 'pause_turn',
+          usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+        },
+        CLEAN_TURN,
+      ],
+      (callIndex) => {
+        if (callIndex !== 2) return;
+        const state = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, state, {
+          type: 'context_injected',
+          data: {
+            content: [{ type: 'text', text: arrival }],
+            inputKind: 'message',
+            priority: 'immediate',
+            recall: { query: 'new ordinary query' },
+          },
+        });
+        writeSessionState(sessionDir, nextState);
+      }
+    );
+    provider.contextWindowForModel = () => 30_000;
+    const createTools = createMockDeps(provider).createToolExecutor;
+    const { promise } = run(provider, {
+      createToolExecutor: async (...args) => {
+        const built = await createTools(...args);
+        built.executor.getTool = vi.fn().mockReturnValue({ name: 'test_tool' });
+        return built;
+      },
+      prepareAutomaticRecall: async ({ query, maxTokens }) => {
+        expect(maxTokens).toBe(2_000);
+        return { block: `recalled evidence for ${query}` };
+      },
+    });
+    const result = await promise;
+
+    expect(provider.sentOptions[2]?.toolChoice).toBe('required');
+    expect(messagesAsText(provider.sentMessages[2])).not.toContain('compacted by track');
+    const restarted = messagesAsText(provider.sentMessages[3]);
+    expect(restarted).toContain('compacted by track');
+    expect(restarted).toContain('Tool work is complete.');
+    expect(restarted).toContain('verify your work before stopping');
+    expect(restarted.split(arrival)).toHaveLength(2);
+    expect(restarted.includes(partial)).toBe(false);
+    expect(provider.sentMessages[3].some((message) => message.thinkingBlocks?.length)).toBe(false);
+    expect(provider.sentOptions[3]?.toolChoice).toBe('required');
+    expect(provider.sentTemporaryContexts[3]).toBe('recalled evidence for new ordinary query');
+    expect(result.content).toEqual([{ type: 'text', text: CLEAN_TURN.content }]);
+  });
+
+  it('enforces the pause limit across repeated compactions', async () => {
+    seedLargeTurns(12, 3_100);
+    const paused: ProviderResponse = {
+      content: 'x'.repeat(80_000),
+      toolCalls: [],
+      stopReason: 'pause_turn',
+      usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+    };
+    const provider = new ScriptedProvider([
+      ...Array.from({ length: 12 }, () => paused),
+      CLEAN_TURN,
+    ]);
+    provider.contextWindowForModel = () => 30_000;
+    const { promise } = run(provider, {
+      prepareAutomaticRecall: async () => ({ block: 'recalled evidence' }),
+    });
+
+    await expect(promise).rejects.toMatchObject({
+      data: { stopDetails: { code: 'pause_turn_loop' } },
+    });
+    expect(provider.callCount).toBe(11);
+    expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(10);
+  });
+
+  it('returns no abandoned partial when a rebuilt request cannot fit', async () => {
+    seedLargeTurns(12, 3_100);
+    const provider = new ScriptedProvider([
+      {
+        content: 'Abandoned partial: ' + 'x'.repeat(9_000),
+        toolCalls: [],
+        stopReason: 'pause_turn',
+        usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+      },
+      CLEAN_TURN,
+    ]);
+    provider.contextWindowForModel = () => 30_000;
+    const { promise } = run(provider, {
+      prepareAutomaticRecall: async () => ({ block: 'recalled evidence' }),
+      rerenderPersonaAfterCompaction: async () => {
+        const state = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, state, {
+          type: 'system_prompt_set',
+          data: { type: 'system_prompt_set', text: 'x'.repeat(80_000), rerender: true },
+        });
+        writeSessionState(sessionDir, nextState);
+      },
+    });
+    const result = await promise;
+
+    expect(result.stopReason).toBe('context_window_exceeded');
+    expect(provider.callCount).toBe(1);
+    expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(1);
+    expect(result.content).toEqual([]);
+  });
+
+  it('keeps ordinary verification when its request needs compaction', async () => {
+    seedLargeTurns(12, 3_100);
+    const provider = new ScriptedProvider([
+      {
+        content: '',
+        toolCalls: [{ id: 'small_result', name: 'test_tool', arguments: {} }],
+        stopReason: 'tool_use',
+        usage: { promptTokens: 1_000, completionTokens: 10, totalTokens: 1_010 },
+      },
+      { ...CLEAN_TURN, content: 'Tool work is complete. ' + 'x'.repeat(9_000), usage: undefined },
+      CLEAN_TURN,
+    ]);
+    provider.contextWindowForModel = () => 30_000;
+    const createTools = createMockDeps(provider).createToolExecutor;
+    const { promise } = run(provider, {
+      createToolExecutor: async (...args) => {
+        const built = await createTools(...args);
+        built.executor.getTool = vi.fn().mockReturnValue({ name: 'test_tool' });
+        return built;
+      },
+      prepareAutomaticRecall: async () => ({ block: 'recalled evidence' }),
+    });
+    await promise;
+
+    expect(messagesAsText(provider.sentMessages[1])).not.toContain('compacted by track');
+    const verification = messagesAsText(provider.sentMessages[2]);
+    expect(verification).toContain('compacted by track');
+    expect(verification).toContain('Tool work is complete.');
+    expect(verification).toContain('verify your work before stopping');
+    expect(provider.sentOptions[2]?.toolChoice).toBe('required');
+    expect(provider.sentTemporaryContexts[2]).toBe('recalled evidence');
+  });
 
   it('sizes the preserved tail to the model window rather than a fixed 300K', async () => {
     // PRI-2906. The tail budget used to be a flat 300K with no relationship to
@@ -460,29 +732,71 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
     expect(retryText.split(marker)).toHaveLength(2);
   });
 
+  it('keeps an arrival appended after the compaction strategy took its snapshot', async () => {
+    const marker = 'PEER-INJECT-AFTER-STRATEGY-SNAPSHOT';
+    let begin!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      begin = resolve;
+    });
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    registries.compaction.register(
+      'blocked-track-based',
+      {
+        name: 'blocked-track-based',
+        async compact(events, ctx) {
+          begin();
+          await blocked;
+          return trackBasedStrategy.compact(events, ctx);
+        },
+      },
+      'test'
+    );
+    const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN]);
+    const { promise } = run(
+      provider,
+      {
+        personaRegistry: {
+          parsePersona: () => ({
+            config: { compaction: { strategy: 'blocked-track-based' } },
+          }),
+        } as RunnerDependencies['personaRegistry'],
+      },
+      { persona: 'test' }
+    );
+    await Promise.race([entered, promise]);
+    injectNotification({ sessionDir, kind: 'job-completed', body: marker });
+    release();
+    const result = await promise;
+
+    const replay = loadTurnEntryProjection(sessionDir, cwd);
+    expect(messagesAsText(replay.messages)).toContain(marker);
+    expect(durableEvents().some((event) => event.type === 'context_compacted')).toBe(false);
+    expect(result.stopReason).toBe('context_window_exceeded');
+    expect(provider.callCount).toBe(1);
+  });
+
   it.each(['message', 'continuation'] as const)(
-    'refreshes recall after compaction only for a new ordinary %s input',
+    'retains recall during overflow recovery with an intervening %s input',
     async (inputKind) => {
       const query = 'What changed for TASK-271 <literal>?';
       const raw = '<messages>ordinary arrival during overflow</messages>';
-      const provider = new ScriptedProvider(
-        [CONTEXT_EXCEEDED, CONTEXT_EXCEEDED, CLEAN_TURN],
-        (callIndex) => {
-          // The first overflow removes automatic context; the second starts compaction.
-          if (callIndex !== 1) return;
-          const state = readSessionState(sessionDir);
-          const { nextState } = appendDurableEvent(sessionDir, state, {
-            type: 'context_injected',
-            data: {
-              content: [{ type: 'text', text: raw }],
-              priority: 'immediate',
-              inputKind,
-              recall: { query, context: 'The previous decision was amber.' },
-            },
-          });
-          writeSessionState(sessionDir, nextState);
-        }
-      );
+      const provider = new ScriptedProvider([CONTEXT_EXCEEDED, CLEAN_TURN], (callIndex) => {
+        if (callIndex !== 0) return;
+        const state = readSessionState(sessionDir);
+        const { nextState } = appendDurableEvent(sessionDir, state, {
+          type: 'context_injected',
+          data: {
+            content: [{ type: 'text', text: raw }],
+            priority: 'immediate',
+            inputKind,
+            recall: { query, context: 'The previous decision was amber.' },
+          },
+        });
+        writeSessionState(sessionDir, nextState);
+      });
       const captured: Array<
         Parameters<NonNullable<RunnerDependencies['prepareAutomaticRecall']>>[0]
       > = [];
@@ -492,24 +806,24 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
           return { block: `evidence for ${input.query}` };
         },
       }).promise;
-      expect(provider.callCount).toBe(3);
+      expect(provider.callCount).toBe(2);
       expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(1);
-      const retryText = messagesAsText(provider.sentMessages[2]);
+      const retryText = messagesAsText(provider.sentMessages[1]);
       expect(retryText.split(raw)).toHaveLength(2);
-      expect(provider.sentTemporaryContexts[1] ?? '').toBe('');
+      expect(provider.sentTemporaryContexts[0]).toBe('evidence for seed prompt 10');
+      expect(captured).toHaveLength(2);
       if (inputKind === 'message') {
-        expect(captured).toHaveLength(2);
         expect(captured[1].query).toBe(query);
         expect(captured[1].tail).toContain('The previous decision was amber.\n' + query);
-        expect(provider.sentTemporaryContexts[2]).toBe(`evidence for ${query}`);
+        expect(provider.sentTemporaryContexts[1]).toBe(`evidence for ${query}`);
       } else {
-        expect(captured).toHaveLength(1);
-        expect(provider.sentTemporaryContexts[2] ?? '').toBe('');
+        expect(captured[1].query).toBe('seed prompt 10');
+        expect(provider.sentTemporaryContexts[1]).toBe('evidence for seed prompt 10');
       }
     }
   );
 
-  it('keeps removed recall suppressed when compaction regroups already consumed tool-only intakes', async () => {
+  it('retains recall when compaction follows tool-only rounds with ordinary intakes', async () => {
     const queries = ['first ordinary intake', 'second ordinary intake'];
     const toolResponse = (id: string): ProviderResponse => ({
       content: '',
@@ -518,13 +832,7 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
       usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
     });
     const provider = new ScriptedProvider(
-      [
-        toolResponse('first_tool'),
-        toolResponse('second_tool'),
-        CONTEXT_EXCEEDED,
-        CONTEXT_EXCEEDED,
-        CLEAN_TURN,
-      ],
+      [toolResponse('first_tool'), toolResponse('second_tool'), CONTEXT_EXCEEDED, CLEAN_TURN],
       (callIndex) => {
         if (callIndex > 1) return;
         const state = readSessionState(sessionDir);
@@ -554,9 +862,9 @@ describe('ConversationRunner — emergency compaction on context_window_exceeded
       },
     }).promise;
     expect(durableEvents().filter((event) => event.type === 'context_compacted')).toHaveLength(1);
-    expect(captured).toEqual(['seed prompt 10', ...queries]);
+    expect(captured.slice(0, 3)).toEqual(['seed prompt 10', ...queries]);
     expect(provider.sentTemporaryContexts[2]).toBe('evidence for second ordinary intake');
-    expect(provider.sentTemporaryContexts.slice(3).every((text) => !text)).toBe(true);
+    expect(provider.sentTemporaryContexts[3]).toContain('second ordinary intake');
   });
 
   it('does not glue pre-compaction partial generation onto the recovered answer', async () => {

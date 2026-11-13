@@ -67,12 +67,11 @@ transport retries keep their snapshot. The supported OpenAI
 streaming-verification fallback preserves the same options and materialized text
 when switching to a non-streaming call on the selected API.
 
-Automatic recall estimates its allowance before awaiting retrieval, then the
-runner reads caller text again immediately before submission. A set or clear
-during that wait affects the pending request. If a larger caller value outgrows
-the earlier allowance and the provider reports overflow, the existing single
-retry removes automatic evidence while retaining current caller text. Retrieval
-is not repeated to chase caller updates.
+The runner estimates request size before preparing automatic recall. It reads
+caller text again before submission, so a set or clear during retrieval affects
+the pending request. If a larger value would consume the space reserved for
+recall and output, the runner compacts history and rechecks headroom. A request
+that still exceeds the window stops with `context_window_exceeded`.
 
 ```text
 system instructions + tools
@@ -81,12 +80,12 @@ current caller temporary context, if set
 automatic recall evidence, when configured and available
 ```
 
-Canonical messages, event logs and compaction input exclude this extra text.
-Required history is never shortened to make room for it. Existing request-size
-estimates and usage fallbacks include the context; provider limits can still
-reject a request that is too large. The model may refer to the context in its
-answer, and provider/request diagnostics may log it. Clear removes future
-injection; it does not erase text the model already wrote into history.
+Canonical messages, event logs and compaction input exclude temporary text.
+Request-size estimates and usage fallbacks include it. A provider overflow can
+trigger bounded emergency compaction with automatic recall still enabled for the
+retry. The model may refer to the context in its answer, and provider/request
+diagnostics may log it. Clearing the value affects future requests. Text the
+model already wrote remains in history.
 
 ## Provider cache behavior
 

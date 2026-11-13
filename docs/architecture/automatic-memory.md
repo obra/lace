@@ -425,16 +425,19 @@ linked accounts can retain readable superseded document support with explicit
 status. An original and all directly linked current accounts stay together.
 Reused selections are revalidated and repacked for each request; changed
 evidence drops the affected group. The displayed redacted framing and JSON data
-count against 2,000 estimated tokens and the remaining request allowance. The
-runner estimates room for history, system and then-current caller text, public
-tool names, descriptions and input schemas, and the selected output allowance
-before packing evidence. Caller text is read again before submission; an update
-during retrieval can change the remaining headroom. Larger caller text is kept,
-with the existing automatic-evidence overflow retry available if needed. When
-that allowance shrinks, packing prioritizes group coverage before sibling
-expansion and keeps every required current account. A completed unit that cannot
-fit is omitted, without trimming its sentences or current accounts. The full
-validated selection remains available for a later larger request.
+count against the 2,000 estimated tokens reserved for recall. Before each
+request with an automatic recall cue, including after resume and tool results,
+the runner estimates the messages, system prompt, tool definitions and current
+caller text together with the full recall allowance and the model's requested
+output allowance. If the estimate exceeds the window, the runner passes the
+space available for history to compaction and rechecks the rebuilt request. An
+unfinished paused response restarts from durable history after compaction.
+Caller updates during retrieval are included in the check before submission.
+Packing prioritizes group coverage before sibling expansion and keeps every
+required current account together with its original. A complete unit that
+exceeds the recall budget is omitted. If the strategy's retained tail and
+summary still leave too little room for both allowances, the runner returns a
+context-window stop.
 
 Prompt and inject requests can carry retrieval-only
 `recall: { query: string; context?: string }` alongside provider content. The
@@ -512,9 +515,9 @@ can support a sufficient answer directly. The framing reserves source expansion
 for a concrete missing fact, ambiguity, contradiction or freshness need;
 repeated background alone creates no new reply, tool or journal obligation.
 Automatic evidence is never persisted or extracted as a new original. Caller
-set/peek/clear remain sticky and independent. On provider context overflow, the
-runner retries once with automatic evidence removed before existing compaction,
-preserving caller text, output format and other normal request options. A
+set/peek/clear remain sticky and independent. Provider context overflow can
+still occur because request sizing is an estimate. The runner uses its bounded
+emergency compaction recovery and revalidates recall for the rebuilt request. A
 cleared tail remains explicit after temporary context has been used.
 `session_info._meta.automaticRecall` and logs contain only mode/reason,
 coverage, identities, counts, duration and packed size.
