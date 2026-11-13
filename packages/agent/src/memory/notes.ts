@@ -99,7 +99,9 @@ export class MemoryNotes {
   pending(): Source[] {
     return (
       this.db
-        .prepare("SELECT * FROM memory_sources WHERE status='pending' ORDER BY rowid LIMIT 128")
+        .prepare(
+          "SELECT * FROM memory_sources WHERE status='pending' ORDER BY rowid DESC LIMIT 128"
+        )
         .all() as SourceRow[]
     ).map((r) => ({
       id: r.id,

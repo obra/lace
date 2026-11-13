@@ -421,8 +421,8 @@ it('defers a fresh correction when earlier originals fill the candidate union ev
   for (let index = 0; index < 16; index++)
     seed(`apples-${index}`, `Apple orchard responsibility ${index}`, [shared]);
   seed('oranges', 'Orange orchard responsibility belongs to Bea.', [shared]);
-  event(2, 'Apple orchard responsibilities were confirmed.');
-  event(3, 'Orange orchard responsibility returned to Alice.');
+  const correctionSource = event(2, 'Orange orchard responsibility returned to Alice.');
+  event(3, 'Apple orchard responsibilities were confirmed.');
   const batches: any[] = [];
   let correctionStatus: unknown;
   open(
@@ -436,7 +436,7 @@ it('defers a fresh correction when earlier originals fill the candidate union ev
       if (correction && candidate)
         correctionStatus = db
           .prepare('SELECT status FROM memory_sources WHERE id=?')
-          .get(`event:${sessionId}:3`);
+          .get(correctionSource.id);
       return correction && candidate
         ? {
             ...empty,
@@ -477,6 +477,6 @@ it('defers a fresh correction when earlier originals fill the candidate union ev
   expect(batches[1].candidates.some((candidate: any) => candidate.id === 'oranges')).toBe(true);
   expect(batches[1].sources.some((source: any) => source.id === sourceHandle(shared))).toBe(true);
   expect(
-    db.prepare('SELECT status FROM memory_sources WHERE id=?').get(`event:${sessionId}:3`)
+    db.prepare('SELECT status FROM memory_sources WHERE id=?').get(correctionSource.id)
   ).toEqual({ status: 'completed' });
 });
