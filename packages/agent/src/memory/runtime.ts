@@ -285,6 +285,7 @@ export function createMemoryRuntime(
         deps.query ?? oneShotQuery,
         configuration.extraction!,
         primary,
+        primaries.map(sourceHandle),
         candidates,
         withheld,
         controller.signal
