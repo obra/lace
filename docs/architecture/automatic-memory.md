@@ -399,11 +399,12 @@ coverage without them.
 Transcript FTS hits join to admitted source versions by event identity.
 Validation uses keyed admission reads and keeps only a bounded cache of source
 text and account results. Groups that cannot fit all their required accounts are
-omitted whole. After awaited source/account reads, Lace rechecks each selected
-original's admission, retained bytes, current account revisions and support
-before packing. Reuse reads aggregate coverage and revalidates the selected
-handles and their indexed account links without encoding a query or searching
-the corpus again.
+omitted whole. After awaited source and account reads, Lace rechecks authority,
+original admission and retained bytes, and the selected accounts' head revisions
+and support before packing. Reuse reads aggregate coverage, reloads each
+directly nominated account at its expected revision, and revalidates originals
+and their indexed account links without encoding a query or searching the corpus
+again.
 
 A bounded query prioritizes incoming ordinary input and adds only a short
 user/assistant conversational tail. Literal text alternatives are safely quoted
@@ -415,7 +416,8 @@ development-calibrated relevance threshold is not a probability or a guarantee
 of useful answers. Textual nominations independently require an FTS match and
 literal term overlap or a complete identifier match. Native Dot scores order
 both methods' candidates. Text-only fallback remains observable, including empty
-results.
+results. A note nomination ranks the note's own text without requiring any
+supporting passage to be projected.
 
 Candidate selection excludes cue events and passages actually present in
 required history. An event represented only by a digest does not exclude its
@@ -423,22 +425,23 @@ full sidecar. Compaction records retained event identities; its watermark does
 not establish presence. The boolean complete-identifier preference applies
 before each method admits up to 24 distinct valid groups, with cosine ordering
 inside each tier and refill after invalid or duplicate nominations. Group merges
-preserve that preference. Packing first attempts the first original and every
-required current account from each ranked group, admitting at most six groups.
-It then uses remaining room for ranked sibling passages of admitted groups,
-keeping a fitting prefix for each group's originals. Bridging sources coalesce
-overlapping account groups without repeating note IDs while retaining distinct
-historical originals that fit. Only current originals are selected; their latest
-linked accounts can retain readable superseded document support with explicit
-status. An original and all directly linked current accounts stay together.
-Reused selections are revalidated and repacked for each request; changed
-evidence drops the affected group. The displayed redacted framing and JSON data
-count against the 2,000 estimated tokens reserved for recall. Before each
-request with an automatic recall cue, including after resume and tool results,
-the runner estimates the messages, system prompt, tool definitions and current
-caller text together with the full recall allowance and the model's requested
-output allowance. If the estimate exceeds the window, the runner passes the
-space available for history to compaction and rechecks the rebuilt request. An
+preserve that preference. At equal identifier priority and score, originals
+precede directly nominated accounts. Packing first attempts the first original
+and every required current account, or a directly nominated account on its own.
+The first fitting group containing an account wins; later groups that repeat it
+are skipped whole. Packing admits at most six groups, then uses remaining room
+for a ranked prefix of sibling passages. Bridging sources can still coalesce
+originals that share accounts. Only current originals are selected. A directly
+nominated account or an account linked to an original can retain readable
+superseded document support with explicit status. An original and all directly
+linked current accounts stay together. Reused selections are revalidated and
+repacked for each request. The displayed redacted framing and JSON data count
+against the 2,000 estimated tokens reserved for recall. Before each request with
+an automatic recall cue, including after resume and tool results, the runner
+estimates the messages, system prompt, tool definitions and current caller text
+together with the full recall allowance and the model's requested output
+allowance. If the estimate exceeds the window, the runner passes the space
+available for history to compaction and rechecks the rebuilt request. An
 unfinished paused response restarts from durable history after compaction.
 Caller updates during retrieval are included in the check before submission.
 Packing prioritizes group coverage before sibling expansion and keeps every
@@ -473,21 +476,22 @@ and is reconstructed from retained events on a cold resume. Session changes
 clear selection. Cancellation stops waiting, prevents a provider call and fences
 late installation.
 
-Automatic evidence is rendered as untrusted historical quotations after required
-history/tool results, alongside separately owned caller temporary text.
-Presentation validates each retrieved passage against the unchanged redacted
-source text used by search, then completes both ends to enclosing sentence
-boundaries within recognized message bodies, journal bodies or a plain source.
-Sentence boundaries use the built-in English sentence segmenter; unusual prose
-is not guaranteed a linguistic interpretation. The presented offsets and text
-remain exact slices of that same source version. Metadata-only selections do not
-acquire unrelated body text. Overlapping or touching completed ranges from the
-same immutable source and required-account binding coalesce, including
-original-only evidence. Ranges within a source appear in ascending source order;
-separated ranges stay separate rather than quoting omitted text. Every message
-retains its own attribution, including selections crossing message boundaries.
-Indexing and retrieval priority remain seed-derived: a contextual identifier
-introduced by sentence completion does not promote the source.
+Automatic evidence is rendered as untrusted historical quotations and
+model-authored accounts after required history/tool results, alongside
+separately owned caller temporary text. Presentation validates each retrieved
+passage against the unchanged redacted source text used by search, then
+completes both ends to enclosing sentence boundaries within recognized message
+bodies, journal bodies or a plain source. Sentence boundaries use the built-in
+English sentence segmenter; unusual prose is not guaranteed a linguistic
+interpretation. The presented offsets and text remain exact slices of that same
+source version. Metadata-only selections do not acquire unrelated body text.
+Overlapping or touching completed ranges from the same immutable source and
+required-account binding coalesce, including original-only evidence. Ranges
+within a source appear in ascending source order; separated ranges stay separate
+rather than quoting omitted text. Every message retains its own attribution,
+including selections crossing message boundaries. Indexing and retrieval
+priority remain seed-derived: a contextual identifier introduced by sentence
+completion does not promote the source.
 
 Sen's finite message envelopes become historical message records with quoted
 bodies, source/channel or room, conversation, sender and message reference where
@@ -507,19 +511,19 @@ source labels, not inferred authorship. Missing, invalid or conflicting date and
 epoch-millisecond timestamp fields remain explicit. Other documents keep their
 source path without being labeled journals.
 
-Every record includes an executable native `recall` read call. Message records
-use `recall({action:"read", event_id, context:5, full:true})` for retained
-historical surrounding context: this bounded event window is not a complete
-thread. Journal and other document records use
+Every quotation includes an executable native `recall` read call. Message
+records use `recall({action:"read", event_id, context:5, full:true})` for
+retained historical surrounding context: this bounded event window is not a
+complete thread. Journal and other document records use
 `recall({action:"read", event_id:"source:…"})` for the complete immutable
 retained source version. The renderer retains required current accounts,
 revisions and support statuses. Redaction applies before packing, and all
 displayed metadata, escaping, calls, accounts and framing count against the same
 2,000-token maximum. This presentation overhead can change how many ranked
 complete presentation units fit, while selected quotations retain exact source
-offsets and text. The framing directs readers to use supplied original excerpts
-as evidence for the existing request and compare them with current accounts to
-see what changed. It reserves source expansion for a concrete missing fact,
+offsets and text. The framing explains that a model-authored account may appear
+without a raw quotation and directs readers to compare it with older originals
+when supplied. It reserves source expansion for a concrete missing fact,
 ambiguity, contradiction or freshness need. Recalled quotations are untrusted,
 and repeated background alone creates no new reply, tool or journal obligation.
 Automatic evidence is never persisted or extracted as a new original. Caller

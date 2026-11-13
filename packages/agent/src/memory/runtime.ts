@@ -12,7 +12,9 @@ import { automaticRecall } from './automatic';
 import {
   attachCurrentAccounts,
   CURRENT_ACCOUNT_ATTACHMENT_BYTES,
+  loadCurrentAccount,
   maxRequiredAccounts,
+  validateCurrentAccount,
 } from './recall-accounts';
 import { redact } from '../storage/recall/redact';
 import { MemorySources } from './sources';
@@ -24,13 +26,12 @@ import { extract, type MemoryQuery } from './extraction';
 import {
   MEMORY_LIMITS as L,
   sourceHandle,
-  sourceReadHandle,
+  type CurrentAccount,
   type MemoryConfiguration,
   type MemoryRuntime,
   type Source,
   type SuppliedSource,
   type Note,
-  type Support,
   type MemoryReader,
 } from './types';
 
@@ -500,6 +501,21 @@ export function createMemoryRuntime(
     configuration,
     reader(readBinding) {
       checkReader(readBinding);
+      const check = () => checkReader(readBinding);
+      const resolveAccount = async ({ id, revision }: Pick<CurrentAccount, 'id' | 'revision'>) => {
+        check();
+        try {
+          const note = notes.note(id);
+          if (note?.revision !== revision) return undefined;
+          const account = await loadCurrentAccount(note, sources, check);
+          check();
+          validateCurrentAccount(account, notes, sources);
+          return account;
+        } catch {
+          check();
+          return undefined;
+        }
+      };
       const reader: MemoryReader = {
         async automatic(input) {
           checkReader(readBinding);
@@ -519,8 +535,9 @@ export function createMemoryRuntime(
                 search,
                 searchUnavailable,
                 floor: deps.semanticFloor ?? 0.8279641135636632,
-                check: () => checkReader(readBinding),
+                check,
                 accountsFor: reader.accountsFor,
+                resolveAccount,
                 indexing: () => !!localRunning,
                 publication: configuration.recall.search
                   ? () => ({
@@ -598,24 +615,12 @@ export function createMemoryRuntime(
               return { original, heads: [], reason: String(error) };
             }
           });
-          const checked = new Map<string, { note: Note; refs: Support[] }>();
+          const checked = new Map<string, CurrentAccount>();
           for (const group of groups) {
             for (const note of group.heads) {
               if (checked.has(note.id)) continue;
-              const refs = await support(note.sources);
-              checkReader(readBinding);
-              for (const ref of refs) {
-                if (ref.status !== 'superseded' || ref.reference.kind !== 'document') continue;
-                // A superseded tree entry does not establish that its pinned blob is readable.
-                try {
-                  await sources.load(ref, false);
-                } catch {
-                  ref.status = 'unavailable';
-                }
-                checkReader(readBinding);
-              }
-              checked.set(note.id, { note, refs });
-              checkReader(readBinding);
+              checked.set(note.id, await loadCurrentAccount(note, sources, check));
+              check();
             }
           }
           // No awaited work follows these authority/head/source checks. All groups share this fence.
@@ -639,37 +644,9 @@ export function createMemoryRuntime(
               )
                 throw new Error('Linked current accounts changed during recall');
               const accounts = group.heads.map((head) => {
-                const { note, refs } = checked.get(head.id)!;
-                if (notes.note(note.id)?.revision !== note.revision)
-                  throw new Error('Current account revision changed during recall');
-                if (
-                  !refs.length ||
-                  refs.some(
-                    (ref) =>
-                      ref.status !== 'current' &&
-                      !(ref.status === 'superseded' && ref.reference.kind === 'document')
-                  )
-                )
-                  throw new Error('Required current account support unavailable');
-                sources.validateAtAcceptance(
-                  refs.map((ref) => ({
-                    ...ref,
-                    sourceStatus: ref.status,
-                    content: [],
-                    textBytes: 0,
-                    imageBytes: 0,
-                  }))
-                );
-                return {
-                  id: note.id,
-                  revision: note.revision,
-                  text: note.text,
-                  attribution: note.producer,
-                  support: refs.map((ref) => ({
-                    handle: sourceReadHandle(ref),
-                    status: ref.status,
-                  })),
-                };
+                const account = checked.get(head.id)!;
+                validateCurrentAccount(account, notes, sources);
+                return account;
               });
               return { accounts };
             } catch (error) {

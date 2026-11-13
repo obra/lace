@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
-import { RecallScratch, RECALL_PAGE_SIZE, type RankedPassage } from '../recall-scratch';
+import { RecallScratch, RECALL_PAGE_SIZE, type RankedCandidate } from '../recall-scratch';
 
 it('pages FTS identities and clears failed semantic ranking while preserving matches and aliases', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'recall-runs-'));
@@ -38,6 +38,7 @@ it('pages FTS identities and clears failed semantic ranking while preserving mat
     expect(scratch.nominate({ kind: 'note', noteId: 'doc', revision: 1 })).toBe(true);
     expect(scratch.nominate({ kind: 'note', noteId: 'doc', revision: 2 })).toBe(true);
     const semantic = {
+      kind: 'passage' as const,
       id: 'doc',
       version: 'v1',
       start: 0,
@@ -75,7 +76,8 @@ it.each(['ranking', 'nominations'] as const)(
       const identity = (i: number) =>
         ({ kind: 'note', noteId: `note-${String(i).padStart(3, '0')}`, revision: 1 }) as const;
       if (table === 'ranking') {
-        const rows: RankedPassage[] = Array.from({ length: count }, (_, ordinal) => ({
+        const rows: RankedCandidate[] = Array.from({ length: count }, (_, ordinal) => ({
+          kind: 'passage',
           id: 'doc',
           version: 'v1',
           start: ordinal,
@@ -118,18 +120,22 @@ it('merges runs larger than the page cache after unlink while preserving locale 
   try {
     expect(readdirSync(directory)).toEqual([]);
     const ids = ['archive:ä', 'archive:A', 'archive:a', 'archive:z', 'archive:é', 'archive:e'];
-    const candidates: RankedPassage[] = Array.from({ length: 4097 }, (_, ordinal) => ({
-      id: ids[ordinal % ids.length],
-      version: String(ordinal),
-      start: ordinal % 5,
-      end: 384 + (ordinal % 5),
-      text: 'passage '.repeat(48),
-      exact: ordinal % 7 === 0,
-      score: (ordinal % 11) / 10,
-      semantic: true,
-      textual: ordinal % 3 === 0,
-      ordinal,
-    }));
+    const candidates: Array<Extract<RankedCandidate, { kind: 'passage' }>> = Array.from(
+      { length: 4097 },
+      (_, ordinal) => ({
+        kind: 'passage',
+        id: ids[ordinal % ids.length],
+        version: String(ordinal),
+        start: ordinal % 5,
+        end: 384 + (ordinal % 5),
+        text: 'passage '.repeat(48),
+        exact: ordinal % 7 === 0,
+        score: (ordinal % 11) / 10,
+        semantic: true,
+        textual: ordinal % 3 === 0,
+        ordinal,
+      })
+    );
     for (let start = 0; start < candidates.length; start += RECALL_PAGE_SIZE)
       scratch.addRun(candidates.slice(start, start + RECALL_PAGE_SIZE));
     scratch.addAlias('from a merged group', 1);
