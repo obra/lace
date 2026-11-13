@@ -692,7 +692,7 @@ async function validateEvidence(
       textual: !!previous?.textual || !!candidate?.textual,
     });
   }
-  function countAdmittedGroups(method: 'semantic' | 'textual') {
+  function admittedGroups(method: 'semantic' | 'textual') {
     const attached = new Set<string>();
     const direct: string[] = [];
     let originals = 0;
@@ -706,7 +706,7 @@ async function validateEvidence(
       }
     }
     // Both presentations stay ranked; a direct account already attached in this method uses no extra slot.
-    return originals + direct.filter((id) => !attached.has(id)).length;
+    return { count: originals + direct.filter((id) => !attached.has(id)).length, attached };
   }
   const fits = (group: AutomaticEvidence) => {
     const packed = packEvidence(
@@ -720,13 +720,21 @@ async function validateEvidence(
   for (const entry of ranked) {
     if (considered++ % RECALL_PAGE_SIZE === 0) await yieldTurn();
     fence();
-    const candidate = 'ordinal' in entry ? entry : undefined;
+    let candidate = 'ordinal' in entry ? entry : undefined;
     if (candidate) {
-      const semanticGroups = countAdmittedGroups('semantic');
-      const textGroups = countAdmittedGroups('textual');
-      if (semanticGroups >= 24 && textGroups >= 24) break;
-      if ((!candidate.semantic || semanticGroups >= 24) && (!candidate.textual || textGroups >= 24))
-        continue;
+      const semanticGroups = admittedGroups('semantic');
+      const textGroups = admittedGroups('textual');
+      if (
+        (!candidate.semantic || semanticGroups.count >= 24) &&
+        (!candidate.textual || textGroups.count >= 24)
+      ) {
+        if (candidate.kind !== 'note') continue;
+        // Even a full method can keep an alternative to an account it already admits.
+        const semantic = candidate.semantic && semanticGroups.attached.has(candidate.id);
+        const textual = candidate.textual && textGroups.attached.has(candidate.id);
+        if (!semantic && !textual) continue;
+        candidate = { ...candidate, semantic, textual };
+      }
     }
     const reused = 'originals' in entry ? entry : undefined;
     if (candidate?.kind === 'note' || (reused && !reused.originals.length)) {

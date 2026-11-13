@@ -1728,6 +1728,28 @@ it('recalls a fitting independent hit after duplicate account presentations', as
     { events: [13], accounts: 0 },
   ]);
 });
+it('packs a smaller account presentation after both methods fill the shortlist', async () => {
+  for (let index = 1; index <= 24; index++)
+    event(`Bicycle routing update ${index}: ${'The dispatch route is under review. '.repeat(7)}`);
+  const runtime = start();
+  await runtime.wake();
+  const accounts = sources().map((source, index) =>
+    accept(`Bicycle route ${index + 1}: ${'follow the marker. '.repeat(index < 2 ? 82 : 5)}`, [
+      source,
+    ])
+  );
+  await runtime.wake();
+
+  const result = await recall(runtime, 'bicycle');
+  expect(result.mode).toBe('hybrid');
+  expect(result.groups[0].originals).not.toHaveLength(0);
+  expect(result.groups[0].accounts[0].id).toBe(accounts[0].id);
+  const directAccounts = result.groups
+    .filter(({ originals }) => !originals.length)
+    .flatMap(({ accounts }) => accounts.map(({ id }) => id));
+  expect(directAccounts.length).toBeGreaterThan(0);
+  for (const id of directAccounts) expect(accounts.map((account) => account.id)).toContain(id);
+});
 it('keeps the semantic admission limit when an attached account has textual-only support', async () => {
   const support = 'TICKET-73 retained original.';
   const outside = 'The gate code for bicycle pickup is green.';

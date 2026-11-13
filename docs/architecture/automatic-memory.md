@@ -426,8 +426,9 @@ not establish presence. The boolean complete-identifier preference applies
 before each method fills up to 24 shortlist slots with valid groups, with cosine
 ordering inside each tier and refill after invalid or duplicate nominations. A
 directly nominated account and a group that attaches it share a shortlist slot
-when both are admitted by the same method. Both presentations remain eligible
-for packing. Group merges preserve identifier preference.
+when both qualify through the same method. The direct account remains eligible
+for packing even when that method has filled its slots. Group merges preserve
+identifier preference.
 
 At equal identifier priority and score, originals precede directly nominated
 accounts. Packing first attempts the first original and every required current
