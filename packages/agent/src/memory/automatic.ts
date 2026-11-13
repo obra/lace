@@ -692,6 +692,22 @@ async function validateEvidence(
       textual: !!previous?.textual || !!candidate?.textual,
     });
   }
+  function countAdmittedGroups(method: 'semantic' | 'textual') {
+    const attached = new Set<string>();
+    const direct: string[] = [];
+    let originals = 0;
+    for (const [id, group] of groups) {
+      if (!ranks.get(id)![method]) continue;
+      if (group.originals.length) {
+        originals++;
+        for (const account of group.accounts) attached.add(account.id);
+      } else {
+        direct.push(group.accounts[0].id);
+      }
+    }
+    // Both presentations stay ranked; a direct account already attached in this method uses no extra slot.
+    return originals + direct.filter((id) => !attached.has(id)).length;
+  }
   const fits = (group: AutomaticEvidence) => {
     const packed = packEvidence(
       { mode, reason, coverage, groups: [group] },
@@ -705,19 +721,13 @@ async function validateEvidence(
     if (considered++ % RECALL_PAGE_SIZE === 0) await yieldTurn();
     fence();
     const candidate = 'ordinal' in entry ? entry : undefined;
-    let semanticGroups = 0;
-    let textGroups = 0;
-    for (const rank of ranks.values()) {
-      semanticGroups += Number(rank.semantic);
-      textGroups += Number(rank.textual);
+    if (candidate) {
+      const semanticGroups = countAdmittedGroups('semantic');
+      const textGroups = countAdmittedGroups('textual');
+      if (semanticGroups >= 24 && textGroups >= 24) break;
+      if ((!candidate.semantic || semanticGroups >= 24) && (!candidate.textual || textGroups >= 24))
+        continue;
     }
-    if (candidate && semanticGroups >= 24 && textGroups >= 24) break;
-    if (
-      candidate &&
-      (!candidate.semantic || semanticGroups >= 24) &&
-      (!candidate.textual || textGroups >= 24)
-    )
-      continue;
     const reused = 'originals' in entry ? entry : undefined;
     if (candidate?.kind === 'note' || (reused && !reused.originals.length)) {
       if (reused && reused.accounts.length !== 1) continue;

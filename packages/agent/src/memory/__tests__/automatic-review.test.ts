@@ -1703,6 +1703,58 @@ it('admits an above-floor exact identifier beyond 24 higher-cosine topic groups'
   const result = await recall(runtime, 'bicycle TICKET-73');
   expect(result.groups[0].originals[0].text).toContain('TICKET-73');
 });
+it('recalls a fitting independent hit after duplicate account presentations', async () => {
+  const independent = 'The gate code for bicycle pickup is green.';
+  vector = (text, kind) =>
+    kind === 'document' && text.includes(independent) ? [0.9, Math.sqrt(0.19)] : [1, 0];
+  for (let index = 1; index <= 12; index++) event(`Bicycle routing update ${index}.`);
+  event(independent);
+  const runtime = start(false);
+  await runtime.wake();
+  for (const [index, source] of sources().slice(0, 12).entries()) {
+    accept(`Bicycle route ${index + 1}: ${'follow the marker. '.repeat(145)}`, [source]);
+  }
+  await runtime.wake();
+
+  const result = await recall(runtime, 'bicycle routing and pickup');
+  expect(result.mode).toBe('semantic-only');
+  expect(
+    result.groups.map(({ originals, accounts }) => ({
+      events: originals.flatMap(({ source }) => (source.kind === 'event' ? [source.eventSeq] : [])),
+      accounts: accounts.length,
+    }))
+  ).toEqual([
+    { events: [1], accounts: 1 },
+    { events: [13], accounts: 0 },
+  ]);
+});
+it('keeps the semantic admission limit when an attached account has textual-only support', async () => {
+  const support = 'TICKET-73 retained original.';
+  const outside = 'The gate code for bicycle pickup is green.';
+  vector = (text, kind) => {
+    if (kind === 'document' && text === support) return [0, 1];
+    if (kind === 'document' && text === outside) return [0.9, Math.sqrt(0.19)];
+    return [1, 0];
+  };
+  event(support);
+  for (let index = 1; index <= 23; index++) event(`Bicycle routing update ${index}.`);
+  event(outside);
+  const runtime = start();
+  await runtime.wake();
+  const account = accept('The latest bicycle schedule is posted.', [sources()[0]]);
+  await runtime.wake();
+
+  const result = await recall(runtime, 'TICKET-73');
+  expect(result.mode).toBe('hybrid');
+  expect(result.groups[0].originals[0].text).toBe(support);
+  expect(result.selected).toContainEqual({
+    originals: [],
+    accounts: [expect.objectContaining({ id: account.id })],
+  });
+  expect(
+    result.selected.flatMap(({ originals }) => originals.map(({ text }) => text))
+  ).not.toContain(outside);
+});
 it('prefers an independently nominated exact original over a relevant account that lacks the identifier', async () => {
   vector = (text, kind) =>
     kind === 'document' && text === 'TICKET-73 retained original' ? [0, 1] : [1, 0];

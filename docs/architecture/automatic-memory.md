@@ -423,11 +423,16 @@ Candidate selection excludes cue events and passages actually present in
 required history. An event represented only by a digest does not exclude its
 full sidecar. Compaction records retained event identities; its watermark does
 not establish presence. The boolean complete-identifier preference applies
-before each method admits up to 24 distinct valid groups, with cosine ordering
-inside each tier and refill after invalid or duplicate nominations. Group merges
-preserve that preference. At equal identifier priority and score, originals
-precede directly nominated accounts. Packing first attempts the first original
-and every required current account, or a directly nominated account on its own.
+before each method fills up to 24 shortlist slots with valid groups, with cosine
+ordering inside each tier and refill after invalid or duplicate nominations. A
+directly nominated account and a group that attaches it share a shortlist slot
+when both are admitted by the same method. Both presentations remain eligible
+for packing. Group merges preserve identifier preference.
+
+At equal identifier priority and score, originals precede directly nominated
+accounts. Packing first attempts the first original and every required current
+account, or a directly nominated account on its own.
+
 The first fitting group containing an account wins; later groups that repeat it
 are skipped whole. Packing admits at most six groups, then uses remaining room
 for a ranked prefix of sibling passages. Bridging sources can still coalesce
