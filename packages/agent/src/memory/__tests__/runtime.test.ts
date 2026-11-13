@@ -263,9 +263,13 @@ describe('configured automatic memory', () => {
     const blocks = requests[0][0].content;
     if (typeof blocks === 'string') throw new Error('Expected extraction content blocks');
     const body = JSON.parse(blocks[0].text!);
-    expect(body.sources.map((source: any) => source.reference.eventSeq)).toEqual([2, 3, 4]);
-    expect(body.sources[0].text).toContain('Jesse chose compact rows.');
-    expect(body.sources[1].text).toContain('The preferred spacing is compact.');
+    const byEvent = new Map<number, string>(
+      body.sources.map((source: any) => [source.reference.eventSeq, source.text])
+    );
+    expect(body.sources).toHaveLength(3);
+    expect([...byEvent.keys()].sort()).toEqual([2, 3, 4]);
+    expect(byEvent.get(2)).toContain('Jesse chose compact rows.');
+    expect(byEvent.get(3)).toContain('The preferred spacing is compact.');
     expect(blocks).toContainEqual({
       type: 'image',
       source: { type: 'base64', media_type: 'image/png', data: 'aGVsbG8=' },
@@ -616,8 +620,8 @@ describe('configured automatic memory', () => {
         attribution: 'persona:root',
         support: [
           { handle: `${sessionId}:2`, status: 'current' },
-          { handle: originalHandle(historical), status: 'superseded' },
           { handle: originalHandle(signs), status: 'current' },
+          { handle: originalHandle(historical), status: 'superseded' },
         ],
       };
       expect(await reader.accountsFor([target])).toEqual([{ accounts: [expectedAccount] }]);
@@ -629,8 +633,8 @@ describe('configured automatic memory', () => {
           reference: expect.objectContaining({ eventSeq: 2 }),
           status: 'current',
         }),
-        { ...historical, status: 'superseded' },
         { ...signs, status: 'current' },
+        { ...historical, status: 'superseded' },
       ]);
       expect(git('cat-file', 'blob', historical.version)).toBe('Distribute packet A.');
 

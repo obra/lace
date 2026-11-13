@@ -79,25 +79,32 @@ beforeEach(async () => {
   notes = new MemoryNotes(db);
   await new MemorySources(notes, { databasePath, binding }).discover();
   const sources = notes.pending();
+  const initial = sources.find(
+    ({ reference }) => reference.kind === 'event' && reference.eventSeq === 1
+  );
+  const correction = sources.find(
+    ({ reference }) => reference.kind === 'event' && reference.eventSeq === 2
+  );
+  if (!initial || !correction) throw new Error('Expected both routing originals');
   db.prepare('INSERT INTO memory_worker VALUES(1,?)').run('test');
-  const first = notes.offer([sources[0]], [], 'fixture', [sources[0]]);
+  const first = notes.offer([initial], [], 'fixture', [initial]);
   notes.accept(
     binding,
     'test',
     first,
-    [sources[0]],
+    [initial],
     [],
     {
       changes: [
-        { text: 'Alice owns routing.', sourceIds: [sourceHandle(sources[0])] },
-        { text: 'Bob owns billing.', sourceIds: [sourceHandle(sources[0])] },
+        { text: 'Alice owns routing.', sourceIds: [sourceHandle(initial)] },
+        { text: 'Bob owns billing.', sourceIds: [sourceHandle(initial)] },
       ],
     },
     () => {},
-    [sources[0]]
+    [initial]
   );
   const routing = notes.candidates().find((note) => note.text.includes('Alice'))!;
-  const second = notes.offer(sources, [routing], 'fixture2', [sources[1]]);
+  const second = notes.offer(sources, [routing], 'fixture2', [correction]);
   notes.accept(
     binding,
     'test',
@@ -108,13 +115,13 @@ beforeEach(async () => {
       changes: [
         {
           text: 'Bea now owns routing after Alice left.',
-          sourceIds: [sourceHandle(sources[1])],
+          sourceIds: [sourceHandle(correction)],
           target: { noteId: routing.id, revision: 1 },
         },
       ],
     },
     () => {},
-    [sources[1]]
+    [correction]
   );
   runtime = createMemoryRuntime({ databasePath, binding });
   resetRegistriesForTest();

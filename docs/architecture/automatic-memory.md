@@ -137,6 +137,11 @@ preserves BOS/content/EOS; the extractor still receives complete admitted
 originals. This bounded window and the 16-candidate union cannot ensure complete
 contradiction coverage.
 
+The extraction worker reads up to 128 pending originals at a time, most recently
+discovered first. A newly discovered original can be selected on the next read;
+it does not interrupt work already in progress. Older originals stay eligible,
+though sustained arrivals can delay them.
+
 Each admitted fresh original gets related-note reconciliation before further
 fresh originals consume support capacity. A batch splits when needed. Candidate
 support is admitted atomically: unavailable or oversized support leaves no
