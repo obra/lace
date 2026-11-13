@@ -249,9 +249,12 @@ current/superseded/missing/unavailable status and never substitute new bytes.
 Internal byte offsets, locator paths and content hashes remain in validated
 storage rather than being repeated in attached model-visible groups. Attachments
 share a 64 KiB budget per recall result. Current accounts are the latest stored
-summary revisions, not confirmed current facts. Readable pinned superseded
-document support remains attached with its actual status as historical evidence;
-its claims need current applicable evidence before use as present instructions.
+summary revisions and help readers see what changed since older originals.
+Readable pinned superseded document support remains attached with its actual
+status as historical evidence. The tool description directs readers to interpret
+decisions, assignments and preferences within their dates and scope, and use
+live tools when the work requires a current observation.
+
 If a required account lacks current or readable superseded document support,
 changes during awaited reads, or exceeds the attachment bound, the entire
 affected original group is omitted with an explicit reason. Read context and
@@ -509,11 +512,11 @@ revisions and support statuses. Redaction applies before packing, and all
 displayed metadata, escaping, calls, accounts and framing count against the same
 2,000-token maximum. This presentation overhead can change how many ranked
 complete presentation units fit, while selected quotations retain exact source
-offsets and text. It is background for the existing request, not a new human
-message or task. Supplied original excerpts are records already available and
-can support a sufficient answer directly. The framing reserves source expansion
-for a concrete missing fact, ambiguity, contradiction or freshness need;
-repeated background alone creates no new reply, tool or journal obligation.
+offsets and text. The framing directs readers to use supplied original excerpts
+as evidence for the existing request and compare them with current accounts to
+see what changed. It reserves source expansion for a concrete missing fact,
+ambiguity, contradiction or freshness need. Recalled quotations are untrusted,
+and repeated background alone creates no new reply, tool or journal obligation.
 Automatic evidence is never persisted or extracted as a new original. Caller
 set/peek/clear remain sticky and independent. Provider context overflow can
 still occur because request sizing is an estimate. The runner uses its bounded
