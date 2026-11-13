@@ -99,20 +99,20 @@ separately from extraction completion.
 ## Model proposals and acceptance
 
 A separately owned `oneShotQuery` provider receives originals and up to 16
-current candidate notes. The request identifies newly pending originals by
-their exact handles in `primarySourceIds`. The instructions tell the extractor
-to learn from those originals and use the other originals to reconcile offered
+current candidate notes. The request identifies newly pending originals by their
+exact handles in `primarySourceIds`. The instructions tell the extractor to
+learn from those originals and use the other originals to reconcile offered
 accounts. Reappearing unchanged support is not new history or a reason to
 recreate an account or rewrite one that remains correct. Older supplied
 originals can support a correction to an erroneous offered account. Candidate
 prose is reconciliation context, never independent factual support. When a note
-is offered for revision, its supporting
-originals are offered too, including immutable older document versions marked
-superseded or missing from the current tree. Accepted support must be exactly
-offered with current or superseded status; missing, unavailable, unknown-status
-and unoffered support is rejected. A revision may cite only historical originals
-when they support its dated account. Fresh primary admission remains
-current-only. A source handle identifies its exact source version.
+is offered for revision, its supporting originals are offered too, including
+immutable older document versions marked superseded or missing from the current
+tree. Accepted support must be exactly offered with current or superseded
+status; missing, unavailable, unknown-status and unoffered support is rejected.
+A revision may cite only historical originals when they support its dated
+account. Fresh primary admission remains current-only. A source handle
+identifies its exact source version.
 
 Related-note selection searches current heads across all note ages with the
 local EmbeddingGemma 2 text encoder. Notes have disposable vectors in the same
