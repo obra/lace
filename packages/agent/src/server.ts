@@ -380,11 +380,12 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         jobId: context?.jobId,
         ...update,
       });
-      writeSessionState(state.activeSession!.dir, {
+      const nextState = {
         ...sessionState,
         nextStreamSeq: sessionState.nextStreamSeq + 1,
-      });
-      state.activeSession = loadSession(state.activeSession!.meta.sessionId);
+      };
+      writeSessionState(state.activeSession!.dir, nextState);
+      state.activeSession = { ...state.activeSession!, state: nextState };
     });
   };
 
