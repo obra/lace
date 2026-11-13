@@ -99,8 +99,12 @@ separately from extraction completion.
 ## Model proposals and acceptance
 
 A separately owned `oneShotQuery` provider receives originals and up to 16
-current candidate notes. Candidate prose is reconciliation context, never
-independent factual support. When a note is offered for revision, its supporting
+current candidate notes. The request identifies newly pending originals by
+their exact handles in `primarySourceIds`. The instructions tell the extractor
+to learn from those originals and use the other originals to reconcile offered
+accounts. Unchanged support alone does not justify creating or revising an
+account. Candidate prose is reconciliation context, never independent factual
+support. When a note is offered for revision, its supporting
 originals are offered too, including immutable older document versions marked
 superseded or missing from the current tree. Accepted support must be exactly
 offered with current or superseded status; missing, unavailable, unknown-status

@@ -36,9 +36,9 @@ describe('configured automatic memory', () => {
   function git(...args: string[]) {
     return execFileSync('git', ['-C', join(dir, 'git'), ...args], { encoding: 'utf8' }).trim();
   }
-  function commit(text: string) {
-    writeFileSync(join(dir, 'git/knowledge.md'), text);
-    git('add', 'knowledge.md');
+  function commit(text: string, path = 'knowledge.md') {
+    writeFileSync(join(dir, 'git', path), text);
+    git('add', path);
     git(
       '-c',
       'user.name=Memory Test',
@@ -522,45 +522,60 @@ describe('configured automatic memory', () => {
     expect(closedBeforeProviderReleased).toBe(true);
   });
 
-  it('offers an existing note with its old originals when reconciling a new document version', async () => {
-    let first = true;
-    const runtime = open((opts: any) => {
-      if (first) {
-        first = false;
-        return proposals(opts);
-      }
-      const body = JSON.parse(opts.messages[0].content[0].text);
-      expect(
-        body.sources.some((source: any) => source.text.includes('Jesse likes compact rows.'))
-      ).toBe(true);
-      const newer = body.sources.find((source: any) =>
-        source.text.includes('Jesse now prefers roomy rows.')
-      );
-      expect(newer).toBeDefined();
-      expect(body.candidates).toHaveLength(1);
-      return {
-        text: JSON.stringify({
-          changes: [
-            {
-              text: 'Jesse now prefers roomy rows.',
-              sourceIds: [newer.id],
-              target: { noteId: body.candidates[0].id, revision: 1 },
-            },
-          ],
-        }),
-        stopReason: 'end_turn',
-        toolCalls: [],
-      };
-    });
+  it('identifies newly pending originals separately from current reconciliation support', async () => {
+    const oldHandle = `document:knowledge.md@${git('rev-parse', 'HEAD:knowledge.md')}`;
+    let freshHandle = '';
+    let followup: unknown;
+    const runtime = open(
+      (opts: any) => {
+        if (!freshHandle) return proposals(opts);
+        const body = JSON.parse(opts.messages[0].content[0].text);
+        followup = body;
+        return {
+          text: JSON.stringify({
+            changes: [
+              {
+                text: 'Jesse now prefers roomy rows.',
+                sourceIds: [freshHandle, oldHandle],
+                target: { noteId: body.candidates[0].id, revision: 1 },
+              },
+            ],
+          }),
+          stopReason: 'end_turn',
+          toolCalls: [],
+        };
+      },
+      undefined,
+      ['knowledge.md', 'correction.md']
+    );
     await runtime.wake();
     const original = await read(runtime);
-    commit('Jesse now prefers roomy rows.');
+    commit('Jesse now prefers roomy rows.', 'correction.md');
+    freshHandle = `document:correction.md@${git('rev-parse', 'HEAD:correction.md')}`;
     await runtime.wake();
+    expect(followup).toMatchObject({
+      primarySourceIds: [freshHandle],
+      sources: expect.arrayContaining([
+        expect.objectContaining({
+          id: oldHandle,
+          sourceStatus: 'current',
+          text: expect.stringContaining('Jesse likes compact rows.'),
+        }),
+        expect.objectContaining({
+          id: freshHandle,
+          sourceStatus: 'current',
+          text: expect.stringContaining('Jesse now prefers roomy rows.'),
+        }),
+      ]),
+      candidates: [{ id: original.id, revision: 1, support: [{ id: oldHandle }] }],
+    });
     const revised = await runtime.reader(binding).read(original.id);
     expect(revised?.revision).toBe(2);
     expect(revised?.text).toBe('Jesse now prefers roomy rows.');
-    expect(revised?.support).toHaveLength(1);
-    expect(revised?.support[0].status).toBe('current');
+    expect(revised?.support.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: 'document:correction.md', status: 'current' },
+      { id: 'document:knowledge.md', status: 'current' },
+    ]);
   });
   it.each(['event', 'document'] as const)(
     'keeps a current %s linked to its corrected account with readable historical support',

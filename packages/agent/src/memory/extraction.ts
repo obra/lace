@@ -29,6 +29,8 @@ export type Proposal = z.infer<typeof proposalSchema>;
 export type MemoryQuery = typeof oneShotQuery;
 const SYSTEM_PROMPT = `You are recording history into durable memory that will guide future answers and actions. Extract useful attributed memories from the supplied originals, keeping what happened, what was reported and what was intended distinct so later work can rely on each in its proper role.
 
+The originals identified by primarySourceIds are the new work for this batch. Learn durable information from them. Other supplied originals are evidence for checking and reconciling the offered accounts. Unchanged support appearing again is not new history and alone is not a reason to create another account or revise an unchanged one.
+
 Preserve applicable dates, attribution, distinct people and scopes, material transition history, qualifications and uncertainty. A named recipient or person mentioned in a message is not necessarily its speaker. Attribute each statement to the speaker identified for that specific statement by the supplied text or metadata. Do not transfer a sender, addressee, or in-reply-to author from a different message to an unnamed message. For example, 'Alex, please investigate' identifies an addressee; a later outgoing 'my test passed' does not establish who sent it. Keep that later speaker unnamed unless the supplied originals explicitly identify them.
 
 An intention recorded as completed would give a future reader a false history. Preserve the stated target and scope of each action without filling in unstated details. A successful tool result establishes only that operation on its recorded target. For example, sending 'I am updating the schedule' establishes that the message was sent, not that the schedule was updated. Preserve a plan or work in progress as such, or omit it if it is not useful durable information. A successful schedule-update result can support that update; a message saying 'I updated it' supports an attributed report of completion. Do not rewrite intent or ongoing work as a completed action.
@@ -42,6 +44,7 @@ export async function extract(
   query: MemoryQuery,
   configuration: { connectionId: string; modelId: string },
   sources: SuppliedSource[],
+  primarySourceIds: readonly string[],
   candidates: Note[],
   withheld: Array<{ id: string; reason: string }>,
   signal: AbortSignal
@@ -50,6 +53,7 @@ export async function extract(
     {
       type: 'text',
       text: JSON.stringify({
+        primarySourceIds,
         sources: sources.map(({ content: blocks, ...source }) => ({
           ...source,
           id: sourceHandle(source),
