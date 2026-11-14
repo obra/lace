@@ -592,6 +592,630 @@ emitted. See
 [Temporary request context](architecture/temporary-request-context.md) for
 examples and exact provider cache behavior.
 
+### Credential env overlay
+
+The active initialized session exposes two requests:
+
+| Method                           | Params                                                                                         | Result |
+| --------------------------------- | ------------------------------------------------------------------------------------------------ | ------ |
+| `ent/session/env_overlay/set`    | `{ vars: Record<string, string> }` (nonempty; keys `^[A-Z_][A-Z0-9_]*# Ent Protocol Specification
+
+A JSON-RPC 2.0 protocol for agent-client communication. Designed for ACP
+compatibility while supporting the full Claude Agent SDK feature set.
+
+See [about-the-protocol.md](about-the-protocol.md) for design decisions and
+rationale.
+
+**Design Principles:**
+
+1. ACP-compatible where possible (same method names, params, semantics)
+2. Agent-centric execution (agent has direct FS/terminal access)
+3. Extensions prefixed with `ent/` for non-ACP features
+4. Full Claude Agent SDK capability coverage
+
+---
+
+## 1. Process and Session Model
+
+**One process = one conversation stream.** Each agent process handles exactly
+one session at a time.
+
+- `initialize` is called once when the process starts
+- `session/new` or `session/load` establishes the active session
+- The process serves that session until it exits
+- To work with multiple sessions concurrently, spawn multiple agent processes
+
+This design ensures clean isolation: each agent process has its own conversation
+state, tool permissions, and resource handles.
+
+**Terminology note**: In this protocol, "session" refers to a single agent
+conversation stream (prompt/response turns with shared context). In higher-level
+products (e.g., Lace), a protocol `sessionId` typically maps to an agent
+identifier—one conversation with one agent. If your product has a broader
+"session" concept (e.g., a workspace grouping multiple agents), that grouping is
+outside this protocol's scope and should use a different term to avoid
+confusion.
+
+**Subagent spawning**: When an agent spawns subagents (via Task tool or
+similar), the **agent process** is responsible for spawning and managing
+subagent processes. The client sees subagents as background jobs via `ent/job/*`
+methods. Subagent IDs are agent-generated (prefixed with `job_agent_`). The
+client does NOT spawn subagent processes directly—it only monitors them through
+the protocol.
+
+```
+Client
+      │
+      ▼ (spawns)
+  Agent Process ◄──── owns subagent lifecycle
+      │
+      ├──▶ (spawns) Subagent Process 1 (job_agent_1)
+      ├──▶ (spawns) Subagent Process 2 (job_agent_2)
+      └──▶ (spawns) Background Shell (job_shell_1)
+```
+
+**Design choice**: This "subagents as jobs" model means subagents are not
+first-class protocol peers—you cannot send `session/prompt` directly to a
+subagent. This is intentional for v1: it simplifies the protocol and matches the
+common case where subagents run autonomously and return results. If interactive
+multi-agent collaboration becomes a requirement, future protocol versions could
+add "subagent = full protocol peer" where the client can connect to subagent
+processes directly.
+
+**Note**: `session/list` queries available sessions on disk without loading
+them. It does not imply multi-session support within a single process.
+
+### Non-goals (v1)
+
+To prevent future drift, these are explicitly **not** goals for this protocol
+version:
+
+1. **Subagents as protocol peers**: Subagents are async jobs, not direct
+   protocol peers. Clients cannot send `session/prompt` to a subagent. Use
+   `ent/job/inject` to provide context to running jobs.
+
+2. **Offline history mirroring**: Browsing history requires live connectivity.
+   The protocol does not define a sync/replication mechanism for offline access.
+
+3. **Multi-session per process**: Each process handles one conversation stream.
+   For multiple concurrent sessions, spawn multiple processes.
+
+---
+
+## 2. Transport
+
+- **Format**: Newline-delimited JSON (NDJSON)
+- **Encoding**: UTF-8
+- **Transport**: stdin/stdout (required), HTTP/SSE (optional)
+- **Direction**: Bidirectional
+
+**Stdout is protocol-only**: When using stdio transport, stdout MUST contain
+only JSON-RPC messages. All logs, diagnostics, and debug output MUST go to
+stderr. This ensures clean message parsing.
+
+### 2.1 Naming Conventions
+
+Follow ACP naming patterns for maximum compatibility:
+
+| Pattern                     | Example                                                                               | Rationale                                       |
+| --------------------------- | ------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `Id` suffix for identifiers | `sessionId`, `turnId`, `jobId`, `toolCallId`, `providerId`, `modelId`, `connectionId` | ACP convention; prevents "wrong id" wiring bugs |
+| Opaque strings              | `sessionId: "sess_abc123"`                                                            | Clients treat identifiers as opaque; no parsing |
+| camelCase                   | `sessionId`, `toolCallId`                                                             | Matches JSON/JavaScript conventions             |
+| Verb phrases for methods    | `session/prompt`, `ent/connections/credentials/start`                                 | Action-oriented naming                          |
+
+**Identifier opacity**: All identifier fields (`sessionId`, `turnId`, `jobId`,
+`toolCallId`/`toolUseId`, `providerId`, `modelId`, `connectionId`,
+`checkpointId`, `taskId`, `optionId`, `requestId`) are opaque strings. Clients
+MUST NOT parse, validate, or assume structure in these values. Note: `eventSeq`
+is a numeric sequence, not an opaque string. Note: `toolCallId` and `toolUseId`
+are the same identifier (see §8.1).
+
+**Ent extensions**: Methods prefixed with `ent/` are protocol extensions not in
+ACP. The prefix makes it clear which parts are standard vs extended.
+
+---
+
+## 3. Message Types
+
+Standard JSON-RPC 2.0:
+
+```typescript
+interface Request {
+  jsonrpc: '2.0';
+  id: string | number;
+  method: string;
+  params?: object;
+}
+
+interface Response {
+  jsonrpc: '2.0';
+  id: string | number;
+  result?: object;
+  error?: { code: number; message: string; data?: any };
+}
+
+interface Notification {
+  jsonrpc: '2.0';
+  method: string;
+  params?: object;
+}
+```
+
+### 3.1 ID Namespacing
+
+To prevent ID collision, client and agent use distinct ID spaces:
+
+- **Client IDs**: Positive integers or strings starting with `c_`
+- **Agent IDs**: Negative integers or strings starting with `a_`
+
+### 3.2 Idempotency and Retries
+
+- **Requests**: Retrying a request with the same `id` is safe; the recipient
+  returns the cached response.
+- **Permission responses**: `toolCallId` is globally unique within a session
+  (across parent agent and all jobs/subagents). Duplicate responses for the same
+  `toolCallId` are ignored.
+- **Notifications**: Fire-and-forget. Duplicates may cause redundant processing
+  but should not corrupt state.
+
+**Caching bounds**: Response caches are bounded to prevent unbounded memory
+growth:
+
+- Cache size: Up to 1000 recent request IDs per direction
+- Eviction: LRU (least recently used)
+- Scope: Per-session (cache cleared on session end)
+
+Implementations SHOULD NOT rely on cached responses for requests older than the
+cache size.
+
+---
+
+## 4. Capability Negotiation
+
+### 4.1 Client Capabilities
+
+```typescript
+interface ClientCapabilities {
+  // ACP standard
+  streaming?: boolean; // Can handle streaming updates
+  permissions?: boolean; // Can handle permission requests
+  images?: boolean; // Can handle image content
+
+  // We declare these FALSE (agent handles internally)
+  fileSystem?: false; // Agent has direct FS access
+  terminal?: false; // Agent has direct terminal access
+
+  // Ent extensions
+  'ent/contextInjection'?: boolean; // Supports session/inject
+  'ent/backgroundJobs'?: boolean; // Supports job/* methods
+  'ent/jobStreaming'?: 'full' | 'coalesced' | 'none'; // Job output verbosity preference
+  'ent/providers'?: {
+    // Provider/config management via agent (not web direct access)
+    list: boolean; // ent/providers/list
+    connections: boolean; // ent/connections/*
+    models: boolean; // ent/models/*
+    catalogRefresh?: boolean; // ent/providers/refresh
+    modelGating?: boolean; // ent/models/enable, ent/models/disable
+  };
+}
+```
+
+### 4.2 Agent Capabilities
+
+```typescript
+interface AgentCapabilities {
+  // ACP standard
+  streaming: boolean;
+  multiTurn: boolean;
+  sessionResume?: boolean;
+  sessionFork?: boolean;
+  modes?: string[]; // ["ask", "architect", "code"]
+
+  // Tools
+  tools: ToolInfo[];
+
+  // State operations (each maps to a protocol method)
+  // Client uses these to know which ent/session/* methods are available
+  operations?: {
+    compact?: boolean; // ent/session/compact
+    checkpoint?: boolean; // ent/session/checkpoint
+    rewind?: boolean; // ent/session/rewind
+    configure?: boolean; // ent/session/configure
+    tokenUsage?: boolean; // ent/session/token_usage
+    contextBreakdown?: boolean; // ent/session/context_breakdown
+  };
+
+  // Conversation commands (sent via session/prompt)
+  // For autocomplete, help display
+  slashCommands?: SlashCommand[];
+
+  // Ent extension feature flags
+  'ent/contextInjection': boolean;
+  'ent/backgroundJobs': boolean;
+  'ent/fileCheckpointing': boolean;
+  'ent/structuredOutput': boolean;
+  'ent/toolPolicies'?: boolean; // Per-tool allow/ask/deny/disable via ent/session/configure
+  'ent/extensions'?: {
+    // Extension/plugin management exposed by the agent
+    list: boolean; // ent/extensions/list
+    enable?: boolean; // ent/extensions/enable
+    disable?: boolean; // ent/extensions/disable
+  };
+  'ent/providers'?: {
+    // Provider/config management the agent exposes
+    list: boolean; // ent/providers/list
+    connections: boolean; // ent/connections/*
+    models: boolean; // ent/models/*
+    catalogRefresh?: boolean; // ent/providers/refresh
+    modelGating?: boolean; // ent/models/enable, ent/models/disable
+  };
+}
+
+interface SlashCommand {
+  name: string; // "commit"
+  description: string; // "Create a git commit"
+  inputHint?: string; // "-m <message>"
+}
+```
+
+---
+
+## 5. Methods: Client → Agent
+
+### 5.1 `initialize` (ACP-compatible)
+
+```typescript
+// Request
+{
+  method: "initialize",
+  params: {
+    protocolVersion: "1.0",
+    clientInfo: {
+      name: string,
+      version: string
+    },
+    capabilities: ClientCapabilities,
+
+    // Configuration
+    config?: {
+      providerId?: string,         // Provider family (opaque string, e.g., "anthropic", "openai", "claude-code-wrapper")
+      connectionId?: string,       // Configured connection (preferred; implies providerId)
+      modelId?: string,            // Model identifier (opaque string)
+      environment?: Record<string, string>, // Per-session env overlay (strings only)
+      executionMode?: string,      // "plan" | "execute" (default: "execute")
+      approvalMode?: string,       // "ask" | "approveReads" | "approveEdits" | "approve" | "deny" | "dangerouslySkipPermissions"
+      mcpServers?: McpServerConfig[],
+
+      // Ent extensions
+      maxBudgetUsd?: number,
+      maxThinkingTokens?: number,
+      enableFileCheckpointing?: boolean,
+      sandbox?: SandboxConfig
+    },
+
+    // Embedder persona setup (Ent extensions)
+    userPersonasPaths?: string[],  // Ordered persona dirs; earlier paths win
+    includeFallbacks?: {           // Default files for user-persona @includes
+      root: string,                // Includes resolving inside root may fall back
+      dirs: string[]               // Tried in order with the root-relative path
+    }
+  }
+}
+
+// Response
+{
+  result: {
+    protocolVersion: "1.0",
+    agentInfo: {
+      name: string,
+      version: string
+    },
+    capabilities: AgentCapabilities
+  }
+}
+```
+
+`includeFallbacks` applies to personas loaded from `userPersonasPaths`. When a
+persona's `@path` include resolves to a file inside `root` that does not exist,
+the agent tries the same root-relative path under each entry of `dirs` in order
+and includes the first file that exists. A local file always wins. Includes that
+resolve outside `root` never use fallbacks. `root` and every `dirs` entry must
+be non-empty strings, and no other keys are allowed; otherwise `initialize`
+fails with `-32602 InvalidParams`.
+
+### 5.2 `session/new` (ACP-compatible)
+
+```typescript
+// Request
+{
+  method: "session/new",
+  params: {
+    workDir: string,
+    persona?: string,
+    systemPrompt?: string | { type: "preset", preset: string, append?: string }
+  }
+}
+
+// Response
+{
+  result: {
+    sessionId: string,
+    created: string  // ISO 8601
+  }
+}
+```
+
+### 5.3 `session/load` (ACP-compatible)
+
+```typescript
+// Request
+{
+  method: "session/load",
+  params: {
+    sessionId: string
+  }
+}
+
+// Response
+{
+  result: {
+    sessionId: string,
+    messageCount: number,
+    updatedAt: string   // ISO 8601
+  }
+}
+```
+
+### 5.4 `session/prompt` (ACP-compatible + extensions)
+
+```typescript
+// Request
+{
+  method: "session/prompt",
+  params: {
+    content: ContentBlock[],
+    maxTurns?: number,
+
+    // Ent extensions
+    outputFormat?: {              // Structured output
+      type: "json_schema",
+      schema: JsonSchema
+    }
+  }
+}
+
+// Response (after turn completes)
+{
+  result: {
+    turnId: string,             // Turn identifier (SHOULD be UUID)
+    stopReason: "end_turn" | "max_tokens" | "max_turns" | "cancelled" | "budget_exceeded",
+    content: ContentBlock[],
+    usage: UsageInfo,
+
+    // Ent extensions
+    structuredOutput?: any,       // Parsed JSON if outputFormat specified
+    cost?: {
+      inputCostUsd: number,
+      outputCostUsd: number,
+      totalCostUsd: number
+    }
+  }
+}
+```
+
+**Durable event guarantee**: A successful `session/prompt` response implies that
+corresponding durable events (`turn_start`, `message`, `tool_use`, `turn_end`)
+have been written and can be fetched via `ent/session/events` with stable
+ordering. The `turnId` in the response matches the `turnId` in those events.
+
+### 5.5 `$/cancel_request` (ACP-compatible, notification)
+
+Cancels a request or ongoing operation.
+
+```typescript
+{
+  jsonrpc: "2.0",
+  method: "$/cancel_request",
+  params: {
+    requestId: string | number   // JSON-RPC ID to cancel
+  }
+}
+```
+
+**Cancellation semantics**:
+
+- If a turn is running (matching `requestId`), it stops and returns with
+  `stopReason: "cancelled"` and error code `-32800`.
+- If a tool is `awaiting_permission` under the request being cancelled, the
+  pending permission request is **invalidated**. The agent MUST emit a
+  `tool_use` update with `status: "cancelled"`, append a durable
+  `permission_cancelled` event, and discard the pending request from
+  `ent/agent/status.pendingPermissions`. Clients MUST dismiss any approval UI
+  for that `toolCallId` (or treat it as stale if a new permission request is
+  later reissued).
+- If no request or turn is in progress, the notification is silently ignored.
+
+**Error code**: Returns `-32800` (RequestCancelled) when responding to the
+cancelled request.
+
+### 5.6 `session/set_mode`
+
+Set the agent's execution mode. This controls what tools are available.
+
+**Note**: This is distinct from approval policy. To change whether tools require
+permission prompts, use `ent/session/configure` with `approvalMode`.
+
+```typescript
+// Request
+{
+  method: "session/set_mode",
+  params: {
+    mode: "plan" | "execute"
+    // plan: Read, search, discuss, write plan files. No system-modifying tools.
+    // execute: Full tool access (default)
+  }
+}
+
+// Response
+{
+  result: {
+    mode: string,
+    previousMode: string
+  }
+}
+```
+
+### 5.7 `session/list` (ACP draft RFD)
+
+```typescript
+// Request
+{
+  method: "session/list",
+  params: {
+    cwd?: string,           // Filter by working directory (renamed from workDir)
+    cursor?: string         // Pagination cursor (opaque)
+  }
+}
+
+// Response
+{
+  result: {
+    sessions: [{
+      sessionId: string,
+      cwd: string,          // Working directory (renamed from workDir)
+      updatedAt: string,    // ISO 8601 (renamed from lastActive)
+      title?: string,       // Optional session title
+      created: string,      // ISO 8601 (Ent extension)
+      messageCount: number, // (Ent extension)
+      _meta?: Record<string, unknown>  // Additional metadata
+    }],
+    nextCursor?: string     // Pagination cursor for next batch (opaque)
+  }
+}
+```
+
+**Field renames**: This method has been updated to align with ACP RFD:
+
+- `workDir` → `cwd` (both parameter and response field)
+- `lastActive` → `updatedAt` (response field)
+- Added `title`, `_meta`, `cursor`, `nextCursor` for pagination and metadata
+
+### 5.8 `session/fork` (ACP draft RFD)
+
+Create a new session by forking an existing session. The forked session
+preserves the conversation history of the original.
+
+```typescript
+// Request
+{
+  method: "session/fork",
+  params: {
+    sessionId: string,                    // Session to fork from
+    cwd?: string,                         // Override working directory
+    mcpServers?: McpServerConfig[]        // Override MCP servers
+  }
+}
+
+// Response
+{
+  result: {
+    sessionId: string,                    // New session ID
+    forkedFrom: string,                   // Original session ID
+    messageCount: number,                 // Messages inherited from original
+    updatedAt: string                     // ISO 8601 (creation time)
+  }
+}
+```
+
+**Behavior**: Creates a new independent session with a copy of the original's
+conversation history. Further changes to either session are independent. The
+original session is unchanged.
+
+---
+
+## 6. Ent Extensions: Client → Agent
+
+### 6.1 `ent/session/compact`
+
+Compact conversation history to reduce context usage. State operation, not
+conversation.
+
+Notes on `strategy`:
+
+- `truncate`: preserve conversation structure but reduce size by trimming large
+  tool results in older context.
+- `summarize`: preserve recent context verbatim and insert a summary of older
+  non-user events; returns `summary` in the response.
+- `selective`: currently treated the same as `summarize` (reserved for future
+  finer-grained strategies).
+
+```typescript
+// Request
+{
+  method: "ent/session/compact",
+  params: {
+    strategy?: "summarize" | "truncate" | "selective",
+    targetTokens?: number,      // Target context size
+    preserveRecent?: number     // Keep last N messages verbatim
+  }
+}
+
+// Response
+{
+  result: {
+    previousTokens: number,
+    currentTokens: number,
+    messagesCompacted: number,
+    summary?: string            // If strategy was summarize
+  }
+}
+```
+
+### Temporary request context
+
+The active initialized session exposes three requests:
+
+| Method                                | Params                                  | Result                     |
+| ------------------------------------- | --------------------------------------- | -------------------------- |
+| `ent/session/temporary_context/set`   | `{ text: string }` (nonempty, verbatim) | `{}`                       |
+| `ent/session/temporary_context/peek`  | `{}` or omitted                         | `{ text: string \| null }` |
+| `ent/session/temporary_context/clear` | `{}` or omitted                         | `{}`                       |
+
+Parameters are strict; unknown fields are invalid. Set replaces the only value;
+peek never consumes it. Context is always sticky until set/clear and survives
+turns, tool rounds and compaction. Successful new, load/resume activation and
+close clear it. It is process-local and is never persisted, restored, forked or
+delegated. Each model request snapshots current context after required history;
+updates leave submitted payloads and retries unchanged. No session event is
+emitted. See
+), `expiresAt?: number` | `{}`   |
+| `ent/session/env_overlay/clear`  | `{ keys?: string[] }` or omitted                                                                | `{}`   |
+
+Set merges `vars` into the live overlay every tool call in this session sees
+as additional environment, replacing any already-present key's value and
+expiry. Every key must be shape-valid AND absent from the dangerous-name
+denylist (`PATH`, `LD_*`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`, proxy variables,
+CA/TLS variables, and more — see
+[Credential env overlay](architecture/credential-env-overlay.md) for the
+full list) or the whole call is refused, naming the offending key(s) and
+never a value. `expiresAt` is optional epoch milliseconds; omit it for an
+entry that lives until cleared, session end, or process restart. Clear
+without `keys` drops the whole overlay; with `keys`, only those entries.
+Both require an active initialized session and emit no session event or
+durable write.
+
+This is memory-only and session-scoped — unlike `ent/session/configure`'s
+`environment`, which is ordinary session configuration persisted to
+`state.json`, the overlay here never touches disk and successful session
+`new`, `load`/`resume` activation, `close` and the `/new` slash command all
+clear it, the same as `temporaryContext`. Every tool call — foreground bash
+and other tools, and `bash background: true` jobs — reads the live overlay
+fresh, so a credential minted or cleared mid-turn takes effect on the very
+next tool call. See
+[Credential env overlay](architecture/credential-env-overlay.md) for name
+rules, subagent forwarding behavior, and implementation details.
+
 ### 6.2 `ent/session/inject` (notification)
 
 Inject context mid-turn. Not in ACP. An `immediate` inject into an idle session
