@@ -596,9 +596,9 @@ examples and exact provider cache behavior.
 
 The active initialized session exposes two requests:
 
-| Method                           | Params                                                                                         | Result |
-| --------------------------------- | ------------------------------------------------------------------------------------------------ | ------ |
-| `ent/session/env_overlay/set`    | `{ vars: Record<string, string> }` (nonempty; keys `^[A-Z_][A-Z0-9_]*# Ent Protocol Specification
+| Method                        | Params                                                                                              | Result |
+| ----------------------------- | --------------------------------------------------------------------------------------------------- | ------ |
+| `ent/session/env_overlay/set` | `{ vars: Record<string, string> }` (nonempty; keys `^[A-Z\_][A-Z0-9_]\*# Ent Protocol Specification |
 
 A JSON-RPC 2.0 protocol for agent-client communication. Designed for ACP
 compatibility while supporting the full Claude Agent SDK feature set.
@@ -1188,32 +1188,29 @@ turns, tool rounds and compaction. Successful new, load/resume activation and
 close clear it. It is process-local and is never persisted, restored, forked or
 delegated. Each model request snapshots current context after required history;
 updates leave submitted payloads and retries unchanged. No session event is
-emitted. See
-), `expiresAt?: number` | `{}`   |
-| `ent/session/env_overlay/clear`  | `{ keys?: string[] }` or omitted                                                                | `{}`   |
+emitted. See ), `expiresAt?: number` | `{}` | | `ent/session/env_overlay/clear`
+| `{ keys?: string[] }` or omitted | `{}` |
 
-Set merges `vars` into the live overlay every tool call in this session sees
-as additional environment, replacing any already-present key's value and
-expiry. Every key must be shape-valid AND absent from the dangerous-name
-denylist (`PATH`, `LD_*`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`, proxy variables,
-CA/TLS variables, and more — see
-[Credential env overlay](architecture/credential-env-overlay.md) for the
-full list) or the whole call is refused, naming the offending key(s) and
-never a value. `expiresAt` is optional epoch milliseconds; omit it for an
-entry that lives until cleared, session end, or process restart. Clear
-without `keys` drops the whole overlay; with `keys`, only those entries.
-Both require an active initialized session and emit no session event or
-durable write.
+Set merges `vars` into the live overlay every tool call in this session sees as
+additional environment, replacing any already-present key's value and expiry.
+Every key must be shape-valid AND absent from the dangerous-name denylist
+(`PATH`, `LD_*`, `NODE_OPTIONS`, `GIT_SSH_COMMAND`, proxy variables, CA/TLS
+variables, and more — see
+[Credential env overlay](architecture/credential-env-overlay.md) for the full
+list) or the whole call is refused, naming the offending key(s) and never a
+value. `expiresAt` is optional epoch milliseconds; omit it for an entry that
+lives until cleared, session end, or process restart. Clear without `keys` drops
+the whole overlay; with `keys`, only those entries. Both require an active
+initialized session and emit no session event or durable write.
 
 This is memory-only and session-scoped — unlike `ent/session/configure`'s
 `environment`, which is ordinary session configuration persisted to
-`state.json`, the overlay here never touches disk and successful session
-`new`, `load`/`resume` activation, `close` and the `/new` slash command all
-clear it, the same as `temporaryContext`. Every tool call — foreground bash
-and other tools, and `bash background: true` jobs — reads the live overlay
-fresh, so a credential minted or cleared mid-turn takes effect on the very
-next tool call. See
-[Credential env overlay](architecture/credential-env-overlay.md) for name
+`state.json`, the overlay here never touches disk and successful session `new`,
+`load`/`resume` activation, `close` and the `/new` slash command all clear it,
+the same as `temporaryContext`. Every tool call — foreground bash and other
+tools, and `bash background: true` jobs — reads the live overlay fresh, so a
+credential minted or cleared mid-turn takes effect on the very next tool call.
+See [Credential env overlay](architecture/credential-env-overlay.md) for name
 rules, subagent forwarding behavior, and implementation details.
 
 ### 6.2 `ent/session/inject` (notification)
