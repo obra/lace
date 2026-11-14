@@ -23,7 +23,9 @@ import {
   formatSubagentStopDetails,
   jobStatusFromStopReason,
   rpcErrorMessage,
+  groupEnvOverlayForForwarding,
 } from './subagent-job-helpers';
+import { pruneExpiredEnvOverlay } from '@lace/agent/core/env-overlay';
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
 import { logger } from '@lace/agent/utils/logger';
 import { getSkillDirectories, type SkillDirEntry } from '@lace/agent/skills';
@@ -965,6 +967,29 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           configId: 'model',
           value: job.modelId,
         });
+      }
+
+      // Forward the parent's live credential env overlay (PRI-3672) to this
+      // freshly-spawned child BEFORE its first session/prompt, i.e. before any
+      // of its own tool calls run. A subagent is a separate lace process with
+      // its own in-memory AgentServerState — the overlay set via
+      // ent/session/env_overlay/set on the parent does not exist in the
+      // child's process until something copies it across, and the parent's
+      // OS env is not that channel (containers don't inherit it, and a native
+      // child's own container-runtime tool calls wouldn't either). Using the
+      // same env_overlay/set RPC the operator/sen-core would use keeps the
+      // child's copy subject to the same dangerous-name refusal and the same
+      // never-persisted guarantee. A key minted AFTER this point (while the
+      // child is already running) is NOT pushed to it: this is a one-shot
+      // forward at spawn time, not an ongoing sync, and is an accepted gap
+      // rather than a bug for this PR. NOTE: this forwards unconditionally on
+      // the parent's overlay regardless of the child's role/persona — a
+      // credential minted for the parent reaches every child it spawns. That
+      // is flagged as an open question for the delivery-path design decision
+      // (see the PR description), not resolved here.
+      pruneExpiredEnvOverlay(currentState);
+      for (const batch of groupEnvOverlayForForwarding(currentState.envOverlay)) {
+        await childPeer.request('ent/session/env_overlay/set', batch);
       }
 
       const childSessionId = job.subagentSessionId;

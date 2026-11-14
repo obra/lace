@@ -72,6 +72,15 @@ export interface RunnerDependencies {
   ) => Promise<{ block: string | null; diagnostics?: Record<string, unknown> }>;
   /** Read current request-only text immediately before each model request. */
   getTemporaryContext?: () => string | null;
+  /**
+   * Read the live credential env overlay (PRI-3672). Called at EVERY tool
+   * call, not once per run, so a credential minted mid-turn (e.g. while a
+   * subagent delegate job is still running) reaches the very next tool call
+   * rather than only tool calls that start after the whole prompt turn
+   * begins. Returns `undefined` when nothing is live. Memory-only — the
+   * runner never persists this.
+   */
+  getEnvOverlay?: () => Record<string, string> | undefined;
   /** Callback for emitting session updates to clients */
   onUpdate: (turnSeq: number, update: SessionUpdate) => Promise<void>;
 

@@ -2,6 +2,7 @@
 // Kept separate from subagent-job.ts so they can be unit-tested without spawning a child process.
 
 import type { LaceStopDetails } from '@lace/agent/providers/base-provider';
+import type { EnvOverlayEntry } from '@lace/agent/core/env-overlay';
 
 export type ApprovalMode =
   | 'ask'
@@ -211,4 +212,48 @@ export function rpcErrorMessage(error: unknown): string {
     if (typeof m === 'string') return m;
   }
   return String(error);
+}
+
+/**
+ * One `ent/session/env_overlay/set` call's worth of params — a batch of keys
+ * that share the same expiry (or share having none).
+ */
+export interface EnvOverlayForwardBatch {
+  vars: Record<string, string>;
+  expiresAt?: number;
+}
+
+/**
+ * Group a (pruned) env overlay snapshot into the batches needed to forward it
+ * to a freshly-spawned subagent over its own `env_overlay/set` RPC (PRI-3672:
+ * a subagent is a separate lace process with its own in-memory
+ * `AgentServerState.envOverlay`, so the parent's overlay does not exist there
+ * until something copies it across).
+ *
+ * `env_overlay/set`'s params carry one optional `expiresAt` for the whole
+ * call, so entries with different expiries (including "no expiry") cannot
+ * share a call without either stretching or shortening someone's TTL —
+ * this groups by exact `expiresAt` value (including the no-expiry group) so
+ * every forwarded key keeps precisely the expiry it already had. Returns one
+ * batch per distinct expiry, in no particular order; an empty overlay yields
+ * no batches.
+ */
+export function groupEnvOverlayForForwarding(
+  overlay: Record<string, EnvOverlayEntry> | undefined
+): EnvOverlayForwardBatch[] {
+  if (!overlay) return [];
+  const batchesByExpiry = new Map<number | 'none', Record<string, string>>();
+  for (const [key, entry] of Object.entries(overlay)) {
+    const bucketKey: number | 'none' = entry.expiresAt ?? 'none';
+    let bucket = batchesByExpiry.get(bucketKey);
+    if (!bucket) {
+      bucket = {};
+      batchesByExpiry.set(bucketKey, bucket);
+    }
+    bucket[key] = entry.value;
+  }
+  return [...batchesByExpiry.entries()].map(([expiresAt, vars]) => ({
+    vars,
+    ...(expiresAt === 'none' ? {} : { expiresAt }),
+  }));
 }

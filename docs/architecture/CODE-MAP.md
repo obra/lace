@@ -27,6 +27,10 @@
 - [Temporary request context](temporary-request-context.md): sticky Ent
   request-only text, session lifetime and provider cache boundaries.
 
+- [Credential env overlay](credential-env-overlay.md): memory-only,
+  session-scoped env vars for tool calls (PRI-3672), dangerous-name denylist,
+  and session-lifetime clearing.
+
 - [Memory authority and permissions](memory-authority.md): internal database
   identity, ownership and permission checks for configured memory.
 - [Automatic memory](automatic-memory.md): local model setup, related

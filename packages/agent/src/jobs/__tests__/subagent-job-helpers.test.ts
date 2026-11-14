@@ -7,6 +7,7 @@ import {
   formatSubagentStopDetails,
   jobStatusFromStopReason,
   rpcErrorMessage,
+  groupEnvOverlayForForwarding,
 } from '../subagent-job-helpers';
 
 describe('applyEffectiveJobConfig', () => {
@@ -306,5 +307,48 @@ describe('rpcErrorMessage', () => {
   it('handles null and undefined', () => {
     expect(rpcErrorMessage(null)).toBe('null');
     expect(rpcErrorMessage(undefined)).toBe('undefined');
+  });
+});
+
+describe('groupEnvOverlayForForwarding (PRI-3672 condition 3: forwarding to a freshly-spawned subagent)', () => {
+  it('returns no batches for an undefined or empty overlay', () => {
+    expect(groupEnvOverlayForForwarding(undefined)).toEqual([]);
+    expect(groupEnvOverlayForForwarding({})).toEqual([]);
+  });
+
+  it('puts every no-expiry entry into one batch with no expiresAt field', () => {
+    const batches = groupEnvOverlayForForwarding({
+      FOO: { value: 'test-placeholder-foo' },
+      BAR: { value: 'test-placeholder-bar' },
+    });
+    expect(batches).toEqual([
+      { vars: { FOO: 'test-placeholder-foo', BAR: 'test-placeholder-bar' } },
+    ]);
+  });
+
+  it('keeps entries with different expiresAt values in separate batches so no key gets a TTL it never had', () => {
+    const batches = groupEnvOverlayForForwarding({
+      SOON: { value: 'test-placeholder-soon', expiresAt: 100 },
+      LATER: { value: 'test-placeholder-later', expiresAt: 200 },
+      FOREVER: { value: 'test-placeholder-forever' },
+    });
+    expect(batches).toHaveLength(3);
+    expect(batches).toEqual(
+      expect.arrayContaining([
+        { vars: { SOON: 'test-placeholder-soon' }, expiresAt: 100 },
+        { vars: { LATER: 'test-placeholder-later' }, expiresAt: 200 },
+        { vars: { FOREVER: 'test-placeholder-forever' } },
+      ])
+    );
+  });
+
+  it('groups two entries sharing the same expiresAt into a single batch', () => {
+    const batches = groupEnvOverlayForForwarding({
+      A: { value: 'test-placeholder-a', expiresAt: 500 },
+      B: { value: 'test-placeholder-b', expiresAt: 500 },
+    });
+    expect(batches).toEqual([
+      { vars: { A: 'test-placeholder-a', B: 'test-placeholder-b' }, expiresAt: 500 },
+    ]);
   });
 });

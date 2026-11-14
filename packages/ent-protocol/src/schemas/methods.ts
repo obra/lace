@@ -1089,6 +1089,68 @@ export const EntSessionTemporaryContextPeekResponseSchema = z
 export const EntSessionTemporaryContextClearResponseSchema =
   EntSessionTemporaryContextSetResponseSchema;
 
+// Memory-only per-session overlay of env vars for tool calls (PRI-3672) — e.g.
+// a placeholder credential the credential broker just minted. Like
+// temporary_context above, never a durable event and never persisted into
+// session state/config.
+//
+// Keys are shape-checked against the same POSIX env-var-name pattern so a
+// key can only ever be a bare name, never e.g. a smuggled assignment like
+// "PATH=/tmp/evil:/usr/bin" used as a map key to slip past the denylist
+// enforced separately in the RPC handler (DANGEROUS_ENV_VAR_NAMES in lace's
+// core/env-overlay.ts). Shape only; it does not by itself make a name safe.
+export const ENV_VAR_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/;
+const ENV_VAR_NAME_INVALID_MESSAGE =
+  'env var name must be uppercase ASCII, digits, and underscores only, not starting with a digit';
+export const EnvOverlaySetParamsSchema = z
+  .object({
+    vars: z
+      .record(z.string().regex(ENV_VAR_NAME_PATTERN, ENV_VAR_NAME_INVALID_MESSAGE), z.string())
+      .refine((vars) => Object.keys(vars).length > 0, { message: 'vars must not be empty' }),
+    // Epoch milliseconds. Omit for an entry that lives until explicitly
+    // cleared or the process restarts.
+    expiresAt: z.number().int().positive().optional(),
+  })
+  .strict();
+export const EnvOverlayClearParamsSchema = z
+  .object({
+    // Omit to clear the whole overlay.
+    keys: z.array(z.string()).optional(),
+  })
+  .strict();
+export const EnvOverlaySetResultSchema = z.object({}).strict();
+export const EnvOverlayClearResultSchema = z.object({}).strict();
+export const EntSessionEnvOverlaySetRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/env_overlay/set'),
+    params: EnvOverlaySetParamsSchema,
+  })
+  .strict();
+export const EntSessionEnvOverlayClearRequestSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    method: z.literal('ent/session/env_overlay/clear'),
+    params: EnvOverlayClearParamsSchema.optional(),
+  })
+  .strict();
+export const EntSessionEnvOverlaySetResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EnvOverlaySetResultSchema,
+  })
+  .strict();
+export const EntSessionEnvOverlayClearResponseSchema = z
+  .object({
+    jsonrpc: JsonRpcVersionSchema,
+    id: JsonRpcIdSchema,
+    result: EnvOverlayClearResultSchema,
+  })
+  .strict();
+
 const EntSessionEventsParamsSchema = z
   .object({
     afterEventSeq: z.number().optional(),
@@ -2517,6 +2579,8 @@ export const EntProtocolRequestSchema = z.union([
   EntSessionTemporaryContextSetRequestSchema,
   EntSessionTemporaryContextPeekRequestSchema,
   EntSessionTemporaryContextClearRequestSchema,
+  EntSessionEnvOverlaySetRequestSchema,
+  EntSessionEnvOverlayClearRequestSchema,
   EntSessionEventsRequestSchema,
   EntProvidersListRequestSchema,
   EntConnectionsListRequestSchema,

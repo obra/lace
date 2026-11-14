@@ -24,6 +24,7 @@ import type { RuntimeExecutionBinding } from './tools/runtime/types';
 import type { RuntimeSecretResolver } from './tools/runtime/secrets';
 import type { WorkspaceReaper } from './jobs/workspace-reaper';
 import type { CachedProjection } from './message-building/incremental-projection';
+import type { EnvOverlayEntry } from './core/env-overlay';
 
 /**
  * Per-build allowlist of tool names. `undefined` means "no scope filter" (all tools available).
@@ -149,6 +150,16 @@ export type AgentServerState = {
   activeSession: LoadedSession | null;
   /** Sticky request-only text; excluded from loaded and persisted session state. */
   temporaryContext?: string | null;
+  /**
+   * Memory-only overlay of env vars for tool calls (PRI-3672) — e.g. a
+   * placeholder credential the credential broker just minted. Like
+   * `temporaryContext`, this is never written into session state/config and
+   * never appears in a durable event; it is read fresh at every tool call
+   * (see `liveEnvOverlay` in `core/env-overlay.ts`) and dropped from this map
+   * once its optional `expiresAt` passes. Set/cleared only via
+   * `ent/session/env_overlay/set` and `ent/session/env_overlay/clear`.
+   */
+  envOverlay?: Record<string, EnvOverlayEntry>;
   config: {
     executionMode: 'plan' | 'execute';
     approvalMode:
