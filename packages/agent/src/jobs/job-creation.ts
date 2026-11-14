@@ -70,7 +70,7 @@ export type JobCreationDeps = {
   /** Emit a session update notification. */
   emitSessionUpdate: (
     update: SessionUpdate,
-    context?: { turnId?: string; turnSeq?: number }
+    context?: { turnId?: string; turnSeq?: number; sessionId?: string }
   ) => Promise<void>;
   /** Set up progress timer for the job. */
   setupProgressTimer: (job: JobState) => void;
@@ -170,9 +170,12 @@ async function finalizeJobCreation(
       jobType: event.jobType,
       description: event.description,
     },
-    event.turnContext
-      ? { turnId: event.turnContext.turnId, turnSeq: event.turnContext.turnSeq }
-      : undefined
+    {
+      ...(event.turnContext
+        ? { turnId: event.turnContext.turnId, turnSeq: event.turnContext.turnSeq }
+        : {}),
+      sessionId: job.sessionId,
+    }
   );
 
   // Progress timer is opt-in: arm only when the caller passed
@@ -200,6 +203,7 @@ export async function createShellJob(
 
   const job: JobState = {
     jobId: scaffold.jobId,
+    sessionId: scaffold.activeSession.meta.sessionId,
     parentJobId: options.parentJobId,
     type: 'bash',
     status: 'running',
@@ -253,6 +257,7 @@ export async function createSubagentJob(
 
   const job: JobState = {
     jobId: scaffold.jobId,
+    sessionId: scaffold.activeSession.meta.sessionId,
     parentJobId: options.parentJobId,
     type: 'delegate',
     status: 'running',

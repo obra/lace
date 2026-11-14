@@ -14,7 +14,7 @@ import { isSessionRecoveredMarker } from './job-derivation';
 export type JobManagerDeps = {
   getActiveSession: () => { sessionId: string; dir: string } | null;
   persistEvent: (event: { type: string; data: Record<string, unknown> }) => Promise<void>;
-  emitUpdate: (update: { type: string; [key: string]: unknown }) => Promise<void>;
+  emitUpdate: (update: { type: string; [key: string]: unknown }, job?: JobState) => Promise<void>;
   runShellProcess: (job: JobState) => void;
   runSubagentProcess: (job: JobState) => void;
   setupProgressTimer?: (job: JobState) => void;
@@ -404,14 +404,17 @@ export class JobManager {
       },
     });
 
-    await this.deps.emitUpdate({
-      type: 'job_finished',
-      jobId: job.jobId,
-      ...(job.parentJobId ? { parentJobId: job.parentJobId } : {}),
-      outcome: job.status,
-      ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
-      ...(job.subagentSessionId ? { subagentSessionId: job.subagentSessionId } : {}),
-    });
+    await this.deps.emitUpdate(
+      {
+        type: 'job_finished',
+        jobId: job.jobId,
+        ...(job.parentJobId ? { parentJobId: job.parentJobId } : {}),
+        outcome: job.status,
+        ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+        ...(job.subagentSessionId ? { subagentSessionId: job.subagentSessionId } : {}),
+      },
+      job
+    );
 
     job.resolveCompletion?.();
     // Stop the progress timer before dropping the job. createFinalizeJob in
@@ -813,6 +816,7 @@ export class JobManager {
 
     const job: JobState = {
       jobId,
+      sessionId: activeSession.sessionId,
       parentJobId: options.parentJobId,
       type: jobType,
       status: 'running',
@@ -874,13 +878,16 @@ export class JobManager {
     });
 
     // 6. Emit job_started update
-    await this.deps.emitUpdate({
-      type: 'job_started',
-      jobId,
-      parentJobId: options.parentJobId,
-      jobType,
-      description,
-    });
+    await this.deps.emitUpdate(
+      {
+        type: 'job_started',
+        jobId,
+        parentJobId: options.parentJobId,
+        jobType,
+        description,
+      },
+      job
+    );
 
     // 7. Set up progress timer ONLY when the operator explicitly opted in
     // via `progressIntervalMs`. Otherwise the timer stays dormant until a

@@ -255,7 +255,7 @@ export function createSetupStallTimer(
 export function createFinalizeJob(
   state: AgentServerState,
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>,
-  emitSessionUpdate: (update: SessionUpdate) => Promise<void>,
+  emitSessionUpdate: (update: SessionUpdate, context?: { sessionId?: string }) => Promise<void>,
   queueJobNotification: (job: JobState, type: JobNotificationType) => void
 ) {
   return async (job: JobState, options: { exitCode?: number } = {}) => {
@@ -298,13 +298,16 @@ export function createFinalizeJob(
       state.activeSession = loadSession(state.activeSession!.meta.sessionId);
     });
 
-    await emitSessionUpdate({
-      type: 'job_finished',
-      jobId: job.jobId,
-      parentJobId: job.parentJobId,
-      ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
-      outcome: job.status,
-    });
+    await emitSessionUpdate(
+      {
+        type: 'job_finished',
+        jobId: job.jobId,
+        parentJobId: job.parentJobId,
+        ...(typeof job.exitCode === 'number' ? { exitCode: job.exitCode } : {}),
+        outcome: job.status,
+      },
+      { sessionId: job.sessionId }
+    );
 
     // Clear progress timer if running
     if (job.progressTimer) {
