@@ -92,6 +92,12 @@ export type JobNotificationType = 'completed' | 'failed' | 'cancelled' | 'progre
 
 export type JobState = {
   jobId: string;
+  // The host session active when this job started. Bound once at creation and
+  // never re-read from global state afterward — a job's updates must stay
+  // labelled with the session that launched it even if the server later
+  // session/load|resume's into a different active session while this job's
+  // kill/finalize is still draining (PRI-3774).
+  sessionId: string;
   parentJobId?: string;
   type: JobType;
   status: JobStatus;

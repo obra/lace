@@ -100,7 +100,7 @@ describe('createSubagentJob — opt-in progress', () => {
       expect.not.objectContaining({
         containerExecutionMetadata: expect.anything(),
       }),
-      undefined
+      { sessionId: 'sess_1' }
     );
   });
 });

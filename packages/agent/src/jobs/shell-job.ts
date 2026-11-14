@@ -33,7 +33,7 @@ export type ShellJobContext = {
   runExclusive: <T>(work: () => Promise<T> | T) => Promise<T>;
   emitSessionUpdate: (
     update: SessionUpdate & { sessionId?: string; streamSeq?: number },
-    context?: { turnId?: string; turnSeq?: number; jobId?: string }
+    context?: { turnId?: string; turnSeq?: number; jobId?: string; sessionId?: string }
   ) => Promise<void>;
   requestPermissionFromClient: (request: {
     sessionId: string;
@@ -126,7 +126,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
               status: 'awaiting_permission',
             },
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
 
         let decision: { decision?: string; updatedInput?: Record<string, unknown> };
@@ -182,7 +182,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
                 result: denied,
               },
             },
-            { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+            { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
           );
 
           job.status = 'cancelled';
@@ -249,7 +249,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
             channel: 'stdout',
             update: { type: 'text_delta', text: chunk },
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
       };
 
@@ -265,7 +265,7 @@ export const createRunShellJobProcess = (context: ShellJobContext) => {
             channel: 'stderr',
             update: { type: 'text_delta', text: chunk },
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
       };
 

@@ -92,7 +92,7 @@ export interface SubagentJobDependencies {
   /** Emit session update to clients */
   emitSessionUpdate: (
     update: SessionUpdate,
-    context?: { turnId?: string; turnSeq?: number; jobId?: string }
+    context?: { turnId?: string; turnSeq?: number; jobId?: string; sessionId?: string }
   ) => Promise<void>;
   /** Request permission from client */
   requestPermissionFromClient: (request: {
@@ -379,6 +379,10 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
 
       const record: JobState = {
         jobId: options.jobId,
+        // Forwarded grandchild/sibling job records inherit the owning host
+        // session from the top-level job that spawned this child process —
+        // they have no session of their own to bind.
+        sessionId: job.sessionId,
         parentJobId: options.parentJobId,
         type: options.type,
         status: 'running',
@@ -430,13 +434,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           updatedState.activeSession = loadSession(currentState.activeSession!.meta.sessionId);
         });
 
-        await emitSessionUpdate({
-          type: 'job_started',
-          jobId: mappedJobId,
-          parentJobId: mappedParentJobId,
-          jobType,
-          description,
-        });
+        await emitSessionUpdate(
+          {
+            type: 'job_started',
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            jobType,
+            description,
+          },
+          { sessionId: job.sessionId }
+        );
 
         return undefined;
       }
@@ -480,13 +487,16 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
           updatedState.activeSession = loadSession(currentState.activeSession!.meta.sessionId);
         });
 
-        await emitSessionUpdate({
-          type: 'job_finished',
-          jobId: mappedJobId,
-          parentJobId: mappedParentJobId,
-          ...(exitCode !== undefined ? { exitCode } : {}),
-          outcome,
-        });
+        await emitSessionUpdate(
+          {
+            type: 'job_finished',
+            jobId: mappedJobId,
+            parentJobId: mappedParentJobId,
+            ...(exitCode !== undefined ? { exitCode } : {}),
+            outcome,
+          },
+          { sessionId: job.sessionId }
+        );
 
         record.resolveCompletion();
         return undefined;
@@ -566,7 +576,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             // Forwarded update from child job - trusted after runtime checks above
             update: update as JobInnerUpdate,
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
 
         return undefined;
@@ -583,7 +593,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             channel: 'internal',
             update: { type: 'text_delta', text: p.text },
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
         return undefined;
       }
@@ -665,7 +675,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
               ...(result ? { result } : {}),
             },
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
         return undefined;
       }
@@ -681,7 +691,7 @@ export function runSubagentJobProcess(job: JobState, deps: SubagentJobDependenci
             // Forwarded context_injected from child job
             update: p as JobInnerUpdate,
           },
-          { turnId: job.originTurnId, turnSeq: job.originTurnSeq }
+          { turnId: job.originTurnId, turnSeq: job.originTurnSeq, sessionId: job.sessionId }
         );
         return undefined;
       }

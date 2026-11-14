@@ -366,11 +366,37 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
 
   const emitSessionUpdate = async (
     update: SessionUpdate,
-    context?: { turnId?: string; turnSeq?: number; jobId?: string }
+    context?: { turnId?: string; turnSeq?: number; jobId?: string; sessionId?: string }
   ) => {
     if (!state.activeSession) return;
 
     await runExclusive(() => {
+      if (!state.activeSession) return;
+
+      // A job's emitting closures bind context.sessionId once, at job start
+      // (see JobState.sessionId). Re-check it HERE, inside the mutex, right
+      // before stamping/consuming the CURRENT active session's identity and
+      // stream counter — not before acquiring the mutex. activateStoredSession
+      // (rpc/handlers/session.ts) can swap state.activeSession to a different
+      // session while this call was queued waiting for the mutex (e.g. a job's
+      // straggling update that survived killAllRunningJobs during
+      // releaseRunningSessionWork). Checking earlier would race the swap;
+      // checking here is exactly when the update would otherwise be
+      // mislabeled with the new session's id and burn its nextStreamSeq
+      // (PRI-3774). Drop it instead.
+      if (
+        context?.sessionId !== undefined &&
+        context.sessionId !== state.activeSession.meta.sessionId
+      ) {
+        logger.warn('session.update.dropped_stale_session', {
+          updateSessionId: context.sessionId,
+          activeSessionId: state.activeSession.meta.sessionId,
+          jobId: context.jobId,
+          updateType: update.type,
+        });
+        return;
+      }
+
       const sessionState = readSessionState(state.activeSession!.dir);
       peer.notify('session/update', {
         sessionId: state.activeSession!.meta.sessionId,
@@ -473,8 +499,11 @@ export function registerAgentRpcMethods(peer: JsonRpcPeer, state: AgentServerSta
         state.activeSession = loadSession(state.activeSession!.meta.sessionId);
       });
     },
-    emitUpdate: async (update) => {
-      await emitSessionUpdate(update as SessionUpdate);
+    emitUpdate: async (update, job) => {
+      await emitSessionUpdate(
+        update as SessionUpdate,
+        job ? { sessionId: job.sessionId } : undefined
+      );
     },
     runShellProcess: (job) => void runShellJobProcess(job),
     runSubagentProcess: (job) => void runSubagentJobProcess(job),
