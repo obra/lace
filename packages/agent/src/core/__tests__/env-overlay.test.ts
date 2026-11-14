@@ -154,5 +154,32 @@ describe('env-overlay helpers (PRI-3672)', () => {
     it('does not refuse a name that merely contains "GIT_CONFIG" as a substring, not a prefix', () => {
       expect(isDangerousEnvVarName('MY_GIT_CONFIG_TOKEN')).toBe(false);
     });
+
+    // Jesse's design-decision comment on PR #458: the shim will pass
+    // credential env vars through, so name-shape guarding has to be complete
+    // on lace's side regardless. These are the exact names/prefix Jesse's
+    // decision calls out as still required, beyond what the review follow-up
+    // above already added.
+    it.each(['NO_PROXY', 'no_proxy', 'SSL_CERT_DIR', 'GIT_SSL_CAINFO'])(
+      'refuses %s (Jesse decision follow-up)',
+      (name) => {
+        expect(isDangerousEnvVarName(name)).toBe(true);
+      }
+    );
+
+    // LD_* is a prefix per Jesse's decision, not just the three literal
+    // dynamic-loader names already in the set — any LD_ variable can steer
+    // the dynamic linker. Names below are real loader knobs that were NOT in
+    // the literal denylist before this prefix was added.
+    it.each(['LD_ASSUME_KERNEL', 'LD_BIND_NOW', 'LD_ORIGIN_PATH', 'LD_SHOWAUXV'])(
+      'refuses %s via the LD_ prefix',
+      (name) => {
+        expect(isDangerousEnvVarName(name)).toBe(true);
+      }
+    );
+
+    it('does not refuse a name that merely contains "LD_" as a substring, not a prefix', () => {
+      expect(isDangerousEnvVarName('MY_LD_TOKEN')).toBe(false);
+    });
   });
 });

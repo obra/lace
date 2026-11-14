@@ -37,9 +37,6 @@ export const DANGEROUS_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'NODE_OPTIONS',
   'NODE_EXTRA_CA_CERTS',
   'NODE_PATH',
-  'LD_PRELOAD',
-  'LD_LIBRARY_PATH',
-  'LD_AUDIT',
   'DYLD_INSERT_LIBRARIES',
   'DYLD_LIBRARY_PATH',
   'DYLD_FRAMEWORK_PATH',
@@ -57,10 +54,13 @@ export const DANGEROUS_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
   'PROMPT_COMMAND',
   'GLOBIGNORE',
   'GIT_SSH_COMMAND',
+  'GIT_SSL_CAINFO',
   'HTTP_PROXY',
   'HTTPS_PROXY',
   'ALL_PROXY',
+  'NO_PROXY',
   'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
   'CURL_CA_BUNDLE',
   'REQUESTS_CA_BUNDLE',
   'NODE_TLS_REJECT_UNAUTHORIZED',
@@ -78,7 +78,15 @@ export const DANGEROUS_ENV_VAR_NAMES: ReadonlySet<string> = new Set([
 // live in DANGEROUS_ENV_VAR_NAMES as literal entries. Any of them injects
 // arbitrary git config — including core.sshCommand/core.fsmonitor — into
 // every git invocation a tool call makes, same hijack class as GIT_SSH_COMMAND.
-const DANGEROUS_ENV_VAR_PREFIXES: readonly string[] = ['GIT_CONFIG_'];
+//
+// LD_ is the same story but for the dynamic loader: LD_PRELOAD and
+// LD_LIBRARY_PATH are the famous ones, but LD_AUDIT, LD_ASSUME_KERNEL,
+// LD_ORIGIN_PATH, LD_BIND_NOW, LD_SHOWAUXV, etc. all steer how the next
+// process's dynamic linker behaves. Jesse's design-decision comment on PR
+// #458 calls this out as "LD_* (prefix)" rather than a fixed literal list,
+// so match the whole family instead of chasing new glibc tunables one at a
+// time as they turn up.
+const DANGEROUS_ENV_VAR_PREFIXES: readonly string[] = ['GIT_CONFIG_', 'LD_'];
 
 export function isDangerousEnvVarName(name: string): boolean {
   const upper = name.toUpperCase();
